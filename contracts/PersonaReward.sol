@@ -15,7 +15,6 @@ import "./contribution/IContributionNft.sol";
 import "./contribution/IServiceNft.sol";
 import "./libs/TokenSaver.sol";
 import "./IPersonaReward.sol";
-import "./virtualPersona/IVirtualIP.sol";
 
 contract PersonaReward is
     IPersonaReward,
@@ -35,7 +34,6 @@ contract PersonaReward is
     address public personaNft;
     address public contributionNft;
     address public serviceNft;
-    address public virtualIPNft;
 
     MainReward[] private _mainRewards;
     uint256 public protocolRewards;
@@ -56,8 +54,6 @@ contract PersonaReward is
 
     bytes32 public constant GOV_ROLE = keccak256("GOV_ROLE");
 
-    mapping(uint256 virtualId => IPReward) private _ipRewards;
-
     modifier onlyGov() {
         if (!hasRole(GOV_ROLE, _msgSender())) {
             revert NotGovError();
@@ -70,7 +66,6 @@ contract PersonaReward is
         address personaNft_,
         address contributionNft_,
         address serviceNft_,
-        address virtualIPNft_,
         RewardSettingsCheckpoints.RewardSettings memory settings_,
         uint256 stakeThreshold_,
         uint16 parentShares_
@@ -79,7 +74,6 @@ contract PersonaReward is
         personaNft = personaNft_;
         contributionNft = contributionNft_;
         serviceNft = serviceNft_;
-        virtualIPNft = virtualIPNft_;
         _rewardSettings.push(0, settings_);
         stakeThreshold = stakeThreshold_;
         parentShares = parentShares_;
@@ -206,8 +200,7 @@ contract PersonaReward is
                     totalDatasets: 0,
                     validatorAmount: 0,
                     modelAmount: 0,
-                    datasetAmount: 0,
-                    ipAmount: 0
+                    datasetAmount: 0
                 })
             );
             grandTotalStaked += totalStaked;
@@ -244,14 +237,6 @@ contract PersonaReward is
 
         uint256 amount = (mainReward.amount * reward.totalStaked) /
             mainReward.totalStaked;
-
-        if (IVirtualIP(virtualIPNft).isOwned(virtualId)) {
-            reward.ipAmount =
-                (amount * uint256(settings.ipShares)) /
-                DENOMINATOR;
-            _ipRewards[virtualId].amount += reward.ipAmount;
-            amount -= reward.ipAmount;
-        }
 
         uint256 contributorAmount = (((amount * reward.totalStaked) /
             mainReward.totalStaked) * uint256(settings.contributorShares)) /
@@ -733,26 +718,6 @@ contract PersonaReward is
         }
     }
 
-    function getClaimableIPRewards(
-        uint256 virtualId
-    ) public view returns (uint256) {
-        IPReward memory reward = _ipRewards[virtualId];
-        return reward.amount - reward.totalClaimed;
-    }
-
-    function claimIPRewards(uint256 virtualId) public {
-        address account = _msgSender();
-        IPReward storage reward = _ipRewards[virtualId];
-        uint256 total = reward.amount - reward.totalClaimed;
-        if (IERC721(virtualIPNft).ownerOf(virtualId) != account) {
-            revert NotOwnerError();
-        }
-
-        reward.totalClaimed += total;
-        IERC20(rewardToken).safeTransfer(account, total);
-        emit IPRewardsClaimed(virtualId, account, total);
-    }
-
     function setStakeThreshold(uint256 threshold) external onlyGov {
         stakeThreshold = threshold;
         emit StakeThresholdUpdated(threshold);
@@ -770,8 +735,7 @@ contract PersonaReward is
         uint16 contributorShares_,
         uint16 stakerShares_,
         uint16 datasetShares_,
-        uint16 impactShares_,
-        uint16 ipShares_
+        uint16 impactShares_
     ) public onlyGov {
         _rewardSettings.push(
             SafeCast.toUint32(block.number),
@@ -782,8 +746,7 @@ contract PersonaReward is
                 contributorShares_,
                 stakerShares_,
                 datasetShares_,
-                impactShares_,
-                ipShares_
+                impactShares_
             )
         );
         emit RewardSettingsUpdated(
@@ -793,8 +756,7 @@ contract PersonaReward is
             contributorShares_,
             stakerShares_,
             datasetShares_,
-            impactShares_,
-            ipShares_
+            impactShares_
         );
     }
 
@@ -802,20 +764,18 @@ contract PersonaReward is
         address rewardToken_,
         address personaNft_,
         address contributionNft_,
-        address serviceNft_,
-        address virtualIPNft_
+        address serviceNft_
     ) external onlyGov {
         rewardToken = rewardToken_;
         personaNft = personaNft_;
         contributionNft = contributionNft_;
         serviceNft = serviceNft_;
-        virtualIPNft = virtualIPNft_;
+
         emit RefContractsUpdated(
             rewardToken_,
             personaNft_,
             contributionNft_,
-            serviceNft_,
-            virtualIPNft_
+            serviceNft_
         );
     }
 }

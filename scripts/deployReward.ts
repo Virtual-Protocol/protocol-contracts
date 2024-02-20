@@ -16,8 +16,7 @@ import { ethers, upgrades } from "hardhat";
         contributorShares: process.env.CONTRIBUTOR_SHARES,
         stakerShares: process.env.STAKER_SHARES,
         datasetShares: process.env.DATASET_SHARES,
-        impactShares: process.env.IMPACT_SHARES,
-        ipShares: process.env.IP_SHARES,
+        impactShares: process.env.IMPACT_SHARES
       },
       process.env.REWARD_THRESHOLD,
       process.env.PARENT_SHARES,

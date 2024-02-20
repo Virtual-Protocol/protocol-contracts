@@ -19,7 +19,6 @@ library RewardSettingsCheckpoints {
         uint16 stakerShares;
         uint16 datasetShares;
         uint16 impactShares;
-        uint16 ipShares;
     }
 
     struct Checkpoint {
@@ -65,7 +64,7 @@ library RewardSettingsCheckpoints {
         uint256 pos = self._checkpoints.length;
         return
             pos == 0
-                ? RewardSettings(0, 0, 0, 0, 0, 0, 0, 0)
+                ? RewardSettings(0, 0, 0, 0, 0, 0, 0)
                 : self._checkpoints[pos - 1]._value;
     }
 
@@ -91,7 +90,7 @@ library RewardSettingsCheckpoints {
 
         return
             pos == 0
-                ? RewardSettings(0, 0, 0, 0, 0, 0, 0, 0)
+                ? RewardSettings(0, 0, 0, 0, 0, 0, 0)
                 : self._checkpoints[pos - 1]._value;
     }
 

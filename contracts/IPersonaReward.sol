@@ -21,17 +21,11 @@ interface IPersonaReward {
         uint256 validatorAmount;
         uint256 modelAmount;
         uint256 datasetAmount;
-        uint256 ipAmount;
     }
 
     struct Claim {
         uint256 totalClaimed;
         uint32 rewardCount;
-    }
-
-    struct IPReward {
-        uint256 amount;
-        uint256 totalClaimed;
     }
 
     struct ModelReward {
@@ -54,16 +48,14 @@ interface IPersonaReward {
         uint16 contributorShares,
         uint16 stakerShares,
         uint16 datasetShares,
-        uint16 impactShares,
-        uint16 ipShares
+        uint16 impactShares
     );
 
     event RefContractsUpdated(
         address rewardToken,
         address personaNft,
         address contributionNft,
-        address serviceNft,
-        address virtualIPNft
+        address serviceNft
     );
 
     event StakeThresholdUpdated(uint256 threshold);
@@ -88,8 +80,6 @@ interface IPersonaReward {
         uint256 total,
         uint256 childrenAmount
     );
-
-    event IPRewardsClaimed(uint256 virtualId, address account, uint256 total);
 
     event DatasetRewardsClaimed(uint256 nftId, address account, uint256 total);
 

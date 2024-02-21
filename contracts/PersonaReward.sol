@@ -688,12 +688,16 @@ contract PersonaReward is
 
     function getTotalClaimableRewards(
         address account,
-        uint256 virtualId,
+        uint256[] memory virtualIds,
         uint256[] memory datasetNftIds,
         uint256[] memory modelNftIds
     ) public view returns (uint256) {
-        uint256 total = getClaimableStakerRewards(account, virtualId) +
-            getClaimableValidatorRewards(account, virtualId);
+        uint256 total = 0;
+        for (uint256 i = 0; i < virtualIds.length; i++) {
+            total +=
+                getClaimableStakerRewards(account, virtualIds[i]) +
+                getClaimableValidatorRewards(account, virtualIds[i]);
+        }
         for (uint256 i = 0; i < datasetNftIds.length; i++) {
             total += getClaimableDatasetRewards(datasetNftIds[i]);
         }
@@ -704,15 +708,19 @@ contract PersonaReward is
     }
 
     function claimAllRewards(
-        uint256 virtualId,
+        uint256[] memory virtualIds,
         uint256[] memory datasetNftIds,
         uint256[] memory modelNftIds
     ) public {
-        claimStakerRewards(virtualId);
-        claimValidatorRewards(virtualId);
+        for (uint256 i = 0; i < virtualIds.length; i++) {
+            claimStakerRewards(virtualIds[i]);
+            claimValidatorRewards(virtualIds[i]);
+        }
+
         for (uint256 i = 0; i < datasetNftIds.length; i++) {
             claimDatasetRewards(datasetNftIds[i]);
         }
+
         for (uint256 i = 0; i < modelNftIds.length; i++) {
             claimModelRewards(modelNftIds[i]);
         }

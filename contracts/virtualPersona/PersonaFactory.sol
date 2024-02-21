@@ -71,6 +71,7 @@ contract PersonaFactory is Initializable, AccessControl {
 
     event ApplicationThresholdUpdated(uint256 newThreshold);
     event GovUpdated(address newGov);
+    event ImplContractsUpdated(address token, address dao);
 
     address private _vault; // Vault to hold all Virtual NFTs
 
@@ -105,14 +106,6 @@ contract PersonaFactory is Initializable, AccessControl {
         uint256 proposalId
     ) public view returns (Application memory) {
         return _applications[proposalId];
-    }
-
-    function setImplementations(
-        address token,
-        address dao
-    ) public onlyRole(DEFAULT_ADMIN_ROLE) {
-        tokenImplementation = token;
-        daoImplementation = dao;
     }
 
     function proposePersona(
@@ -309,5 +302,13 @@ contract PersonaFactory is Initializable, AccessControl {
         address newVault
     ) public onlyRole(DEFAULT_ADMIN_ROLE) {
         _vault = newVault;
+    }
+
+    function setImplementations(
+        address token,
+        address dao
+    ) public onlyRole(DEFAULT_ADMIN_ROLE) {
+        tokenImplementation = token;
+        daoImplementation = dao;
     }
 }

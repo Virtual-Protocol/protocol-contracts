@@ -171,6 +171,15 @@ contract PersonaNft is
         info.tba = tba;
     }
 
+    function setDAO(uint256 virtualId, address newDAO) public {
+        require(
+            _msgSender() == virtualInfos[virtualId].dao,
+            "Caller is not VIRTUAL DAO"
+        );
+        VirtualInfo storage info = virtualInfos[virtualId];
+        info.dao = newDAO;
+    }
+
     function totalStaked(uint256 virtualId) public view returns (uint256) {
         return IERC20(virtualInfos[virtualId].token).totalSupply();
     }

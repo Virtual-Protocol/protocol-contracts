@@ -93,8 +93,15 @@ contract PersonaDAO is
 
         uint256 proposerVotes = getVotes(proposer, clock() - 1);
         uint256 votesThreshold = proposalThreshold();
-        if (proposerVotes < votesThreshold && proposer != IContributionNft(_contributionNft).getAdmin()) {
-            revert GovernorInsufficientProposerVotes(proposer, proposerVotes, votesThreshold);
+        if (
+            proposerVotes < votesThreshold &&
+            proposer != IContributionNft(_contributionNft).getAdmin()
+        ) {
+            revert GovernorInsufficientProposerVotes(
+                proposer,
+                proposerVotes,
+                votesThreshold
+            );
         }
 
         return _propose(targets, values, calldatas, description, proposer);
@@ -161,13 +168,14 @@ contract PersonaDAO is
         }
 
         if (support == 1) {
-            _updateMaturity(proposalId, weight, params);
+            _updateMaturity(account, proposalId, weight, params);
         }
 
         return weight;
     }
 
     function _updateMaturity(
+        address account,
         uint256 proposalId,
         uint256 weight,
         bytes memory params
@@ -180,17 +188,19 @@ contract PersonaDAO is
 
         // Maturity score is for model contribution only
         bool isModel = IContributionNft(_contributionNft).isModel(proposalId);
-        if(!isModel) {
-            return;
-        }
-
-        uint256 maturity = uint256(bytes32(params));
         require(
-            maturity >= 0 && maturity <= 10000,
-            "Invalid maturity"
+            isModel == true,
+            "Maturity score is for model contribution only"
+        );
+
+        (uint256 maturity, uint8[] memory votes) = abi.decode(
+            params,
+            (uint256, uint8[])
         );
 
         _proposalMaturities[proposalId] += (maturity * weight);
+
+        emit NewEloRating(proposalId, account, maturity, votes);
     }
 
     function getMaturity(uint256 proposalId) public view returns (uint16) {

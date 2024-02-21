@@ -8,6 +8,8 @@ We will test the end-to-end implementation of a Contribution flow till Service.
 5. Execute the proposal
 */
 const { parseEther, formatEther, toBeHex } = require("ethers/utils");
+const { ethers } = require("hardhat");
+const abi = ethers.AbiCoder.defaultAbiCoder();
 const { expect } = require("chai");
 const {
   loadFixture,
@@ -80,7 +82,9 @@ describe("Contribution", function () {
       personaNft.target,
       protocolDAO.target,
       parseEther("100000"),
-      5
+      5,
+      protocolDAO.target,
+      deployer.address
     );
 
     await personaNft.grantRole(
@@ -286,15 +290,20 @@ describe("Contribution", function () {
     );
     const personaDAO = await ethers.getContractAt("PersonaDAO", persona.dao);
     // We need 51% to reach quorum
+    const voteParams = abi.encode(
+      ["uint256", "uint8[] memory"],
+      [20, [0, 1, 1, 0, 2]]
+    );
+
     await personaDAO.castVoteWithReasonAndParams(
       proposalId,
       1,
       "lfg",
-      toBeHex(1500, 32)
+      voteParams
     );
     await personaDAO
       .connect(this.signers[2])
-      .castVoteWithReasonAndParams(proposalId, 1, "lfg", toBeHex(1500, 32));
+      .castVoteWithReasonAndParams(proposalId, 1, "lfg", voteParams);
     await mine(600);
     await personaDAO.execute(proposalId);
 
@@ -337,18 +346,31 @@ describe("Contribution", function () {
     expect(
       formatEther(await personaToken.getVotes(validator3.address))
     ).to.be.equal("70000.0");
-    await personaDAO.castVoteWithReasonAndParams(
-      proposalId,
-      1,
-      "lfg",
-      toBeHex(1500, 32)
+    const voteParams = abi.encode(
+      ["uint256", "uint8[] memory"],
+      [1500, [0, 1, 1, 0, 2]]
     );
+    const voteParams2 = abi.encode(
+      ["uint256", "uint8[] memory"],
+      [2000, [0, 1, 1, 0, 2]]
+    );
+    const voteParams3 = abi.encode(
+      ["uint256", "uint8[] memory"],
+      [3000, [0, 1, 1, 0, 2]]
+    );
+
+    await expect(
+      personaDAO.castVoteWithReasonAndParams(proposalId, 1, "lfg", voteParams)
+    )
+      .to.emit(personaDAO, "NewEloRating")
+      .withArgs(proposalId, validator1.address, 1500, [0, 1, 1, 0, 2]);
+
     await personaDAO
       .connect(validator2)
-      .castVoteWithReasonAndParams(proposalId, 1, "lfg", toBeHex(2000, 32));
+      .castVoteWithReasonAndParams(proposalId, 1, "lfg", voteParams2);
     await personaDAO
       .connect(validator3)
-      .castVoteWithReasonAndParams(proposalId, 1, "lfg", toBeHex(3000, 32));
+      .castVoteWithReasonAndParams(proposalId, 1, "lfg", voteParams3);
     await mine(43200 * 7);
     await personaDAO.execute(proposalId);
     expect(await service.getMaturity(proposalId)).to.be.equal(2090n);
@@ -374,19 +396,35 @@ describe("Contribution", function () {
     Continuing from previous test case, the first service NFT has maturity score of 2090 and we are improving it to 4000, the impact should be 4000-2090 = 1910
     */
     // Proposal 1
+    const voteParams = abi.encode(
+      ["uint256", "uint8[] memory"],
+      [1500, [0, 1, 1, 0, 2]]
+    );
+    const voteParams2 = abi.encode(
+      ["uint256", "uint8[] memory"],
+      [2000, [0, 1, 1, 0, 2]]
+    );
+    const voteParams3 = abi.encode(
+      ["uint256", "uint8[] memory"],
+      [3000, [0, 1, 1, 0, 2]]
+    );
+    const voteParams4 = abi.encode(
+      ["uint256", "uint8[] memory"],
+      [4000, [0, 1, 1, 0, 2]]
+    );
     const [validator1, validator2, validator3] = this.signers;
     await personaDAO.castVoteWithReasonAndParams(
       proposalId,
       1,
       "lfg",
-      toBeHex(1500, 32)
+      voteParams
     );
     await personaDAO
       .connect(validator2)
-      .castVoteWithReasonAndParams(proposalId, 1, "lfg", toBeHex(2000, 32));
+      .castVoteWithReasonAndParams(proposalId, 1, "lfg", voteParams2);
     await personaDAO
       .connect(validator3)
-      .castVoteWithReasonAndParams(proposalId, 1, "lfg", toBeHex(3000, 32));
+      .castVoteWithReasonAndParams(proposalId, 1, "lfg", voteParams3);
     await mine(43200 * 7);
     await personaDAO.execute(proposalId);
 
@@ -428,14 +466,14 @@ describe("Contribution", function () {
       proposalId2,
       1,
       "lfg",
-      toBeHex(4000, 32)
+      voteParams4
     );
     await personaDAO
       .connect(validator2)
-      .castVoteWithReasonAndParams(proposalId2, 1, "lfg", toBeHex(4000, 32));
+      .castVoteWithReasonAndParams(proposalId2, 1, "lfg", voteParams4);
     await personaDAO
       .connect(validator3)
-      .castVoteWithReasonAndParams(proposalId2, 1, "lfg", toBeHex(4000, 32));
+      .castVoteWithReasonAndParams(proposalId2, 1, "lfg", voteParams4);
     await mine(43200 * 7);
     await personaDAO.execute(proposalId2);
 
@@ -444,25 +482,30 @@ describe("Contribution", function () {
   });
 
   it("should allow contribution admin to create proposal", async () => {
-    const signers = await ethers.getSigners()
+    const signers = await ethers.getSigners();
     const { persona, proposalId, service, contribution } = await loadFixture(
       proposeContribution
     );
     const personaDAO = await ethers.getContractAt("PersonaDAO", persona.dao);
     await contribution.setAdmin(signers[15].address);
     await expect(
-      personaDAO.connect(signers[15]).propose([personaDAO.target], [0], [ethers.ZeroAddress], "Test1")
+      personaDAO
+        .connect(signers[15])
+        .propose([personaDAO.target], [0], [ethers.ZeroAddress], "Test1")
     ).to.emit(personaDAO, "ProposalCreated");
 
     await expect(
-      personaDAO.connect(signers[14]).propose([personaDAO.target], [0], [ethers.ZeroAddress], "Test2")
+      personaDAO
+        .connect(signers[14])
+        .propose([personaDAO.target], [0], [ethers.ZeroAddress], "Test2")
     ).to.be.reverted;
 
     await contribution.connect(signers[15]).setAdmin(signers[14].address);
 
     await expect(
-      personaDAO.connect(signers[14]).propose([personaDAO.target], [0], [ethers.ZeroAddress], "Test3")
+      personaDAO
+        .connect(signers[14])
+        .propose([personaDAO.target], [0], [ethers.ZeroAddress], "Test3")
     ).to.emit(personaDAO, "ProposalCreated");
-
   });
 });

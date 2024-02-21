@@ -23,4 +23,6 @@ interface IPersonaDAO {
     ) external view returns (uint256);
 
     function getMaturity(uint256 proposalId) external view returns (uint16);
+
+    event NewEloRating(uint256 proposalId, address voter, uint256 score, uint8[] votes);
 }

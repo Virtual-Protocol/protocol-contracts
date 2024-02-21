@@ -81,9 +81,10 @@ contract ServiceNft is IServiceNft, ERC721, ERC721Enumerable, ERC721URIStorage {
         // Get current service maturity
         uint256 prevServiceId = _coreServices[virtualId][_cores[proposalId]];
 
-        _impacts[proposalId] =
-            _maturities[proposalId] -
-            _maturities[prevServiceId];
+        _impacts[proposalId] = _maturities[proposalId] >
+            _maturities[prevServiceId]
+            ? _maturities[proposalId] - _maturities[prevServiceId]
+            : 0;
 
         bool isModel = IContributionNft(contributionNft).isModel(proposalId);
 

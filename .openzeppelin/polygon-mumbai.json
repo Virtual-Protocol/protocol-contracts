@@ -33,7 +33,7 @@
     },
     {
       "address": "0xBd770416a3345F91E4B34576cb804a576fa48EB1",
-      "txHash": "0x6be85c09ee8304f3a7df2a40a716e026963b6f566584bcdedb6c5a4835e49095",
+      "txHash": "0xd52f3aa9b990dffd06fb755e204dce2f9856bd7e1e285da5d5bdca39c39fc09e",
       "kind": "transparent"
     }
   ],
@@ -4120,6 +4120,495 @@
           "t_uint8": {
             "label": "uint8",
             "numberOfBytes": "1"
+          }
+        },
+        "namespaces": {
+          "erc7201:openzeppelin.storage.Initializable": [
+            {
+              "contract": "Initializable",
+              "label": "_initialized",
+              "type": "t_uint64",
+              "src": "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol:69",
+              "offset": 0,
+              "slot": "0"
+            },
+            {
+              "contract": "Initializable",
+              "label": "_initializing",
+              "type": "t_bool",
+              "src": "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol:73",
+              "offset": 8,
+              "slot": "0"
+            }
+          ]
+        }
+      }
+    },
+    "1cdfeb170158100e63865dc2619b63af603164220ca7d4d5541211124a99479b": {
+      "address": "0x508cEdA22ac5604d9A2D923C9402eE334A844996",
+      "txHash": "0x77a9d97b7d29c09a3306e98f3835c131f5173e9be0361745d032d35f15be3c45",
+      "layout": {
+        "solcVersion": "0.8.20",
+        "storage": [
+          {
+            "label": "_roles",
+            "offset": 0,
+            "slot": "0",
+            "type": "t_mapping(t_bytes32,t_struct(RoleData)3781_storage)",
+            "contract": "AccessControl",
+            "src": "@openzeppelin/contracts/access/AccessControl.sol:55"
+          },
+          {
+            "label": "_nextRewardId",
+            "offset": 0,
+            "slot": "1",
+            "type": "t_uint48",
+            "contract": "PersonaReward",
+            "src": "contracts/PersonaReward.sol:29"
+          },
+          {
+            "label": "rewardToken",
+            "offset": 6,
+            "slot": "1",
+            "type": "t_address",
+            "contract": "PersonaReward",
+            "src": "contracts/PersonaReward.sol:33"
+          },
+          {
+            "label": "personaNft",
+            "offset": 0,
+            "slot": "2",
+            "type": "t_address",
+            "contract": "PersonaReward",
+            "src": "contracts/PersonaReward.sol:34"
+          },
+          {
+            "label": "contributionNft",
+            "offset": 0,
+            "slot": "3",
+            "type": "t_address",
+            "contract": "PersonaReward",
+            "src": "contracts/PersonaReward.sol:35"
+          },
+          {
+            "label": "serviceNft",
+            "offset": 0,
+            "slot": "4",
+            "type": "t_address",
+            "contract": "PersonaReward",
+            "src": "contracts/PersonaReward.sol:36"
+          },
+          {
+            "label": "_mainRewards",
+            "offset": 0,
+            "slot": "5",
+            "type": "t_array(t_struct(MainReward)16044_storage)dyn_storage",
+            "contract": "PersonaReward",
+            "src": "contracts/PersonaReward.sol:38"
+          },
+          {
+            "label": "protocolRewards",
+            "offset": 0,
+            "slot": "6",
+            "type": "t_uint256",
+            "contract": "PersonaReward",
+            "src": "contracts/PersonaReward.sol:39"
+          },
+          {
+            "label": "stakeThreshold",
+            "offset": 0,
+            "slot": "7",
+            "type": "t_uint256",
+            "contract": "PersonaReward",
+            "src": "contracts/PersonaReward.sol:40"
+          },
+          {
+            "label": "parentShares",
+            "offset": 0,
+            "slot": "8",
+            "type": "t_uint16",
+            "contract": "PersonaReward",
+            "src": "contracts/PersonaReward.sol:41"
+          },
+          {
+            "label": "_rewardSettings",
+            "offset": 0,
+            "slot": "9",
+            "type": "t_struct(Trace)19290_storage",
+            "contract": "PersonaReward",
+            "src": "contracts/PersonaReward.sol:43"
+          },
+          {
+            "label": "_claimedStakerRewards",
+            "offset": 0,
+            "slot": "10",
+            "type": "t_mapping(t_address,t_mapping(t_uint256,t_struct(Claim)16066_storage))",
+            "contract": "PersonaReward",
+            "src": "contracts/PersonaReward.sol:45"
+          },
+          {
+            "label": "_claimedValidatorRewards",
+            "offset": 0,
+            "slot": "11",
+            "type": "t_mapping(t_address,t_mapping(t_uint256,t_struct(Claim)16066_storage))",
+            "contract": "PersonaReward",
+            "src": "contracts/PersonaReward.sol:47"
+          },
+          {
+            "label": "_rewards",
+            "offset": 0,
+            "slot": "12",
+            "type": "t_mapping(t_uint256,t_array(t_struct(Reward)16061_storage)dyn_storage)",
+            "contract": "PersonaReward",
+            "src": "contracts/PersonaReward.sol:49"
+          },
+          {
+            "label": "_validatorScores",
+            "offset": 0,
+            "slot": "13",
+            "type": "t_mapping(t_address,t_mapping(t_uint48,t_uint256))",
+            "contract": "PersonaReward",
+            "src": "contracts/PersonaReward.sol:50"
+          },
+          {
+            "label": "_modelRewards",
+            "offset": 0,
+            "slot": "14",
+            "type": "t_mapping(t_uint256,t_struct(ModelReward)16075_storage)",
+            "contract": "PersonaReward",
+            "src": "contracts/PersonaReward.sol:52"
+          },
+          {
+            "label": "_datasetClaims",
+            "offset": 0,
+            "slot": "15",
+            "type": "t_mapping(t_uint256,t_struct(Claim)16066_storage)",
+            "contract": "PersonaReward",
+            "src": "contracts/PersonaReward.sol:53"
+          }
+        ],
+        "types": {
+          "t_bool": {
+            "label": "bool",
+            "numberOfBytes": "1"
+          },
+          "t_struct(InitializableStorage)489_storage": {
+            "label": "struct Initializable.InitializableStorage",
+            "members": [
+              {
+                "label": "_initialized",
+                "type": "t_uint64",
+                "offset": 0,
+                "slot": "0"
+              },
+              {
+                "label": "_initializing",
+                "type": "t_bool",
+                "offset": 8,
+                "slot": "0"
+              }
+            ],
+            "numberOfBytes": "32"
+          },
+          "t_uint64": {
+            "label": "uint64",
+            "numberOfBytes": "8"
+          },
+          "t_address": {
+            "label": "address",
+            "numberOfBytes": "20"
+          },
+          "t_array(t_struct(Checkpoint)19311_storage)dyn_storage": {
+            "label": "struct RewardSettingsCheckpoints.Checkpoint[]",
+            "numberOfBytes": "32"
+          },
+          "t_array(t_struct(MainReward)16044_storage)dyn_storage": {
+            "label": "struct IPersonaReward.MainReward[]",
+            "numberOfBytes": "32"
+          },
+          "t_array(t_struct(Reward)16061_storage)dyn_storage": {
+            "label": "struct IPersonaReward.Reward[]",
+            "numberOfBytes": "32"
+          },
+          "t_bytes32": {
+            "label": "bytes32",
+            "numberOfBytes": "32"
+          },
+          "t_mapping(t_address,t_bool)": {
+            "label": "mapping(address => bool)",
+            "numberOfBytes": "32"
+          },
+          "t_mapping(t_address,t_mapping(t_uint256,t_struct(Claim)16066_storage))": {
+            "label": "mapping(address => mapping(uint256 => struct IPersonaReward.Claim))",
+            "numberOfBytes": "32"
+          },
+          "t_mapping(t_address,t_mapping(t_uint48,t_uint256))": {
+            "label": "mapping(address => mapping(uint48 => uint256))",
+            "numberOfBytes": "32"
+          },
+          "t_mapping(t_bytes32,t_struct(RoleData)3781_storage)": {
+            "label": "mapping(bytes32 => struct AccessControl.RoleData)",
+            "numberOfBytes": "32"
+          },
+          "t_mapping(t_uint256,t_array(t_struct(Reward)16061_storage)dyn_storage)": {
+            "label": "mapping(uint256 => struct IPersonaReward.Reward[])",
+            "numberOfBytes": "32"
+          },
+          "t_mapping(t_uint256,t_struct(Claim)16066_storage)": {
+            "label": "mapping(uint256 => struct IPersonaReward.Claim)",
+            "numberOfBytes": "32"
+          },
+          "t_mapping(t_uint256,t_struct(ModelReward)16075_storage)": {
+            "label": "mapping(uint256 => struct IPersonaReward.ModelReward)",
+            "numberOfBytes": "32"
+          },
+          "t_mapping(t_uint48,t_uint256)": {
+            "label": "mapping(uint48 => uint256)",
+            "numberOfBytes": "32"
+          },
+          "t_struct(Checkpoint)19311_storage": {
+            "label": "struct RewardSettingsCheckpoints.Checkpoint",
+            "members": [
+              {
+                "label": "_key",
+                "type": "t_uint32",
+                "offset": 0,
+                "slot": "0"
+              },
+              {
+                "label": "_value",
+                "type": "t_struct(RewardSettings)19305_storage",
+                "offset": 0,
+                "slot": "1"
+              }
+            ],
+            "numberOfBytes": "64"
+          },
+          "t_struct(Claim)16066_storage": {
+            "label": "struct IPersonaReward.Claim",
+            "members": [
+              {
+                "label": "totalClaimed",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "0"
+              },
+              {
+                "label": "rewardCount",
+                "type": "t_uint32",
+                "offset": 0,
+                "slot": "1"
+              }
+            ],
+            "numberOfBytes": "64"
+          },
+          "t_struct(MainReward)16044_storage": {
+            "label": "struct IPersonaReward.MainReward",
+            "members": [
+              {
+                "label": "blockNumber",
+                "type": "t_uint32",
+                "offset": 0,
+                "slot": "0"
+              },
+              {
+                "label": "amount",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "1"
+              },
+              {
+                "label": "personaCount",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "2"
+              },
+              {
+                "label": "totalStaked",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "3"
+              }
+            ],
+            "numberOfBytes": "128"
+          },
+          "t_struct(ModelReward)16075_storage": {
+            "label": "struct IPersonaReward.ModelReward",
+            "members": [
+              {
+                "label": "amount",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "0"
+              },
+              {
+                "label": "parentAmount",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "1"
+              },
+              {
+                "label": "totalClaimed",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "2"
+              },
+              {
+                "label": "totalClaimedParent",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "3"
+              }
+            ],
+            "numberOfBytes": "128"
+          },
+          "t_struct(Reward)16061_storage": {
+            "label": "struct IPersonaReward.Reward",
+            "members": [
+              {
+                "label": "id",
+                "type": "t_uint48",
+                "offset": 0,
+                "slot": "0"
+              },
+              {
+                "label": "mainIndex",
+                "type": "t_uint32",
+                "offset": 6,
+                "slot": "0"
+              },
+              {
+                "label": "totalStaked",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "1"
+              },
+              {
+                "label": "totalVScore",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "2"
+              },
+              {
+                "label": "totalDatasets",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "3"
+              },
+              {
+                "label": "validatorAmount",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "4"
+              },
+              {
+                "label": "modelAmount",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "5"
+              },
+              {
+                "label": "datasetAmount",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "6"
+              }
+            ],
+            "numberOfBytes": "224"
+          },
+          "t_struct(RewardSettings)19305_storage": {
+            "label": "struct RewardSettingsCheckpoints.RewardSettings",
+            "members": [
+              {
+                "label": "uptimeWeight",
+                "type": "t_uint16",
+                "offset": 0,
+                "slot": "0"
+              },
+              {
+                "label": "stakeWeight",
+                "type": "t_uint16",
+                "offset": 2,
+                "slot": "0"
+              },
+              {
+                "label": "protocolShares",
+                "type": "t_uint16",
+                "offset": 4,
+                "slot": "0"
+              },
+              {
+                "label": "contributorShares",
+                "type": "t_uint16",
+                "offset": 6,
+                "slot": "0"
+              },
+              {
+                "label": "stakerShares",
+                "type": "t_uint16",
+                "offset": 8,
+                "slot": "0"
+              },
+              {
+                "label": "datasetShares",
+                "type": "t_uint16",
+                "offset": 10,
+                "slot": "0"
+              },
+              {
+                "label": "impactShares",
+                "type": "t_uint16",
+                "offset": 12,
+                "slot": "0"
+              }
+            ],
+            "numberOfBytes": "32"
+          },
+          "t_struct(RoleData)3781_storage": {
+            "label": "struct AccessControl.RoleData",
+            "members": [
+              {
+                "label": "hasRole",
+                "type": "t_mapping(t_address,t_bool)",
+                "offset": 0,
+                "slot": "0"
+              },
+              {
+                "label": "adminRole",
+                "type": "t_bytes32",
+                "offset": 0,
+                "slot": "1"
+              }
+            ],
+            "numberOfBytes": "64"
+          },
+          "t_struct(Trace)19290_storage": {
+            "label": "struct RewardSettingsCheckpoints.Trace",
+            "members": [
+              {
+                "label": "_checkpoints",
+                "type": "t_array(t_struct(Checkpoint)19311_storage)dyn_storage",
+                "offset": 0,
+                "slot": "0"
+              }
+            ],
+            "numberOfBytes": "32"
+          },
+          "t_uint16": {
+            "label": "uint16",
+            "numberOfBytes": "2"
+          },
+          "t_uint256": {
+            "label": "uint256",
+            "numberOfBytes": "32"
+          },
+          "t_uint32": {
+            "label": "uint32",
+            "numberOfBytes": "4"
+          },
+          "t_uint48": {
+            "label": "uint48",
+            "numberOfBytes": "6"
           }
         },
         "namespaces": {

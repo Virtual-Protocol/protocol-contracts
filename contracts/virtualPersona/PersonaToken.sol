@@ -59,14 +59,6 @@ contract PersonaToken is IPersonaToken, ERC20Upgradeable, ERC20Votes {
     ) public canDelegate(delegatee) {
         address sender = _msgSender();
         require(amount > 0, "Cannot stake 0");
-        require(
-            IERC20(assetToken).allowance(sender, address(this)) >= amount,
-            "Insufficient asset allowance"
-        );
-        require(
-            IERC20(assetToken).balanceOf(sender) >= amount,
-            "Insufficient asset balance"
-        );
 
         IERC20(assetToken).safeTransferFrom(sender, address(this), amount);
         _mint(receiver, amount);

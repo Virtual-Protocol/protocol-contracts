@@ -8,16 +8,16 @@ import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/access/AccessControl.sol";
 import {IERC5805} from "@openzeppelin/contracts/interfaces/IERC5805.sol";
 import {SafeCast} from "@openzeppelin/contracts/utils/math/SafeCast.sol";
-import "./virtualPersona/IPersonaNft.sol";
-import "./virtualPersona/IPersonaToken.sol";
+import "./virtualPersona/IAgentNft.sol";
+import "./virtualPersona/IAgentToken.sol";
 import "./libs/RewardSettingsCheckpoints.sol";
 import "./contribution/IContributionNft.sol";
 import "./contribution/IServiceNft.sol";
 import "./libs/TokenSaver.sol";
-import "./IPersonaReward.sol";
+import "./IAgentReward.sol";
 
-contract PersonaReward is
-    IPersonaReward,
+contract AgentReward is
+    IAgentReward,
     Initializable,
     AccessControl,
     TokenSaver
@@ -147,7 +147,7 @@ contract PersonaReward is
         // Stake portion
         uint256 normalizedVoteScore = totalStaked > 0
             ? (DENOMINATOR *
-                IPersonaNft(personaNft).getVotes(virtualId, validator)) /
+                IAgentNft(personaNft).getVotes(virtualId, validator)) /
                 totalStaked
             : 0;
 
@@ -157,10 +157,10 @@ contract PersonaReward is
         return uptimeShares + stakeShares;
     }
 
-    function _distributePersonaRewards(
+    function _distributeAgentRewards(
         uint256 amount
     ) private returns (uint256 personaCount) {
-        IPersonaNft nft = IPersonaNft(personaNft);
+        IAgentNft nft = IAgentNft(personaNft);
         uint256 grandTotalStaked = 0; // Total staked amount for all personas
         personaCount = nft.totalSupply();
         uint32 mainPos = SafeCast.toUint32(_mainRewards.length);
@@ -251,7 +251,7 @@ contract PersonaReward is
         uint256 amount,
         uint256 totalMaturity
     ) private {
-        uint256[] memory services = IPersonaNft(personaNft).getAllServices(
+        uint256[] memory services = IAgentNft(personaNft).getAllServices(
             virtualId
         );
         uint256 serviceId;
@@ -295,7 +295,7 @@ contract PersonaReward is
         uint256 impactAmount = (amount * uint256(settings.impactShares)) /
             DENOMINATOR;
 
-        uint8[] memory coreTypes = IPersonaNft(personaNft)
+        uint8[] memory coreTypes = IAgentNft(personaNft)
             .virtualInfo(virtualId)
             .coreTypes;
         uint256[] memory currentServices = new uint256[](coreTypes.length);
@@ -352,7 +352,7 @@ contract PersonaReward is
         protocolRewards += protocolShares;
 
         uint256 personaShares = amount - protocolShares;
-        uint256 personaCount = _distributePersonaRewards(personaShares);
+        uint256 personaCount = _distributeAgentRewards(personaShares);
         uint32 mainRewardIndex = SafeCast.toUint32(_mainRewards.length - 1);
         RewardSettingsCheckpoints.RewardSettings
             memory settings = getRewardSettings();
@@ -382,7 +382,7 @@ contract PersonaReward is
     ) private view returns (uint256) {
         Reward memory reward = getReward(virtualId, SafeCast.toUint32(pos));
         MainReward memory mainReward = getMainReward(reward.mainIndex);
-        IPersonaToken token = IPersonaToken(stakingAddress);
+        IAgentToken token = IAgentToken(stakingAddress);
 
         address delegatee = token.getPastDelegates(
             account,
@@ -416,7 +416,7 @@ contract PersonaReward is
         uint256 virtualId,
         address account
     ) public view returns (uint256) {
-        address stakingAddress = IPersonaNft(personaNft)
+        address stakingAddress = IAgentNft(personaNft)
             .virtualInfo(virtualId)
             .token;
 
@@ -438,7 +438,7 @@ contract PersonaReward is
             return 0;
         }
 
-        address stakingAddress = IPersonaNft(personaNft)
+        address stakingAddress = IAgentNft(personaNft)
             .virtualInfo(virtualId)
             .token;
 

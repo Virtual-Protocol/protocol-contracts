@@ -17,3 +17,4 @@ Thumbs.db
 cache/
 artifacts/
 deployments
+.openzeppelin

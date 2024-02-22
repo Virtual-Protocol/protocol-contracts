@@ -1,20 +1,22 @@
-import { ethers } from "hardhat";
+import { ethers, upgrades } from "hardhat";
 
 (async () => {
   try {
-    const contribution = await ethers.deployContract("ContributionNft", [
+    const Contribution = await ethers.getContractFactory("ContributionNft");
+    const contribution = await upgrades.deployProxy(Contribution, [
       process.env.VIRTUAL_NFT,
     ]);
     console.log("ContributionNft deployed to:", contribution.target);
 
-    const service = await ethers.deployContract("ServiceNft", [
+    const Service = await ethers.getContractFactory("ServiceNft");
+    const service = await upgrades.deployProxy(Service, [
       process.env.VIRTUAL_NFT,
       contribution.target,
     ]);
     console.log("ServiceNft deployed to:", service.target);
 
     const nft = await ethers.getContractAt(
-      "PersonaNft",
+      "AgentNft",
       process.env.VIRTUAL_NFT
     );
     await nft.setContributionService(contribution.target, service.target);

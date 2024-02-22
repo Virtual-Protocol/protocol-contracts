@@ -4,21 +4,23 @@ pragma solidity ^0.8.20;
 import "@openzeppelin/contracts/governance/extensions/GovernorVotes.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {IERC5805} from "@openzeppelin/contracts/interfaces/IERC5805.sol";
-import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
-import "@openzeppelin/contracts/token/ERC721/extensions/ERC721URIStorage.sol";
+import "@openzeppelin/contracts-upgradeable/token/ERC721/ERC721Upgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/token/ERC721/extensions/ERC721URIStorageUpgradeable.sol";
 import "@openzeppelin/contracts/token/ERC721/extensions/IERC721Enumerable.sol";
-import "@openzeppelin/contracts/access/AccessControl.sol";
+import "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
 import "@openzeppelin/contracts/interfaces/IERC5805.sol";
-import "./IPersonaNft.sol";
+import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
+import "./IAgentNft.sol";
 import "./CoreRegistry.sol";
 import "./ValidatorRegistry.sol";
-import "./IPersonaDAO.sol";
+import "./IAgentDAO.sol";
 
-contract PersonaNft is
-    IPersonaNft,
-    ERC721,
-    ERC721URIStorage,
-    AccessControl,
+contract AgentNft is
+    IAgentNft,
+    Initializable,
+    ERC721Upgradeable,
+    ERC721URIStorageUpgradeable,
+    AccessControlUpgradeable,
     CoreRegistry,
     ValidatorRegistry
 {
@@ -47,17 +49,15 @@ contract PersonaNft is
     address private _contributionNft;
     address private _serviceNft;
 
-    constructor(
-        address defaultAdmin
-    )
-        ERC721("Persona", "PERSONA")
-        CoreRegistry()
-        ValidatorRegistry(
+    function initialize(address defaultAdmin) public initializer {
+        __ERC721_init("Persona", "PERSONA");
+        __CoreRegistry_init();
+        __ValidatorRegistry_init(
             _validatorScoreOf,
             _totalVirtualProposals,
             _getPastValidatorScore
-        )
-    {
+        );
+        __AccessControl_init();
         _grantRole(DEFAULT_ADMIN_ROLE, defaultAdmin);
         _grantRole(VALIDATOR_ADMIN_ROLE, defaultAdmin);
         _nextVirtualId = 1;
@@ -124,7 +124,7 @@ contract PersonaNft is
         address account
     ) internal view returns (uint256) {
         VirtualInfo memory info = virtualInfos[virtualId];
-        IPersonaDAO dao = IPersonaDAO(info.dao);
+        IAgentDAO dao = IAgentDAO(info.dao);
         return dao.scoreOf(account);
     }
 
@@ -134,7 +134,7 @@ contract PersonaNft is
         uint256 timepoint
     ) internal view returns (uint256) {
         VirtualInfo memory info = virtualInfos[virtualId];
-        IPersonaDAO dao = IPersonaDAO(info.dao);
+        IAgentDAO dao = IAgentDAO(info.dao);
         return dao.getPastScore(account, timepoint);
     }
 
@@ -142,7 +142,7 @@ contract PersonaNft is
         uint256 virtualId
     ) internal view returns (uint256) {
         VirtualInfo memory info = virtualInfos[virtualId];
-        IPersonaDAO dao = IPersonaDAO(info.dao);
+        IAgentDAO dao = IAgentDAO(info.dao);
         return dao.proposalCount();
     }
 
@@ -216,7 +216,12 @@ contract PersonaNft is
 
     function tokenURI(
         uint256 tokenId
-    ) public view override(ERC721, ERC721URIStorage) returns (string memory) {
+    )
+        public
+        view
+        override(ERC721Upgradeable, ERC721URIStorageUpgradeable)
+        returns (string memory)
+    {
         return super.tokenURI(tokenId);
     }
 
@@ -225,7 +230,11 @@ contract PersonaNft is
     )
         public
         view
-        override(ERC721, ERC721URIStorage, AccessControl)
+        override(
+            ERC721Upgradeable,
+            ERC721URIStorageUpgradeable,
+            AccessControlUpgradeable
+        )
         returns (bool)
     {
         return super.supportsInterface(interfaceId);

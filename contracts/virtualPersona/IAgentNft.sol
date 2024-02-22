@@ -3,7 +3,7 @@ pragma solidity ^0.8.20;
 
 import "./IValidatorRegistry.sol";
 
-interface IPersonaNft is IValidatorRegistry {
+interface IAgentNft is IValidatorRegistry {
     struct VirtualInfo {
         address dao; // Persona DAO can update the persona metadata
         address token;

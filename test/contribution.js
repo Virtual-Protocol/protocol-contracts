@@ -2,8 +2,8 @@
 We will test the end-to-end implementation of a Contribution flow till Service.
 
 1. Prepare 100k tokens
-2. Propose a new Persona at PersonaFactory
-3. Once received proposalId from PersonaFactory, create a proposal at ProtocolDAO
+2. Propose a new Persona at AgentFactory
+3. Once received proposalId from AgentFactory, create a proposal at ProtocolDAO
 4. Vote on the proposal
 5. Execute the proposal
 */
@@ -61,19 +61,19 @@ describe("Contribution", function () {
     );
     await protocolDAO.waitForDeployment();
 
-    const personaNft = await ethers.deployContract("PersonaNft", [
+    const personaNft = await ethers.deployContract("AgentNft", [
       deployer.address,
     ]);
     await personaNft.waitForDeployment();
 
-    const personaToken = await ethers.deployContract("PersonaToken");
+    const personaToken = await ethers.deployContract("AgentToken");
     await personaToken.waitForDeployment();
-    const personaDAO = await ethers.deployContract("PersonaDAO");
+    const personaDAO = await ethers.deployContract("AgentDAO");
     await personaDAO.waitForDeployment();
 
     const tba = await ethers.deployContract("ERC6551Registry");
 
-    const personaFactory = await ethers.deployContract("PersonaFactory");
+    const personaFactory = await ethers.deployContract("AgentFactory");
     await personaFactory.initialize(
       personaToken.target,
       personaDAO.target,
@@ -197,7 +197,7 @@ describe("Contribution", function () {
     const { persona, personaNft, service, demoToken } = base;
     const descHash = getDescHash(CONTRIBUTION_DESC);
 
-    const personaDaoContract = await ethers.getContractFactory("PersonaDAO");
+    const personaDaoContract = await ethers.getContractFactory("AgentDAO");
     const mintCalldata = await getMintServiceCalldata(
       service,
       persona.virtualId,
@@ -218,7 +218,7 @@ describe("Contribution", function () {
     await personaNft.addValidator(persona.virtualId, validator2.address);
     await personaNft.addValidator(persona.virtualId, validator3.address);
     const tokenInstance = await ethers.getContractAt(
-      "PersonaToken",
+      "AgentToken",
       persona.token
     );
     await tokenInstance
@@ -288,7 +288,7 @@ describe("Contribution", function () {
       "0x0000000000000000000000000000000000000000",
       true
     );
-    const personaDAO = await ethers.getContractAt("PersonaDAO", persona.dao);
+    const personaDAO = await ethers.getContractAt("AgentDAO", persona.dao);
     // We need 51% to reach quorum
     const voteParams = abi.encode(
       ["uint256", "uint8[] memory"],
@@ -324,7 +324,7 @@ describe("Contribution", function () {
       "0x0000000000000000000000000000000000000000",
       true
     );
-    const personaDAO = await ethers.getContractAt("PersonaDAO", persona.dao);
+    const personaDAO = await ethers.getContractAt("AgentDAO", persona.dao);
     /*
     Scenario: 
     1. Validator1 with 100000 votes set maturity score to 1500
@@ -334,7 +334,7 @@ describe("Contribution", function () {
     */
     const [validator1, validator2, validator3] = this.signers;
     const personaToken = await ethers.getContractAt(
-      "PersonaToken",
+      "AgentToken",
       persona.token
     );
     expect(
@@ -390,7 +390,7 @@ describe("Contribution", function () {
       "0x0000000000000000000000000000000000000000",
       true
     );
-    const personaDAO = await ethers.getContractAt("PersonaDAO", persona.dao);
+    const personaDAO = await ethers.getContractAt("AgentDAO", persona.dao);
     /*
     Scenario: 
     Continuing from previous test case, the first service NFT has maturity score of 2090 and we are improving it to 4000, the impact should be 4000-2090 = 1910
@@ -431,7 +431,7 @@ describe("Contribution", function () {
     // Proposal 2
     const descHash = getDescHash(CONTRIBUTION_DESC + " V2");
 
-    const personaDaoContract = await ethers.getContractFactory("PersonaDAO");
+    const personaDaoContract = await ethers.getContractFactory("AgentDAO");
     const mintCalldata = await getMintServiceCalldata(
       service,
       persona.virtualId,
@@ -486,7 +486,7 @@ describe("Contribution", function () {
     const { persona, proposalId, service, contribution } = await loadFixture(
       proposeContribution
     );
-    const personaDAO = await ethers.getContractAt("PersonaDAO", persona.dao);
+    const personaDAO = await ethers.getContractAt("AgentDAO", persona.dao);
     await contribution.setAdmin(signers[15].address);
     await expect(
       personaDAO

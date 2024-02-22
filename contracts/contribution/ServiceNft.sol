@@ -3,21 +3,28 @@ pragma solidity ^0.8.20;
 
 import "@openzeppelin/contracts/governance/IGovernor.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import "@openzeppelin/contracts/token/ERC721/extensions/ERC721Enumerable.sol";
-import "@openzeppelin/contracts/token/ERC721/extensions/ERC721URIStorage.sol";
+import "@openzeppelin/contracts-upgradeable/token/ERC721/ERC721Upgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/token/ERC721/extensions/ERC721EnumerableUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/token/ERC721/extensions/ERC721URIStorageUpgradeable.sol";
 import "@openzeppelin/contracts/access/AccessControl.sol";
 import "@openzeppelin/contracts/interfaces/IERC5805.sol";
-import "@openzeppelin/contracts/access/AccessControl.sol";
-import "../virtualPersona/IPersonaNft.sol";
-import "../virtualPersona/IPersonaDAO.sol";
+import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
+import "../virtualPersona/IAgentNft.sol";
+import "../virtualPersona/IAgentDAO.sol";
 import "./IContributionNft.sol";
 import "./IServiceNft.sol";
 
-contract ServiceNft is IServiceNft, ERC721, ERC721Enumerable, ERC721URIStorage {
+contract ServiceNft is
+    IServiceNft,
+    Initializable,
+    ERC721Upgradeable,
+    ERC721EnumerableUpgradeable,
+    ERC721URIStorageUpgradeable
+{
     uint256 private _nextTokenId;
 
-    address public immutable personaNft;
-    address public immutable contributionNft;
+    address public personaNft;
+    address public contributionNft;
 
     mapping(uint256 tokenId => uint8 coreId) private _cores;
     mapping(uint256 tokenId => uint16 maturity) private _maturities;
@@ -37,11 +44,12 @@ contract ServiceNft is IServiceNft, ERC721, ERC721Enumerable, ERC721URIStorage {
         bool isModel
     );
 
-    constructor(
-        address initialPersonaNft,
+    function initialize(
+        address initialAgentNft,
         address initialContributionNft
-    ) ERC721("Service", "VS") {
-        personaNft = initialPersonaNft;
+    ) public initializer {
+        __ERC721_init("Service", "VS");
+        personaNft = initialAgentNft;
         contributionNft = initialContributionNft;
     }
 
@@ -49,7 +57,7 @@ contract ServiceNft is IServiceNft, ERC721, ERC721Enumerable, ERC721URIStorage {
         uint256 virtualId,
         bytes32 descHash
     ) external returns (uint256) {
-        IPersonaNft.VirtualInfo memory info = IPersonaNft(personaNft)
+        IAgentNft.VirtualInfo memory info = IAgentNft(personaNft)
             .virtualInfo(virtualId);
         require(_msgSender() == info.dao, "Caller is not VIRTUAL DAO");
 
@@ -76,7 +84,7 @@ contract ServiceNft is IServiceNft, ERC721, ERC721Enumerable, ERC721URIStorage {
             proposalId
         );
         // Calculate maturity
-        _maturities[proposalId] = IPersonaDAO(info.dao).getMaturity(proposalId);
+        _maturities[proposalId] = IAgentDAO(info.dao).getMaturity(proposalId);
         // Calculate impact
         // Get current service maturity
         uint256 prevServiceId = _coreServices[virtualId][_cores[proposalId]];
@@ -159,7 +167,7 @@ contract ServiceNft is IServiceNft, ERC721, ERC721Enumerable, ERC721URIStorage {
 
     function tokenURI(
         uint256 tokenId
-    ) public view override(ERC721, ERC721URIStorage) returns (string memory) {
+    ) public view override(ERC721Upgradeable, ERC721URIStorageUpgradeable) returns (string memory) {
         // Service NFT is a mirror of Contribution NFT
         return IContributionNft(contributionNft).tokenURI(tokenId);
     }
@@ -169,7 +177,7 @@ contract ServiceNft is IServiceNft, ERC721, ERC721Enumerable, ERC721URIStorage {
     )
         public
         view
-        override(ERC721, ERC721URIStorage, ERC721Enumerable)
+        override(ERC721Upgradeable, ERC721URIStorageUpgradeable, ERC721EnumerableUpgradeable)
         returns (bool)
     {
         return super.supportsInterface(interfaceId);
@@ -178,7 +186,7 @@ contract ServiceNft is IServiceNft, ERC721, ERC721Enumerable, ERC721URIStorage {
     function _increaseBalance(
         address account,
         uint128 amount
-    ) internal override(ERC721, ERC721Enumerable) {
+    ) internal override(ERC721Upgradeable, ERC721EnumerableUpgradeable) {
         return super._increaseBalance(account, amount);
     }
 
@@ -186,7 +194,7 @@ contract ServiceNft is IServiceNft, ERC721, ERC721Enumerable, ERC721URIStorage {
         address to,
         uint256 tokenId,
         address auth
-    ) internal override(ERC721, ERC721Enumerable) returns (address) {
+    ) internal override(ERC721Upgradeable, ERC721EnumerableUpgradeable) returns (address) {
         return super._update(to, tokenId, auth);
     }
 }

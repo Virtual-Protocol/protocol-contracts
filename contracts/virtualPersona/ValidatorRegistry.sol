@@ -1,26 +1,26 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
+import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import "./IValidatorRegistry.sol";
 
-abstract contract ValidatorRegistry is IValidatorRegistry {
+abstract contract ValidatorRegistry is IValidatorRegistry, Initializable {
     mapping(uint256 virtualId => mapping(address account => bool isValidator))
         private _validatorsMap;
     mapping(address account => mapping(uint256 virtualId => uint256 score))
         private _baseValidatorScore;
     mapping(uint256 virtualId => address[] validators) private _validators;
 
-    function(uint256, address) view returns (uint256)
-        private immutable _getScoreOf;
-    function(uint256) view returns (uint256) private immutable _getMaxScore;
+    function(uint256, address) view returns (uint256) private _getScoreOf;
+    function(uint256) view returns (uint256) private _getMaxScore;
     function(uint256, address, uint256) view returns (uint256)
-        private immutable _getPastScore;
+        private _getPastScore;
 
-    constructor(
+    function __ValidatorRegistry_init(
         function(uint256, address) view returns (uint256) getScoreOf_,
         function(uint256) view returns (uint256) getMaxScore_,
         function(uint256, address, uint256) view returns (uint256) getPastScore_
-    ) {
+    ) internal onlyInitializing {
         _getScoreOf = getScoreOf_;
         _getMaxScore = getMaxScore_;
         _getPastScore = getPastScore_;

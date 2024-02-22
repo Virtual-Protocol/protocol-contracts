@@ -5,11 +5,11 @@ import "@openzeppelin/contracts-upgradeable/token/ERC20/ERC20Upgradeable.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {Checkpoints} from "@openzeppelin/contracts/utils/structs/Checkpoints.sol";
-import "./IPersonaToken.sol";
-import "./IPersonaNft.sol";
+import "./IAgentToken.sol";
+import "./IAgentNft.sol";
 import "./ERC20Votes.sol";
 
-contract PersonaToken is IPersonaToken, ERC20Upgradeable, ERC20Votes {
+contract AgentToken is IAgentToken, ERC20Upgradeable, ERC20Votes {
     using SafeERC20 for IERC20;
     using Checkpoints for Checkpoints.Trace208;
 
@@ -23,7 +23,7 @@ contract PersonaToken is IPersonaToken, ERC20Upgradeable, ERC20Votes {
     }
 
     modifier canDelegate(address target) {
-        IPersonaNft registry = IPersonaNft(virtualNft);
+        IAgentNft registry = IAgentNft(virtualNft);
         uint256 virtualId = registry.stakingTokenToVirtualId(address(this));
         require(
             registry.isValidator(virtualId, target),

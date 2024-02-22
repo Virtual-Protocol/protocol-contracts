@@ -7,14 +7,14 @@ import "@openzeppelin/contracts-upgradeable/governance/extensions/GovernorStorag
 import "@openzeppelin/contracts-upgradeable/governance/extensions/GovernorVotesUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/governance/extensions/GovernorVotesQuorumFractionUpgradeable.sol";
 import "@openzeppelin/contracts/utils/structs/Checkpoints.sol";
-import "./IPersonaDAO.sol";
+import "./IAgentDAO.sol";
 import "./GovernorCountingSimpleUpgradeable.sol";
 import "@openzeppelin/contracts/token/ERC721/IERC721.sol";
 import "@openzeppelin/contracts/utils/Strings.sol";
 import "../contribution/IContributionNft.sol";
 
-contract PersonaDAO is
-    IPersonaDAO,
+contract AgentDAO is
+    IAgentDAO,
     GovernorUpgradeable,
     GovernorSettingsUpgradeable,
     GovernorCountingSimpleUpgradeable,
@@ -125,7 +125,7 @@ contract PersonaDAO is
     function proposalCount()
         public
         view
-        override(IPersonaDAO, GovernorStorageUpgradeable)
+        override(IAgentDAO, GovernorStorageUpgradeable)
         returns (uint256)
     {
         return super.proposalCount();

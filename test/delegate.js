@@ -54,7 +54,7 @@ describe("Delegation", function () {
     );
     await protocolDAO.waitForDeployment();
 
-    const personaNft = await ethers.deployContract("PersonaNft", [
+    const personaNft = await ethers.deployContract("AgentNft", [
       deployer.address,
     ]);
     await personaNft.waitForDeployment();
@@ -76,14 +76,14 @@ describe("Delegation", function () {
       service.target
     );
 
-    const personaToken = await ethers.deployContract("PersonaToken");
+    const personaToken = await ethers.deployContract("AgentToken");
     await personaToken.waitForDeployment();
-    const personaDAO = await ethers.deployContract("PersonaDAO");
+    const personaDAO = await ethers.deployContract("AgentDAO");
     await personaDAO.waitForDeployment();
 
     const tba = await ethers.deployContract("ERC6551Registry");
 
-    const personaFactory = await ethers.deployContract("PersonaFactory");
+    const personaFactory = await ethers.deployContract("AgentFactory");
     await personaFactory.initialize(
       personaToken.target,
       personaDAO.target,
@@ -151,7 +151,7 @@ describe("Delegation", function () {
     const persona = { virtualId, token, dao };
 
     const personaTokenContract = await ethers.getContractAt(
-      "PersonaToken",
+      "AgentToken",
       persona.token
     );
     return { personaTokenContract };

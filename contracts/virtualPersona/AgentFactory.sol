@@ -8,12 +8,12 @@ import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/access/AccessControl.sol";
 
-import "./IPersonaToken.sol";
-import "./IPersonaDAO.sol";
-import "./IPersonaNft.sol";
+import "./IAgentToken.sol";
+import "./IAgentDAO.sol";
+import "./IAgentNft.sol";
 import "../libs/IERC6551Registry.sol";
 
-contract PersonaFactory is Initializable, AccessControl {
+contract AgentFactory is Initializable, AccessControl {
     uint256 private _nextId;
     address public tokenImplementation;
     address public daoImplementation;
@@ -195,7 +195,7 @@ contract PersonaFactory is Initializable, AccessControl {
         );
 
         Application storage application = _applications[id];
-        address token = _createNewPersonaToken(
+        address token = _createNewAgentToken(
             application.name,
             application.symbol,
             application.proposer
@@ -209,7 +209,7 @@ contract PersonaFactory is Initializable, AccessControl {
                 application.daoThreshold
             )
         );
-        uint256 virtualId = IPersonaNft(nft).mint(
+        uint256 virtualId = IAgentNft(nft).mint(
             _vault,
             application.tokenURI,
             dao,
@@ -218,7 +218,7 @@ contract PersonaFactory is Initializable, AccessControl {
         );
 
         IERC20(assetToken).approve(token, application.withdrawableAmount);
-        IPersonaToken(token).stake(
+        IAgentToken(token).stake(
             application.withdrawableAmount,
             application.proposer,
             application.proposer
@@ -235,7 +235,7 @@ contract PersonaFactory is Initializable, AccessControl {
             virtualId
         );
 
-        IPersonaNft(nft).setTBA(virtualId, tbaAddress);
+        IAgentNft(nft).setTBA(virtualId, tbaAddress);
 
         application.withdrawableAmount = 0;
         application.status = ApplicationStatus.Executed;
@@ -251,10 +251,10 @@ contract PersonaFactory is Initializable, AccessControl {
         uint256 daoThreshold
     ) internal returns (address instance) {
         instance = Clones.clone(daoImplementation);
-        IPersonaDAO(instance).initialize(
+        IAgentDAO(instance).initialize(
             name,
             token,
-            IPersonaNft(nft).getContributionNft(),
+            IAgentNft(nft).getContributionNft(),
             daoThreshold,
             daoVotingPeriod
         );
@@ -263,13 +263,13 @@ contract PersonaFactory is Initializable, AccessControl {
         return instance;
     }
 
-    function _createNewPersonaToken(
+    function _createNewAgentToken(
         string memory name,
         string memory symbol,
         address founder
     ) internal returns (address instance) {
         instance = Clones.clone(tokenImplementation);
-        IPersonaToken(instance).initialize(
+        IAgentToken(instance).initialize(
             name,
             symbol,
             founder,

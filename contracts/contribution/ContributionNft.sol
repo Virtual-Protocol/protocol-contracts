@@ -3,19 +3,21 @@ pragma solidity ^0.8.20;
 
 import "@openzeppelin/contracts/governance/IGovernor.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
-import "@openzeppelin/contracts/token/ERC721/extensions/ERC721URIStorage.sol";
-import "@openzeppelin/contracts/token/ERC721/extensions/ERC721Enumerable.sol";
+import "@openzeppelin/contracts-upgradeable/token/ERC721/ERC721Upgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/token/ERC721/extensions/ERC721EnumerableUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/token/ERC721/extensions/ERC721URIStorageUpgradeable.sol";
 import "@openzeppelin/contracts/access/AccessControl.sol";
 import "@openzeppelin/contracts/interfaces/IERC5805.sol";
+import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import "./IContributionNft.sol";
-import "../virtualPersona/IPersonaNft.sol";
+import "../virtualPersona/IAgentNft.sol";
 
 contract ContributionNft is
     IContributionNft,
-    ERC721,
-    ERC721Enumerable,
-    ERC721URIStorage
+    Initializable,
+    ERC721Upgradeable,
+    ERC721EnumerableUpgradeable,
+    ERC721URIStorageUpgradeable
 {
     address public personaNft;
 
@@ -30,7 +32,8 @@ contract ContributionNft is
 
     address private _admin; // Admin is able to create contribution proposal without votes
 
-    constructor(address thePersonaAddress) ERC721("Contribution", "VC") {
+    function initialize(address thePersonaAddress) public initializer {
+        __ERC721_init("Contribution", "VC");
         personaNft = thePersonaAddress;
         _admin = _msgSender();
     }
@@ -39,13 +42,13 @@ contract ContributionNft is
         return _contributionVirtualId[tokenId];
     }
 
-    function getPersonaDAO(uint256 virtualId) public view returns (IGovernor) {
-        return IGovernor(IPersonaNft(personaNft).virtualInfo(virtualId).dao);
+    function getAgentDAO(uint256 virtualId) public view returns (IGovernor) {
+        return IGovernor(IAgentNft(personaNft).virtualInfo(virtualId).dao);
     }
 
     function isAccepted(uint256 tokenId) public view returns (bool) {
         uint256 virtualId = _contributionVirtualId[tokenId];
-        IGovernor personaDAO = getPersonaDAO(virtualId);
+        IGovernor personaDAO = getAgentDAO(virtualId);
         return personaDAO.state(tokenId) == IGovernor.ProposalState.Succeeded;
     }
 
@@ -58,7 +61,7 @@ contract ContributionNft is
         uint256 parentId,
         bool isModel_
     ) external returns (uint256) {
-        IGovernor personaDAO = getPersonaDAO(virtualId);
+        IGovernor personaDAO = getAgentDAO(virtualId);
         require(
             msg.sender == personaDAO.proposalProposer(proposalId),
             "Only proposal proposer can mint Contribution NFT"
@@ -97,7 +100,7 @@ contract ContributionNft is
     )
         public
         view
-        override(IContributionNft, ERC721, ERC721URIStorage)
+        override(IContributionNft, ERC721Upgradeable, ERC721URIStorageUpgradeable)
         returns (string memory)
     {
         return super.tokenURI(tokenId);
@@ -122,7 +125,7 @@ contract ContributionNft is
     )
         public
         view
-        override(ERC721, ERC721URIStorage, ERC721Enumerable)
+        override(ERC721Upgradeable, ERC721URIStorageUpgradeable, ERC721EnumerableUpgradeable)
         returns (bool)
     {
         return super.supportsInterface(interfaceId);
@@ -131,7 +134,7 @@ contract ContributionNft is
     function _increaseBalance(
         address account,
         uint128 amount
-    ) internal override(ERC721, ERC721Enumerable) {
+    ) internal override(ERC721Upgradeable, ERC721EnumerableUpgradeable) {
         return super._increaseBalance(account, amount);
     }
 
@@ -139,7 +142,7 @@ contract ContributionNft is
         address to,
         uint256 tokenId,
         address auth
-    ) internal override(ERC721, ERC721Enumerable) returns (address) {
+    ) internal override(ERC721Upgradeable, ERC721EnumerableUpgradeable) returns (address) {
         return super._update(to, tokenId, auth);
     }
 
@@ -147,7 +150,9 @@ contract ContributionNft is
         return modelContributions[tokenId];
     }
 
-    function ownerOf(uint256 tokenId) public view override(IERC721, ERC721) returns (address) {
+    function ownerOf(
+        uint256 tokenId
+    ) public view override(IERC721, ERC721Upgradeable) returns (address) {
         return _ownerOf(tokenId);
     }
 }

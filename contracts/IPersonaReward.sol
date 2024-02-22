@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
-interface IPersonaReward {
+interface IAgentReward {
     struct MainReward {
         uint32 blockNumber;
         uint256 amount;

@@ -2,7 +2,7 @@ import { ethers, upgrades } from "hardhat";
 
 (async () => {
   try {
-    const Contract = await ethers.getContractFactory("PersonaReward");
+    const Contract = await ethers.getContractFactory("AgentReward");
     const contract = await upgrades.deployProxy(Contract, [
       process.env.ASSET_TOKEN,
       process.env.VIRTUAL_NFT,
@@ -22,7 +22,7 @@ import { ethers, upgrades } from "hardhat";
     ]);
     await contract.waitForDeployment();
 
-    console.log("PersonaReward deployed to:", contract.target);
+    console.log("AgentReward deployed to:", contract.target);
   } catch (e) {
     console.log(e);
   }

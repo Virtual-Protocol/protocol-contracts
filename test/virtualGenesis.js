@@ -2,8 +2,8 @@
 We will test the end-to-end implementation of a Virtual genesis initiation
 
 1. Prepare 100k tokens
-2. Propose a new Persona at PersonaFactory
-3. Once received proposalId from PersonaFactory, create a proposal at ProtocolDAO
+2. Propose a new Persona at AgentFactory
+3. Once received proposalId from AgentFactory, create a proposal at ProtocolDAO
 4. Vote on the proposal
 5. Execute the proposal
 */
@@ -18,7 +18,7 @@ const getExecuteCallData = (factory, proposalId) => {
   return factory.interface.encodeFunctionData("executeApplication", [proposalId]);
 };
 
-describe("PersonaFactory", function () {
+describe("AgentFactory", function () {
   const PROPOSAL_THRESHOLD = parseEther("100000");
   const QUORUM = parseEther("10000");
   const PROTOCOL_DAO_VOTING_PERIOD = 300;
@@ -60,7 +60,7 @@ describe("PersonaFactory", function () {
     );
     await protocolDAO.waitForDeployment();
 
-    const personaNft = await ethers.deployContract("PersonaNft", [
+    const personaNft = await ethers.deployContract("AgentNft", [
       deployer.address,
     ]);
     await personaNft.waitForDeployment();
@@ -82,14 +82,14 @@ describe("PersonaFactory", function () {
       service.target
     );
 
-    const personaToken = await ethers.deployContract("PersonaToken");
+    const personaToken = await ethers.deployContract("AgentToken");
     await personaToken.waitForDeployment();
-    const personaDAO = await ethers.deployContract("PersonaDAO");
+    const personaDAO = await ethers.deployContract("AgentDAO");
     await personaDAO.waitForDeployment();
 
     const tba = await ethers.deployContract("ERC6551Registry");
 
-    const personaFactory = await ethers.deployContract("PersonaFactory");
+    const personaFactory = await ethers.deployContract("AgentFactory");
     await personaFactory.initialize(
       personaToken.target,
       personaDAO.target,
@@ -291,8 +291,8 @@ describe("PersonaFactory", function () {
     expect(firstToken).to.not.equal(ethers.ZeroAddress);
     expect(firstDao).to.not.equal(ethers.ZeroAddress);
 
-    const PersonaDAO = await ethers.getContractFactory("PersonaDAO");
-    const daoInstance = PersonaDAO.attach(dao);
+    const AgentDAO = await ethers.getContractFactory("AgentDAO");
+    const daoInstance = AgentDAO.attach(dao);
     expect(await daoInstance.token()).to.equal(token);
     expect(await daoInstance.name()).to.equal(genesisInput.daoName);
     expect(await daoInstance.proposalThreshold()).to.equal(
@@ -302,8 +302,8 @@ describe("PersonaFactory", function () {
       genesisInput.daoVotingPeriod
     );
 
-    const PersonaToken = await ethers.getContractFactory("PersonaToken");
-    const tokenInstance = PersonaToken.attach(token);
+    const AgentToken = await ethers.getContractFactory("AgentToken");
+    const tokenInstance = AgentToken.attach(token);
     expect(await tokenInstance.name()).to.equal(genesisInput.name);
     expect(await tokenInstance.symbol()).to.equal(genesisInput.symbol);
 
@@ -328,8 +328,8 @@ describe("PersonaFactory", function () {
     const [validator, staker] = this.accounts;
     const { persona, demoToken } = await loadFixture(deployGenesisVirtual);
 
-    const PersonaToken = await ethers.getContractFactory("PersonaToken");
-    const tokenInstance = PersonaToken.attach(persona.token);
+    const AgentToken = await ethers.getContractFactory("AgentToken");
+    const tokenInstance = AgentToken.attach(persona.token);
     // Prepare tokens for staking
     // The validatory should have 100k sToken initially because of the initiation stake
     expect(await demoToken.balanceOf(validator)).to.be.equal(0n);
@@ -367,8 +367,8 @@ describe("PersonaFactory", function () {
   it("should not allow staking and delegate to non-validator", async function () {
     const [validator, staker] = this.accounts;
     const { persona, demoToken } = await loadFixture(deployGenesisVirtual);
-    const PersonaToken = await ethers.getContractFactory("PersonaToken");
-    const tokenInstance = PersonaToken.attach(persona.token);
+    const AgentToken = await ethers.getContractFactory("AgentToken");
+    const tokenInstance = AgentToken.attach(persona.token);
 
     await demoToken.mint(staker, QUORUM);
     const stakeAmount = parseEther("100");
@@ -385,8 +385,8 @@ describe("PersonaFactory", function () {
     const { persona, demoToken, personaNft } = await loadFixture(
       deployGenesisVirtual
     );
-    const PersonaToken = await ethers.getContractFactory("PersonaToken");
-    const tokenInstance = PersonaToken.attach(persona.token);
+    const AgentToken = await ethers.getContractFactory("AgentToken");
+    const tokenInstance = AgentToken.attach(persona.token);
 
     await demoToken.mint(staker, QUORUM);
     const stakeAmount = parseEther("100");
@@ -408,8 +408,8 @@ describe("PersonaFactory", function () {
     const [validator, staker] = this.accounts;
     const { persona, demoToken, personaNft, personaFactory } =
       await loadFixture(deployGenesisVirtual);
-    const PersonaDAO = await ethers.getContractFactory("PersonaDAO");
-    const personaDAO = PersonaDAO.attach(persona.dao);
+    const AgentDAO = await ethers.getContractFactory("AgentDAO");
+    const personaDAO = AgentDAO.attach(persona.dao);
     expect(
       await personaNft.validatorScore(persona.virtualId, validator)
     ).to.be.equal(0n);
@@ -460,8 +460,8 @@ describe("PersonaFactory", function () {
     const [validator, validator2] = this.accounts;
     const { persona, demoToken, personaNft, personaFactory } =
       await loadFixture(deployGenesisVirtual);
-    const PersonaDAO = await ethers.getContractFactory("PersonaDAO");
-    const personaDAO = PersonaDAO.attach(persona.dao);
+    const AgentDAO = await ethers.getContractFactory("AgentDAO");
+    const personaDAO = AgentDAO.attach(persona.dao);
 
     // First proposal
     await personaDAO.propose([validator], [0], ["0x"], "First proposal");

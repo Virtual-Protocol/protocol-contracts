@@ -85,19 +85,19 @@ describe("Rewards", function () {
     );
     await protocolDAO.waitForDeployment();
 
-    const personaNft = await ethers.deployContract("PersonaNft", [
+    const personaNft = await ethers.deployContract("AgentNft", [
       deployer.address,
     ]);
     await personaNft.waitForDeployment();
 
-    const personaToken = await ethers.deployContract("PersonaToken");
+    const personaToken = await ethers.deployContract("AgentToken");
     await personaToken.waitForDeployment();
-    const personaDAO = await ethers.deployContract("PersonaDAO");
+    const personaDAO = await ethers.deployContract("AgentDAO");
     await personaDAO.waitForDeployment();
 
     const tba = await ethers.deployContract("ERC6551Registry");
 
-    const personaFactory = await ethers.deployContract("PersonaFactory");
+    const personaFactory = await ethers.deployContract("AgentFactory");
     await personaFactory.initialize(
       personaToken.target,
       personaDAO.target,
@@ -115,7 +115,7 @@ describe("Rewards", function () {
       personaFactory.target
     );
 
-    const reward = await ethers.deployContract("PersonaReward", [], {});
+    const reward = await ethers.deployContract("AgentReward", [], {});
     await reward.waitForDeployment();
 
     const contributionNft = await ethers.deployContract(
@@ -229,7 +229,7 @@ describe("Rewards", function () {
     const signers = await ethers.getSigners();
     const [validator1, staker1, validator2, staker2] = signers;
     const base = await deployGenesisVirtual();
-    const Token = await ethers.getContractFactory("PersonaToken");
+    const Token = await ethers.getContractFactory("AgentToken");
     const token = Token.attach(base.persona.token);
     const { persona, demoToken, personaNft, reward } = base;
     // Staking
@@ -253,7 +253,7 @@ describe("Rewards", function () {
       .stake(STAKE_AMOUNTS[3], staker2.address, validator2.address);
 
     // Propose & validate
-    const Dao = await ethers.getContractFactory("PersonaDAO");
+    const Dao = await ethers.getContractFactory("AgentDAO");
     const dao = Dao.attach(persona.dao);
 
     const proposals = await Promise.all([
@@ -294,7 +294,7 @@ describe("Rewards", function () {
   ) {
     const signers = await ethers.getSigners();
     const { persona, serviceNft, contributionNft } = base;
-    const personaDAO = await ethers.getContractAt("PersonaDAO", persona.dao);
+    const personaDAO = await ethers.getContractAt("AgentDAO", persona.dao);
 
     const descHash = getDescHash(desc);
 

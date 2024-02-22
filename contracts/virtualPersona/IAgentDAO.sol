@@ -4,7 +4,7 @@ pragma solidity ^0.8.20;
 import "@openzeppelin/contracts/governance/utils/IVotes.sol";
 import "@openzeppelin/contracts/governance/IGovernor.sol";
 
-interface IPersonaDAO {
+interface IAgentDAO {
     function initialize(
         string memory name,
         IVotes token,

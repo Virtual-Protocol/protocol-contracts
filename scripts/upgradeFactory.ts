@@ -2,10 +2,10 @@ import { ethers, upgrades } from "hardhat";
 
 (async () => {
   try {
-    const PersonaFactory = await ethers.getContractFactory("PersonaFactory");
+    const AgentFactory = await ethers.getContractFactory("AgentFactory");
     const factory = await upgrades.upgradeProxy(
       process.env.VIRTUAL_FACTORY,
-      PersonaFactory
+      AgentFactory
     );
     await factory.setImplementations(
       process.env.VIRTUAL_TOKEN_IMPL,

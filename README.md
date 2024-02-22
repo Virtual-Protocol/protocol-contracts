@@ -15,6 +15,7 @@
 | PersonaToken | This is implementation contract for VIRTUAL staking. PersonaFactory will clone this during VIRTUAL instantiation. Staked token is non-transferable. | - | N |
 | PersonaDAO | This is implementation contract for VIRTUAL specific DAO. PersonaFactory will clone this during VIRTUAL instantiation. It holds the maturity score for each core service. | - | N |
 | PersonaReward | This is reward distribution center. | Roles: GOV_ROLE, TOKEN_SAVER_ROLE | Y |
+| TimeLockStaking | Allows user to stake their $VIRTUAL in exchange for $sVIRTUAL | Roles: GOV_ROLE, TOKEN_SAVER_ROLE | N |
 
 
 # Main Activities
@@ -56,9 +57,5 @@
 
 
 ## Staking VIRTUAL
-1. Call **PersonaToken**.stake , pass in the validator that you would like to delegate your voting power to. It will take in $VIRTUAL and mint $*PERSONA* to you.
-2. Call **PersonaToken**.withdraw to withdraw , will burn your $*PERSONA* and return $VIRTUAL to you.
-
-
-**Notes**
-Everything inside contracts/dev are placeholder contracts for development purpose, to simulate token bridging and TBA functionality. They will not be deployed.
+1. Call **PersonaToken**.stake , pass in the validator that you would like to delegate your voting power to. It will take in $sVIRTUAL and mint $*PERSONA* to you.
+2. Call **PersonaToken**.withdraw to withdraw , will burn your $*PERSONA* and return $sVIRTUAL to you.

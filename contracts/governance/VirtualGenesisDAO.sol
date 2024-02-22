@@ -8,6 +8,7 @@ import "@openzeppelin/contracts/governance/extensions/GovernorStorage.sol";
 import "@openzeppelin/contracts/governance/extensions/GovernorVotes.sol";
 import "@openzeppelin/contracts/governance/extensions/GovernorVotesQuorumFraction.sol";
 import "./GovernorCountingSimple.sol";
+import {Checkpoints} from "@openzeppelin/contracts/utils/structs/Checkpoints.sol";
 
 contract VirtualGenesisDAO is
     Governor,
@@ -16,7 +17,14 @@ contract VirtualGenesisDAO is
     GovernorVotes,
     GovernorCountingSimple
 {
+    using Checkpoints for Checkpoints.Trace224;
+
     mapping(uint256 => bool) _earlyExecutions;
+    Checkpoints.Trace224 private _quorumCheckpoints;
+
+    uint256 private _quorum;
+
+    event QuorumUpdated(uint224 oldQuorum, uint224 newQuorum);
 
     constructor(
         IVotes token,
@@ -31,7 +39,9 @@ contract VirtualGenesisDAO is
             initialProposalThreshold
         )
         GovernorVotes(token)
-    {}
+    {
+        _quorumCheckpoints.push(0, 10000e18);
+    }
 
     // The following functions are overrides required by Solidity.
 
@@ -84,8 +94,19 @@ contract VirtualGenesisDAO is
 
     function quorum(
         uint256 blockNumber
-    ) public pure override returns (uint256) {
-        return 10000e18;
+    ) public view override returns (uint256) {
+        uint256 length = _quorumCheckpoints.length();
+
+        // Optimistic search, check the latest checkpoint
+        Checkpoints.Checkpoint224 memory latest = _quorumCheckpoints.at(SafeCast.toUint32(length - 1));
+        uint48 latestKey = latest._key;
+        uint224 latestValue = latest._value;
+        if (latestKey <= blockNumber) {
+            return latestValue;
+        }
+
+        // Otherwise, do the binary search
+        return _quorumCheckpoints.upperLookupRecent(SafeCast.toUint32(blockNumber));
     }
 
     function earlyExecute(uint256 proposalId) public payable returns (uint256) {
@@ -119,10 +140,21 @@ contract VirtualGenesisDAO is
     }
 
     // Handle early execution
-    function state(uint256 proposalId) public view override returns (ProposalState) {
+    function state(
+        uint256 proposalId
+    ) public view override returns (ProposalState) {
         if (_earlyExecutions[proposalId]) {
             return ProposalState.Executed;
         }
         return super.state(proposalId);
+    }
+
+    function updateQuorum(uint224 newQuorum) public onlyGovernance {
+        uint224 oldQuorum = _quorumCheckpoints.latest();
+        _quorumCheckpoints.push(
+            SafeCast.toUint32(clock()),
+            SafeCast.toUint208(newQuorum)
+        );
+        emit QuorumUpdated(oldQuorum, newQuorum);
     }
 }

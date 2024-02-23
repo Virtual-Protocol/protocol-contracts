@@ -27,8 +27,14 @@ contract ContributionNft is
     mapping(uint256 => uint8) private _cores;
 
     mapping(uint256 => bool) public modelContributions;
+    mapping(uint256 => uint256[]) public modelDatasets;
 
-    event NewContribution(uint256 tokenId, uint256 virtualId, uint256 parentId);
+    event NewContribution(
+        uint256 tokenId,
+        uint256 virtualId,
+        uint256 parentId,
+        uint256[] datasets
+    );
 
     address private _admin; // Admin is able to create contribution proposal without votes
 
@@ -59,7 +65,8 @@ contract ContributionNft is
         string memory newTokenURI,
         uint256 proposalId,
         uint256 parentId,
-        bool isModel_
+        bool isModel_,
+        uint256[] memory datasets
     ) external returns (uint256) {
         IGovernor personaDAO = getAgentDAO(virtualId);
         require(
@@ -77,9 +84,10 @@ contract ContributionNft is
 
         if (isModel_) {
             modelContributions[proposalId] = true;
+            modelDatasets[proposalId] = datasets;
         }
 
-        emit NewContribution(proposalId, virtualId, parentId);
+        emit NewContribution(proposalId, virtualId, parentId, datasets);
 
         return proposalId;
     }
@@ -100,7 +108,11 @@ contract ContributionNft is
     )
         public
         view
-        override(IContributionNft, ERC721Upgradeable, ERC721URIStorageUpgradeable)
+        override(
+            IContributionNft,
+            ERC721Upgradeable,
+            ERC721URIStorageUpgradeable
+        )
         returns (string memory)
     {
         return super.tokenURI(tokenId);
@@ -125,7 +137,11 @@ contract ContributionNft is
     )
         public
         view
-        override(ERC721Upgradeable, ERC721URIStorageUpgradeable, ERC721EnumerableUpgradeable)
+        override(
+            ERC721Upgradeable,
+            ERC721URIStorageUpgradeable,
+            ERC721EnumerableUpgradeable
+        )
         returns (bool)
     {
         return super.supportsInterface(interfaceId);
@@ -142,7 +158,11 @@ contract ContributionNft is
         address to,
         uint256 tokenId,
         address auth
-    ) internal override(ERC721Upgradeable, ERC721EnumerableUpgradeable) returns (address) {
+    )
+        internal
+        override(ERC721Upgradeable, ERC721EnumerableUpgradeable)
+        returns (address)
+    {
         return super._update(to, tokenId, auth);
     }
 
@@ -154,5 +174,11 @@ contract ContributionNft is
         uint256 tokenId
     ) public view override(IERC721, ERC721Upgradeable) returns (address) {
         return _ownerOf(tokenId);
+    }
+
+    function getDatasets(
+        uint256 tokenId
+    ) external view returns (uint256[] memory) {
+        return modelDatasets[tokenId];
     }
 }

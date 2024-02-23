@@ -5,7 +5,7 @@ interface IAgentReward {
     struct MainReward {
         uint32 blockNumber;
         uint256 amount;
-        uint256 personaCount;
+        uint256 agentCount;
         uint256 totalStaked;
     }
 
@@ -44,12 +44,14 @@ interface IAgentReward {
     event RewardSettingsUpdated(
         uint16 protocolShares,
         uint16 contributorShares,
-        uint16 stakerShares
+        uint16 stakerShares,
+        uint16 parentShares,
+        uint256 stakeThreshold
     );
 
     event RefContractsUpdated(
         address rewardToken,
-        address personaNft,
+        address agentNft,
         address contributionNft,
         address serviceNft
     );

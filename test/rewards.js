@@ -7,6 +7,7 @@ Test scenario:
 */
 const { expect } = require("chai");
 const { toBeHex } = require("ethers/utils");
+const abi = ethers.AbiCoder.defaultAbiCoder();
 const {
   loadFixture,
   mine,
@@ -28,13 +29,13 @@ function getDescHash(str) {
 }
 
 describe("Rewards", function () {
-  const PROPOSAL_THRESHOLD = parseEther("10000");
+  const PROPOSAL_THRESHOLD = parseEther("5000");
   const QUORUM = parseEther("10000");
   const STAKE_AMOUNTS = [
-    parseEther("10000"),
-    parseEther("2000"),
     parseEther("5000"),
-    parseEther("20000"),
+    parseEther("100000"),
+    parseEther("5000"),
+    parseEther("2000"),
   ];
   const UPTIME = [3, 1];
   const REWARD_AMOUNT = parseEther("2000");
@@ -85,9 +86,8 @@ describe("Rewards", function () {
     );
     await protocolDAO.waitForDeployment();
 
-    const personaNft = await ethers.deployContract("AgentNft", [
-      deployer.address,
-    ]);
+    const personaNft = await ethers.deployContract("AgentNft");
+    await personaNft.initialize(deployer.address);
     await personaNft.waitForDeployment();
 
     const personaToken = await ethers.deployContract("AgentToken");
@@ -108,6 +108,7 @@ describe("Rewards", function () {
       PROPOSAL_THRESHOLD,
       5,
       protocolDAO.target,
+      deployer.address
     );
 
     await personaNft.grantRole(
@@ -118,16 +119,14 @@ describe("Rewards", function () {
     const reward = await ethers.deployContract("AgentReward", [], {});
     await reward.waitForDeployment();
 
-    const contributionNft = await ethers.deployContract(
-      "ContributionNft",
-      [personaNft],
-      {}
-    );
+    const contributionNft = await ethers.deployContract("ContributionNft");
+    await contributionNft.initialize(personaNft);
 
-    const serviceNft = await ethers.deployContract(
-      "ServiceNft",
-      [personaNft, contributionNft.target],
-      {}
+    const serviceNft = await ethers.deployContract("ServiceNft");
+    await serviceNft.initialize(
+      personaNft,
+      contributionNft.target,
+      process.env.DATASET_SHARES
     );
 
     await personaNft.setContributionService(
@@ -141,16 +140,12 @@ describe("Rewards", function () {
       contributionNft.target,
       serviceNft.target,
       {
-        uptimeWeight: 7000,
-        stakeWeight: 3000,
         protocolShares: 1000,
         contributorShares: 5000,
         stakerShares: 9000,
-        datasetShares: 7000,
-        impactShares: 5000,
-      },
-      "2000000000000000000",
-      2000
+        parentShares: 2000,
+        stakeThreshold: "1000000000000000000000",
+      }
     );
     const role = await reward.GOV_ROLE();
     await reward.grantRole(role, signers[0].address);
@@ -265,14 +260,9 @@ describe("Rewards", function () {
         .propose([persona.token], [0], ["0x"], "Proposal 2")
         .then((tx) => tx.wait())
         .then((receipt) => receipt.logs[0].args[0]),
-      dao
-        .propose([persona.token], [0], ["0x"], "Proposal 3")
-        .then((tx) => tx.wait())
-        .then((receipt) => receipt.logs[0].args[0]),
     ]);
     await dao.castVote(proposals[0], 1);
-    await dao.castVote(proposals[1], 1);
-    await dao.castVote(proposals[2], 1);
+    await dao.connect(validator2).castVote(proposals[0], 1);
     await dao.connect(validator2).castVote(proposals[1], 1);
 
     // Distribute rewards
@@ -288,6 +278,7 @@ describe("Rewards", function () {
     maturity,
     parentId,
     isModel,
+    datasetId,
     desc,
     base,
     account
@@ -317,21 +308,22 @@ describe("Rewards", function () {
       TOKEN_URI,
       proposalId,
       parentId,
-      isModel
+      isModel,
+      datasetId
     );
 
+    const voteParams = isModel
+      ? abi.encode(["uint256", "uint8[] memory"], [maturity, [0, 1, 1, 0, 2]])
+      : "0x";
     await personaDAO.castVoteWithReasonAndParams(
       proposalId,
       1,
       "lfg",
-      toBeHex(maturity, 32)
+      voteParams
     );
     await personaDAO
-      .connect(signers[1])
-      .castVoteWithReasonAndParams(proposalId, 1, "lfg", toBeHex(maturity, 32));
-    await personaDAO
       .connect(signers[2])
-      .castVoteWithReasonAndParams(proposalId, 1, "lfg", toBeHex(maturity, 32));
+      .castVoteWithReasonAndParams(proposalId, 1, "lfg", voteParams);
     await mine(600);
 
     await personaDAO.execute(proposalId);
@@ -344,8 +336,8 @@ describe("Rewards", function () {
     NFT 1 (LLM DS)	
     NFT 2 (LLM Model)	
     NFT 3 (Voice DS)	
-    NFT 4 (Voice Model *current)	
-    NFT5 (LLM Model *current)
+    NFT 4 (Voice Model *current)
+    NFT 5 (Visual model, no DS)
     */
     const base = await stakeAndVote();
     const signers = await ethers.getSigners();
@@ -354,36 +346,64 @@ describe("Rewards", function () {
     const account = signers[10].address;
 
     // NFT 1 (LLM DS)
-    let nft = await createContribution(0, 0, 0, false, "LLM DS", base, account);
+    let nft = await createContribution(
+      0,
+      0,
+      0,
+      false,
+      0,
+      "LLM DS",
+      base,
+      account
+    );
     contributionList.push(nft);
 
     // NFT 2 (LLM Model)
-    nft = await createContribution(0, 10, 0, true, "LLM Model", base, account);
+    nft = await createContribution(
+      0,
+      200,
+      0,
+      true,
+      nft,
+      "LLM Model",
+      base,
+      account
+    );
     contributionList.push(nft);
 
     // NFT 3 (Voice DS)
-    nft = await createContribution(1, 0, 0, false, "Voice DS", base, account);
+    nft = await createContribution(
+      1,
+      0,
+      0,
+      false,
+      0,
+      "Voice DS",
+      base,
+      account
+    );
     contributionList.push(nft);
 
     // NFT 4 (Voice Model *current)
     nft = await createContribution(
       1,
-      40,
+      100,
       0,
       true,
+      nft,
       "Voice Model",
       base,
       account
     );
     contributionList.push(nft);
 
-    // NFT 5 (LLM Model *current)
     nft = await createContribution(
+      2,
+      100,
       0,
-      20,
-      contributionList[1],
       true,
-      "LLM Model 2",
+      0,
+      "Visual Model",
       base,
       account
     );
@@ -404,7 +424,7 @@ describe("Rewards", function () {
 
   it("should be able to retrieve past reward settings", async function () {
     const { reward } = await loadFixture(deployBaseContracts);
-    const settings = [7000n, 3000n, 1000n, 5000n, 9000n, 7000n, 5000n];
+    const settings = [1000n, 5000n, 9000n, 2000n, 1000000000000000000000n];
     expect(await reward.getRewardSettings()).to.deep.equal(settings);
     let blockNumber = await ethers.provider.getBlockNumber();
     expect(await reward.getPastRewardSettings(blockNumber - 1)).to.deep.equal(
@@ -413,18 +433,10 @@ describe("Rewards", function () {
     for (let i = 0; i < 10; i++) {
       const val = i + 2;
       let blockNumber = await ethers.provider.getBlockNumber();
-      await reward.setRewardSettings(val, val, val, val, val, val, val);
+      await reward.setRewardSettings(val, val, val, val, val);
       await mine(1);
       expect(await reward.getPastRewardSettings(blockNumber + 1)).to.deep.equal(
-        [
-          BigInt(val),
-          BigInt(val),
-          BigInt(val),
-          BigInt(val),
-          BigInt(val),
-          BigInt(val),
-          BigInt(val),
-        ]
+        [BigInt(val), BigInt(val), BigInt(val), BigInt(val), BigInt(val)]
       );
     }
     expect(await reward.getRewardSettings()).to.deep.equal([
@@ -433,36 +445,37 @@ describe("Rewards", function () {
       11n,
       11n,
       11n,
-      11n,
-      11n,
     ]);
   });
 
-  it("should allow withdrawal of protocol rewards", async function () {
-    const { reward, demoToken } = await loadFixture(stakeAndVote);
-    const [validator1] = this.accounts;
-
-    expect(await demoToken.balanceOf(validator1)).to.equal(parseEther("0"));
-    expect(await reward.protocolRewards()).to.equal(parseEther("200"));
-    await reward.withdrawProtocolRewards();
-    expect(await demoToken.balanceOf(validator1)).to.equal(parseEther("200"));
-  });
-
-  it("should calculate correct staker rewards", async function () {
-    const { reward } = await loadFixture(stakeAndVote);
+  it("should calculate correct staker and validator rewards", async function () {
+    const { reward, persona } = await loadFixture(stakeAndVote);
     const [validator1, staker1, validator2, staker2] = this.accounts;
     await mine(1);
 
-    const total = await Promise.all([
-      reward.getClaimableStakerRewards(validator1, 1),
-      reward.getClaimableStakerRewards(staker1, 1),
-      reward.getClaimableStakerRewards(validator2, 1),
-      reward.getClaimableStakerRewards(staker2, 1),
-    ]).then((rewards) => rewards.reduce((a, b) => a + b, 0n));
-    expect(Math.ceil(parseFloat(formatEther(total)))).to.equal(810);
+    expect(
+      parseFloat(
+        formatEther(await reward.getTotalClaimableRewards(validator1, [1], []))
+      ).toFixed(4)
+    ).to.be.equal("60.2679");
+    expect(
+      parseFloat(
+        formatEther(await reward.getTotalClaimableRewards(staker1, [1], []))
+      ).toFixed(4)
+    ).to.be.equal("361.6071");
+    expect(
+      parseFloat(
+        formatEther(await reward.getTotalClaimableRewards(validator2, [1], []))
+      ).toFixed(4)
+    ).to.be.equal("41.7857");
+    expect(
+      parseFloat(
+        formatEther(await reward.getTotalClaimableRewards(staker2, [1], []))
+      ).toFixed(4)
+    ).to.be.equal("14.4643");
   });
 
-  it("should withdraw correct staker rewards", async function () {
+  it("should withdraw correct staker and validator rewards", async function () {
     const { reward, demoToken } = await loadFixture(stakeAndVote);
     const [validator1, staker1, validator2, staker2] = this.signers;
     await mine(1);
@@ -484,169 +497,104 @@ describe("Rewards", function () {
       parseEther("0")
     );
 
-    await reward.claimStakerRewards(1);
+    await reward.claimAllRewards([1], []);
     expect(
-      parseFloat(formatEther(await demoToken.balanceOf(validator1))).toFixed(0)
-    ).to.be.equal("420");
+      parseFloat(formatEther(await demoToken.balanceOf(validator1))).toFixed(4)
+    ).to.be.equal("60.2679");
 
-    await reward.connect(staker1).claimStakerRewards(1);
+    await reward.connect(staker1).claimAllRewards([1], []);
     expect(
-      parseFloat(formatEther(await demoToken.balanceOf(staker1))).toFixed(0)
-    ).to.be.equal("84");
+      parseFloat(formatEther(await demoToken.balanceOf(staker1))).toFixed(4)
+    ).to.be.equal("361.6071");
 
-    await reward.connect(validator2).claimStakerRewards(1);
+    await reward.connect(validator2).claimAllRewards([1], []);
     expect(
-      parseFloat(formatEther(await demoToken.balanceOf(validator2))).toFixed(0)
-    ).to.be.equal("61");
+      parseFloat(formatEther(await demoToken.balanceOf(validator2))).toFixed(4)
+    ).to.be.equal("41.7857");
 
-    await reward.connect(staker2).claimStakerRewards(1);
+    await reward.connect(staker2).claimAllRewards([1], []);
     expect(
-      parseFloat(formatEther(await demoToken.balanceOf(staker2))).toFixed(0)
-    ).to.be.equal("245");
+      parseFloat(formatEther(await demoToken.balanceOf(staker2))).toFixed(4)
+    ).to.be.equal("14.4643");
 
     // Prevent double claim
-    await reward.claimStakerRewards(1);
+    await reward.claimAllRewards([1], []);
     expect(
-      parseFloat(formatEther(await demoToken.balanceOf(validator1))).toFixed(0)
-    ).to.be.equal("420");
-    await expect(reward.connect(staker1).claimStakerRewards(1))
+      parseFloat(formatEther(await demoToken.balanceOf(validator1))).toFixed(4)
+    ).to.be.equal("60.2679");
+    await expect(reward.connect(staker1).claimAllRewards([1], []));
     expect(
-      parseFloat(formatEther(await demoToken.balanceOf(staker1))).toFixed(0)
-    ).to.be.equal("84");
-    await reward.connect(validator2).claimStakerRewards(1)
+      parseFloat(formatEther(await demoToken.balanceOf(staker1))).toFixed(4)
+    ).to.be.equal("361.6071");
+    await expect(reward.connect(validator2).claimAllRewards([1], []));
     expect(
-      parseFloat(formatEther(await demoToken.balanceOf(validator2))).toFixed(0)
-    ).to.be.equal("61");
-    await reward.connect(staker2).claimStakerRewards(1)
+      parseFloat(formatEther(await demoToken.balanceOf(validator2))).toFixed(4)
+    ).to.be.equal("41.7857");
+    await expect(reward.connect(staker2).claimAllRewards([1], []));
     expect(
-      parseFloat(formatEther(await demoToken.balanceOf(staker2))).toFixed(0)
-    ).to.be.equal("245");
+      parseFloat(formatEther(await demoToken.balanceOf(staker2))).toFixed(4)
+    ).to.be.equal("14.4643");
   });
 
-  it("should calculate correct staker rewards", async function () {
-    const { reward } = await loadFixture(stakeAndVote);
-    const [validator1, staker1, validator2, staker2] = this.accounts;
-    await mine(1);
+  it("should calculate correct contributor rewards", async function () {
+    const { contributionList, demoToken, reward, serviceNft } =
+      await loadFixture(prepareContributions);
+    const taxCollector = this.signers[10];
+    expect(await serviceNft.getMaturity(contributionList[0])).to.equal(200n);
+    expect(await serviceNft.getMaturity(contributionList[1])).to.equal(200n);
+    expect(await serviceNft.getMaturity(contributionList[2])).to.equal(100n);
+    expect(await serviceNft.getMaturity(contributionList[3])).to.equal(100n);
 
-    const amt1 = await reward.getClaimableValidatorRewards(validator1, 1);
-    const amt2 = await reward.getClaimableValidatorRewards(staker1, 1);
-    const amt3 = await reward.getClaimableValidatorRewards(validator2, 1);
-    const amt4 = await reward.getClaimableValidatorRewards(staker2, 1);
-    expect(Math.round(formatEther(amt1))).to.equal(56);
-    expect(Math.round(formatEther(amt2))).to.equal(0);
-    expect(Math.round(formatEther(amt3))).to.equal(34);
-    expect(Math.round(formatEther(amt4))).to.equal(0);
-  });
+    expect(await serviceNft.getImpact(contributionList[0])).to.equal(140n);
+    expect(await serviceNft.getImpact(contributionList[1])).to.equal(60n);
+    expect(await serviceNft.getImpact(contributionList[2])).to.equal(70n);
+    expect(await serviceNft.getImpact(contributionList[3])).to.equal(30n);
 
-  it("should withdraw correct validator rewards", async function () {
-    const { reward, demoToken } = await loadFixture(stakeAndVote);
-    const [validator1, staker1, validator2, staker2] = this.signers;
-    await mine(1);
-
-    expect(await demoToken.balanceOf(reward.target)).to.be.equal(
-      parseEther("2000")
-    );
-
-    expect(await demoToken.balanceOf(validator1.address)).to.be.equal(
-      parseEther("0")
-    );
-    expect(await demoToken.balanceOf(staker1.address)).to.be.equal(
-      parseEther("0")
-    );
-    expect(await demoToken.balanceOf(validator2.address)).to.be.equal(
-      parseEther("0")
-    );
-    expect(await demoToken.balanceOf(staker2.address)).to.be.equal(
-      parseEther("0")
-    );
-
-    await reward.claimValidatorRewards(1);
     expect(
-      Math.round(formatEther(await demoToken.balanceOf(validator1)))
-    ).to.be.equal(56);
-
-    await reward.connect(validator2).claimValidatorRewards(1);
+      formatEther(
+        await reward.getTotalClaimableRewards(
+          taxCollector.address,
+          [],
+          [contributionList[0]]
+        )
+      )
+    ).to.be.equal("210.0");
     expect(
-      Math.round(formatEther(await demoToken.balanceOf(validator2)))
-    ).to.be.equal(34);
-
-    // Prevent double claim
-    expect(reward.claimValidatorRewards(1));
+      formatEther(
+        await reward.getTotalClaimableRewards(
+          taxCollector.address,
+          [],
+          [contributionList[1]]
+        )
+      )
+    ).to.be.equal("90.0");
     expect(
-      Math.round(formatEther(await demoToken.balanceOf(validator1)))
-    ).to.be.equal(56);
-
-    await reward.connect(staker1).claimValidatorRewards(1);
+      formatEther(
+        await reward.getTotalClaimableRewards(
+          taxCollector.address,
+          [],
+          [contributionList[2]]
+        )
+      )
+    ).to.be.equal("210.0");
     expect(
-      Math.round(formatEther(await demoToken.balanceOf(staker1)))
-    ).to.be.equal(0);
-
-    await reward.connect(validator2).claimValidatorRewards(1);
+      formatEther(
+        await reward.getTotalClaimableRewards(
+          taxCollector.address,
+          [],
+          [contributionList[3]]
+        )
+      )
+    ).to.be.equal("90.0");
     expect(
-      Math.round(formatEther(await demoToken.balanceOf(validator2)))
-    ).to.be.equal(34);
-
-    await reward.connect(staker2).claimValidatorRewards(1);
-    expect(
-      Math.round(formatEther(await demoToken.balanceOf(staker2)))
-    ).to.be.equal(0);
-  });
-
-  it("should calculate correct model contributor rewards", async function () {
-    const { contributionList, reward, serviceNft } = await loadFixture(
-      prepareContributions
-    );
-    expect(await serviceNft.getMaturity(contributionList[0])).to.equal(0n);
-    expect(await serviceNft.getMaturity(contributionList[1])).to.equal(10n);
-    expect(await serviceNft.getMaturity(contributionList[2])).to.equal(0n);
-    expect(await serviceNft.getMaturity(contributionList[3])).to.equal(40n);
-    expect(await serviceNft.getMaturity(contributionList[4])).to.equal(20n);
-
-    expect(await reward.getModelReward(contributionList[0])).to.deep.equal([
-      parseEther("0"),
-      parseEther("0"),
-      parseEther("0"),
-      parseEther("0"),
-    ]);
-    expect(await reward.getClaimableModelRewards(contributionList[0])).to.equal(
-      0n
-    );
-    expect(await reward.getModelReward(contributionList[1])).to.deep.equal([
-      parseEther("75"),
-      parseEther("0"),
-      parseEther("0"),
-      parseEther("0"),
-    ]);
-    expect(await reward.getClaimableModelRewards(contributionList[1])).to.equal(
-      parseEther("90")
-    ); // 75 + 15 (NFT5's 20%)
-    expect(await reward.getModelReward(contributionList[2])).to.deep.equal([
-      parseEther("0"),
-      parseEther("0"),
-      parseEther("0"),
-      parseEther("0"),
-    ]);
-    expect(await reward.getClaimableModelRewards(contributionList[2])).to.equal(
-      parseEther("0")
-    );
-    expect(await reward.getModelReward(contributionList[3])).to.deep.equal([
-      parseEther("367.5"),
-      parseEther("0"),
-      parseEther("0"),
-      parseEther("0"),
-    ]);
-    expect(await reward.getClaimableModelRewards(contributionList[3])).to.equal(
-      parseEther("367.5")
-    );
-    expect(await reward.getModelReward(contributionList[4])).to.deep.equal([
-      parseEther("127.5"),
-      parseEther("15"),
-      parseEther("0"),
-      parseEther("0"),
-    ]);
-    expect(await reward.getClaimableModelRewards(contributionList[4])).to.equal(
-      parseEther("127.5")
-    ); // 142.5 - 15 (NFT5's parent 20%)
+      formatEther(
+        await reward.getTotalClaimableRewards(
+          taxCollector.address,
+          [],
+          [contributionList[4]]
+        )
+      )
+    ).to.be.equal("300.0");
   });
 
   it("should claim correct model contributor rewards", async function () {
@@ -657,257 +605,106 @@ describe("Rewards", function () {
     expect(await demoToken.balanceOf(taxCollector.address)).to.be.equal(0);
 
     await expect(
-      reward.connect(taxCollector).claimModelRewards(contributionList[0])
-    ).to.be.revertedWith("Not a model NFT");
-    expect(await demoToken.balanceOf(taxCollector.address)).to.be.equal(0n);
-
-    await expect(
-      reward.connect(taxCollector).claimModelRewards(contributionList[1])
-    )
-      .to.emit(reward, "ModelRewardsClaimed")
-      .withArgs(
-        contributionList[1],
-        taxCollector.address,
-        parseEther("90"),
-        parseEther("15")
-      );
-    expect(await demoToken.balanceOf(taxCollector.address)).to.be.equal(
-      parseEther("90")
-    );
-
-    await expect(
-      reward.connect(taxCollector).claimModelRewards(contributionList[2])
-    ).to.be.revertedWith("Not a model NFT");
-    expect(await demoToken.balanceOf(taxCollector.address)).to.be.equal(
-      parseEther("90")
-    );
-
-    await expect(
-      reward.connect(taxCollector).claimModelRewards(contributionList[3])
-    )
-      .to.emit(reward, "ModelRewardsClaimed")
-      .withArgs(
-        contributionList[3],
-        taxCollector.address,
-        parseEther("367.5"),
-        parseEther("0")
-      );
-    expect(await demoToken.balanceOf(taxCollector.address)).to.be.equal(
-      parseEther("457.5")
-    );
-
-    await expect(
-      reward.connect(taxCollector).claimModelRewards(contributionList[4])
-    )
-      .to.emit(reward, "ModelRewardsClaimed")
-      .withArgs(
-        contributionList[4],
-        taxCollector.address,
-        parseEther("127.5"),
-        parseEther("0")
-      );
-    expect(await demoToken.balanceOf(taxCollector.address)).to.be.equal(
-      parseEther("585")
-    );
-  });
-
-  it("should calculate correct dataset contributor rewards", async function () {
-    const { contributionList, reward, serviceNft } = await loadFixture(
-      prepareContributions
-    );
-
+      reward.connect(taxCollector).claimAllRewards([], [contributionList[0]])
+    ).to.be.fulfilled;
     expect(
-      await reward.getClaimableDatasetRewards(contributionList[0])
-    ).to.equal(parseEther("157.5"));
-    expect(
-      await reward.getClaimableDatasetRewards(contributionList[1])
-    ).to.equal(parseEther("0"));
-    expect(
-      await reward.getClaimableDatasetRewards(contributionList[2])
-    ).to.equal(parseEther("157.5"));
-    expect(
-      await reward.getClaimableDatasetRewards(contributionList[3])
-    ).to.equal(parseEther("0"));
-    expect(
-      await reward.getClaimableDatasetRewards(contributionList[4])
-    ).to.equal(parseEther("0"));
-  });
-
-  it("should claim correct dataset rewards", async function () {
-    const { contributionList, reward, demoToken } = await loadFixture(
-      prepareContributions
-    );
-    const taxCollector = this.signers[10];
-    expect(await demoToken.balanceOf(taxCollector.address)).to.be.equal(0);
+      formatEther(await demoToken.balanceOf(taxCollector.address))
+    ).to.be.equal("210.0");
     await expect(
-      reward.claimDatasetRewards(contributionList[0])
-    ).to.be.revertedWith("Only NFT owner can claim rewards");
-
+      reward.connect(taxCollector).claimAllRewards([], [contributionList[1]])
+    ).to.be.fulfilled;
+    expect(
+      formatEther(await demoToken.balanceOf(taxCollector.address))
+    ).to.be.equal("300.0");
     await expect(
-      reward.connect(taxCollector).claimDatasetRewards(contributionList[0])
-    )
-      .to.emit(reward, "DatasetRewardsClaimed")
-      .withArgs(contributionList[0], taxCollector.address, parseEther("157.5"));
-    expect(await demoToken.balanceOf(taxCollector.address)).to.be.equal(
-      parseEther("157.5")
-    );
-
-    await reward.connect(taxCollector).claimDatasetRewards(contributionList[1]);
-    expect(await demoToken.balanceOf(taxCollector.address)).to.be.equal(
-      parseEther("157.5")
-    ); // Nothing to claim, balance remains the same
-
+      reward.connect(taxCollector).claimAllRewards([], [contributionList[2]])
+    ).to.be.fulfilled;
+    expect(
+      formatEther(await demoToken.balanceOf(taxCollector.address))
+    ).to.be.equal("510.0");
     await expect(
-      reward.connect(taxCollector).claimDatasetRewards(contributionList[2])
-    )
-      .to.emit(reward, "DatasetRewardsClaimed")
-      .withArgs(contributionList[2], taxCollector.address, parseEther("157.5"));
-    expect(await demoToken.balanceOf(taxCollector.address)).to.be.equal(
-      parseEther("315")
-    );
-
-    await reward.connect(taxCollector).claimDatasetRewards(contributionList[3]);
-    await reward.connect(taxCollector).claimDatasetRewards(contributionList[4]);
+      reward.connect(taxCollector).claimAllRewards([], [contributionList[3]])
+    ).to.be.fulfilled;
+    expect(
+      formatEther(await demoToken.balanceOf(taxCollector.address))
+    ).to.be.equal("600.0");
+    await expect(
+      reward.connect(taxCollector).claimAllRewards([], [contributionList[4]])
+    ).to.be.fulfilled;
+    expect(
+      formatEther(await demoToken.balanceOf(taxCollector.address))
+    ).to.be.equal("900.0");
 
     // Prevent double claim
-    await reward.connect(taxCollector).claimDatasetRewards(contributionList[0]);
-    expect(await demoToken.balanceOf(taxCollector.address)).to.be.equal(
-      parseEther("315")
-    ); // Nothing to claim, balance remains the same
+    await expect(
+      reward.connect(taxCollector).claimAllRewards([], contributionList)
+    ).to.be.fulfilled;
+    expect(
+      formatEther(await demoToken.balanceOf(taxCollector.address))
+    ).to.be.equal("900.0");
   });
 
   it("should claim correct total rewards", async function () {
-    const base = await loadFixture(stakeAndVote);
-    const { reward, demoToken, contributionNft } = base;
+    const { contributionList, reward, serviceNft, demoToken } =
+      await loadFixture(prepareContributions);
     const [validator1, staker1, validator2, staker2] = this.signers;
+    const taxCollector = this.signers[10];
     await mine(1);
 
-    expect(await demoToken.balanceOf(validator1.address)).to.be.equal(
-      parseEther("0")
-    );
-    expect(await demoToken.balanceOf(staker1.address)).to.be.equal(
-      parseEther("0")
-    );
-    expect(await demoToken.balanceOf(validator2.address)).to.be.equal(
-      parseEther("0")
-    );
-    expect(await demoToken.balanceOf(staker2.address)).to.be.equal(
-      parseEther("0")
-    );
+    await reward.connect(validator1).claimAllRewards([1], []);
+    expect(
+      parseFloat(formatEther(await demoToken.balanceOf(validator1))).toFixed(4)
+    ).to.be.equal("163.5842");
+    await reward.connect(staker1).claimAllRewards([1], []);
+    expect(
+      parseFloat(formatEther(await demoToken.balanceOf(staker1))).toFixed(4)
+    ).to.be.equal("981.5051");
+    await reward.connect(validator2).claimAllRewards([1], []);
+    expect(
+      parseFloat(formatEther(await demoToken.balanceOf(validator2))).toFixed(4)
+    ).to.be.equal("83.5714");
+    await reward.connect(staker2).claimAllRewards([1], []);
+    expect(
+      parseFloat(formatEther(await demoToken.balanceOf(staker2))).toFixed(4)
+    ).to.be.equal("28.9286");
 
-    // Prepare contributions
-    // validator1 = model contributor, staker1 = ds contributor
-    // NFT 1 (LLM DS)
-    const contributionList = [];
-    let nft = await createContribution(
-      0,
-      0,
-      0,
-      false,
-      "LLM DS",
-      base,
-      staker1.address
-    );
-    contributionList.push(nft);
-
-    // NFT 2 (LLM Model)
-    nft = await createContribution(
-      0,
-      10,
-      0,
-      true,
-      "LLM Model",
-      base,
-      validator1.address
-    );
-    contributionList.push(nft);
-
-    // NFT 3 (Voice DS)
-    nft = await createContribution(
-      1,
-      0,
-      0,
-      false,
-      "Voice DS",
-      base,
-      staker1.address
-    );
-    contributionList.push(nft);
-
-    // NFT 4 (Voice Model *current)
-    nft = await createContribution(
-      1,
-      40,
-      0,
-      true,
-      "Voice Model",
-      base,
-      validator1.address
-    );
-    contributionList.push(nft);
-
-    // NFT 5 (LLM Model *current)
-    nft = await createContribution(
-      0,
-      20,
-      contributionList[1],
-      true,
-      "LLM Model 2",
-      base,
-      validator1.address
-    );
-    contributionList.push(nft);
-
-    await base.demoToken.mint(validator1.address, REWARD_AMOUNT);
-    await base.demoToken.approve(reward.target, REWARD_AMOUNT);
-    await base.reward.distributeRewards(REWARD_AMOUNT);
-    await mine(1);
-    //////////
-
-    const expectedVSAmount = [856.51, 151.15, 221.85, 570.48];
-    const expectedContributorAmount = [585, 315, 0, 0];
-
-    for (let i = 0; i < 4; i++) {
-      const { datasetNfts, modelNfts } = await getNfts(
-        this.signers[i].address,
-        contributionNft
-      );
-      expect(
-        parseFloat(
-          formatEther(
-            await reward.getTotalClaimableRewards(
-              this.signers[i].address,
-              1,
-              datasetNfts,
-              modelNfts
-            )
-          )
-        ).toFixed(2)
-      ).to.equal(`${expectedVSAmount[i] + expectedContributorAmount[i]}`);
-      await reward
-        .connect(this.signers[i])
-        .claimAllRewards(1, datasetNfts, modelNfts);
-      expect(
-        parseFloat(
-          formatEther(await demoToken.balanceOf(this.signers[i].address))
-        ).toFixed(2)
-      ).to.be.equal(`${expectedVSAmount[i] + expectedContributorAmount[i]}`);
-    }
+    await expect(
+      reward.connect(taxCollector).claimAllRewards([], contributionList)
+    ).to.be.fulfilled;
+    expect(
+      parseFloat(formatEther(await demoToken.balanceOf(taxCollector))).toFixed(
+        4
+      )
+    ).to.be.equal("900.0000");
   });
 
-  async function getNfts(account, contributionNft) {
-    const totalNfts = await contributionNft.balanceOf(account);
-    const datasetNfts = [];
-    const modelNfts = [];
-    for (let i = 0; i < totalNfts; i++) {
-      const id = await contributionNft.tokenOfOwnerByIndex(account, i);
-      const isModel = await contributionNft.isModel(id);
-      if (isModel) {
-        modelNfts.push(id);
-      } else {
-        datasetNfts.push(id);
-      }
-    }
-    return { datasetNfts, modelNfts };
-  }
+  it("should withdraw correct protocol rewards", async function () {
+    const { contributionList, reward, serviceNft, demoToken } =
+      await loadFixture(prepareContributions);
+    const treasury = this.signers[9];
+
+    expect(await demoToken.balanceOf(treasury.address)).to.be.equal(
+      parseEther("0")
+    );
+    await reward.withdrawProtocolRewards(treasury.address);
+    expect(await demoToken.balanceOf(treasury.address)).to.be.equal(
+      parseEther("400")
+    );
+  });
+
+  it("should withdraw correct validator pool rewards", async function () {
+    const { contributionList, reward, serviceNft, demoToken } =
+      await loadFixture(prepareContributions);
+    const treasury = this.signers[9];
+
+    expect(await demoToken.balanceOf(treasury.address)).to.be.equal(
+      parseEther("0")
+    );
+    await reward.withdrawValidatorPoolRewards(treasury.address);
+    expect(
+      parseFloat(
+        formatEther(await demoToken.balanceOf(treasury.address))
+      ).toFixed(4)
+    ).to.be.equal("542.4107");
+  });
 });

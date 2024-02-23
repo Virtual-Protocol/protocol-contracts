@@ -111,7 +111,6 @@ contract AgentReward is IAgentReward, Initializable, AccessControl, TokenSaver {
     // Distribute rewards
     // ----------------
 
-    // DONE
     function distributeRewards(uint256 amount) public onlyGov returns (uint32) {
         require(amount > 0, "Invalid amount");
 
@@ -138,10 +137,9 @@ contract AgentReward is IAgentReward, Initializable, AccessControl, TokenSaver {
         return SafeCast.toUint32(_mainRewards.length - 1);
     }
 
-    // DONE
     function _distributeProtocolRewards(
         uint256 amount
-    ) private view returns (uint256) {
+    ) private returns (uint256) {
         RewardSettingsCheckpoints.RewardSettings
             memory rewardSettings = _rewardSettings.latest();
         uint256 protocolShares = (amount * rewardSettings.protocolShares) /
@@ -150,7 +148,6 @@ contract AgentReward is IAgentReward, Initializable, AccessControl, TokenSaver {
         return protocolShares;
     }
 
-    // DONE
     // Prepare agent reward placeholders and calculate total staked tokens for all eligible agents
     function _prepareAgentsRewards(
         uint256 amount,
@@ -196,7 +193,6 @@ contract AgentReward is IAgentReward, Initializable, AccessControl, TokenSaver {
         emit NewMainReward(mainPos, amount, agentCount, grandTotalStaked);
     }
 
-    // DONE
     // Calculate agent rewards based on staked weightage and distribute to all stakers, validators and contributors
     function _distributeAgentRewards(
         uint256 virtualId,
@@ -229,8 +225,7 @@ contract AgentReward is IAgentReward, Initializable, AccessControl, TokenSaver {
             reward.validatorAmount,
             virtualId,
             reward.id,
-            mainReward.totalStaked,
-            settings
+            mainReward.totalStaked
         );
         _distributeContributorRewards(
             reward.contributorAmount,
@@ -239,14 +234,12 @@ contract AgentReward is IAgentReward, Initializable, AccessControl, TokenSaver {
         );
     }
 
-    // DONE
     // Calculate validator rewards based on votes weightage and participation rate
     function _distributeValidatorRewards(
         uint256 amount,
         uint256 virtualId,
-        uint256 rewardId,
-        uint256 totalStaked,
-        RewardSettingsCheckpoints.RewardSettings memory settings
+        uint48 rewardId,
+        uint256 totalStaked
     ) private {
         IAgentNft nft = IAgentNft(agentNft);
         // Calculate weighted validator shares
@@ -257,10 +250,7 @@ contract AgentReward is IAgentReward, Initializable, AccessControl, TokenSaver {
 
             // Get validator revenue by votes weightage
             address stakingAddress = nft.virtualInfo(virtualId).token;
-            uint256 votes = IERC5805(stakingAddress).getPastVotes(
-                validator,
-                block.number
-            );
+            uint256 votes = IERC5805(stakingAddress).getVotes(validator);
             uint256 validatorRewards = (amount * votes) / totalStaked;
 
             // Calc validator reward based on participation rate
@@ -272,7 +262,6 @@ contract AgentReward is IAgentReward, Initializable, AccessControl, TokenSaver {
         }
     }
 
-    // DONE
     function _distributeContributorRewards(
         uint256 amount,
         uint256 virtualId,
@@ -289,7 +278,6 @@ contract AgentReward is IAgentReward, Initializable, AccessControl, TokenSaver {
             _rewards[virtualId].length - 1
         ];
         reward.coreAmount = amount / coreTypes.length;
-        uint256[] memory coreImpacts = new uint256[](coreTypes.length);
         uint256[] memory services = nft.getAllServices(virtualId);
 
         // Populate service impacts
@@ -303,7 +291,7 @@ contract AgentReward is IAgentReward, Initializable, AccessControl, TokenSaver {
             }
 
             ServiceReward storage serviceReward = _serviceRewards[serviceId];
-            if(serviceReward.impact == 0){
+            if (serviceReward.impact == 0) {
                 serviceReward.impact = impact;
             }
             _rewardImpacts[reward.id][
@@ -338,8 +326,6 @@ contract AgentReward is IAgentReward, Initializable, AccessControl, TokenSaver {
     // ----------------
     // Functions to query rewards
     // ----------------
-
-    // Done
     function _getClaimableStakerRewardsAt(
         uint256 pos,
         uint256 virtualId,
@@ -378,7 +364,6 @@ contract AgentReward is IAgentReward, Initializable, AccessControl, TokenSaver {
                 uint256(settings.stakerShares)) / DENOMINATOR;
     }
 
-    // DONE
     function _getClaimableStakerRewards(
         address staker,
         uint256 virtualId
@@ -392,7 +377,7 @@ contract AgentReward is IAgentReward, Initializable, AccessControl, TokenSaver {
             .virtualInfo(virtualId)
             .token;
 
-        Claim memory claim = claimedStakerRewards(staker, virtualId);
+        Claim memory claim = _claimedStakerRewards[staker][virtualId];
         uint256 total = 0;
         for (uint256 i = claim.rewardCount; i < count; i++) {
             total += _getClaimableStakerRewardsAt(
@@ -406,7 +391,6 @@ contract AgentReward is IAgentReward, Initializable, AccessControl, TokenSaver {
         return total;
     }
 
-    // DONE
     function _getClaimableValidatorRewardsAt(
         uint256 pos,
         uint256 virtualId,
@@ -427,7 +411,6 @@ contract AgentReward is IAgentReward, Initializable, AccessControl, TokenSaver {
             DENOMINATOR;
     }
 
-    // DONE
     function _getClaimableValidatorRewards(
         address validator,
         uint256 virtualId
@@ -446,7 +429,6 @@ contract AgentReward is IAgentReward, Initializable, AccessControl, TokenSaver {
         return total;
     }
 
-    // DONE
     function getChildrenRewards(uint256 nftId) public view returns (uint256) {
         uint256 childrenAmount = 0;
         uint256[] memory children = IContributionNft(contributionNft)
@@ -461,7 +443,6 @@ contract AgentReward is IAgentReward, Initializable, AccessControl, TokenSaver {
         return childrenAmount;
     }
 
-    // DONE
     function _getClaimableServiceRewards(
         uint256 nftId
     ) public view returns (uint256 total) {
@@ -474,7 +455,6 @@ contract AgentReward is IAgentReward, Initializable, AccessControl, TokenSaver {
     // ----------------
     // Functions to claim rewards
     // ----------------
-    // DONE
     function _claimStakerRewards(address account, uint256 virtualId) internal {
         uint256 amount = _getClaimableStakerRewards(account, virtualId);
         if (amount == 0) {
@@ -491,7 +471,6 @@ contract AgentReward is IAgentReward, Initializable, AccessControl, TokenSaver {
         claim.totalClaimed += amount;
     }
 
-    // DONE
     function _claimValidatorRewards(uint256 virtualId) internal {
         address account = _msgSender();
 
@@ -510,21 +489,18 @@ contract AgentReward is IAgentReward, Initializable, AccessControl, TokenSaver {
         claim.totalClaimed += amount;
     }
 
-    // DONE
-    function withdrawProtocolRewards() external onlyGov {
+    function withdrawProtocolRewards(address recipient) external onlyGov {
         require(protocolRewards > 0, "No protocol rewards");
-        IERC20(rewardToken).safeTransfer(_msgSender(), protocolRewards);
+        IERC20(rewardToken).safeTransfer(recipient, protocolRewards);
         protocolRewards = 0;
     }
 
-    // DONE
-    function withdrawValidatorPoolRewards() external onlyGov {
+    function withdrawValidatorPoolRewards(address recipient) external onlyGov {
         require(validatorPoolRewards > 0, "No validator pool rewards");
-        IERC20(rewardToken).safeTransfer(_msgSender(), validatorPoolRewards);
+        IERC20(rewardToken).safeTransfer(recipient, validatorPoolRewards);
         validatorPoolRewards = 0;
     }
 
-    // DONE
     function getServiceReward(
         uint256 virtualId
     ) public view returns (ServiceReward memory) {
@@ -540,7 +516,7 @@ contract AgentReward is IAgentReward, Initializable, AccessControl, TokenSaver {
 
         ServiceReward storage serviceReward = _serviceRewards[nftId];
         uint256 total = (serviceReward.amount - serviceReward.totalClaimed);
- 
+
         serviceReward.totalClaimed += total;
 
         // Claim children rewards
@@ -623,6 +599,7 @@ contract AgentReward is IAgentReward, Initializable, AccessControl, TokenSaver {
                 stakeThreshold_
             )
         );
+
         emit RewardSettingsUpdated(
             protocolShares_,
             contributorShares_,
@@ -634,18 +611,18 @@ contract AgentReward is IAgentReward, Initializable, AccessControl, TokenSaver {
 
     function updateRefContracts(
         address rewardToken_,
-        address personaNft_,
+        address agentNft_,
         address contributionNft_,
         address serviceNft_
     ) external onlyGov {
         rewardToken = rewardToken_;
-        personaNft = personaNft_;
+        agentNft = agentNft_;
         contributionNft = contributionNft_;
         serviceNft = serviceNft_;
 
         emit RefContractsUpdated(
             rewardToken_,
-            personaNft_,
+            agentNft_,
             contributionNft_,
             serviceNft_
         );

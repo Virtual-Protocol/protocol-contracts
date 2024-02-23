@@ -12,6 +12,7 @@ import { ethers, upgrades } from "hardhat";
     const service = await upgrades.deployProxy(Service, [
       process.env.VIRTUAL_NFT,
       contribution.target,
+      process.env.DATASET_SHARES
     ]);
     console.log("ServiceNft deployed to:", service.target);
 

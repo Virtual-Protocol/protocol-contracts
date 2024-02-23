@@ -41,17 +41,19 @@ contract ServiceNft is
 
     function initialize(
         address initialAgentNft,
-        address initialContributionNft
+        address initialContributionNft,
+        uint16 initialDatasetImpactWeight
     ) public initializer {
         __ERC721_init("Service", "VS");
         personaNft = initialAgentNft;
         contributionNft = initialContributionNft;
+        datasetImpactWeight = initialDatasetImpactWeight;
     }
 
     function mint(
         uint256 virtualId,
         bytes32 descHash
-    ) external returns (uint256) {
+    ) public returns (uint256) {
         IAgentNft.VirtualInfo memory info = IAgentNft(personaNft).virtualInfo(
             virtualId
         );
@@ -83,12 +85,10 @@ contract ServiceNft is
         _maturities[proposalId] = IAgentDAO(info.dao).getMaturity(proposalId);
 
         bool isModel = IContributionNft(contributionNft).isModel(proposalId);
-
         if (isModel) {
-            _coreServices[virtualId][_cores[proposalId]] = proposalId;
             emit CoreServiceUpdated(virtualId, _cores[proposalId], proposalId);
-
             updateImpact(virtualId, proposalId);
+            _coreServices[virtualId][_cores[proposalId]] = proposalId;
         } else {
             _coreDatasets[virtualId][_cores[proposalId]].push(proposalId);
         }
@@ -108,7 +108,7 @@ contract ServiceNft is
         // Calculate impact
         // Get current service maturity
         uint256 prevServiceId = _coreServices[virtualId][_cores[proposalId]];
-        uint256 rawImpact = _maturities[proposalId] > _maturities[prevServiceId]
+        uint256 rawImpact = (prevServiceId == 0 || _maturities[proposalId] > _maturities[prevServiceId])
             ? _maturities[proposalId] - _maturities[prevServiceId]
             : 0;
         uint256 datasetId = IContributionNft(contributionNft).getDatasetId(
@@ -119,10 +119,19 @@ contract ServiceNft is
         if (datasetId > 0) {
             _impacts[datasetId] = (rawImpact * datasetImpactWeight) / 10000;
             _impacts[proposalId] = rawImpact - _impacts[datasetId];
-
-            emit SetServiceScore(proposalId, _maturities[proposalId], _impacts[proposalId]);
-            emit SetServiceScore(datasetId, _maturities[proposalId], _impacts[datasetId]);
+            emit SetServiceScore(
+                datasetId,
+                _maturities[proposalId],
+                _impacts[datasetId]
+            );
+             _maturities[datasetId] = _maturities[proposalId];
         }
+        
+        emit SetServiceScore(
+            proposalId,
+            _maturities[proposalId],
+            _impacts[proposalId]
+        );
     }
 
     function getCore(uint256 tokenId) public view returns (uint8) {

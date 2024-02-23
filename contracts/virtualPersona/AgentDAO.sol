@@ -167,7 +167,7 @@ contract AgentDAO is
             );
         }
 
-        if (support == 1) {
+        if (params.length > 0) {
             _updateMaturity(account, proposalId, weight, params);
         }
 
@@ -186,19 +186,15 @@ contract AgentDAO is
             return;
         }
 
-        // Maturity score is for model contribution only
-        bool isModel = IContributionNft(_contributionNft).isModel(proposalId);
-        require(
-            isModel == true,
-            "Maturity score is for model contribution only"
-        );
-
         (uint256 maturity, uint8[] memory votes) = abi.decode(
             params,
             (uint256, uint8[])
         );
 
-        _proposalMaturities[proposalId] += (maturity * weight);
+        bool isModel = IContributionNft(_contributionNft).isModel(proposalId);
+        if (isModel) {
+            _proposalMaturities[proposalId] += (maturity * weight);
+        }
 
         emit ValidatorEloRating(proposalId, account, maturity, votes);
     }

@@ -9,13 +9,15 @@ import "@openzeppelin/contracts/governance/extensions/GovernorVotes.sol";
 import "@openzeppelin/contracts/governance/extensions/GovernorVotesQuorumFraction.sol";
 import "./GovernorCountingSimple.sol";
 import {Checkpoints} from "@openzeppelin/contracts/utils/structs/Checkpoints.sol";
+import "@openzeppelin/contracts/access/AccessControl.sol";
 
 contract VirtualGenesisDAO is
     Governor,
     GovernorSettings,
     GovernorStorage,
     GovernorVotes,
-    GovernorCountingSimple
+    GovernorCountingSimple,
+    AccessControl
 {
     using Checkpoints for Checkpoints.Trace224;
 
@@ -25,6 +27,8 @@ contract VirtualGenesisDAO is
     uint256 private _quorum;
 
     event QuorumUpdated(uint224 oldQuorum, uint224 newQuorum);
+
+    bytes32 public constant EXECUTOR_ROLE = keccak256("EXECUTOR_ROLE");
 
     constructor(
         IVotes token,
@@ -98,7 +102,9 @@ contract VirtualGenesisDAO is
         uint256 length = _quorumCheckpoints.length();
 
         // Optimistic search, check the latest checkpoint
-        Checkpoints.Checkpoint224 memory latest = _quorumCheckpoints.at(SafeCast.toUint32(length - 1));
+        Checkpoints.Checkpoint224 memory latest = _quorumCheckpoints.at(
+            SafeCast.toUint32(length - 1)
+        );
         uint48 latestKey = latest._key;
         uint224 latestValue = latest._value;
         if (latestKey <= blockNumber) {
@@ -106,10 +112,13 @@ contract VirtualGenesisDAO is
         }
 
         // Otherwise, do the binary search
-        return _quorumCheckpoints.upperLookupRecent(SafeCast.toUint32(blockNumber));
+        return
+            _quorumCheckpoints.upperLookupRecent(
+                SafeCast.toUint32(blockNumber)
+            );
     }
 
-    function earlyExecute(uint256 proposalId) public payable returns (uint256) {
+    function earlyExecute(uint256 proposalId) public onlyRole(EXECUTOR_ROLE) payable returns (uint256) {
         (
             address[] memory targets,
             uint256[] memory values,
@@ -156,5 +165,11 @@ contract VirtualGenesisDAO is
             SafeCast.toUint208(newQuorum)
         );
         emit QuorumUpdated(oldQuorum, newQuorum);
+    }
+
+    function supportsInterface(
+        bytes4 interfaceId
+    ) public view override(Governor, AccessControl) returns (bool) {
+        return super.supportsInterface(interfaceId);
     }
 }

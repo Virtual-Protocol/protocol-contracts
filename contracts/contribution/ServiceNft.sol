@@ -6,7 +6,7 @@ import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts-upgradeable/token/ERC721/ERC721Upgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/token/ERC721/extensions/ERC721EnumerableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/token/ERC721/extensions/ERC721URIStorageUpgradeable.sol";
-import "@openzeppelin/contracts/access/AccessControl.sol";
+import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import "@openzeppelin/contracts/interfaces/IERC5805.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import "../virtualPersona/IAgentNft.sol";
@@ -19,30 +19,25 @@ contract ServiceNft is
     Initializable,
     ERC721Upgradeable,
     ERC721EnumerableUpgradeable,
-    ERC721URIStorageUpgradeable
+    ERC721URIStorageUpgradeable,
+    OwnableUpgradeable
 {
     uint256 private _nextTokenId;
 
     address public personaNft;
     address public contributionNft;
 
+    uint16 public datasetImpactWeight;
+
     mapping(uint256 tokenId => uint8 coreId) private _cores;
-    mapping(uint256 tokenId => uint16 maturity) private _maturities;
-    mapping(uint256 tokenId => uint16 impact) private _impacts;
+    mapping(uint256 tokenId => uint256 maturity) private _maturities;
+    mapping(uint256 tokenId => uint256 impact) private _impacts;
     mapping(uint256 tokenId => uint256 blockNumber) private _mintedAts;
 
     mapping(uint256 personaId => mapping(uint8 coreId => uint256 serviceId))
         private _coreServices; // Latest service NFT id for a core
     mapping(uint256 personaId => mapping(uint8 coreId => uint256[] serviceId))
         private _coreDatasets;
-
-    event NewService(
-        uint256 tokenId,
-        uint8 coreId,
-        uint16 maturity,
-        uint16 impact,
-        bool isModel
-    );
 
     function initialize(
         address initialAgentNft,
@@ -57,8 +52,9 @@ contract ServiceNft is
         uint256 virtualId,
         bytes32 descHash
     ) external returns (uint256) {
-        IAgentNft.VirtualInfo memory info = IAgentNft(personaNft)
-            .virtualInfo(virtualId);
+        IAgentNft.VirtualInfo memory info = IAgentNft(personaNft).virtualInfo(
+            virtualId
+        );
         require(_msgSender() == info.dao, "Caller is not VIRTUAL DAO");
 
         IGovernor personaDAO = IGovernor(info.dao);
@@ -85,20 +81,14 @@ contract ServiceNft is
         );
         // Calculate maturity
         _maturities[proposalId] = IAgentDAO(info.dao).getMaturity(proposalId);
-        // Calculate impact
-        // Get current service maturity
-        uint256 prevServiceId = _coreServices[virtualId][_cores[proposalId]];
-
-        _impacts[proposalId] = _maturities[proposalId] >
-            _maturities[prevServiceId]
-            ? _maturities[proposalId] - _maturities[prevServiceId]
-            : 0;
 
         bool isModel = IContributionNft(contributionNft).isModel(proposalId);
 
         if (isModel) {
             _coreServices[virtualId][_cores[proposalId]] = proposalId;
             emit CoreServiceUpdated(virtualId, _cores[proposalId], proposalId);
+
+            updateImpact(virtualId, proposalId);
         } else {
             _coreDatasets[virtualId][_cores[proposalId]].push(proposalId);
         }
@@ -114,17 +104,38 @@ contract ServiceNft is
         return proposalId;
     }
 
+    function updateImpact(uint256 virtualId, uint256 proposalId) public {
+        // Calculate impact
+        // Get current service maturity
+        uint256 prevServiceId = _coreServices[virtualId][_cores[proposalId]];
+        uint256 rawImpact = _maturities[proposalId] > _maturities[prevServiceId]
+            ? _maturities[proposalId] - _maturities[prevServiceId]
+            : 0;
+        uint256 datasetId = IContributionNft(contributionNft).getDatasetId(
+            proposalId
+        );
+
+        _impacts[proposalId] = rawImpact;
+        if (datasetId > 0) {
+            _impacts[datasetId] = (rawImpact * datasetImpactWeight) / 10000;
+            _impacts[proposalId] = rawImpact - _impacts[datasetId];
+
+            emit SetServiceScore(proposalId, _maturities[proposalId], _impacts[proposalId]);
+            emit SetServiceScore(datasetId, _maturities[proposalId], _impacts[datasetId]);
+        }
+    }
+
     function getCore(uint256 tokenId) public view returns (uint8) {
         _requireOwned(tokenId);
         return _cores[tokenId];
     }
 
-    function getMaturity(uint256 tokenId) public view returns (uint16) {
+    function getMaturity(uint256 tokenId) public view returns (uint256) {
         _requireOwned(tokenId);
         return _maturities[tokenId];
     }
 
-    function getImpact(uint256 tokenId) public view returns (uint16) {
+    function getImpact(uint256 tokenId) public view returns (uint256) {
         _requireOwned(tokenId);
         return _impacts[tokenId];
     }
@@ -163,11 +174,21 @@ contract ServiceNft is
         return _coreDatasets[virtualId][coreType];
     }
 
+    function setDatasetImpactWeight(uint16 weight) public onlyOwner {
+        datasetImpactWeight = weight;
+        emit DatasetImpactUpdated(weight);
+    }
+
     // The following functions are overrides required by Solidity.
 
     function tokenURI(
         uint256 tokenId
-    ) public view override(ERC721Upgradeable, ERC721URIStorageUpgradeable) returns (string memory) {
+    )
+        public
+        view
+        override(ERC721Upgradeable, ERC721URIStorageUpgradeable)
+        returns (string memory)
+    {
         // Service NFT is a mirror of Contribution NFT
         return IContributionNft(contributionNft).tokenURI(tokenId);
     }
@@ -177,7 +198,11 @@ contract ServiceNft is
     )
         public
         view
-        override(ERC721Upgradeable, ERC721URIStorageUpgradeable, ERC721EnumerableUpgradeable)
+        override(
+            ERC721Upgradeable,
+            ERC721URIStorageUpgradeable,
+            ERC721EnumerableUpgradeable
+        )
         returns (bool)
     {
         return super.supportsInterface(interfaceId);
@@ -194,7 +219,11 @@ contract ServiceNft is
         address to,
         uint256 tokenId,
         address auth
-    ) internal override(ERC721Upgradeable, ERC721EnumerableUpgradeable) returns (address) {
+    )
+        internal
+        override(ERC721Upgradeable, ERC721EnumerableUpgradeable)
+        returns (address)
+    {
         return super._update(to, tokenId, auth);
     }
 }

@@ -27,13 +27,13 @@ contract ContributionNft is
     mapping(uint256 => uint8) private _cores;
 
     mapping(uint256 => bool) public modelContributions;
-    mapping(uint256 => uint256[]) public modelDatasets;
+    mapping(uint256 => uint256) public modelDatasets;
 
     event NewContribution(
         uint256 tokenId,
         uint256 virtualId,
         uint256 parentId,
-        uint256[] datasets
+        uint256 datasetId
     );
 
     address private _admin; // Admin is able to create contribution proposal without votes
@@ -66,7 +66,7 @@ contract ContributionNft is
         uint256 proposalId,
         uint256 parentId,
         bool isModel_,
-        uint256[] memory datasets
+        uint256 datasetId
     ) external returns (uint256) {
         IGovernor personaDAO = getAgentDAO(virtualId);
         require(
@@ -84,10 +84,10 @@ contract ContributionNft is
 
         if (isModel_) {
             modelContributions[proposalId] = true;
-            modelDatasets[proposalId] = datasets;
+            modelDatasets[proposalId] = datasetId;
         }
 
-        emit NewContribution(proposalId, virtualId, parentId, datasets);
+        emit NewContribution(proposalId, virtualId, parentId, datasetId);
 
         return proposalId;
     }
@@ -176,9 +176,9 @@ contract ContributionNft is
         return _ownerOf(tokenId);
     }
 
-    function getDatasets(
+    function getDatasetId(
         uint256 tokenId
-    ) external view returns (uint256[] memory) {
+    ) external view returns (uint256) {
         return modelDatasets[tokenId];
     }
 }

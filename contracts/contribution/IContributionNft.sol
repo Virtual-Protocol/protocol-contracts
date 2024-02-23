@@ -9,5 +9,5 @@ interface IContributionNft {
     function getCore(uint256 tokenId) external view returns (uint8);
     function isModel(uint256 tokenId) external view returns (bool);
     function getAdmin() external view returns (address);
-    function getDatasets(uint256 tokenId) external view returns (uint256[] memory);
+    function getDatasetId(uint256 tokenId) external view returns (uint256);
 }

@@ -200,15 +200,12 @@ contract AgentDAO is
 
         _proposalMaturities[proposalId] += (maturity * weight);
 
-        emit NewEloRating(proposalId, account, maturity, votes);
+        emit ValidatorEloRating(proposalId, account, maturity, votes);
     }
 
-    function getMaturity(uint256 proposalId) public view returns (uint16) {
+    function getMaturity(uint256 proposalId) public view returns (uint256) {
         (, uint256 forVotes, ) = proposalVotes(proposalId);
-        return
-            SafeCast.toUint16(
-                Math.min(10000, _proposalMaturities[proposalId] / forVotes)
-            );
+        return Math.min(10000, _proposalMaturities[proposalId] / forVotes);
     }
 
     function quorum(

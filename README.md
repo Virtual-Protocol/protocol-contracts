@@ -16,6 +16,8 @@
 | AgentDAO | This is implementation contract for VIRTUAL specific DAO. AgentFactory will clone this during VIRTUAL instantiation. It holds the maturity score for each core service. | - | N |
 | AgentReward | This is reward distribution center. | Roles: GOV_ROLE, TOKEN_SAVER_ROLE | Y |
 | TimeLockStaking | Allows user to stake their $VIRTUAL in exchange for $sVIRTUAL | Roles: GOV_ROLE, TOKEN_SAVER_ROLE | N |
+| Virtual | $VIRTUAL token | Ownable | N |
+| Airdrop | Airdrop token to holders | - | N |
 
 
 # Main Activities

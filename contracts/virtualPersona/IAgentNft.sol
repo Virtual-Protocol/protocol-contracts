@@ -41,6 +41,8 @@ interface IAgentNft is IValidatorRegistry {
         address validator
     ) external view returns (uint256);
 
+    function totalProposals(uint256 virtualId) external view returns (uint256);
+
     function getContributionNft() external view returns (address);
 
     function getServiceNft() external view returns (address);

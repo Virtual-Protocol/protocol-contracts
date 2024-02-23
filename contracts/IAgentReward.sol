@@ -16,19 +16,18 @@ interface IAgentReward {
         uint48 id;
         uint32 mainIndex;
         uint256 totalStaked;
-        uint256 totalVScore;
-        uint256 totalDatasets;
         uint256 validatorAmount;
-        uint256 modelAmount;
-        uint256 datasetAmount;
+        uint256 contributorAmount;
+        uint256 coreAmount; // Rewards per core
     }
 
     struct Claim {
         uint256 totalClaimed;
-        uint32 rewardCount;
+        uint32 rewardCount; // Track number of reward blocks claimed to avoid reclaiming
     }
 
-    struct ModelReward {
+    struct ServiceReward {
+        uint256 impact;
         uint256 amount;
         uint256 parentAmount;
         uint256 totalClaimed;
@@ -38,17 +37,14 @@ interface IAgentReward {
     event NewMainReward(
         uint32 indexed pos,
         uint256 amount,
+        uint256 agentCount,
         uint256 totalStaked
     );
 
     event RewardSettingsUpdated(
-        uint16 uptimeWeight,
-        uint16 stakeWeight,
         uint16 protocolShares,
         uint16 contributorShares,
-        uint16 stakerShares,
-        uint16 datasetShares,
-        uint16 impactShares
+        uint16 stakerShares
     );
 
     event RefContractsUpdated(
@@ -74,7 +70,7 @@ interface IAgentReward {
         address validator
     );
 
-    event ModelRewardsClaimed(
+    event ServiceRewardsClaimed(
         uint256 nftId,
         address account,
         uint256 total,

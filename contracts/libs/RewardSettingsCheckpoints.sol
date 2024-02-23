@@ -12,13 +12,11 @@ library RewardSettingsCheckpoints {
     }
 
     struct RewardSettings {
-        uint16 uptimeWeight;
-        uint16 stakeWeight;
         uint16 protocolShares;
         uint16 contributorShares;
         uint16 stakerShares;
-        uint16 datasetShares;
-        uint16 impactShares;
+        uint16 parentShares; // Optional rewards for contribution's parent
+        uint256 stakeThreshold; // Each VIRTUAL will require minimum amount of staked tokens to be considered for rewards
     }
 
     struct Checkpoint {
@@ -64,7 +62,7 @@ library RewardSettingsCheckpoints {
         uint256 pos = self._checkpoints.length;
         return
             pos == 0
-                ? RewardSettings(0, 0, 0, 0, 0, 0, 0)
+                ? RewardSettings(0, 0, 0, 0, 0)
                 : self._checkpoints[pos - 1]._value;
     }
 
@@ -90,7 +88,7 @@ library RewardSettingsCheckpoints {
 
         return
             pos == 0
-                ? RewardSettings(0, 0, 0, 0, 0, 0, 0)
+                ? RewardSettings(0, 0, 0, 0, 0)
                 : self._checkpoints[pos - 1]._value;
     }
 

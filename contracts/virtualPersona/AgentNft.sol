@@ -54,7 +54,7 @@ contract AgentNft is
         __CoreRegistry_init();
         __ValidatorRegistry_init(
             _validatorScoreOf,
-            _totalVirtualProposals,
+            totalProposals,
             _getPastValidatorScore
         );
         __AccessControl_init();
@@ -138,9 +138,7 @@ contract AgentNft is
         return dao.getPastScore(account, timepoint);
     }
 
-    function _totalVirtualProposals(
-        uint256 virtualId
-    ) internal view returns (uint256) {
+    function totalProposals(uint256 virtualId) public view returns (uint256) {
         VirtualInfo memory info = virtualInfos[virtualId];
         IAgentDAO dao = IAgentDAO(info.dao);
         return dao.proposalCount();

@@ -16,12 +16,7 @@ import "./contribution/IServiceNft.sol";
 import "./libs/TokenSaver.sol";
 import "./IAgentReward.sol";
 
-contract AgentReward is
-    IAgentReward,
-    Initializable,
-    AccessControl,
-    TokenSaver
-{
+contract AgentReward is IAgentReward, Initializable, AccessControl, TokenSaver {
     using Math for uint256;
     using SafeERC20 for IERC20;
     using RewardSettingsCheckpoints for RewardSettingsCheckpoints.Trace;
@@ -29,30 +24,32 @@ contract AgentReward is
     uint48 private _nextRewardId;
 
     uint256 public constant DENOMINATOR = 10000;
+    bytes32 public constant GOV_ROLE = keccak256("GOV_ROLE");
 
+    // Referencing contracts
     address public rewardToken;
-    address public personaNft;
+    address public agentNft;
     address public contributionNft;
     address public serviceNft;
 
+    // Rewards checkpoints, split into Master reward and Virtual shares
     MainReward[] private _mainRewards;
-    uint256 public protocolRewards;
-    uint256 public stakeThreshold; // Each VIRTUAL will require minimum amount of staked tokens to be considered for rewards
-    uint16 public parentShares;
+    mapping(uint256 virtualId => Reward[]) private _rewards;
 
     RewardSettingsCheckpoints.Trace private _rewardSettings;
 
+    // Rewards ledger
+    uint256 public protocolRewards;
+    uint256 public validatorPoolRewards; // Accumulate the penalties from missed proposal voting
     mapping(address account => mapping(uint256 virtualId => Claim claim))
         private _claimedStakerRewards;
     mapping(address account => mapping(uint256 virtualId => Claim claim))
         private _claimedValidatorRewards;
-    mapping(uint256 virtualId => Reward[]) private _rewards;
-    mapping(address validator => mapping(uint48 rewardId => uint256 score))
-        private _validatorScores;
-    mapping(uint256 serviceId => ModelReward) private _modelRewards;
-    mapping(uint256 datasetId => Claim) private _datasetClaims;
+    mapping(uint256 serviceId => ServiceReward) private _serviceRewards;
+    mapping(uint48 rewardId => mapping(uint8 coreType => uint256 impacts)) _rewardImpacts;
 
-    bytes32 public constant GOV_ROLE = keccak256("GOV_ROLE");
+    mapping(address validator => mapping(uint48 rewardId => uint256 amount))
+        private _validatorRewards;
 
     modifier onlyGov() {
         if (!hasRole(GOV_ROLE, _msgSender())) {
@@ -63,20 +60,16 @@ contract AgentReward is
 
     function initialize(
         address rewardToken_,
-        address personaNft_,
+        address agentNft_,
         address contributionNft_,
         address serviceNft_,
-        RewardSettingsCheckpoints.RewardSettings memory settings_,
-        uint256 stakeThreshold_,
-        uint16 parentShares_
+        RewardSettingsCheckpoints.RewardSettings memory settings_
     ) external initializer {
         rewardToken = rewardToken_;
-        personaNft = personaNft_;
+        agentNft = agentNft_;
         contributionNft = contributionNft_;
         serviceNft = serviceNft_;
         _rewardSettings.push(0, settings_);
-        stakeThreshold = stakeThreshold_;
-        parentShares = parentShares_;
         _grantRole(DEFAULT_ADMIN_ROLE, _msgSender());
         _nextRewardId = 1;
     }
@@ -114,110 +107,98 @@ contract AgentReward is
         return _rewards[virtualId].length;
     }
 
-    function _calcProtocolRewards(
+    // ----------------
+    // Distribute rewards
+    // ----------------
+
+    // DONE
+    function distributeRewards(uint256 amount) public onlyGov returns (uint32) {
+        require(amount > 0, "Invalid amount");
+
+        IERC20(rewardToken).safeTransferFrom(
+            _msgSender(),
+            address(this),
+            amount
+        );
+
+        RewardSettingsCheckpoints.RewardSettings
+            memory settings = getRewardSettings();
+
+        uint256 protocolShares = _distributeProtocolRewards(amount);
+
+        uint256 agentShares = amount - protocolShares;
+        uint256 agentCount = _prepareAgentsRewards(agentShares, settings);
+
+        uint32 mainRewardIndex = SafeCast.toUint32(_mainRewards.length - 1);
+
+        for (uint256 virtualId = 1; virtualId <= agentCount; virtualId++) {
+            _distributeAgentRewards(virtualId, mainRewardIndex, settings);
+        }
+
+        return SafeCast.toUint32(_mainRewards.length - 1);
+    }
+
+    // DONE
+    function _distributeProtocolRewards(
         uint256 amount
     ) private view returns (uint256) {
         RewardSettingsCheckpoints.RewardSettings
             memory rewardSettings = _rewardSettings.latest();
         uint256 protocolShares = (amount * rewardSettings.protocolShares) /
             DENOMINATOR;
+        protocolRewards += protocolShares;
         return protocolShares;
     }
 
-    // Validator score is calculated based on weighted uptime and votes
-    function _calcValidatorScore(
-        address validator,
-        uint256 virtualId,
-        uint256 totalStaked,
-        uint256 totalUptime
-    ) private view returns (uint256) {
-        RewardSettingsCheckpoints.RewardSettings
-            memory settings = getRewardSettings();
-        // Uptime portion
-        uint256 normalizedUptimeScore = totalUptime > 0
-            ? (DENOMINATOR *
-                IValidatorRegistry(personaNft).validatorScore(
-                    virtualId,
-                    validator
-                )) / totalUptime
-            : 0;
-        uint256 uptimeShares = (uint256(settings.uptimeWeight) *
-            normalizedUptimeScore) / DENOMINATOR;
-
-        // Stake portion
-        uint256 normalizedVoteScore = totalStaked > 0
-            ? (DENOMINATOR *
-                IAgentNft(personaNft).getVotes(virtualId, validator)) /
-                totalStaked
-            : 0;
-
-        uint256 stakeShares = (uint256(settings.stakeWeight) *
-            normalizedVoteScore) / DENOMINATOR;
-
-        return uptimeShares + stakeShares;
-    }
-
-    function _distributeAgentRewards(
-        uint256 amount
-    ) private returns (uint256 personaCount) {
-        IAgentNft nft = IAgentNft(personaNft);
+    // DONE
+    // Prepare agent reward placeholders and calculate total staked tokens for all eligible agents
+    function _prepareAgentsRewards(
+        uint256 amount,
+        RewardSettingsCheckpoints.RewardSettings memory settings
+    ) private returns (uint256 agentCount) {
+        IAgentNft nft = IAgentNft(agentNft);
         uint256 grandTotalStaked = 0; // Total staked amount for all personas
-        personaCount = nft.totalSupply();
+        uint256 totalAgents = nft.totalSupply();
         uint32 mainPos = SafeCast.toUint32(_mainRewards.length);
 
-        // Get staking amount for all personas
-        for (uint256 virtualId = 1; virtualId <= personaCount; virtualId++) {
+        // Get staking amount for all agents
+        for (uint256 virtualId = 1; virtualId <= totalAgents; virtualId++) {
             // Get staked amount
             uint256 totalStaked = nft.totalStaked(virtualId);
-            if (totalStaked < stakeThreshold) {
+            if (totalStaked < settings.stakeThreshold) {
                 continue;
             }
 
-            // Calculate validator score
+            agentCount++;
+            grandTotalStaked += totalStaked;
             uint48 rewardId = _nextRewardId++;
-            uint256 validatorCount = nft.validatorCount(virtualId);
-            uint256 totalVScore = 0;
-            for (uint256 j = 0; j < validatorCount; j++) {
-                address validator = nft.validatorAt(virtualId, j);
-
-                // Calculate validator score
-                uint256 validatorScore = _calcValidatorScore(
-                    validator,
-                    virtualId,
-                    totalStaked,
-                    nft.totalUptimeScore(virtualId)
-                );
-                totalVScore += validatorScore;
-                _validatorScores[validator][rewardId] = validatorScore;
-            }
 
             _rewards[virtualId].push(
                 Reward({
                     id: rewardId,
                     mainIndex: mainPos,
                     totalStaked: totalStaked,
-                    totalVScore: totalVScore,
-                    totalDatasets: 0,
                     validatorAmount: 0,
-                    modelAmount: 0,
-                    datasetAmount: 0
+                    contributorAmount: 0,
+                    coreAmount: 0
                 })
             );
-            grandTotalStaked += totalStaked;
         }
 
         _mainRewards.push(
             MainReward(
                 SafeCast.toUint32(block.number),
                 amount,
-                personaCount,
+                agentCount,
                 grandTotalStaked
             )
         );
-        emit NewMainReward(mainPos, amount, grandTotalStaked);
+        emit NewMainReward(mainPos, amount, agentCount, grandTotalStaked);
     }
 
-    function _populateRewardAmounts(
+    // DONE
+    // Calculate agent rewards based on staked weightage and distribute to all stakers, validators and contributors
+    function _distributeAgentRewards(
         uint256 virtualId,
         uint256 mainRewardIndex,
         RewardSettingsCheckpoints.RewardSettings memory settings
@@ -235,146 +216,131 @@ contract AgentReward is
             return;
         }
 
+        // Calculate VIRTUAL reward based on staked weightage
         uint256 amount = (mainReward.amount * reward.totalStaked) /
             mainReward.totalStaked;
 
-        uint256 contributorAmount = (((amount * reward.totalStaked) /
-            mainReward.totalStaked) * uint256(settings.contributorShares)) /
+        reward.contributorAmount =
+            (amount * uint256(settings.contributorShares)) /
             DENOMINATOR;
-        reward.validatorAmount = amount - contributorAmount;
+        reward.validatorAmount = amount - reward.contributorAmount;
 
-        _distributeContributorRewards(virtualId, contributorAmount, settings);
-    }
-
-    function _distributeImpactRewards(
-        uint256 virtualId,
-        uint256 amount,
-        uint256 totalMaturity
-    ) private {
-        uint256[] memory services = IAgentNft(personaNft).getAllServices(
-            virtualId
+        _distributeValidatorRewards(
+            reward.validatorAmount,
+            virtualId,
+            reward.id,
+            mainReward.totalStaked,
+            settings
         );
-        uint256 serviceId;
-        uint256 impact;
-        uint256 impactAmount;
-        uint256 parentAmount;
-        for (uint256 i = 0; i < services.length; i++) {
-            serviceId = services[i];
-            impact = IServiceNft(serviceNft).getImpact(serviceId);
-            if (impact > 0) {
-                impactAmount = (amount * impact) / totalMaturity;
-                parentAmount = IContributionNft(contributionNft).getParentId(
-                    serviceId
-                ) == 0
-                    ? 0
-                    : (impactAmount * uint256(parentShares)) / DENOMINATOR;
-                _modelRewards[serviceId].amount += impactAmount - parentAmount;
-                _modelRewards[serviceId].parentAmount += parentAmount;
-            }
-        }
+        _distributeContributorRewards(
+            reward.contributorAmount,
+            virtualId,
+            settings
+        );
     }
 
-    function _distributeModelUtilizationRewards(
+    // DONE
+    // Calculate validator rewards based on votes weightage and participation rate
+    function _distributeValidatorRewards(
         uint256 amount,
-        uint256[] memory services,
-        uint8 totalCores,
-        uint8 totalCurrent
-    ) private {
-        for (uint i = 0; i < totalCores; i++) {
-            if (services[i] > 0) {
-                _modelRewards[services[i]].amount += (amount / totalCurrent);
-            }
-        }
-    }
-
-    function _distributeContributorRewards(
         uint256 virtualId,
-        uint256 amount,
+        uint256 rewardId,
+        uint256 totalStaked,
         RewardSettingsCheckpoints.RewardSettings memory settings
     ) private {
-        uint256 impactAmount = (amount * uint256(settings.impactShares)) /
-            DENOMINATOR;
+        IAgentNft nft = IAgentNft(agentNft);
+        // Calculate weighted validator shares
+        uint256 validatorCount = nft.validatorCount(virtualId);
+        uint256 totalProposals = nft.totalProposals(virtualId);
+        for (uint256 i = 0; i < validatorCount; i++) {
+            address validator = nft.validatorAt(virtualId, i);
 
-        uint8[] memory coreTypes = IAgentNft(personaNft)
-            .virtualInfo(virtualId)
-            .coreTypes;
-        uint256[] memory currentServices = new uint256[](coreTypes.length);
-        uint256 totalMaturity = 0;
-        uint8 totalModels = 0;
+            // Get validator revenue by votes weightage
+            address stakingAddress = nft.virtualInfo(virtualId).token;
+            uint256 votes = IERC5805(stakingAddress).getPastVotes(
+                validator,
+                block.number
+            );
+            uint256 validatorRewards = (amount * votes) / totalStaked;
+
+            // Calc validator reward based on participation rate
+            uint256 participationReward = (validatorRewards *
+                nft.validatorScore(virtualId, validator)) / totalProposals;
+            _validatorRewards[validator][rewardId] = participationReward;
+
+            validatorPoolRewards += validatorRewards - participationReward;
+        }
+    }
+
+    // DONE
+    function _distributeContributorRewards(
+        uint256 amount,
+        uint256 virtualId,
+        RewardSettingsCheckpoints.RewardSettings memory settings
+    ) private {
+        IAgentNft nft = IAgentNft(agentNft);
+        uint8[] memory coreTypes = nft.virtualInfo(virtualId).coreTypes;
         IServiceNft serviceNftContract = IServiceNft(serviceNft);
+        IContributionNft contributionNftContract = IContributionNft(
+            contributionNft
+        );
+
         Reward storage reward = _rewards[virtualId][
             _rewards[virtualId].length - 1
         ];
-        for (uint i = 0; i < coreTypes.length; i++) {
-            currentServices[i] = serviceNftContract.getCoreService(
-                virtualId,
-                coreTypes[i]
-            );
-            if (currentServices[i] > 0) {
-                totalMaturity += serviceNftContract.getMaturity(
-                    currentServices[i]
-                );
-                totalModels++;
+        reward.coreAmount = amount / coreTypes.length;
+        uint256[] memory coreImpacts = new uint256[](coreTypes.length);
+        uint256[] memory services = nft.getAllServices(virtualId);
+
+        // Populate service impacts
+        uint256 serviceId;
+        uint256 impact;
+        for (uint i = 0; i < services.length; i++) {
+            serviceId = services[i];
+            impact = serviceNftContract.getImpact(serviceId);
+            if (impact == 0) {
+                continue;
             }
-            reward.totalDatasets += serviceNftContract.totalCoreDatasets(
-                virtualId,
-                coreTypes[i]
-            );
-        }
-        if (totalMaturity > 0) {
-            _distributeImpactRewards(virtualId, impactAmount, totalMaturity);
-        }
-        uint256 utilAmount = amount - impactAmount;
 
-        reward.datasetAmount =
-            (utilAmount * uint256(settings.datasetShares)) /
-            DENOMINATOR;
-        if (totalModels > 0) {
-            _distributeModelUtilizationRewards(
-                (utilAmount - reward.datasetAmount),
-                currentServices,
-                uint8(coreTypes.length),
-                totalModels
-            );
+            ServiceReward storage serviceReward = _serviceRewards[serviceId];
+            if(serviceReward.impact == 0){
+                serviceReward.impact = impact;
+            }
+            _rewardImpacts[reward.id][
+                serviceNftContract.getCore(serviceId)
+            ] += impact;
+        }
+
+        // Distribute service rewards
+        uint256 impactAmount = 0;
+        uint256 parentAmount = 0;
+        uint256 parentShares = uint256(settings.parentShares);
+        for (uint i = 0; i < services.length; i++) {
+            serviceId = services[i];
+            ServiceReward storage serviceReward = _serviceRewards[serviceId];
+            if (serviceReward.impact == 0) {
+                continue;
+            }
+            impactAmount =
+                (reward.coreAmount * serviceReward.impact) /
+                _rewardImpacts[reward.id][
+                    serviceNftContract.getCore(serviceId)
+                ];
+            parentAmount = contributionNftContract.getParentId(serviceId) == 0
+                ? 0
+                : ((impactAmount * parentShares) / DENOMINATOR);
+
+            serviceReward.amount += impactAmount - parentAmount;
+            serviceReward.parentAmount += parentAmount;
         }
     }
 
-    function distributeRewards(uint256 amount) public onlyGov returns (uint32) {
-        require(amount > 0, "Invalid amount");
+    // ----------------
+    // Functions to query rewards
+    // ----------------
 
-        IERC20(rewardToken).safeTransferFrom(
-            _msgSender(),
-            address(this),
-            amount
-        );
-
-        uint256 protocolShares = _calcProtocolRewards(amount);
-        protocolRewards += protocolShares;
-
-        uint256 personaShares = amount - protocolShares;
-        uint256 personaCount = _distributeAgentRewards(personaShares);
-        uint32 mainRewardIndex = SafeCast.toUint32(_mainRewards.length - 1);
-        RewardSettingsCheckpoints.RewardSettings
-            memory settings = getRewardSettings();
-        for (uint256 virtualId = 1; virtualId <= personaCount; virtualId++) {
-            _populateRewardAmounts(virtualId, mainRewardIndex, settings);
-        }
-
-        return SafeCast.toUint32(_mainRewards.length - 1);
-    }
-
-    function _calcDelegateeRevenue(
-        Reward memory reward,
-        address delegatee
-    ) private view returns (uint256) {
-        uint256 delegateeRevenue = reward.totalVScore > 0
-            ? (reward.validatorAmount *
-                _validatorScores[delegatee][reward.id]) / reward.totalVScore
-            : 0;
-        return delegateeRevenue;
-    }
-
-    function _getClaimableStakerRewardAt(
+    // Done
+    function _getClaimableStakerRewardsAt(
         uint256 pos,
         uint256 virtualId,
         address account,
@@ -396,7 +362,8 @@ contract AgentReward is
         RewardSettingsCheckpoints.RewardSettings
             memory settings = getPastRewardSettings(mainReward.blockNumber);
 
-        uint256 delegateeRevenue = _calcDelegateeRevenue(reward, delegatee);
+        uint256 validatorGroupRewards = _validatorRewards[delegatee][reward.id];
+
         uint256 tokens = token.getPastBalanceOf(
             account,
             mainReward.blockNumber
@@ -407,45 +374,28 @@ contract AgentReward is
         );
 
         return
-            (((delegateeRevenue * tokens) / votes) *
+            (((validatorGroupRewards * tokens) / votes) *
                 uint256(settings.stakerShares)) / DENOMINATOR;
     }
 
-    function getClaimableStakerRewardAt(
-        uint256 pos,
-        uint256 virtualId,
-        address account
-    ) public view returns (uint256) {
-        address stakingAddress = IAgentNft(personaNft)
-            .virtualInfo(virtualId)
-            .token;
-
-        return
-            _getClaimableStakerRewardAt(
-                pos,
-                virtualId,
-                account,
-                stakingAddress
-            );
-    }
-
-    function getClaimableStakerRewards(
+    // DONE
+    function _getClaimableStakerRewards(
         address staker,
         uint256 virtualId
-    ) public view returns (uint256) {
+    ) internal view returns (uint256) {
         uint256 count = rewardCount(virtualId);
         if (count == 0) {
             return 0;
         }
 
-        address stakingAddress = IAgentNft(personaNft)
+        address stakingAddress = IAgentNft(agentNft)
             .virtualInfo(virtualId)
             .token;
 
         Claim memory claim = claimedStakerRewards(staker, virtualId);
         uint256 total = 0;
         for (uint256 i = claim.rewardCount; i < count; i++) {
-            total += _getClaimableStakerRewardAt(
+            total += _getClaimableStakerRewardsAt(
                 i,
                 virtualId,
                 staker,
@@ -456,9 +406,77 @@ contract AgentReward is
         return total;
     }
 
-    function claimStakerRewards(uint256 virtualId) public {
-        address account = _msgSender();
-        uint256 amount = getClaimableStakerRewards(account, virtualId);
+    // DONE
+    function _getClaimableValidatorRewardsAt(
+        uint256 pos,
+        uint256 virtualId,
+        address validator
+    ) internal view returns (uint256) {
+        Reward memory reward = getReward(virtualId, SafeCast.toUint32(pos));
+        MainReward memory mainReward = getMainReward(reward.mainIndex);
+        RewardSettingsCheckpoints.RewardSettings
+            memory rewardSettings = getPastRewardSettings(
+                mainReward.blockNumber
+            );
+
+        uint256 validatorGroupRewards = _validatorRewards[validator][reward.id];
+
+        return
+            (validatorGroupRewards *
+                (DENOMINATOR - uint256(rewardSettings.stakerShares))) /
+            DENOMINATOR;
+    }
+
+    // DONE
+    function _getClaimableValidatorRewards(
+        address validator,
+        uint256 virtualId
+    ) internal view returns (uint256) {
+        uint256 count = rewardCount(virtualId);
+        if (count == 0) {
+            return 0;
+        }
+
+        Claim memory claim = _claimedValidatorRewards[validator][virtualId];
+        uint256 total = 0;
+        for (uint256 i = claim.rewardCount; i < count; i++) {
+            total += _getClaimableValidatorRewardsAt(i, virtualId, validator);
+        }
+
+        return total;
+    }
+
+    // DONE
+    function getChildrenRewards(uint256 nftId) public view returns (uint256) {
+        uint256 childrenAmount = 0;
+        uint256[] memory children = IContributionNft(contributionNft)
+            .getChildren(nftId);
+
+        ServiceReward memory childReward;
+        for (uint256 i = 0; i < children.length; i++) {
+            childReward = getServiceReward(children[i]);
+            childrenAmount += (childReward.parentAmount -
+                childReward.totalClaimedParent);
+        }
+        return childrenAmount;
+    }
+
+    // DONE
+    function _getClaimableServiceRewards(
+        uint256 nftId
+    ) public view returns (uint256 total) {
+        ServiceReward memory serviceReward = getServiceReward(nftId);
+        total = serviceReward.amount - serviceReward.totalClaimed;
+        uint256 childrenAmount = getChildrenRewards(nftId);
+        total += childrenAmount;
+    }
+
+    // ----------------
+    // Functions to claim rewards
+    // ----------------
+    // DONE
+    function _claimStakerRewards(address account, uint256 virtualId) internal {
+        uint256 amount = _getClaimableStakerRewards(account, virtualId);
         if (amount == 0) {
             return;
         }
@@ -473,47 +491,11 @@ contract AgentReward is
         claim.totalClaimed += amount;
     }
 
-    function getClaimableValidatorRewardsAt(
-        uint256 pos,
-        uint256 virtualId,
-        address validator
-    ) public view returns (uint256) {
-        Reward memory reward = getReward(virtualId, SafeCast.toUint32(pos));
-        MainReward memory mainReward = getMainReward(reward.mainIndex);
-        RewardSettingsCheckpoints.RewardSettings
-            memory rewardSettings = getPastRewardSettings(
-                mainReward.blockNumber
-            );
-
-        uint256 delegateeRevenue = _calcDelegateeRevenue(reward, validator);
-        return
-            (delegateeRevenue *
-                (DENOMINATOR - uint256(rewardSettings.stakerShares))) /
-            DENOMINATOR;
-    }
-
-    function getClaimableValidatorRewards(
-        address validator,
-        uint256 virtualId
-    ) public view returns (uint256) {
-        uint256 count = rewardCount(virtualId);
-        if (count == 0) {
-            return 0;
-        }
-
-        Claim memory claim = _claimedValidatorRewards[validator][virtualId];
-        uint256 total = 0;
-        for (uint256 i = claim.rewardCount; i < count; i++) {
-            total += getClaimableValidatorRewardsAt(i, virtualId, validator);
-        }
-
-        return total;
-    }
-
-    function claimValidatorRewards(uint256 virtualId) public {
+    // DONE
+    function _claimValidatorRewards(uint256 virtualId) internal {
         address account = _msgSender();
 
-        uint256 amount = getClaimableValidatorRewards(account, virtualId);
+        uint256 amount = _getClaimableValidatorRewards(account, virtualId);
         if (amount == 0) {
             return;
         }
@@ -528,71 +510,38 @@ contract AgentReward is
         claim.totalClaimed += amount;
     }
 
-    function claimedStakerRewards(
-        address staker,
-        uint256 virtualId
-    ) public view returns (Claim memory) {
-        return _claimedStakerRewards[staker][virtualId];
-    }
-
-    function claimedValidatorRewards(
-        address staker,
-        uint256 virtualId
-    ) public view returns (Claim memory) {
-        return _claimedValidatorRewards[staker][virtualId];
-    }
-
+    // DONE
     function withdrawProtocolRewards() external onlyGov {
         require(protocolRewards > 0, "No protocol rewards");
         IERC20(rewardToken).safeTransfer(_msgSender(), protocolRewards);
         protocolRewards = 0;
     }
 
-    function getModelReward(
+    // DONE
+    function withdrawValidatorPoolRewards() external onlyGov {
+        require(validatorPoolRewards > 0, "No validator pool rewards");
+        IERC20(rewardToken).safeTransfer(_msgSender(), validatorPoolRewards);
+        validatorPoolRewards = 0;
+    }
+
+    // DONE
+    function getServiceReward(
         uint256 virtualId
-    ) public view returns (ModelReward memory) {
-        return _modelRewards[virtualId];
+    ) public view returns (ServiceReward memory) {
+        return _serviceRewards[virtualId];
     }
 
-    function getChildrenRewards(uint256 nftId) public view returns (uint256) {
-        uint256 childrenAmount = 0;
-        uint256[] memory children = IContributionNft(contributionNft)
-            .getChildren(nftId);
-
-        ModelReward memory childReward;
-        for (uint256 i = 0; i < children.length; i++) {
-            childReward = getModelReward(children[i]);
-            childrenAmount += (childReward.parentAmount -
-                childReward.totalClaimedParent);
-        }
-        return childrenAmount;
-    }
-
-    function getClaimableModelRewards(
-        uint256 nftId
-    ) public view returns (uint256 total) {
-        ModelReward memory modelReward = getModelReward(nftId);
-        total = modelReward.amount - modelReward.totalClaimed;
-        uint256 childrenAmount = getChildrenRewards(nftId);
-        total += childrenAmount;
-    }
-
-    function claimModelRewards(uint256 nftId) public {
+    function _claimServiceRewards(uint256 nftId) public {
         address account = _msgSender();
         require(
             IERC721(contributionNft).ownerOf(nftId) == account,
-            "Only NFT owner can claim rewards"
+            "Not NFT owner"
         );
 
-        require(
-            IContributionNft(contributionNft).isModel(nftId),
-            "Not a model NFT"
-        );
-
-        ModelReward storage modelReward = _modelRewards[nftId];
-        uint256 total = (modelReward.amount - modelReward.totalClaimed);
-
-        modelReward.totalClaimed += total;
+        ServiceReward storage serviceReward = _serviceRewards[nftId];
+        uint256 total = (serviceReward.amount - serviceReward.totalClaimed);
+ 
+        serviceReward.totalClaimed += total;
 
         // Claim children rewards
         uint256[] memory children = IContributionNft(contributionNft)
@@ -601,14 +550,13 @@ contract AgentReward is
         uint256 totalChildrenAmount;
         uint256 childAmount;
         for (uint256 i = 0; i < children.length; i++) {
-            ModelReward storage childReward = _modelRewards[children[i]];
+            ServiceReward storage childReward = _serviceRewards[children[i]];
 
             childAmount = (childReward.parentAmount -
                 childReward.totalClaimedParent);
 
             if (childAmount > 0) {
                 childReward.totalClaimedParent += childAmount;
-                modelReward.parentAmount += childAmount;
                 total += childAmount;
                 totalChildrenAmount += childAmount;
             }
@@ -619,152 +567,68 @@ contract AgentReward is
         }
 
         IERC20(rewardToken).safeTransfer(account, total);
-        emit ModelRewardsClaimed(nftId, account, total, totalChildrenAmount);
-    }
-
-    function _getClaimableDatasetRewards(
-        uint256 datasetId,
-        uint256 virtualId
-    ) private view returns (uint256 total) {
-        if (IContributionNft(contributionNft).isModel(datasetId)) {
-            return 0;
-        }
-        Claim memory claim = _datasetClaims[datasetId];
-        uint256 mintedAt = IServiceNft(serviceNft).getMintedAt(datasetId);
-        uint256 totalRewardCount = _rewards[virtualId].length;
-
-        for (uint256 i = (totalRewardCount - 1); i > claim.rewardCount; i--) {
-            Reward memory reward = _rewards[virtualId][i];
-            if (claim.rewardCount == 0) {
-                // This is the first time claiming, we need to ensure the nft is not claiming rewards before the minting blockNumber
-                MainReward memory mainReward = _mainRewards[reward.mainIndex];
-                if (mintedAt > mainReward.blockNumber) {
-                    break;
-                }
-            }
-            if (reward.datasetAmount > 0) {
-                total += reward.datasetAmount / reward.totalDatasets;
-            }
-        }
-    }
-
-    function getClaimableDatasetRewards(
-        uint256 datasetId
-    ) public view returns (uint256 total) {
-        uint256 virtualId = IContributionNft(contributionNft).tokenVirtualId(
-            datasetId
-        );
-        return _getClaimableDatasetRewards(datasetId, virtualId);
-    }
-
-    function claimDatasetRewards(uint256 datasetId) public {
-        address account = _msgSender();
-        require(
-            IERC721(contributionNft).ownerOf(datasetId) == account,
-            "Only NFT owner can claim rewards"
-        );
-
-        uint256 virtualId = IContributionNft(contributionNft).tokenVirtualId(
-            datasetId
-        );
-        uint256 totalRewardCount = _rewards[virtualId].length;
-
-        if (totalRewardCount == 0) {
-            return;
-        }
-
-        uint256 total = _getClaimableDatasetRewards(datasetId, virtualId);
-        if (total == 0) {
-            return;
-        }
-
-        Claim storage claim = _datasetClaims[datasetId];
-        claim.rewardCount = SafeCast.toUint32(totalRewardCount);
-        claim.totalClaimed += total;
-
-        emit DatasetRewardsClaimed(datasetId, account, total);
-        IERC20(rewardToken).safeTransfer(account, total);
+        emit ServiceRewardsClaimed(nftId, account, total, totalChildrenAmount);
     }
 
     function getTotalClaimableRewards(
         address account,
         uint256[] memory virtualIds,
-        uint256[] memory datasetNftIds,
-        uint256[] memory modelNftIds
+        uint256[] memory contributionNftIds
     ) public view returns (uint256) {
         uint256 total = 0;
         for (uint256 i = 0; i < virtualIds.length; i++) {
             total +=
-                getClaimableStakerRewards(account, virtualIds[i]) +
-                getClaimableValidatorRewards(account, virtualIds[i]);
+                _getClaimableStakerRewards(account, virtualIds[i]) +
+                _getClaimableValidatorRewards(account, virtualIds[i]);
         }
-        for (uint256 i = 0; i < datasetNftIds.length; i++) {
-            total += getClaimableDatasetRewards(datasetNftIds[i]);
-        }
-        for (uint256 i = 0; i < modelNftIds.length; i++) {
-            total += getClaimableModelRewards(modelNftIds[i]);
+        for (uint256 i = 0; i < contributionNftIds.length; i++) {
+            total += _getClaimableServiceRewards(contributionNftIds[i]);
         }
         return total;
     }
 
     function claimAllRewards(
         uint256[] memory virtualIds,
-        uint256[] memory datasetNftIds,
-        uint256[] memory modelNftIds
+        uint256[] memory contributionNftIds
     ) public {
+        address account = _msgSender();
         for (uint256 i = 0; i < virtualIds.length; i++) {
-            claimStakerRewards(virtualIds[i]);
-            claimValidatorRewards(virtualIds[i]);
+            _claimStakerRewards(account, virtualIds[i]);
+            _claimValidatorRewards(virtualIds[i]);
         }
 
-        for (uint256 i = 0; i < datasetNftIds.length; i++) {
-            claimDatasetRewards(datasetNftIds[i]);
-        }
-
-        for (uint256 i = 0; i < modelNftIds.length; i++) {
-            claimModelRewards(modelNftIds[i]);
+        for (uint256 i = 0; i < contributionNftIds.length; i++) {
+            _claimServiceRewards(contributionNftIds[i]);
         }
     }
 
-    function setStakeThreshold(uint256 threshold) external onlyGov {
-        stakeThreshold = threshold;
-        emit StakeThresholdUpdated(threshold);
-    }
-
-    function setParentShares(uint16 shares) external onlyGov {
-        parentShares = shares;
-        emit ParentSharesUpdated(shares);
-    }
+    // ----------------
+    // Manage parameters
+    // ----------------
 
     function setRewardSettings(
-        uint16 uptimeWeight_,
-        uint16 stakeWeight_,
         uint16 protocolShares_,
         uint16 contributorShares_,
         uint16 stakerShares_,
-        uint16 datasetShares_,
-        uint16 impactShares_
+        uint16 parentShares_,
+        uint256 stakeThreshold_
     ) public onlyGov {
         _rewardSettings.push(
             SafeCast.toUint32(block.number),
             RewardSettingsCheckpoints.RewardSettings(
-                uptimeWeight_,
-                stakeWeight_,
                 protocolShares_,
                 contributorShares_,
                 stakerShares_,
-                datasetShares_,
-                impactShares_
+                parentShares_,
+                stakeThreshold_
             )
         );
         emit RewardSettingsUpdated(
-            uptimeWeight_,
-            stakeWeight_,
             protocolShares_,
             contributorShares_,
             stakerShares_,
-            datasetShares_,
-            impactShares_
+            parentShares_,
+            stakeThreshold_
         );
     }
 

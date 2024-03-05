@@ -7,14 +7,17 @@ const deployParams = require("./arguments/personaFactoryArguments.js");
     const factory = await upgrades.deployProxy(AgentFactory, deployParams);
     await factory.waitForDeployment();
 
-    console.log("AgentFactory deployed to:", factory.target);
+    const factoryAddress = await factory.getAddress();
+
+    console.log("AgentFactory deployed to:", factoryAddress);
 
     // Grant factory to mint NFTs
-    const AgentNft = await ethers.getContractFactory("AgentNft");
-    const nft = AgentNft.attach(process.env.VIRTUAL_NFT);
-
-    await nft.grantRole(ethers.id("MINTER_ROLE"), factory.target);
-    
+    const adminSigner = new ethers.Wallet(
+      process.env.ADMIN_PRIVATE_KEY,
+      ethers.provider
+    );
+    const nft = await ethers.getContractAt("AgentNft", process.env.VIRTUAL_NFT, adminSigner);
+    await nft.grantRole(ethers.id("MINTER_ROLE"), factoryAddress);
   } catch (e) {
     console.log(e);
   }

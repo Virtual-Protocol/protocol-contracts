@@ -1,6 +1,6 @@
 module.exports = [
     'Staked VIRTUAL',
-    'VAI',
+    'sVIRTUAL',
     process.env.BRIDGED_TOKEN,
     100000000000, // maxBonus
     1000, // maxLockDuration

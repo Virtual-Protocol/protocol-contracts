@@ -1,6 +1,6 @@
 module.exports = [
   process.env.VOTING_TOKEN,
-  0,
-  process.env.PROTOCOL_VOTING_PERIOD,
-  0
+  process.env.GENESIS_VOTING_DELAY,
+  process.env.GENESIS_VOTING_PERIOD,
+  process.env.GENESIS_PROPOSAL_THRESHOLD
 ];

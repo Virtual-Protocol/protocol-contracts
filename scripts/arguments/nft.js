@@ -1,1 +1,1 @@
-module.exports = [process.env.DEPLOYER];
+module.exports = [process.env.ADMIN];

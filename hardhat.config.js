@@ -2,7 +2,7 @@
 require("dotenv").config();
 require("@nomicfoundation/hardhat-toolbox");
 require("hardhat-deploy");
-require('@openzeppelin/hardhat-upgrades');
+require("@openzeppelin/hardhat-upgrades");
 
 module.exports = {
   solidity: {
@@ -19,18 +19,38 @@ module.exports = {
   },
   etherscan: {
     apiKey: process.env.ETHERSCAN_API_KEY,
+    customChains: [
+      {
+        network: "base_sepolia",
+        chainId: 84532,
+        urls: {
+          apiURL: "https://api-sepolia.basescan.org/api",
+          browserURL: "https://sepolia.basescan.org/",
+        },
+      },
+    ],
   },
   networks: {
     base: {
-      url: process.env.BASE_RPC,
+      url: "https://mainnet.base.org",
       accounts: [process.env.PRIVATE_KEY],
     },
+    base_sepolia: {
+      url: "https://sepolia.base.org",
+      accounts: [process.env.PRIVATE_KEY],
+      verify: {
+        etherscan: {
+          apiUrl: "https://api-sepolia.basescan.org",
+          apiKey: process.env.ETHERSCAN_API_KEY,
+        },
+      },
+    },
     polygon: {
-      url: process.env.POLYGON_RPC,
+      url: "https://rpc-mainnet.maticvigil.com/",
       accounts: [process.env.PRIVATE_KEY],
     },
     mumbai: {
-      url: process.env.MUMBAI_RPC,
+      url: "https://rpc.ankr.com/polygon_mumbai",
       accounts: [process.env.PRIVATE_KEY],
     },
     goerli: {

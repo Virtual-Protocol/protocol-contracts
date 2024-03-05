@@ -25,7 +25,6 @@ contract AgentFactory is Initializable, AccessControl {
     address[] public allDAOs;
 
     address public assetToken; // Staked token
-    address public protocolDAO; // Protocol DAO
     uint256 public maturityDuration; // Maturity duration in seconds
 
     bytes32 public constant WITHDRAW_ROLE = keccak256("WITHDRAW_ROLE");
@@ -81,7 +80,6 @@ contract AgentFactory is Initializable, AccessControl {
         address tbaRegistry_,
         address assetToken_,
         address nft_,
-        address protocolDAO_,
         uint256 applicationThreshold_,
         uint256 maturityDuration_,
         address gov_,
@@ -92,7 +90,6 @@ contract AgentFactory is Initializable, AccessControl {
         assetToken = assetToken_;
         tbaRegistry = tbaRegistry_;
         nft = nft_;
-        protocolDAO = protocolDAO_;
         applicationThreshold = applicationThreshold_;
         maturityDuration = maturityDuration_;
         _nextId = 1;
@@ -138,8 +135,8 @@ contract AgentFactory is Initializable, AccessControl {
 
         uint256 id = _nextId++;
         uint256 proposalEndBlock = block.number +
-            IGovernor(protocolDAO).votingPeriod() +
-            IGovernor(protocolDAO).votingDelay();
+            IGovernor(gov).votingPeriod() +
+            IGovernor(gov).votingDelay();
         Application memory application = Application(
             name,
             symbol,

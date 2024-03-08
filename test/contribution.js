@@ -49,22 +49,15 @@ describe("Contribution", function () {
     await demoToken.waitForDeployment();
 
     const protocolDAO = await ethers.deployContract(
-      "VirtualProtocolDAO",
-      [
-        veToken.target,
-        process.env.PROTOCOL_VOTING_DELAY,
-        process.env.PROTOCOL_VOTING_PERIOD,
-        process.env.PROTOCOL_PROPOSAL_THRESHOLD,
-        process.env.PROTOCOL_QUORUM_NUMERATOR,
-      ],
+      "VirtualGenesisDAO",
+      [veToken.target, 0, 100, 0],
       {}
     );
     await protocolDAO.waitForDeployment();
 
-    const personaNft = await ethers.deployContract("AgentNft", [
-      deployer.address,
-    ]);
+    const personaNft = await ethers.deployContract("AgentNft");
     await personaNft.waitForDeployment();
+    await personaNft.initialize(deployer.address);
 
     const personaToken = await ethers.deployContract("AgentToken");
     await personaToken.waitForDeployment();
@@ -74,17 +67,17 @@ describe("Contribution", function () {
     const tba = await ethers.deployContract("ERC6551Registry");
 
     const personaFactory = await ethers.deployContract("AgentFactory");
+
     await personaFactory.initialize(
       personaToken.target,
       personaDAO.target,
       tba.target,
       demoToken.target,
       personaNft.target,
-      protocolDAO.target,
       parseEther("100000"),
       5,
       protocolDAO.target,
-      deployer.address
+      signers[8].address
     );
 
     await personaNft.grantRole(
@@ -92,17 +85,11 @@ describe("Contribution", function () {
       personaFactory.target
     );
 
-    const contribution = await ethers.deployContract(
-      "ContributionNft",
-      [personaNft.target],
-      {}
-    );
+    const contribution = await ethers.deployContract("ContributionNft", [], {});
+    await contribution.initialize(personaNft.target);
 
-    const service = await ethers.deployContract(
-      "ServiceNft",
-      [personaNft.target, contribution.target],
-      {}
-    );
+    const service = await ethers.deployContract("ServiceNft", [], {});
+    await service.initialize(personaNft.target, contribution.target, 7000n);
 
     await personaNft.setContributionService(
       contribution.target,
@@ -265,7 +252,8 @@ describe("Contribution", function () {
         TOKEN_URI,
         proposalId,
         "0x0000000000000000000000000000000000000000",
-        true
+        true,
+        0
       )
     ).to.emit(contribution, "NewContribution");
 
@@ -286,7 +274,8 @@ describe("Contribution", function () {
       TOKEN_URI,
       proposalId,
       "0x0000000000000000000000000000000000000000",
-      true
+      true,
+      0
     );
     const personaDAO = await ethers.getContractAt("AgentDAO", persona.dao);
     // We need 51% to reach quorum
@@ -322,7 +311,8 @@ describe("Contribution", function () {
       TOKEN_URI,
       proposalId,
       "0x0000000000000000000000000000000000000000",
-      true
+      true,
+      0
     );
     const personaDAO = await ethers.getContractAt("AgentDAO", persona.dao);
     /*
@@ -362,9 +352,8 @@ describe("Contribution", function () {
     await expect(
       personaDAO.castVoteWithReasonAndParams(proposalId, 1, "lfg", voteParams)
     )
-      .to.emit(personaDAO, "NewEloRating")
+      .to.emit(personaDAO, "ValidatorEloRating")
       .withArgs(proposalId, validator1.address, 1500, [0, 1, 1, 0, 2]);
-
     await personaDAO
       .connect(validator2)
       .castVoteWithReasonAndParams(proposalId, 1, "lfg", voteParams2);
@@ -388,7 +377,8 @@ describe("Contribution", function () {
       TOKEN_URI,
       proposalId,
       "0x0000000000000000000000000000000000000000",
-      true
+      true,
+      0
     );
     const personaDAO = await ethers.getContractAt("AgentDAO", persona.dao);
     /*
@@ -459,7 +449,8 @@ describe("Contribution", function () {
       TOKEN_URI,
       proposalId2,
       proposalId,
-      true
+      true,
+      0
     );
 
     await personaDAO.castVoteWithReasonAndParams(
@@ -507,5 +498,147 @@ describe("Contribution", function () {
         .connect(signers[14])
         .propose([personaDAO.target], [0], [ethers.ZeroAddress], "Test3")
     ).to.emit(personaDAO, "ProposalCreated");
+  });
+
+  it("should increase validator score with for,against,abstain", async function () {
+    const signers = await ethers.getSigners();
+    const { persona, proposalId, service, contribution } = await loadFixture(
+      proposeContribution
+    );
+    const personaDAO = await ethers.getContractAt("AgentDAO", persona.dao);
+
+    const [validator1, validator2, validator3] = signers;
+    const voteParams = abi.encode(
+      ["uint256", "uint8[] memory"],
+      [20, [0, 1, 1, 0, 2]]
+    );
+
+    expect(await personaDAO.scoreOf(validator1)).to.be.equal(0);
+    expect(await personaDAO.scoreOf(validator2)).to.be.equal(0);
+    expect(await personaDAO.scoreOf(validator3)).to.be.equal(0);
+    await personaDAO.castVoteWithReasonAndParams(
+      proposalId,
+      0,
+      "lfg",
+      voteParams
+    );
+    await personaDAO
+      .connect(validator2)
+      .castVoteWithReasonAndParams(proposalId, 1, "lfg", voteParams);
+    await personaDAO
+      .connect(validator3)
+      .castVoteWithReasonAndParams(proposalId, 2, "lfg", voteParams);
+    expect(await personaDAO.scoreOf(validator1)).to.be.equal(1n);
+    expect(await personaDAO.scoreOf(validator2)).to.be.equal(1n);
+    expect(await personaDAO.scoreOf(validator3)).to.be.equal(1n);
+  });
+
+  it("should reject double votes", async function () {
+    const signers = await ethers.getSigners();
+    const { persona, proposalId, service, contribution } = await loadFixture(
+      proposeContribution
+    );
+    const personaDAO = await ethers.getContractAt("AgentDAO", persona.dao);
+
+    const [validator1, validator2, validator3] = signers;
+    const voteParams = abi.encode(
+      ["uint256", "uint8[] memory"],
+      [20, [0, 1, 1, 0, 2]]
+    );
+
+    await personaDAO.castVoteWithReasonAndParams(
+      proposalId,
+      0,
+      "lfg",
+      voteParams
+    );
+    await expect(
+      personaDAO.castVoteWithReasonAndParams(proposalId, 1, "lfg", voteParams)
+    ).to.be.reverted;
+  });
+
+  it("should not increase validator score with deliberate votes", async function () {
+    const signers = await ethers.getSigners();
+    const { persona, proposalId, service, contribution } = await loadFixture(
+      proposeContribution
+    );
+    const personaDAO = await ethers.getContractAt("AgentDAO", persona.dao);
+
+    const [validator1, validator2, validator3] = signers;
+    const voteParams = abi.encode(
+      ["uint256", "uint8[] memory"],
+      [20, [0, 1, 1, 0, 2]]
+    );
+
+    expect(await personaDAO.scoreOf(validator1)).to.be.equal(0);
+    await personaDAO.castVoteWithReasonAndParams(
+      proposalId,
+      3,
+      "lfg",
+      voteParams
+    );
+    expect(await personaDAO.scoreOf(validator1)).to.be.equal(0);
+  });
+
+  it("should not increase validator score with deliberate votes after a valid vote", async function () {
+    const signers = await ethers.getSigners();
+    const { persona, proposalId, service, contribution } = await loadFixture(
+      proposeContribution
+    );
+    const personaDAO = await ethers.getContractAt("AgentDAO", persona.dao);
+
+    const [validator1, validator2, validator3] = signers;
+    const voteParams = abi.encode(
+      ["uint256", "uint8[] memory"],
+      [20, [0, 1, 1, 0, 2]]
+    );
+
+    expect(await personaDAO.scoreOf(validator1)).to.be.equal(0);
+    await personaDAO.castVoteWithReasonAndParams(
+      proposalId,
+      1,
+      "lfg",
+      voteParams
+    );
+    expect(await personaDAO.scoreOf(validator1)).to.be.equal(1n);
+    await personaDAO.castVoteWithReasonAndParams(
+      proposalId,
+      3,
+      "lfg",
+      voteParams
+    );
+    expect(await personaDAO.scoreOf(validator1)).to.be.equal(1n);
+  });
+
+  it("should not emit ValidatorEloRating for deliberate votes", async function () {
+    const signers = await ethers.getSigners();
+    const { persona, proposalId, service, contribution } = await loadFixture(
+      proposeContribution
+    );
+    const personaDAO = await ethers.getContractAt("AgentDAO", persona.dao);
+
+    // Only contribution proposal will emit ValidatorEloRating event
+    await contribution.mint(
+      this.accounts[1],
+      persona.virtualId,
+      0,
+      TOKEN_URI,
+      proposalId,
+      "0x0000000000000000000000000000000000000000",
+      true,
+      0
+    );
+
+    const voteParams = abi.encode(
+      ["uint256", "uint8[] memory"],
+      [20, [0, 1, 1, 0, 2]]
+    );
+
+    await expect(
+      personaDAO.castVoteWithReasonAndParams(proposalId, 3, "lfg", voteParams)
+    ).to.not.to.emit(personaDAO, "ValidatorEloRating");
+    await expect(
+      personaDAO.castVoteWithReasonAndParams(proposalId, 1, "lfg", voteParams)
+    ).to.emit(personaDAO, "ValidatorEloRating");
   });
 });

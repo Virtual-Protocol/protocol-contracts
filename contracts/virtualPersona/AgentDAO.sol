@@ -153,6 +153,8 @@ contract AgentDAO is
         string memory reason,
         bytes memory params
     ) internal override returns (uint256) {
+        bool votedPreviously = hasVoted(proposalId, account);
+
         uint256 weight = super._castVote(
             proposalId,
             account,
@@ -160,15 +162,15 @@ contract AgentDAO is
             reason,
             params
         );
-        if (hasVoted(proposalId, account)) {
+
+        if (!votedPreviously && hasVoted(proposalId, account)) {
             _scores[account].push(
                 SafeCast.toUint48(block.number),
                 SafeCast.toUint208(scoreOf(account)) + 1
             );
-        }
-
-        if (params.length > 0) {
-            _updateMaturity(account, proposalId, weight, params);
+            if (params.length > 0) {
+                _updateMaturity(account, proposalId, weight, params);
+            }
         }
 
         return weight;

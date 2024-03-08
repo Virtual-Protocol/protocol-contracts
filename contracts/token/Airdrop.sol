@@ -1,9 +1,11 @@
 pragma solidity ^0.8.20;
 
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
+import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
 contract Airdrop {
-
+    using SafeERC20 for IERC20;
+    
     /**
      *
      * @param _token ERC20 token to airdrop
@@ -17,15 +19,15 @@ contract Airdrop {
         uint256[] calldata _amounts,
         uint256 _total
     ) external {
-        // bytes selector for transferFrom(address,address,uint256)
-        bytes4 transferFrom = 0x23b872dd;
-        // bytes selector for transfer(address,uint256)
-        bytes4 transfer = 0xa9059cbb;
+        // bytes selector for safeTransferFrom(address,address,uint256)
+        bytes4 safeFransferFrom = 0x42842e0e;
+        // bytes selector for safeTransfer(address,uint256)
+        bytes4 safeTransfer = 0x423f6cef;
 
         assembly {
             // store transferFrom selector
             let transferFromData := add(0x20, mload(0x40))
-            mstore(transferFromData, transferFrom)
+            mstore(transferFromData, safeFransferFrom)
             // store caller address
             mstore(add(transferFromData, 0x04), caller())
             // store address
@@ -49,7 +51,7 @@ contract Airdrop {
 
             // store transfer selector
             let transferData := add(0x20, mload(0x40))
-            mstore(transferData, transfer)
+            mstore(transferData, safeTransfer)
 
             // store length of _recipients
             let sz := _amounts.length

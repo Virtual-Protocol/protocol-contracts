@@ -49,8 +49,13 @@ contract AgentNft is
     address private _contributionNft;
     address private _serviceNft;
 
+    constructor() {
+        _disableInitializers();
+    }
+
     function initialize(address defaultAdmin) public initializer {
         __ERC721_init("Persona", "PERSONA");
+        __ERC721URIStorage_init();
         __CoreRegistry_init();
         __ValidatorRegistry_init(
             _validatorScoreOf,

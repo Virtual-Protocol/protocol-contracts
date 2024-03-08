@@ -47,6 +47,9 @@ contract AgentDAO is
         __GovernorCountingSimple_init();
         __GovernorVotes_init(token);
         __GovernorVotesQuorumFraction_init(5100);
+        __GovernorCountingSimple_init();
+        __GovernorStorage_init();
+    
         _contributionNft = contributionNft;
     }
 

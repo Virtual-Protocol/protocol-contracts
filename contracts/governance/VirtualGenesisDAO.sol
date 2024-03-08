@@ -45,6 +45,7 @@ contract VirtualGenesisDAO is
         GovernorVotes(token)
     {
         _quorumCheckpoints.push(0, 10000e18);
+        _grantRole(DEFAULT_ADMIN_ROLE, _msgSender());
     }
 
     // The following functions are overrides required by Solidity.

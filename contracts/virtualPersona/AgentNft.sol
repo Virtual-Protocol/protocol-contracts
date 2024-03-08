@@ -89,6 +89,7 @@ contract AgentNft is
         info.token = address(daoToken);
         _stakingTokenToVirtualId[address(daoToken)] = virtualId;
         _addValidator(virtualId, founder);
+        _initValidatorScore(virtualId, founder);
         return virtualId;
     }
 

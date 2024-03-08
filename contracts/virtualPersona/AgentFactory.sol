@@ -74,6 +74,15 @@ contract AgentFactory is Initializable, AccessControl {
 
     address private _vault; // Vault to hold all Virtual NFTs
 
+    bool internal locked;
+
+    modifier noReentrant() {
+        require(!locked, "cannot reenter");
+        locked = true;
+        _;
+        locked = false;
+    }
+
     function initialize(
         address tokenImplementation_,
         address daoImplementation_,
@@ -158,7 +167,7 @@ contract AgentFactory is Initializable, AccessControl {
         return id;
     }
 
-    function withdraw(uint256 id) public {
+    function withdraw(uint256 id) public noReentrant {
         Application storage application = _applications[id];
 
         require(
@@ -177,12 +186,13 @@ contract AgentFactory is Initializable, AccessControl {
             "Application is not matured yet"
         );
 
+        application.withdrawableAmount = 0;
+        application.status = ApplicationStatus.Withdrawn;
+
         IERC20(assetToken).transfer(
             application.proposer,
             application.withdrawableAmount
         );
-        application.withdrawableAmount = 0;
-        application.status = ApplicationStatus.Withdrawn;
     }
 
     function executeApplication(uint256 id) public onlyGov {
@@ -295,9 +305,7 @@ contract AgentFactory is Initializable, AccessControl {
         emit GovUpdated(newGov);
     }
 
-    function setVault(
-        address newVault
-    ) public onlyRole(DEFAULT_ADMIN_ROLE) {
+    function setVault(address newVault) public onlyRole(DEFAULT_ADMIN_ROLE) {
         _vault = newVault;
     }
 

@@ -74,14 +74,8 @@ describe("Rewards", function () {
     await demoToken.waitForDeployment();
 
     const protocolDAO = await ethers.deployContract(
-      "VirtualProtocolDAO",
-      [
-        veToken.target,
-        process.env.PROTOCOL_VOTING_DELAY,
-        process.env.PROTOCOL_VOTING_PERIOD,
-        process.env.PROTOCOL_PROPOSAL_THRESHOLD,
-        process.env.PROTOCOL_QUORUM_NUMERATOR,
-      ],
+      "VirtualGenesisDAO",
+      [veToken.target, 0, 100, 0],
       {}
     );
     await protocolDAO.waitForDeployment();
@@ -104,7 +98,6 @@ describe("Rewards", function () {
       tba.target,
       demoToken.target,
       personaNft.target,
-      protocolDAO.target,
       PROPOSAL_THRESHOLD,
       5,
       protocolDAO.target,

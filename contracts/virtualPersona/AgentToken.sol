@@ -34,6 +34,15 @@ contract AgentToken is IAgentToken, ERC20Upgradeable, ERC20Votes {
 
     mapping(address => Checkpoints.Trace208) private _balanceCheckpoints;
 
+    bool internal locked;
+
+    modifier noReentrant() {
+        require(!locked, "cannot reenter");
+        locked = true;
+        _;
+        locked = false;
+    }
+
     function initialize(
         string memory name,
         string memory symbol,
@@ -69,7 +78,7 @@ contract AgentToken is IAgentToken, ERC20Upgradeable, ERC20Votes {
         );
     }
 
-    function withdraw(uint256 amount) public {
+    function withdraw(uint256 amount) public noReentrant {
         address sender = _msgSender();
         require(balanceOf(sender) >= amount, "Insufficient balance");
         if (sender == founder) {
@@ -77,11 +86,12 @@ contract AgentToken is IAgentToken, ERC20Upgradeable, ERC20Votes {
         }
 
         _burn(sender, amount);
-        IERC20(assetToken).safeTransfer(sender, amount);
         _balanceCheckpoints[sender].push(
             clock(),
             SafeCast.toUint208(balanceOf(sender))
         );
+
+        IERC20(assetToken).safeTransfer(sender, amount);
     }
 
     function getPastBalanceOf(

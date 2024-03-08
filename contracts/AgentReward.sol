@@ -58,6 +58,15 @@ contract AgentReward is IAgentReward, Initializable, AccessControl, TokenSaver {
         _;
     }
 
+    bool internal locked;
+
+    modifier noReentrant() {
+        require(!locked, "cannot reenter");
+        locked = true;
+        _;
+        locked = false;
+    }
+
     function initialize(
         address rewardToken_,
         address agentNft_,
@@ -455,7 +464,10 @@ contract AgentReward is IAgentReward, Initializable, AccessControl, TokenSaver {
     // ----------------
     // Functions to claim rewards
     // ----------------
-    function _claimStakerRewards(address account, uint256 virtualId) internal {
+    function _claimStakerRewards(
+        address account,
+        uint256 virtualId
+    ) internal noReentrant {
         uint256 amount = _getClaimableStakerRewards(account, virtualId);
         if (amount == 0) {
             return;
@@ -464,14 +476,14 @@ contract AgentReward is IAgentReward, Initializable, AccessControl, TokenSaver {
         uint256 count = rewardCount(virtualId);
 
         Claim storage claim = _claimedStakerRewards[account][virtualId];
-        IERC20(rewardToken).safeTransfer(account, amount);
-        emit StakerRewardClaimed(virtualId, amount, account);
-
         claim.rewardCount = SafeCast.toUint32(count);
         claim.totalClaimed += amount;
+        emit StakerRewardClaimed(virtualId, amount, account);
+
+        IERC20(rewardToken).safeTransfer(account, amount);
     }
 
-    function _claimValidatorRewards(uint256 virtualId) internal {
+    function _claimValidatorRewards(uint256 virtualId) internal noReentrant {
         address account = _msgSender();
 
         uint256 amount = _getClaimableValidatorRewards(account, virtualId);
@@ -482,11 +494,11 @@ contract AgentReward is IAgentReward, Initializable, AccessControl, TokenSaver {
         uint256 count = rewardCount(virtualId);
 
         Claim storage claim = _claimedValidatorRewards[account][virtualId];
-        IERC20(rewardToken).safeTransfer(account, amount);
-        emit ValidatorRewardClaimed(virtualId, amount, account);
-
         claim.rewardCount = SafeCast.toUint32(count);
         claim.totalClaimed += amount;
+        emit ValidatorRewardClaimed(virtualId, amount, account);
+
+        IERC20(rewardToken).safeTransfer(account, amount);
     }
 
     function withdrawProtocolRewards(address recipient) external onlyGov {

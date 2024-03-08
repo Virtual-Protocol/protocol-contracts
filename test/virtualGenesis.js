@@ -15,7 +15,9 @@ const {
 } = require("@nomicfoundation/hardhat-toolbox/network-helpers");
 
 const getExecuteCallData = (factory, proposalId) => {
-  return factory.interface.encodeFunctionData("executeApplication", [proposalId]);
+  return factory.interface.encodeFunctionData("executeApplication", [
+    proposalId,
+  ]);
 };
 
 describe("AgentFactory", function () {
@@ -60,20 +62,18 @@ describe("AgentFactory", function () {
     );
     await protocolDAO.waitForDeployment();
 
-    const personaNft = await ethers.deployContract("AgentNft", [
-      deployer.address,
-    ]);
-    await personaNft.waitForDeployment();
+    const AgentNft = await ethers.getContractFactory("AgentNft");
+    const personaNft = await upgrades.deployProxy(AgentNft, [deployer.address]);
 
-    const contribution = await ethers.deployContract(
-      "ContributionNft",
+    const contribution = await upgrades.deployProxy(
+      await ethers.getContractFactory("ContributionNft"),
       [personaNft.target],
       {}
     );
 
-    const service = await ethers.deployContract(
-      "ServiceNft",
-      [personaNft.target, contribution.target],
+    const service = await upgrades.deployProxy(
+      await ethers.getContractFactory("ServiceNft"),
+      [personaNft.target, contribution.target, process.env.DATASET_SHARES],
       {}
     );
 
@@ -89,18 +89,20 @@ describe("AgentFactory", function () {
 
     const tba = await ethers.deployContract("ERC6551Registry");
 
-    const personaFactory = await ethers.deployContract("AgentFactory");
-    await personaFactory.initialize(
-      personaToken.target,
-      personaDAO.target,
-      tba.target,
-      demoToken.target,
-      personaNft.target,
-      protocolDAO.target,
-      parseEther("100000"),
-      5
+    const personaFactory = await upgrades.deployProxy(
+      await ethers.getContractFactory("AgentFactory"),
+      [
+        personaToken.target,
+        personaDAO.target,
+        tba.target,
+        demoToken.target,
+        personaNft.target,
+        PROPOSAL_THRESHOLD,
+        5,
+        protocolDAO.target,
+        deployer.address,
+      ]
     );
-
     await personaNft.grantRole(
       await personaNft.MINTER_ROLE(),
       personaFactory.target
@@ -471,7 +473,12 @@ describe("AgentFactory", function () {
     let events = await personaDAO.queryFilter(filter, -1);
     let event = events[0];
     const { proposalId: secondId } = event.args;
-    await personaDAO.castVoteWithReasonAndParams(secondId, 1, '', MATURITY_SCORE);
+    await personaDAO.castVoteWithReasonAndParams(
+      secondId,
+      1,
+      "",
+      MATURITY_SCORE
+    );
 
     // Validator #2 joins when we have 2 proposals
     await personaNft.addValidator(persona.virtualId, validator2);
@@ -487,7 +494,9 @@ describe("AgentFactory", function () {
     events = await personaDAO.queryFilter(filter, -1);
     event = events[0];
     const { proposalId: thirdId } = event.args;
-    await personaDAO.connect(this.signers[1]).castVoteWithReasonAndParams(thirdId, 1, '', MATURITY_SCORE);
+    await personaDAO
+      .connect(this.signers[1])
+      .castVoteWithReasonAndParams(thirdId, 1, "", MATURITY_SCORE);
     expect(
       await personaNft.validatorScore(persona.virtualId, validator)
     ).to.be.equal(1n);

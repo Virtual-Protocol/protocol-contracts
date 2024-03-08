@@ -9,7 +9,9 @@ const {
 } = require("@nomicfoundation/hardhat-toolbox/network-helpers");
 
 const getExecuteCallData = (factory, proposalId) => {
-  return factory.interface.encodeFunctionData("executeApplication", [proposalId]);
+  return factory.interface.encodeFunctionData("executeApplication", [
+    proposalId,
+  ]);
 };
 
 describe("Delegation", function () {
@@ -54,20 +56,18 @@ describe("Delegation", function () {
     );
     await protocolDAO.waitForDeployment();
 
-    const personaNft = await ethers.deployContract("AgentNft", [
-      deployer.address,
-    ]);
-    await personaNft.waitForDeployment();
+    const AgentNft = await ethers.getContractFactory("AgentNft");
+    const personaNft = await upgrades.deployProxy(AgentNft, [deployer.address]);
 
-    const contribution = await ethers.deployContract(
-      "ContributionNft",
+    const contribution = await upgrades.deployProxy(
+      await ethers.getContractFactory("ContributionNft"),
       [personaNft.target],
       {}
     );
 
-    const service = await ethers.deployContract(
-      "ServiceNft",
-      [personaNft.target, contribution.target],
+    const service = await upgrades.deployProxy(
+      await ethers.getContractFactory("ServiceNft"),
+      [personaNft.target, contribution.target, 7000n],
       {}
     );
 
@@ -83,16 +83,19 @@ describe("Delegation", function () {
 
     const tba = await ethers.deployContract("ERC6551Registry");
 
-    const personaFactory = await ethers.deployContract("AgentFactory");
-    await personaFactory.initialize(
-      personaToken.target,
-      personaDAO.target,
-      tba.target,
-      demoToken.target,
-      personaNft.target,
-      protocolDAO.target,
-      parseEther("100000"),
-      5
+    const personaFactory = await upgrades.deployProxy(
+      await ethers.getContractFactory("AgentFactory"),
+      [
+        personaToken.target,
+        personaDAO.target,
+        tba.target,
+        demoToken.target,
+        personaNft.target,
+        parseEther("100000"),
+        5,
+        protocolDAO.target,
+        deployer.address,
+      ]
     );
 
     await personaNft.grantRole(
@@ -202,9 +205,12 @@ describe("Delegation", function () {
     }
     await mine(1);
     for (let i = 0; i < 8; i++) {
-      expect(await personaTokenContract.getPastDelegates(account1, blockNumber + i + 1)).to.equal(
-        this.accounts[i]
-      );
+      expect(
+        await personaTokenContract.getPastDelegates(
+          account1,
+          blockNumber + i + 1
+        )
+      ).to.equal(this.accounts[i]);
     }
   });
 });

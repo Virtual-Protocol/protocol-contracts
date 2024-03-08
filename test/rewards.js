@@ -80,9 +80,8 @@ describe("Rewards", function () {
     );
     await protocolDAO.waitForDeployment();
 
-    const personaNft = await ethers.deployContract("AgentNft");
-    await personaNft.initialize(deployer.address);
-    await personaNft.waitForDeployment();
+    const AgentNft = await ethers.getContractFactory("AgentNft");
+    const personaNft = await upgrades.deployProxy(AgentNft, [deployer.address]);
 
     const personaToken = await ethers.deployContract("AgentToken");
     await personaToken.waitForDeployment();
@@ -91,17 +90,20 @@ describe("Rewards", function () {
 
     const tba = await ethers.deployContract("ERC6551Registry");
 
-    const personaFactory = await ethers.deployContract("AgentFactory");
-    await personaFactory.initialize(
-      personaToken.target,
-      personaDAO.target,
-      tba.target,
-      demoToken.target,
-      personaNft.target,
-      PROPOSAL_THRESHOLD,
-      5,
-      protocolDAO.target,
-      deployer.address
+
+    const personaFactory = await upgrades.deployProxy(
+      await ethers.getContractFactory("AgentFactory"),
+      [
+        personaToken.target,
+        personaDAO.target,
+        tba.target,
+        demoToken.target,
+        personaNft.target,
+        PROPOSAL_THRESHOLD,
+        5,
+        protocolDAO.target,
+        deployer.address
+      ]
     );
 
     await personaNft.grantRole(
@@ -112,14 +114,16 @@ describe("Rewards", function () {
     const reward = await ethers.deployContract("AgentReward", [], {});
     await reward.waitForDeployment();
 
-    const contributionNft = await ethers.deployContract("ContributionNft");
-    await contributionNft.initialize(personaNft);
+    const contributionNft = await upgrades.deployProxy(
+      await ethers.getContractFactory("ContributionNft"),
+      [personaNft.target],
+      {}
+    );
 
-    const serviceNft = await ethers.deployContract("ServiceNft");
-    await serviceNft.initialize(
-      personaNft,
-      contributionNft.target,
-      process.env.DATASET_SHARES
+    const serviceNft = await upgrades.deployProxy(
+      await ethers.getContractFactory("ServiceNft"),
+      [personaNft.target, contributionNft.target, process.env.DATASET_SHARES],
+      {}
     );
 
     await personaNft.setContributionService(

@@ -10,7 +10,7 @@ const getMintCallData = (token, to, amount) => {
   return token.interface.encodeFunctionData("mint", [to, amount]);
 };
 
-describe("ProtocolDAO", function () {
+describe("GenesisDAO", function () {
   const PROPOSAL_THRESHOLD = parseEther("100000000");
   const QUORUM = parseEther("10000");
   const VOTING_PERIOD = parseInt(process.env.PROTOCOL_VOTING_PERIOD);
@@ -36,6 +36,7 @@ describe("ProtocolDAO", function () {
       {}
     );
     await dao.waitForDeployment();
+    await dao.grantRole("0xd8aa0f3194971a2a116679f7c2090f6939c8d4e01a2a8d7e41d55e5351469e63", deployer.address); // EXECUTOR_ROLE
 
     const demoToken = await ethers.deployContract(
       "BMWToken",
@@ -87,7 +88,7 @@ describe("ProtocolDAO", function () {
     // Ensure proposal is still in ACTIVE state
     expect(await dao.state(proposalId)).to.be.equal(1n);
 
-    // Try to execute proposal
+    // // Try to execute proposal
     expect(await demoToken.balanceOf(this.accounts[2])).to.equal(
       parseEther("0")
     );

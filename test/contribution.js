@@ -55,9 +55,8 @@ describe("Contribution", function () {
     );
     await protocolDAO.waitForDeployment();
 
-    const personaNft = await ethers.deployContract("AgentNft");
-    await personaNft.waitForDeployment();
-    await personaNft.initialize(deployer.address);
+    const AgentNft = await ethers.getContractFactory("AgentNft");
+    const personaNft = await upgrades.deployProxy(AgentNft, [deployer.address]);
 
     const personaToken = await ethers.deployContract("AgentToken");
     await personaToken.waitForDeployment();
@@ -66,30 +65,37 @@ describe("Contribution", function () {
 
     const tba = await ethers.deployContract("ERC6551Registry");
 
-    const personaFactory = await ethers.deployContract("AgentFactory");
-
-    await personaFactory.initialize(
-      personaToken.target,
-      personaDAO.target,
-      tba.target,
-      demoToken.target,
-      personaNft.target,
-      parseEther("100000"),
-      5,
-      protocolDAO.target,
-      signers[8].address
+    const personaFactory = await upgrades.deployProxy(
+      await ethers.getContractFactory("AgentFactory"),
+      [
+        personaToken.target,
+        personaDAO.target,
+        tba.target,
+        demoToken.target,
+        personaNft.target,
+        PROPOSAL_THRESHOLD,
+        5,
+        protocolDAO.target,
+        deployer.address,
+      ]
     );
-
+    
     await personaNft.grantRole(
       await personaNft.MINTER_ROLE(),
       personaFactory.target
     );
 
-    const contribution = await ethers.deployContract("ContributionNft", [], {});
-    await contribution.initialize(personaNft.target);
+    const contribution = await upgrades.deployProxy(
+      await ethers.getContractFactory("ContributionNft"),
+      [personaNft.target],
+      {}
+    );
 
-    const service = await ethers.deployContract("ServiceNft", [], {});
-    await service.initialize(personaNft.target, contribution.target, 7000n);
+    const service = await upgrades.deployProxy(
+      await ethers.getContractFactory("ServiceNft"),
+      [personaNft.target, contribution.target, process.env.DATASET_SHARES],
+      {}
+    );
 
     await personaNft.setContributionService(
       contribution.target,

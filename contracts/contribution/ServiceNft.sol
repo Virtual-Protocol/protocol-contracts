@@ -39,6 +39,11 @@ contract ServiceNft is
     mapping(uint256 personaId => mapping(uint8 coreId => uint256[] serviceId))
         private _coreDatasets;
 
+    /// @custom:oz-upgrades-unsafe-allow constructor
+    constructor() {
+        _disableInitializers();
+    }
+
     function initialize(
         address initialAgentNft,
         address initialContributionNft,

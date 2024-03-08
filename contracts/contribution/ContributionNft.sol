@@ -38,6 +38,11 @@ contract ContributionNft is
 
     address private _admin; // Admin is able to create contribution proposal without votes
 
+    /// @custom:oz-upgrades-unsafe-allow constructor
+    constructor() {
+        _disableInitializers();
+    }
+
     function initialize(address thePersonaAddress) public initializer {
         __ERC721_init("Contribution", "VC");
         personaNft = thePersonaAddress;

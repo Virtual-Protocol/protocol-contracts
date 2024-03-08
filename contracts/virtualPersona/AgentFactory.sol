@@ -86,6 +86,11 @@ contract AgentFactory is Initializable, AccessControl {
         locked = false;
     }
 
+    /// @custom:oz-upgrades-unsafe-allow constructor
+    constructor() {
+        _disableInitializers();
+    }
+
     function initialize(
         address tokenImplementation_,
         address daoImplementation_,

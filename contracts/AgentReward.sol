@@ -234,7 +234,7 @@ contract AgentReward is IAgentReward, Initializable, AccessControl, TokenSaver {
             reward.validatorAmount,
             virtualId,
             reward.id,
-            mainReward.totalStaked
+            reward.totalStaked
         );
         _distributeContributorRewards(
             reward.contributorAmount,
@@ -517,9 +517,9 @@ contract AgentReward is IAgentReward, Initializable, AccessControl, TokenSaver {
     }
 
     function getServiceReward(
-        uint256 virtualId
+        uint256 nftId
     ) public view returns (ServiceReward memory) {
-        return _serviceRewards[virtualId];
+        return _serviceRewards[nftId];
     }
 
     function _claimServiceRewards(uint256 nftId) public {

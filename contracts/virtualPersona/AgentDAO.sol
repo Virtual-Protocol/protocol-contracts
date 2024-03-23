@@ -171,7 +171,7 @@ contract AgentDAO is
                 SafeCast.toUint48(block.number),
                 SafeCast.toUint208(scoreOf(account)) + 1
             );
-            if (params.length > 0) {
+            if (params.length > 0 && support == 1) {
                 _updateMaturity(account, proposalId, weight, params);
             }
         }

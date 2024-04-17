@@ -1,18 +1,20 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
-import "@openzeppelin/contracts/access/Ownable.sol";
+import "@openzeppelin/contracts/access/AccessControl.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "./AgentReward.sol";
 
-contract RewardTreasury is Ownable {
+contract RewardTreasury is AccessControl {
     using SafeERC20 for IERC20;
 
     struct RewardBucket {
         uint256 amount;
         bool disbursed;
     }
+
+    bytes32 public constant EXECUTOR_ROLE = keccak256("EXECUTOR_ROLE");
 
     mapping(uint32 => RewardBucket) public buckets;
     IERC20 public rewardToken;
@@ -25,12 +27,7 @@ contract RewardTreasury is Ownable {
         uint32 startTS
     );
 
-    event TokenSaved(
-        address indexed by,
-        address indexed receiver,
-        address indexed token,
-        uint256 amount
-    );
+    event TokenSaved(address indexed by, address indexed token, uint256 amount);
 
     event RewardManagerUpdated(address newManager);
 
@@ -38,14 +35,11 @@ contract RewardTreasury is Ownable {
 
     event RewardAmountUpdated(uint32 indexed ts, uint256 amount);
 
-    constructor(
-        address owner,
-        address token,
-        address rewardManager_
-    ) Ownable(owner) {
+    constructor(address admin, address token, address rewardManager_) {
         rewardToken = IERC20(token);
         rewardToken.approve(rewardManager_, type(uint256).max);
         rewardManager = AgentReward(rewardManager_);
+        _grantRole(DEFAULT_ADMIN_ROLE, admin);
     }
 
     function createReward(
@@ -53,7 +47,7 @@ contract RewardTreasury is Ownable {
         uint8 count,
         uint32 interval,
         uint32 startTS
-    ) external onlyOwner {
+    ) external onlyRole(DEFAULT_ADMIN_ROLE) {
         require(total > 0, "Total must be greater than zero");
         require(count > 0, "Number of buckets must be greater than zero");
         require(interval > 0, "Interval must be greater than zero");
@@ -73,16 +67,19 @@ contract RewardTreasury is Ownable {
         emit RewardCreated(total, count, interval, startTS);
     }
 
-    function saveToken(address _token, uint256 _amount) external onlyOwner {
-        IERC20(_token).safeTransfer(owner(), _amount);
-        emit TokenSaved(_msgSender(), owner(), _token, _amount);
+    function saveToken(
+        address _token,
+        uint256 _amount
+    ) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        IERC20(_token).safeTransfer(_msgSender(), _amount);
+        emit TokenSaved(_msgSender(), _token, _amount);
     }
 
-    function withdraw(uint256 _amount) external onlyOwner {
-        payable(owner()).transfer(_amount);
+    function withdraw(uint256 _amount) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        payable(_msgSender()).transfer(_amount);
     }
 
-    function distribute(uint32 ts) external {
+    function distribute(uint32 ts) external onlyRole(EXECUTOR_ROLE) {
         RewardBucket storage bucket = buckets[ts];
         require(!bucket.disbursed, "Bucket already disbursed");
         require(bucket.amount > 0, "Bucket is empty");
@@ -98,12 +95,17 @@ contract RewardTreasury is Ownable {
         emit RewardDisbursed(ts, bucket.amount);
     }
 
-    function setRewardManager(address rewardManager_) external onlyOwner {
+    function setRewardManager(
+        address rewardManager_
+    ) external onlyRole(DEFAULT_ADMIN_ROLE) {
         rewardManager = AgentReward(rewardManager_);
         emit RewardManagerUpdated(rewardManager_);
     }
 
-    function adjustAmount(uint32 ts, uint256 amount) external onlyOwner {
+    function adjustAmount(
+        uint32 ts,
+        uint256 amount
+    ) external onlyRole(DEFAULT_ADMIN_ROLE) {
         RewardBucket storage bucket = buckets[ts];
         require(!bucket.disbursed, "Bucket already disbursed");
 

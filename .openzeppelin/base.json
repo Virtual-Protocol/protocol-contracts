@@ -2069,7 +2069,7 @@
             "label": "_mainRewards",
             "offset": 0,
             "slot": "5",
-            "type": "t_array(t_struct(MainReward)6310_storage)dyn_storage",
+            "type": "t_array(t_struct(MainReward)8260_storage)dyn_storage",
             "contract": "AgentReward",
             "src": "contracts/AgentReward.sol:36"
           },
@@ -2077,7 +2077,7 @@
             "label": "_rewards",
             "offset": 0,
             "slot": "6",
-            "type": "t_mapping(t_uint256,t_array(t_struct(Reward)6323_storage)dyn_storage)",
+            "type": "t_mapping(t_uint256,t_array(t_struct(Reward)8273_storage)dyn_storage)",
             "contract": "AgentReward",
             "src": "contracts/AgentReward.sol:37"
           },
@@ -2085,7 +2085,7 @@
             "label": "_rewardSettings",
             "offset": 0,
             "slot": "7",
-            "type": "t_struct(Trace)6595_storage",
+            "type": "t_struct(Trace)8925_storage",
             "contract": "AgentReward",
             "src": "contracts/AgentReward.sol:39"
           },
@@ -2109,7 +2109,7 @@
             "label": "_claimedStakerRewards",
             "offset": 0,
             "slot": "10",
-            "type": "t_mapping(t_address,t_mapping(t_uint256,t_struct(Claim)6328_storage))",
+            "type": "t_mapping(t_address,t_mapping(t_uint256,t_struct(Claim)8278_storage))",
             "contract": "AgentReward",
             "src": "contracts/AgentReward.sol:44"
           },
@@ -2117,7 +2117,7 @@
             "label": "_claimedValidatorRewards",
             "offset": 0,
             "slot": "11",
-            "type": "t_mapping(t_address,t_mapping(t_uint256,t_struct(Claim)6328_storage))",
+            "type": "t_mapping(t_address,t_mapping(t_uint256,t_struct(Claim)8278_storage))",
             "contract": "AgentReward",
             "src": "contracts/AgentReward.sol:46"
           },
@@ -2125,7 +2125,7 @@
             "label": "_serviceRewards",
             "offset": 0,
             "slot": "12",
-            "type": "t_mapping(t_uint256,t_struct(ServiceReward)6339_storage)",
+            "type": "t_mapping(t_uint256,t_struct(ServiceReward)8289_storage)",
             "contract": "AgentReward",
             "src": "contracts/AgentReward.sol:48"
           },
@@ -2185,15 +2185,15 @@
             "label": "address",
             "numberOfBytes": "20"
           },
-          "t_array(t_struct(Checkpoint)6612_storage)dyn_storage": {
+          "t_array(t_struct(Checkpoint)8942_storage)dyn_storage": {
             "label": "struct RewardSettingsCheckpoints.Checkpoint[]",
             "numberOfBytes": "32"
           },
-          "t_array(t_struct(MainReward)6310_storage)dyn_storage": {
+          "t_array(t_struct(MainReward)8260_storage)dyn_storage": {
             "label": "struct IAgentReward.MainReward[]",
             "numberOfBytes": "32"
           },
-          "t_array(t_struct(Reward)6323_storage)dyn_storage": {
+          "t_array(t_struct(Reward)8273_storage)dyn_storage": {
             "label": "struct IAgentReward.Reward[]",
             "numberOfBytes": "32"
           },
@@ -2205,7 +2205,7 @@
             "label": "mapping(address => bool)",
             "numberOfBytes": "32"
           },
-          "t_mapping(t_address,t_mapping(t_uint256,t_struct(Claim)6328_storage))": {
+          "t_mapping(t_address,t_mapping(t_uint256,t_struct(Claim)8278_storage))": {
             "label": "mapping(address => mapping(uint256 => struct IAgentReward.Claim))",
             "numberOfBytes": "32"
           },
@@ -2217,15 +2217,15 @@
             "label": "mapping(bytes32 => struct AccessControl.RoleData)",
             "numberOfBytes": "32"
           },
-          "t_mapping(t_uint256,t_array(t_struct(Reward)6323_storage)dyn_storage)": {
+          "t_mapping(t_uint256,t_array(t_struct(Reward)8273_storage)dyn_storage)": {
             "label": "mapping(uint256 => struct IAgentReward.Reward[])",
             "numberOfBytes": "32"
           },
-          "t_mapping(t_uint256,t_struct(Claim)6328_storage)": {
+          "t_mapping(t_uint256,t_struct(Claim)8278_storage)": {
             "label": "mapping(uint256 => struct IAgentReward.Claim)",
             "numberOfBytes": "32"
           },
-          "t_mapping(t_uint256,t_struct(ServiceReward)6339_storage)": {
+          "t_mapping(t_uint256,t_struct(ServiceReward)8289_storage)": {
             "label": "mapping(uint256 => struct IAgentReward.ServiceReward)",
             "numberOfBytes": "32"
           },
@@ -2241,7 +2241,7 @@
             "label": "mapping(uint8 => uint256)",
             "numberOfBytes": "32"
           },
-          "t_struct(Checkpoint)6612_storage": {
+          "t_struct(Checkpoint)8942_storage": {
             "label": "struct RewardSettingsCheckpoints.Checkpoint",
             "members": [
               {
@@ -2252,14 +2252,14 @@
               },
               {
                 "label": "_value",
-                "type": "t_struct(RewardSettings)6606_storage",
+                "type": "t_struct(RewardSettings)8936_storage",
                 "offset": 0,
                 "slot": "1"
               }
             ],
             "numberOfBytes": "96"
           },
-          "t_struct(Claim)6328_storage": {
+          "t_struct(Claim)8278_storage": {
             "label": "struct IAgentReward.Claim",
             "members": [
               {
@@ -2277,7 +2277,7 @@
             ],
             "numberOfBytes": "64"
           },
-          "t_struct(MainReward)6310_storage": {
+          "t_struct(MainReward)8260_storage": {
             "label": "struct IAgentReward.MainReward",
             "members": [
               {
@@ -2307,7 +2307,7 @@
             ],
             "numberOfBytes": "128"
           },
-          "t_struct(Reward)6323_storage": {
+          "t_struct(Reward)8273_storage": {
             "label": "struct IAgentReward.Reward",
             "members": [
               {
@@ -2349,7 +2349,7 @@
             ],
             "numberOfBytes": "160"
           },
-          "t_struct(RewardSettings)6606_storage": {
+          "t_struct(RewardSettings)8936_storage": {
             "label": "struct RewardSettingsCheckpoints.RewardSettings",
             "members": [
               {
@@ -2403,7 +2403,7 @@
             ],
             "numberOfBytes": "64"
           },
-          "t_struct(ServiceReward)6339_storage": {
+          "t_struct(ServiceReward)8289_storage": {
             "label": "struct IAgentReward.ServiceReward",
             "members": [
               {
@@ -2439,12 +2439,495 @@
             ],
             "numberOfBytes": "160"
           },
-          "t_struct(Trace)6595_storage": {
+          "t_struct(Trace)8925_storage": {
             "label": "struct RewardSettingsCheckpoints.Trace",
             "members": [
               {
                 "label": "_checkpoints",
-                "type": "t_array(t_struct(Checkpoint)6612_storage)dyn_storage",
+                "type": "t_array(t_struct(Checkpoint)8942_storage)dyn_storage",
+                "offset": 0,
+                "slot": "0"
+              }
+            ],
+            "numberOfBytes": "32"
+          },
+          "t_uint16": {
+            "label": "uint16",
+            "numberOfBytes": "2"
+          },
+          "t_uint256": {
+            "label": "uint256",
+            "numberOfBytes": "32"
+          },
+          "t_uint32": {
+            "label": "uint32",
+            "numberOfBytes": "4"
+          },
+          "t_uint48": {
+            "label": "uint48",
+            "numberOfBytes": "6"
+          },
+          "t_uint8": {
+            "label": "uint8",
+            "numberOfBytes": "1"
+          }
+        },
+        "namespaces": {
+          "erc7201:openzeppelin.storage.Initializable": [
+            {
+              "contract": "Initializable",
+              "label": "_initialized",
+              "type": "t_uint64",
+              "src": "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol:69",
+              "offset": 0,
+              "slot": "0"
+            },
+            {
+              "contract": "Initializable",
+              "label": "_initializing",
+              "type": "t_bool",
+              "src": "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol:73",
+              "offset": 8,
+              "slot": "0"
+            }
+          ]
+        }
+      }
+    },
+    "16ae1d76b375e323cf99563c3f8cd9badf02553eb5b5e610ed0b42d5628640f7": {
+      "address": "0x634D91f7A67011A60985dF555A5157f9b321f7dE",
+      "txHash": "0x926ffce5d7bb5a671409efb22b415e4646e2bbe189ad895331bbcf0e2870a34c",
+      "layout": {
+        "solcVersion": "0.8.20",
+        "storage": [
+          {
+            "label": "_roles",
+            "offset": 0,
+            "slot": "0",
+            "type": "t_mapping(t_bytes32,t_struct(RoleData)275_storage)",
+            "contract": "AccessControl",
+            "src": "@openzeppelin/contracts/access/AccessControl.sol:55"
+          },
+          {
+            "label": "_nextRewardId",
+            "offset": 0,
+            "slot": "1",
+            "type": "t_uint48",
+            "contract": "AgentRewardV2",
+            "src": "contracts/AgentRewardV2.sol:29"
+          },
+          {
+            "label": "rewardToken",
+            "offset": 6,
+            "slot": "1",
+            "type": "t_address",
+            "contract": "AgentRewardV2",
+            "src": "contracts/AgentRewardV2.sol:35"
+          },
+          {
+            "label": "agentNft",
+            "offset": 0,
+            "slot": "2",
+            "type": "t_address",
+            "contract": "AgentRewardV2",
+            "src": "contracts/AgentRewardV2.sol:36"
+          },
+          {
+            "label": "contributionNft",
+            "offset": 0,
+            "slot": "3",
+            "type": "t_address",
+            "contract": "AgentRewardV2",
+            "src": "contracts/AgentRewardV2.sol:37"
+          },
+          {
+            "label": "serviceNft",
+            "offset": 0,
+            "slot": "4",
+            "type": "t_address",
+            "contract": "AgentRewardV2",
+            "src": "contracts/AgentRewardV2.sol:38"
+          },
+          {
+            "label": "_mainRewards",
+            "offset": 0,
+            "slot": "5",
+            "type": "t_array(t_struct(MainReward)6343_storage)dyn_storage",
+            "contract": "AgentRewardV2",
+            "src": "contracts/AgentRewardV2.sol:41"
+          },
+          {
+            "label": "_rewards",
+            "offset": 0,
+            "slot": "6",
+            "type": "t_mapping(t_uint256,t_array(t_struct(Reward)6356_storage)dyn_storage)",
+            "contract": "AgentRewardV2",
+            "src": "contracts/AgentRewardV2.sol:42"
+          },
+          {
+            "label": "_rewardSettings",
+            "offset": 0,
+            "slot": "7",
+            "type": "t_struct(Trace)6640_storage",
+            "contract": "AgentRewardV2",
+            "src": "contracts/AgentRewardV2.sol:44"
+          },
+          {
+            "label": "protocolRewards",
+            "offset": 0,
+            "slot": "8",
+            "type": "t_uint256",
+            "contract": "AgentRewardV2",
+            "src": "contracts/AgentRewardV2.sol:47"
+          },
+          {
+            "label": "validatorPoolRewards",
+            "offset": 0,
+            "slot": "9",
+            "type": "t_uint256",
+            "contract": "AgentRewardV2",
+            "src": "contracts/AgentRewardV2.sol:48"
+          },
+          {
+            "label": "_claimedStakerRewards",
+            "offset": 0,
+            "slot": "10",
+            "type": "t_mapping(t_address,t_mapping(t_uint256,t_struct(Claim)6361_storage))",
+            "contract": "AgentRewardV2",
+            "src": "contracts/AgentRewardV2.sol:49"
+          },
+          {
+            "label": "_claimedValidatorRewards",
+            "offset": 0,
+            "slot": "11",
+            "type": "t_mapping(t_address,t_mapping(t_uint256,t_struct(Claim)6361_storage))",
+            "contract": "AgentRewardV2",
+            "src": "contracts/AgentRewardV2.sol:51"
+          },
+          {
+            "label": "_serviceRewards",
+            "offset": 0,
+            "slot": "12",
+            "type": "t_mapping(t_uint256,t_struct(ServiceReward)6372_storage)",
+            "contract": "AgentRewardV2",
+            "src": "contracts/AgentRewardV2.sol:53"
+          },
+          {
+            "label": "_rewardImpacts",
+            "offset": 0,
+            "slot": "13",
+            "type": "t_mapping(t_uint48,t_mapping(t_uint8,t_uint256))",
+            "contract": "AgentRewardV2",
+            "src": "contracts/AgentRewardV2.sol:54"
+          },
+          {
+            "label": "_validatorRewards",
+            "offset": 0,
+            "slot": "14",
+            "type": "t_mapping(t_address,t_mapping(t_uint48,t_uint256))",
+            "contract": "AgentRewardV2",
+            "src": "contracts/AgentRewardV2.sol:56"
+          },
+          {
+            "label": "locked",
+            "offset": 0,
+            "slot": "15",
+            "type": "t_bool",
+            "contract": "AgentRewardV2",
+            "src": "contracts/AgentRewardV2.sol:66"
+          }
+        ],
+        "types": {
+          "t_bool": {
+            "label": "bool",
+            "numberOfBytes": "1"
+          },
+          "t_struct(InitializableStorage)10_storage": {
+            "label": "struct Initializable.InitializableStorage",
+            "members": [
+              {
+                "label": "_initialized",
+                "type": "t_uint64",
+                "offset": 0,
+                "slot": "0"
+              },
+              {
+                "label": "_initializing",
+                "type": "t_bool",
+                "offset": 8,
+                "slot": "0"
+              }
+            ],
+            "numberOfBytes": "32"
+          },
+          "t_uint64": {
+            "label": "uint64",
+            "numberOfBytes": "8"
+          },
+          "t_address": {
+            "label": "address",
+            "numberOfBytes": "20"
+          },
+          "t_array(t_struct(Checkpoint)6657_storage)dyn_storage": {
+            "label": "struct RewardSettingsCheckpoints.Checkpoint[]",
+            "numberOfBytes": "32"
+          },
+          "t_array(t_struct(MainReward)6343_storage)dyn_storage": {
+            "label": "struct IAgentReward.MainReward[]",
+            "numberOfBytes": "32"
+          },
+          "t_array(t_struct(Reward)6356_storage)dyn_storage": {
+            "label": "struct IAgentReward.Reward[]",
+            "numberOfBytes": "32"
+          },
+          "t_bytes32": {
+            "label": "bytes32",
+            "numberOfBytes": "32"
+          },
+          "t_mapping(t_address,t_bool)": {
+            "label": "mapping(address => bool)",
+            "numberOfBytes": "32"
+          },
+          "t_mapping(t_address,t_mapping(t_uint256,t_struct(Claim)6361_storage))": {
+            "label": "mapping(address => mapping(uint256 => struct IAgentReward.Claim))",
+            "numberOfBytes": "32"
+          },
+          "t_mapping(t_address,t_mapping(t_uint48,t_uint256))": {
+            "label": "mapping(address => mapping(uint48 => uint256))",
+            "numberOfBytes": "32"
+          },
+          "t_mapping(t_bytes32,t_struct(RoleData)275_storage)": {
+            "label": "mapping(bytes32 => struct AccessControl.RoleData)",
+            "numberOfBytes": "32"
+          },
+          "t_mapping(t_uint256,t_array(t_struct(Reward)6356_storage)dyn_storage)": {
+            "label": "mapping(uint256 => struct IAgentReward.Reward[])",
+            "numberOfBytes": "32"
+          },
+          "t_mapping(t_uint256,t_struct(Claim)6361_storage)": {
+            "label": "mapping(uint256 => struct IAgentReward.Claim)",
+            "numberOfBytes": "32"
+          },
+          "t_mapping(t_uint256,t_struct(ServiceReward)6372_storage)": {
+            "label": "mapping(uint256 => struct IAgentReward.ServiceReward)",
+            "numberOfBytes": "32"
+          },
+          "t_mapping(t_uint48,t_mapping(t_uint8,t_uint256))": {
+            "label": "mapping(uint48 => mapping(uint8 => uint256))",
+            "numberOfBytes": "32"
+          },
+          "t_mapping(t_uint48,t_uint256)": {
+            "label": "mapping(uint48 => uint256)",
+            "numberOfBytes": "32"
+          },
+          "t_mapping(t_uint8,t_uint256)": {
+            "label": "mapping(uint8 => uint256)",
+            "numberOfBytes": "32"
+          },
+          "t_struct(Checkpoint)6657_storage": {
+            "label": "struct RewardSettingsCheckpoints.Checkpoint",
+            "members": [
+              {
+                "label": "_key",
+                "type": "t_uint32",
+                "offset": 0,
+                "slot": "0"
+              },
+              {
+                "label": "_value",
+                "type": "t_struct(RewardSettings)6651_storage",
+                "offset": 0,
+                "slot": "1"
+              }
+            ],
+            "numberOfBytes": "96"
+          },
+          "t_struct(Claim)6361_storage": {
+            "label": "struct IAgentReward.Claim",
+            "members": [
+              {
+                "label": "totalClaimed",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "0"
+              },
+              {
+                "label": "rewardCount",
+                "type": "t_uint32",
+                "offset": 0,
+                "slot": "1"
+              }
+            ],
+            "numberOfBytes": "64"
+          },
+          "t_struct(MainReward)6343_storage": {
+            "label": "struct IAgentReward.MainReward",
+            "members": [
+              {
+                "label": "blockNumber",
+                "type": "t_uint32",
+                "offset": 0,
+                "slot": "0"
+              },
+              {
+                "label": "amount",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "1"
+              },
+              {
+                "label": "agentCount",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "2"
+              },
+              {
+                "label": "totalStaked",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "3"
+              }
+            ],
+            "numberOfBytes": "128"
+          },
+          "t_struct(Reward)6356_storage": {
+            "label": "struct IAgentReward.Reward",
+            "members": [
+              {
+                "label": "id",
+                "type": "t_uint48",
+                "offset": 0,
+                "slot": "0"
+              },
+              {
+                "label": "mainIndex",
+                "type": "t_uint32",
+                "offset": 6,
+                "slot": "0"
+              },
+              {
+                "label": "totalStaked",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "1"
+              },
+              {
+                "label": "validatorAmount",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "2"
+              },
+              {
+                "label": "contributorAmount",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "3"
+              },
+              {
+                "label": "coreAmount",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "4"
+              }
+            ],
+            "numberOfBytes": "160"
+          },
+          "t_struct(RewardSettings)6651_storage": {
+            "label": "struct RewardSettingsCheckpoints.RewardSettings",
+            "members": [
+              {
+                "label": "protocolShares",
+                "type": "t_uint16",
+                "offset": 0,
+                "slot": "0"
+              },
+              {
+                "label": "contributorShares",
+                "type": "t_uint16",
+                "offset": 2,
+                "slot": "0"
+              },
+              {
+                "label": "stakerShares",
+                "type": "t_uint16",
+                "offset": 4,
+                "slot": "0"
+              },
+              {
+                "label": "parentShares",
+                "type": "t_uint16",
+                "offset": 6,
+                "slot": "0"
+              },
+              {
+                "label": "stakeThreshold",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "1"
+              }
+            ],
+            "numberOfBytes": "64"
+          },
+          "t_struct(RoleData)275_storage": {
+            "label": "struct AccessControl.RoleData",
+            "members": [
+              {
+                "label": "hasRole",
+                "type": "t_mapping(t_address,t_bool)",
+                "offset": 0,
+                "slot": "0"
+              },
+              {
+                "label": "adminRole",
+                "type": "t_bytes32",
+                "offset": 0,
+                "slot": "1"
+              }
+            ],
+            "numberOfBytes": "64"
+          },
+          "t_struct(ServiceReward)6372_storage": {
+            "label": "struct IAgentReward.ServiceReward",
+            "members": [
+              {
+                "label": "impact",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "0"
+              },
+              {
+                "label": "amount",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "1"
+              },
+              {
+                "label": "parentAmount",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "2"
+              },
+              {
+                "label": "totalClaimed",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "3"
+              },
+              {
+                "label": "totalClaimedParent",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "4"
+              }
+            ],
+            "numberOfBytes": "160"
+          },
+          "t_struct(Trace)6640_storage": {
+            "label": "struct RewardSettingsCheckpoints.Trace",
+            "members": [
+              {
+                "label": "_checkpoints",
+                "type": "t_array(t_struct(Checkpoint)6657_storage)dyn_storage",
                 "offset": 0,
                 "slot": "0"
               }

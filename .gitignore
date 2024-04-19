@@ -17,3 +17,4 @@ Thumbs.db
 cache/
 artifacts/
 deployments
+fireblocks_secret.key

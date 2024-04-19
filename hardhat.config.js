@@ -3,6 +3,8 @@ require("dotenv").config();
 require("@nomicfoundation/hardhat-toolbox");
 require("hardhat-deploy");
 require("@openzeppelin/hardhat-upgrades");
+require("@fireblocks/hardhat-fireblocks");
+const { ApiBaseUrl } = require("@fireblocks/fireblocks-web3-provider");
 
 module.exports = {
   solidity: {
@@ -35,6 +37,15 @@ module.exports = {
       url: "https://mainnet.base.org",
       accounts: [process.env.PRIVATE_KEY],
     },
+    base_fire: {
+      url: "https://mainnet.base.org",
+      accounts: [process.env.PRIVATE_KEY],
+      fireblocks: {
+        privateKey: process.env.FIREBLOCKS_API_PRIVATE_KEY_PATH,
+        apiKey: process.env.FIREBLOCKS_API_KEY,
+        vaultAccountIds: process.env.FIREBLOCKS_VAULT_ACCOUNT_IDS,
+      },
+    },
     base_sepolia: {
       url: "https://sepolia.base.org",
       accounts: [process.env.PRIVATE_KEY],
@@ -43,6 +54,22 @@ module.exports = {
           apiUrl: "https://api-sepolia.basescan.org",
           apiKey: process.env.ETHERSCAN_API_KEY,
         },
+      },
+    },
+    base_sepolia_fire: {
+      url: "https://sepolia.base.org",
+      accounts: [process.env.PRIVATE_KEY],
+      verify: {
+        etherscan: {
+          apiUrl: "https://api-sepolia.basescan.org",
+          apiKey: process.env.ETHERSCAN_API_KEY,
+        },
+      },
+      fireblocks: {
+        apiBaseUrl: ApiBaseUrl.Sandbox,
+        privateKey: process.env.FIREBLOCKS_API_PRIVATE_KEY_PATH,
+        apiKey: process.env.FIREBLOCKS_API_KEY,
+        vaultAccountIds: process.env.FIREBLOCKS_VAULT_ACCOUNT_IDS,
       },
     },
     polygon: {

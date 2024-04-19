@@ -6,7 +6,7 @@ import { ethers, upgrades } from "hardhat";
       process.env.ADMIN_PRIVATE_KEY,
       ethers.provider
     );
-    const Contract = await ethers.getContractFactory("AgentReward", adminSigner);
+    const Contract = await ethers.getContractFactory("AgentRewardV2", adminSigner);
     const contract = await upgrades.upgradeProxy(process.env.PERSONA_REWARD, Contract);
     console.log("Upgraded", contract.target)
   } catch (e) {

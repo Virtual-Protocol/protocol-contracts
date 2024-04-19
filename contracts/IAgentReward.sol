@@ -79,6 +79,14 @@ interface IAgentReward {
         uint256 childrenAmount
     );
 
+    event NewAgentReward(
+        uint32 mainIndex,
+        uint256 virtualId,
+        uint256 validatorAmount,
+        uint256 contributorAmount,
+        uint256 coreAmount
+    );
+
     event DatasetRewardsClaimed(uint256 nftId, address account, uint256 total);
 
     error ERC5805FutureLookup(uint256 timepoint, uint32 clock);

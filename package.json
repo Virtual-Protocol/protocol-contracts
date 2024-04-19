@@ -37,6 +37,7 @@
   },
   "dependencies": {
     "@account-abstraction/contracts": "^0.6.0",
+    "@fireblocks/hardhat-fireblocks": "^1.3.5",
     "@nomicfoundation/hardhat-verify": "^2.0.3",
     "@openzeppelin/contracts": "5.0.0",
     "@openzeppelin/contracts-upgradeable": "^5.0.1",

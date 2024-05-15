@@ -84,8 +84,5 @@ module.exports = {
       url: "https://rpc.ankr.com/eth_goerli",
       accounts: [process.env.PRIVATE_KEY],
     },
-  },
-  sourcify: {
-    enabled: true,
-  },
+  }
 };

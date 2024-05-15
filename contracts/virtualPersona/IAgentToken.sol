@@ -28,4 +28,6 @@ interface IAgentToken {
         address account,
         uint256 timepoint
     ) external view returns (uint256);
+
+    function mint(address receiver, uint256 amount) external;
 }

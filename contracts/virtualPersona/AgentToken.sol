@@ -146,4 +146,8 @@ contract AgentToken is IAgentToken, ERC20Upgradeable, ERC20Votes {
     ) public view returns (address) {
         return super._getPastDelegates(account, timepoint);
     }
+
+    function mint(address receiver, uint256 amount) external{
+        return _mint(receiver, amount);
+    }
 }

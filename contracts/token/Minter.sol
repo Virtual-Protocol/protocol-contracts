@@ -2,6 +2,7 @@ pragma solidity ^0.8.20;
 
 // SPDX-License-Identifier: MIT
 
+import "./IMinter.sol";
 import "../contribution/IServiceNft.sol";
 import "../contribution/IContributionNft.sol";
 import "../virtualPersona/IAgentNft.sol";
@@ -10,7 +11,7 @@ import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/token/ERC721/IERC721.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
-contract Minter is Ownable {
+contract Minter is IMinter, Ownable {
     address public serviceNft;
     address public contributionNft;
     address public agentNft;
@@ -19,9 +20,13 @@ contract Minter is Ownable {
     uint256 public ipShare; // Share for IP holder
     uint256 public dataShare; // Share for Dataset provider
 
+    uint256 public bootstrapAmount; // Amount for initial LP bootstrap
+
     mapping(uint256 => bool) _minted;
 
     bool internal locked;
+
+    address agentFactory;
 
     constructor(
         address serviceAddress,
@@ -29,6 +34,7 @@ contract Minter is Ownable {
         address agentAddress,
         uint256 _ipShare,
         address _ipVault,
+        address _agentFactory,
         address initialOwner
     ) Ownable(initialOwner) {
         serviceNft = serviceAddress;
@@ -36,6 +42,13 @@ contract Minter is Ownable {
         agentNft = agentAddress;
         ipShare = _ipShare;
         ipVault = _ipVault;
+        agentFactory = _agentFactory;
+    }
+
+    modifier onlyFactory() {
+        require(_msgSender() == agentFactory, "Caller is not Agent Factory");
+        _;
+        
     }
 
     function setServiceNft(address serviceAddress) public onlyOwner {
@@ -56,6 +69,18 @@ contract Minter is Ownable {
 
     function setIPVault(address _ipVault) public onlyOwner {
         ipVault = _ipVault;
+    }
+
+    function setAgentFactory(address _factory) public onlyOwner {
+        agentFactory = _factory;
+    }
+
+    function setBootstrapAmount(uint256 amount) public onlyOwner {
+        bootstrapAmount = amount;
+    }
+
+    function mintInitial(address token) public onlyFactory {
+        IAgentToken(token).mint(_msgSender(), bootstrapAmount);
     }
 
     function mint(uint256 nftId) public {

@@ -1,13 +1,14 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
-import "@openzeppelin/contracts/governance/utils/IVotes.sol";
+import "../governance/IERC1155Votes.sol";
 import "@openzeppelin/contracts/governance/IGovernor.sol";
 
 interface IAgentDAO {
     function initialize(
         string memory name,
-        IVotes token,
+        IERC1155Votes token,
+        uint256 tokenId,
         address contributionNft,
         uint256 threshold,
         uint32 votingPeriod_

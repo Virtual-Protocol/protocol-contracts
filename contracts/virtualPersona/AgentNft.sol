@@ -77,14 +77,19 @@ contract AgentNft is
         _serviceNft = serviceNft_;
     }
 
+    function nextVirtualId() public view returns (uint256) {
+        return _nextVirtualId;
+    }
+
     function mint(
+        uint256 virtualId,
         address to,
         string memory newTokenURI,
         address payable theDAO,
         address founder,
         uint8[] memory coreTypes
     ) external onlyRole(MINTER_ROLE) returns (uint256) {
-        uint256 virtualId = _nextVirtualId++;
+        _nextVirtualId++;
         _mint(to, virtualId);
         _setTokenURI(virtualId, newTokenURI);
         VirtualInfo storage info = virtualInfos[virtualId];

@@ -1,26 +1,27 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
-import "@openzeppelin/contracts-upgradeable/governance/GovernorUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/governance/extensions/GovernorSettingsUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/governance/extensions/GovernorStorageUpgradeable.sol";
-import "@openzeppelin/contracts-upgradeable/governance/extensions/GovernorVotesUpgradeable.sol";
-import "@openzeppelin/contracts-upgradeable/governance/extensions/GovernorVotesQuorumFractionUpgradeable.sol";
+//import "@openzeppelin/contracts-upgradeable/governance/extensions/GovernorVotesQuorumFractionUpgradeable.sol";
 import "@openzeppelin/contracts/utils/structs/Checkpoints.sol";
 import "./IAgentDAO.sol";
 import "./GovernorCountingSimpleUpgradeable.sol";
 import "@openzeppelin/contracts/token/ERC721/IERC721.sol";
 import "@openzeppelin/contracts/utils/Strings.sol";
 import "../contribution/IContributionNft.sol";
+import "../governance/IERC1155Votes.sol";
+import "../governance/GovernorVotesUpgradeable.sol";
+
+//GovernorVotesUpgradeable,
+//GovernorVotesQuorumFractionUpgradeable
 
 contract AgentDAO is
     IAgentDAO,
-    GovernorUpgradeable,
     GovernorSettingsUpgradeable,
     GovernorCountingSimpleUpgradeable,
     GovernorStorageUpgradeable,
-    GovernorVotesUpgradeable,
-    GovernorVotesQuorumFractionUpgradeable
+    GovernorVotesUpgradeable
 {
     using Checkpoints for Checkpoints.Trace208;
 
@@ -37,7 +38,8 @@ contract AgentDAO is
 
     function initialize(
         string memory name,
-        IVotes token,
+        IERC1155Votes token,
+        uint256 tokenId_,
         address contributionNft,
         uint256 threshold,
         uint32 votingPeriod_
@@ -45,8 +47,8 @@ contract AgentDAO is
         __Governor_init(name);
         __GovernorSettings_init(0, votingPeriod_, threshold);
         __GovernorCountingSimple_init();
-        __GovernorVotes_init(token);
-        __GovernorVotesQuorumFraction_init(5100);
+         __GovernorVotes_init(token, tokenId_);
+        // __GovernorVotesQuorumFraction_init(5100);
         __GovernorCountingSimple_init();
         __GovernorStorage_init();
 
@@ -215,13 +217,13 @@ contract AgentDAO is
     )
         public
         view
-        override(GovernorUpgradeable, GovernorVotesQuorumFractionUpgradeable)
+        override(GovernorUpgradeable)
         returns (uint256)
     {
-        return super.quorum(blockNumber);
+        return token().getPastTotalSupply(tokenId, blockNumber);
     }
 
-    function quorumDenominator() public pure override returns (uint256) {
-        return 10000;
-    }
+    // function quorumDenominator() public pure override returns (uint256) {
+    //     return 10000;
+    // }
 }

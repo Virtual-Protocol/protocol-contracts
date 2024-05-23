@@ -13,13 +13,12 @@ contract AgentVeToken is IAgentVeToken, ERC20Upgradeable, ERC20Votes {
     using SafeERC20 for IERC20;
     using Checkpoints for Checkpoints.Trace208;
 
-    address public immutable assetToken; // This is the token that is staked
+    address public assetToken; // This is the token that is staked
     address public founder;
     uint256 public matureAt; // The timestamp when the founder can withdraw the tokens
 
-    constructor(address _assetToken) {
+    constructor() {
         _disableInitializers();
-        assetToken = _assetToken;
     }
 
     mapping(address => Checkpoints.Trace208) private _balanceCheckpoints;
@@ -36,14 +35,16 @@ contract AgentVeToken is IAgentVeToken, ERC20Upgradeable, ERC20Votes {
     function initialize(
         string memory name,
         string memory symbol,
-        address _founder,
-        uint256 _matureAt
+        address founder_,
+        address assetToken_,
+        uint256 matureAt_
     ) external initializer {
         __ERC20_init(name, symbol);
         __ERC20Votes_init();
 
-        founder = _founder;
-        matureAt = _matureAt;
+        founder = founder_;
+        matureAt = matureAt_;
+        assetToken = assetToken_;
     }
 
     // Stakers have to stake their tokens and delegate to a validator

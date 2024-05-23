@@ -6,6 +6,7 @@ interface IAgentVeToken {
         string memory name,
         string memory symbol,
         address _founder,
+        address _assetToken,
         uint256 _matureAt
     ) external;
 

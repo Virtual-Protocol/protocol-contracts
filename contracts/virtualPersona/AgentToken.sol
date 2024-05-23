@@ -2,8 +2,9 @@
 pragma solidity ^0.8.20;
 
 import "@openzeppelin/contracts-upgradeable/token/ERC20/ERC20Upgradeable.sol";
+import "./IAgentToken.sol";
 
-contract AgentToken is ERC20Upgradeable {
+contract AgentToken is IAgentToken, ERC20Upgradeable {
     address public minter;
 
     modifier onlyMinter() {

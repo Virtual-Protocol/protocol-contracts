@@ -11,7 +11,7 @@ import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/token/ERC721/IERC721.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
-contract Minter is IMinter, Ownable {
+contract Minter is IMinter,  Ownable {
     address public serviceNft;
     address public contributionNft;
     address public agentNft;
@@ -20,9 +20,7 @@ contract Minter is IMinter, Ownable {
     uint256 public ipShare; // Share for IP holder
     uint256 public dataShare; // Share for Dataset provider
 
-    uint256 public bootstrapAmount; // Amount for initial LP bootstrap
-
-    mapping(uint256 => bool) _minted;
+    mapping(uint256 => bool) _mintedNfts;
 
     bool internal locked;
 
@@ -75,12 +73,8 @@ contract Minter is IMinter, Ownable {
         agentFactory = _factory;
     }
 
-    function setBootstrapAmount(uint256 amount) public onlyOwner {
-        bootstrapAmount = amount;
-    }
-
-    function mintInitial(address token) public onlyFactory {
-        IAgentToken(token).mint(_msgSender(), bootstrapAmount);
+    function mintInitial(address token, uint256 amount) public onlyFactory {
+        IAgentToken(token).mint(_msgSender(), amount);
     }
 
     function mint(uint256 nftId) public {
@@ -88,7 +82,7 @@ contract Minter is IMinter, Ownable {
         // 1. ELO impact amount, to be shared between model and dataset owner
         // 2. IP share amount, ontop of the ELO impact
 
-        require(!_minted[nftId], "Already minted");
+        require(!_mintedNfts[nftId], "Already minted");
 
         uint256 agentId = IContributionNft(contributionNft).tokenVirtualId(
             nftId
@@ -98,7 +92,7 @@ contract Minter is IMinter, Ownable {
         address dao = address(IContributionNft(contributionNft).getAgentDAO(agentId));
         require(_msgSender() == dao, "Caller is not Agent DAO");
 
-        _minted[nftId] = true;
+        _mintedNfts[nftId] = true;
 
         address tokenAddress = IAgentNft(agentNft).virtualInfo(agentId).token;
         uint256 datasetId = IContributionNft(contributionNft).getDatasetId(

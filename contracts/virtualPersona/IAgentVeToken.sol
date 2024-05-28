@@ -7,7 +7,8 @@ interface IAgentVeToken {
         string memory symbol,
         address _founder,
         address _assetToken,
-        uint256 _matureAt
+        uint256 _matureAt,
+        address agentNft_
     ) external;
 
     function stake(

@@ -72,6 +72,9 @@ module.exports = {
         vaultAccountIds: process.env.FIREBLOCKS_VAULT_ACCOUNT_IDS,
       },
     },
+    local:{
+      url: "http://127.0.0.1:8545"
+    },
     polygon: {
       url: "https://rpc-mainnet.maticvigil.com/",
       accounts: [process.env.PRIVATE_KEY],

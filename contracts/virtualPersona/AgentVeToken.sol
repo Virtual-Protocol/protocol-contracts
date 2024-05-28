@@ -13,9 +13,11 @@ contract AgentVeToken is IAgentVeToken, ERC20Upgradeable, ERC20Votes {
     using SafeERC20 for IERC20;
     using Checkpoints for Checkpoints.Trace208;
 
-    address public assetToken; // This is the token that is staked
     address public founder;
+    address public assetToken; // This is the token that is staked
+    address public agentNft;
     uint256 public matureAt; // The timestamp when the founder can withdraw the tokens
+    bool public canStake; // To control private/public agent mode
 
     constructor() {
         _disableInitializers();
@@ -37,7 +39,8 @@ contract AgentVeToken is IAgentVeToken, ERC20Upgradeable, ERC20Votes {
         string memory symbol,
         address founder_,
         address assetToken_,
-        uint256 matureAt_
+        uint256 matureAt_,
+        address agentNft_
     ) external initializer {
         __ERC20_init(name, symbol);
         __ERC20Votes_init();
@@ -45,16 +48,22 @@ contract AgentVeToken is IAgentVeToken, ERC20Upgradeable, ERC20Votes {
         founder = founder_;
         matureAt = matureAt_;
         assetToken = assetToken_;
+        agentNft = agentNft_;
     }
 
     // Stakers have to stake their tokens and delegate to a validator
-    function stake(
-        uint256 amount,
-        address receiver,
-        address delegatee
-    ) public {
+    function stake(uint256 amount, address receiver, address delegatee) public {
+        require(
+            canStake || totalSupply() == 0,
+            "Staking is disabled for private agent"
+        ); // Either public or first staker
+
         address sender = _msgSender();
         require(amount > 0, "Cannot stake 0");
+
+        IAgentNft registry = IAgentNft(agentNft);
+        uint256 virtualId = registry.stakingTokenToVirtualId(address(this));
+        registry.addValidator(virtualId, delegatee);
 
         IERC20(assetToken).safeTransferFrom(sender, address(this), amount);
         _mint(receiver, amount);
@@ -63,6 +72,11 @@ contract AgentVeToken is IAgentVeToken, ERC20Upgradeable, ERC20Votes {
             clock(),
             SafeCast.toUint208(balanceOf(receiver))
         );
+    }
+
+    function setCanStake(bool _canStake) public {
+        require(_msgSender() == founder, "Not founder");
+        canStake = _canStake;
     }
 
     function withdraw(uint256 amount) public noReentrant {

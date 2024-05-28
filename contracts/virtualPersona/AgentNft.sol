@@ -123,10 +123,10 @@ contract AgentNft is
         return _stakingTokenToVirtualId[stakingToken];
     }
 
-    function addValidator(
-        uint256 virtualId,
-        address validator
-    ) public onlyRole(VALIDATOR_ADMIN_ROLE) {
+    function addValidator(uint256 virtualId, address validator) public {
+        if (isValidator(virtualId, validator)) {
+            return;
+        }
         _addValidator(virtualId, validator);
         _initValidatorScore(virtualId, validator);
     }

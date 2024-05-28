@@ -9,6 +9,7 @@ import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/access/AccessControl.sol";
 
+import "./IAgentFactory.sol";
 import "./IAgentToken.sol";
 import "./IAgentVeToken.sol";
 import "./IAgentDAO.sol";
@@ -17,29 +18,25 @@ import "../libs/IERC6551Registry.sol";
 import "../pool/IUniswapV2Router02.sol";
 import "../pool/IUniswapV2Factory.sol";
 import "../pool/IUniswapV2Pair.sol";
-import "../governance/IERC1155Votes.sol";
+import "../token/IMinter.sol";
 
-contract AgentFactory is Initializable, AccessControl {
+contract AgentFactoryV2 is IAgentFactory, Initializable, AccessControl {
     using SafeERC20 for IERC20;
 
     uint256 private _nextId;
-    IUniswapV2Router02 internal _uniswapRouter;
-
     address public tokenImplementation;
-    address public veTokenImplementation;
     address public daoImplementation;
     address public nft;
     address public tbaRegistry; // Token bound account
     uint256 public applicationThreshold;
-    IERC1155Votes public voteToken;
 
     address[] public allTokens;
     address[] public allDAOs;
 
     address public assetToken; // Base currency
-    uint256 public maturityDuration; // Maturity duration in seconds
+    uint256 public maturityDuration; // Staking duration in seconds for initial LP. eg: 100years
 
-    bytes32 public constant WITHDRAW_ROLE = keccak256("WITHDRAW_ROLE");
+    bytes32 public constant WITHDRAW_ROLE = keccak256("WITHDRAW_ROLE"); // Able to withdraw and execute applications
 
     event NewPersona(
         uint256 virtualId,
@@ -75,15 +72,20 @@ contract AgentFactory is Initializable, AccessControl {
 
     mapping(uint256 => Application) private _applications;
 
+    address public gov; // Deprecated in v2, execution of application does not require DAO decision anymore
+
+    modifier onlyGov() {
+        require(msg.sender == gov, "Only DAO can execute proposal");
+        _;
+    }
+
     event ApplicationThresholdUpdated(uint256 newThreshold);
+    event GovUpdated(address newGov);
     event ImplContractsUpdated(address token, address dao);
 
     address private _vault; // Vault to hold all Virtual NFTs
 
     bool internal locked;
-
-    // V2 Storage
-    address[] public allTradingTokens;
 
     modifier noReentrant() {
         require(!locked, "cannot reenter");
@@ -92,7 +94,15 @@ contract AgentFactory is Initializable, AccessControl {
         locked = false;
     }
 
-    address minter;
+    ///////////////////////////////////////////////////////////////
+    // V2 Storage
+    ///////////////////////////////////////////////////////////////
+    address[] public allTradingTokens;
+    IUniswapV2Router02 internal _uniswapRouter;
+    address public veTokenImplementation;
+    address private _minter;
+
+    ///////////////////////////////////////////////////////////////
 
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() {
@@ -107,11 +117,7 @@ contract AgentFactory is Initializable, AccessControl {
         address assetToken_,
         address nft_,
         uint256 applicationThreshold_,
-        address vault_,
-        address minter_,
-        address uniswapRouter_,
-        address voteToken_,
-        uint256 maturityDuration_
+        address vault_
     ) public initializer {
         tokenImplementation = tokenImplementation_;
         veTokenImplementation = veTokenImplementation_;
@@ -122,12 +128,7 @@ contract AgentFactory is Initializable, AccessControl {
         applicationThreshold = applicationThreshold_;
         _nextId = 1;
         _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
-        _grantRole(WITHDRAW_ROLE, msg.sender);
         _vault = vault_;
-        minter = minter_;
-        _uniswapRouter = IUniswapV2Router02(uniswapRouter_);
-        voteToken = IERC1155Votes(voteToken_);
-        maturityDuration = maturityDuration_;
     }
 
     function getApplication(
@@ -136,7 +137,7 @@ contract AgentFactory is Initializable, AccessControl {
         return _applications[proposalId];
     }
 
-    function proposePersona(
+    function proposeAgent(
         string memory name,
         string memory symbol,
         string memory tokenURI,
@@ -206,16 +207,28 @@ contract AgentFactory is Initializable, AccessControl {
             "Application is not matured yet"
         );
 
+        uint256 withdrawableAmount = application.withdrawableAmount;
+
         application.withdrawableAmount = 0;
         application.status = ApplicationStatus.Withdrawn;
 
         IERC20(assetToken).safeTransfer(
             application.proposer,
-            application.withdrawableAmount
+            withdrawableAmount
         );
     }
 
     function executeApplication(uint256 id) public noReentrant {
+        // This will bootstrap an Agent with following components:
+        // C1: Agent Token
+        // C2: LP Pool
+        // C3: Agent veToken
+        // C4: Agent DAO
+        // C5: Agent NFT
+        // C6: TBA
+        // C7: Mint initial Agent tokens
+        // C8: Provide liquidity
+        // C9: Stake liquidity token to get veToken
         require(
             _applications[id].status == ApplicationStatus.Active,
             "Application is not active"
@@ -223,19 +236,27 @@ contract AgentFactory is Initializable, AccessControl {
 
         Application storage application = _applications[id];
 
+        require(
+            msg.sender == application.proposer ||
+                hasRole(WITHDRAW_ROLE, msg.sender),
+            "Not proposer"
+        );
+
+        uint256 initialSupply = application.withdrawableAmount; // Initial LP supply
+
         application.withdrawableAmount = 0;
         application.status = ApplicationStatus.Executed;
 
+        // C1
         address token = _createNewAgentToken(
             application.name,
             application.symbol
         );
 
-        // Create LP
+        // C2
         address lp = _createLP(token, assetToken);
-        uint256 virtualId = IAgentNft(nft).nextVirtualId();
 
-        // Create Staking Token
+        // C3
         address veToken = _createNewAgentVeToken(
             string.concat("Staked ", application.name),
             string.concat("s", application.symbol),
@@ -243,17 +264,19 @@ contract AgentFactory is Initializable, AccessControl {
             application.proposer
         );
 
+        // C4
         string memory daoName = string.concat(application.name, " DAO");
         address payable dao = payable(
             _createNewDAO(
                 daoName,
-                voteToken,
-                virtualId,
+                IVotes(veToken),
                 application.daoVotingPeriod,
                 application.daoThreshold
             )
         );
 
+        // C5
+        uint256 virtualId = IAgentNft(nft).nextVirtualId();
         IAgentNft(nft).mint(
             virtualId,
             _vault,
@@ -264,6 +287,7 @@ contract AgentFactory is Initializable, AccessControl {
         );
         application.virtualId = virtualId;
 
+        // C6
         uint256 chainId;
         assembly {
             chainId := chainid()
@@ -275,21 +299,29 @@ contract AgentFactory is Initializable, AccessControl {
             nft,
             virtualId
         );
-
         IAgentNft(nft).setTBA(virtualId, tbaAddress);
 
-        // Call minter to mint initial tokens
-        // Stake in LP
-        // Add liquidity
-        IAgentToken(token).mint(address(this), application.withdrawableAmount);
-        IERC20(token).transfer(lp, application.withdrawableAmount ** 18);
-        IERC20(assetToken).transfer(lp, application.withdrawableAmount ** 18);
-        uint256 liq = IUniswapV2Pair(lp).mint(address(this));
-        // TODO: Check how much LP token minted
+        // C7
+        IMinter(_minter).mintInitial(token, initialSupply);
 
-        // IERC20(assetToken).forceApprove(token, application.withdrawableAmount);
-        IAgentVeToken(token).stake(
-            liq,
+        // C8
+        IERC20(assetToken).approve(address(_uniswapRouter), initialSupply);
+        IERC20(token).approve(address(_uniswapRouter), initialSupply);
+        (, , uint liquidity) = _uniswapRouter.addLiquidity(
+            token,
+            assetToken,
+            initialSupply,
+            initialSupply,
+            0,
+            0,
+            address(this),
+            block.timestamp + 60
+        );
+
+        // C9
+        IERC20(lp).approve(veToken, liquidity);
+        IAgentVeToken(veToken).stake(
+            liquidity,
             application.proposer,
             application.proposer
         );
@@ -311,8 +343,7 @@ contract AgentFactory is Initializable, AccessControl {
 
     function _createNewDAO(
         string memory name,
-        IERC1155Votes token,
-        uint256 tokenId,
+        IVotes token,
         uint32 daoVotingPeriod,
         uint256 daoThreshold
     ) internal returns (address instance) {
@@ -320,7 +351,6 @@ contract AgentFactory is Initializable, AccessControl {
         IAgentDAO(instance).initialize(
             name,
             token,
-            tokenId,
             IAgentNft(nft).getContributionNft(),
             daoThreshold,
             daoVotingPeriod
@@ -335,7 +365,7 @@ contract AgentFactory is Initializable, AccessControl {
         string memory symbol
     ) internal returns (address instance) {
         instance = Clones.clone(tokenImplementation);
-        IAgentToken(instance).initialize(name, symbol, minter);
+        IAgentToken(instance).initialize(name, symbol);
 
         allTradingTokens.push(instance);
         return instance;
@@ -347,20 +377,21 @@ contract AgentFactory is Initializable, AccessControl {
         address stakingAsset,
         address founder
     ) internal returns (address instance) {
-        instance = Clones.clone(tokenImplementation);
+        instance = Clones.clone(veTokenImplementation);
         IAgentVeToken(instance).initialize(
             name,
             symbol,
             founder,
             stakingAsset,
-            block.timestamp + maturityDuration
+            block.timestamp + maturityDuration,
+            address(nft)
         );
 
         allTokens.push(instance);
         return instance;
     }
 
-    function totalPersonas() public view returns (uint256) {
+    function totalAgents() public view returns (uint256) {
         return allTokens.length;
     }
 
@@ -384,12 +415,22 @@ contract AgentFactory is Initializable, AccessControl {
     }
 
     function setMinter(address newMinter) public onlyRole(DEFAULT_ADMIN_ROLE) {
-        minter = newMinter;
+        _minter = newMinter;
+    }
+
+    function minter() public view override returns (address) {
+        return _minter;
     }
 
     function setMaturityDuration(
         uint256 newDuration
     ) public onlyRole(DEFAULT_ADMIN_ROLE) {
         maturityDuration = newDuration;
+    }
+
+    function setUniswapRouter(
+        address router
+    ) public onlyRole(DEFAULT_ADMIN_ROLE) {
+        _uniswapRouter = IUniswapV2Router02(router);
     }
 }

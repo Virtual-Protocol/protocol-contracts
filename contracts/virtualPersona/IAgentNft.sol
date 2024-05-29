@@ -54,4 +54,6 @@ interface IAgentNft is IValidatorRegistry {
     ) external view returns (uint256[] memory);
 
     function nextVirtualId() external view returns (uint256);
+
+    function isBlacklisted(uint256 virtualId) external view returns (bool);
 }

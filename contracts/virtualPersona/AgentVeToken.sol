@@ -8,6 +8,7 @@ import {Checkpoints} from "@openzeppelin/contracts/utils/structs/Checkpoints.sol
 import "./IAgentVeToken.sol";
 import "./IAgentNft.sol";
 import "./ERC20Votes.sol";
+import "@openzeppelin/contracts/access/IAccessControl.sol";
 
 contract AgentVeToken is IAgentVeToken, ERC20Upgradeable, ERC20Votes {
     using SafeERC20 for IERC20;
@@ -77,6 +78,15 @@ contract AgentVeToken is IAgentVeToken, ERC20Upgradeable, ERC20Votes {
     function setCanStake(bool _canStake) public {
         require(_msgSender() == founder, "Not founder");
         canStake = _canStake;
+    }
+
+    function setMatureAt(uint256 _matureAt) public {
+        bytes32 ADMIN_ROLE = keccak256("ADMIN_ROLE");
+        require(
+            IAccessControl(agentNft).hasRole(ADMIN_ROLE, _msgSender()),
+            "Not admin"
+        );
+        matureAt = _matureAt;
     }
 
     function withdraw(uint256 amount) public noReentrant {

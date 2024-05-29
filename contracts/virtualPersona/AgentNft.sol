@@ -49,6 +49,11 @@ contract AgentNft is
     address private _contributionNft;
     address private _serviceNft;
 
+    // V2 Storage
+    bytes32 public constant ADMIN_ROLE =
+        keccak256("ADMIN_ROLE");
+    mapping(uint256 => bool) private _blacklists;
+
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() {
         _disableInitializers();
@@ -252,5 +257,13 @@ contract AgentNft is
 
     function totalSupply() public view returns (uint256) {
         return _nextVirtualId - 1;
+    }
+
+    function isBlacklisted(uint256 virtualId) public view returns (bool) {
+        return _blacklists[virtualId];
+    }
+
+    function setBlacklist(uint256 virtualId, bool value) public onlyRole(ADMIN_ROLE) {
+        _blacklists[virtualId] = value;
     }
 }

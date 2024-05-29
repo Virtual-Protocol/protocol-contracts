@@ -34,7 +34,7 @@ contract AgentFactoryV2 is IAgentFactory, Initializable, AccessControl {
     address[] public allDAOs;
 
     address public assetToken; // Base currency
-    uint256 public maturityDuration; // Staking duration in seconds for initial LP. eg: 100years
+    uint256 public maturityDuration; // Staking duration in seconds for initial LP. eg: 10years
 
     bytes32 public constant WITHDRAW_ROLE = keccak256("WITHDRAW_ROLE"); // Able to withdraw and execute applications
 

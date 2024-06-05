@@ -99,11 +99,12 @@ contract AgentFactoryV2 is IAgentFactory, Initializable, AccessControl {
     address public veTokenImplementation;
     address private _minter;
     address private _tokenAdmin;
+    address public defaultDelegatee;
 
     // Default agent token params
     bytes private _tokenSupplyParams;
     bytes private _tokenTaxParams;
-    uint16 private _tokenMultiplier = 10000;
+    uint16 private _tokenMultiplier;
 
     ///////////////////////////////////////////////////////////////
 
@@ -132,6 +133,7 @@ contract AgentFactoryV2 is IAgentFactory, Initializable, AccessControl {
         _nextId = 1;
         _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
         _vault = vault_;
+        _tokenMultiplier = 10000;
     }
 
     function getApplication(
@@ -224,14 +226,12 @@ contract AgentFactoryV2 is IAgentFactory, Initializable, AccessControl {
     function executeApplication(uint256 id) public noReentrant {
         // This will bootstrap an Agent with following components:
         // C1: Agent Token
-        // C2: LP Pool
+        // C2: LP Pool + Initial liquidity
         // C3: Agent veToken
         // C4: Agent DAO
         // C5: Agent NFT
         // C6: TBA
-        // C7: Mint initial Agent tokens
-        // C8: Provide liquidity
-        // C9: Stake liquidity token to get veToken
+        // C7: Stake liquidity token to get veToken
         require(
             _applications[id].status == ApplicationStatus.Active,
             "Application is not active"
@@ -247,8 +247,8 @@ contract AgentFactoryV2 is IAgentFactory, Initializable, AccessControl {
             "Not proposer"
         );
 
-        uint256 initialSupply = (application.withdrawableAmount *
-            _tokenMultiplier) / 10000; // Initial LP supply
+        uint256 initialAmount = application.withdrawableAmount;
+        uint256 initialSupply = (initialAmount * _tokenMultiplier) / 10000; // Initial LP supply
 
         application.withdrawableAmount = 0;
         application.status = ApplicationStatus.Executed;
@@ -259,7 +259,11 @@ contract AgentFactoryV2 is IAgentFactory, Initializable, AccessControl {
             application.symbol,
             initialSupply
         );
+        
+        // C2
         address lp = IAgentToken(token).liquidityPools()[0];
+        IERC20(assetToken).transfer(token, initialAmount);
+        IAgentToken(token).addInitialLiquidity(address(this));
 
         // C3
         address veToken = _createNewAgentVeToken(
@@ -268,6 +272,7 @@ contract AgentFactoryV2 is IAgentFactory, Initializable, AccessControl {
             lp,
             application.proposer
         );
+        
 
         // C4
         string memory daoName = string.concat(application.name, " DAO");
@@ -308,28 +313,14 @@ contract AgentFactoryV2 is IAgentFactory, Initializable, AccessControl {
         );
         IAgentNft(nft).setTBA(virtualId, tbaAddress);
 
-        // C8
-        /*IERC20(assetToken).approve(address(_uniswapRouter), initialSupply);
-        IERC20(token).approve(address(_uniswapRouter), initialSupply);
-        (, , uint liquidity) = _uniswapRouter.addLiquidity(
-            token,
-            assetToken,
-            initialSupply,
-            initialSupply,
-            0,
-            0,
-            address(this),
-            block.timestamp + 60
-        );*/
-
-        // C9
-        // IERC20(lp).approve(veToken, liquidity);
-        // IAgentVeToken(veToken).stake(
-        //     liquidity,
-        //     application.proposer,
-        //     application.proposer
-        // );
-
+        // C7
+        IERC20(lp).approve(veToken, type(uint256).max);
+        IAgentVeToken(veToken).stake(
+            IERC20(lp).balanceOf(address(this)),
+            application.proposer,
+            defaultDelegatee
+        );
+        
         emit NewPersona(virtualId, token, veToken, dao, tbaAddress, lp);
     }
 
@@ -469,5 +460,11 @@ contract AgentFactoryV2 is IAgentFactory, Initializable, AccessControl {
         uint16 newMultiplier
     ) public onlyRole(DEFAULT_ADMIN_ROLE) {
         _tokenMultiplier = newMultiplier;
+    }
+
+    function setDefaultDelegatee(
+        address newDelegatee
+    ) public onlyRole(DEFAULT_ADMIN_ROLE) {
+        defaultDelegatee = newDelegatee;
     }
 }

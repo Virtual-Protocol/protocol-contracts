@@ -40,7 +40,7 @@ contract AgentToken is
      * call autoswap when processing initial liquidity from this address. We turn this OFF when
      * liquidity has been loaded, and use this bool to control processing during auto-swaps
      * from that point onwards. */
-    bool private _autoSwapInProgress = true;
+    bool private _autoSwapInProgress;
 
     uint128 public maxTokensPerTransaction;
     uint128 public maxTokensPerWallet;
@@ -70,6 +70,18 @@ contract AgentToken is
 
     modifier onlyMinter() {
         require(_msgSender() == _factory.minter(), "Caller is not the minter");
+        _;
+    }
+
+    /**
+     * @dev {onlyOwnerOrFactory}
+     *
+     * Throws if called by any account other than the owner, factory or pool.
+     */
+    modifier onlyOwnerOrFactory() {
+        if (owner() != _msgSender() && address(_factory) != _msgSender()) {
+            revert CallerIsNotAdminNorFactory();
+        }
         _;
     }
 
@@ -119,6 +131,7 @@ contract AgentToken is
         uniswapV2Pair = _createPair();
 
         _factory = IAgentFactory(_msgSender());
+        _autoSwapInProgress = true; // We don't want to tax initial liquidity
     }
 
     /**
@@ -225,7 +238,7 @@ contract AgentToken is
      *
      * @param lpOwner The recipient of LP tokens
      */
-    function addInitialLiquidity(address lpOwner) external onlyOwner {
+    function addInitialLiquidity(address lpOwner) external onlyOwnerOrFactory {
         _addInitialLiquidity(lpOwner);
     }
 
@@ -311,13 +324,15 @@ contract AgentToken is
     }
 
     /**
-     * @dev function {addLiquidityPool} onlyOwner
+     * @dev function {addLiquidityPool} onlyOwnerOrFactory
      *
      * Allows the manager to add a liquidity pool to the pool enumerable set
      *
      * @param newLiquidityPool_ The address of the new liquidity pool
      */
-    function addLiquidityPool(address newLiquidityPool_) public onlyOwner {
+    function addLiquidityPool(
+        address newLiquidityPool_
+    ) public onlyOwnerOrFactory {
         // Don't allow calls that didn't pass an address:
         if (newLiquidityPool_ == address(0)) {
             revert LiquidityPoolCannotBeAddressZero();
@@ -332,7 +347,7 @@ contract AgentToken is
     }
 
     /**
-     * @dev function {removeLiquidityPool} onlyOwner
+     * @dev function {removeLiquidityPool} onlyOwnerOrFactory
      *
      * Allows the manager to remove a liquidity pool
      *
@@ -340,7 +355,7 @@ contract AgentToken is
      */
     function removeLiquidityPool(
         address removedLiquidityPool_
-    ) external onlyOwner {
+    ) external onlyOwnerOrFactory {
         // Remove this from the enumerated list:
         _liquidityPools.remove(removedLiquidityPool_);
         emit LiquidityPoolRemoved(removedLiquidityPool_);
@@ -374,26 +389,28 @@ contract AgentToken is
     }
 
     /**
-     * @dev function {addUnlimited} onlyOwner
+     * @dev function {addUnlimited} onlyOwnerOrFactory
      *
      * Allows the manager to add an unlimited address
      *
      * @param newUnlimited_ The address of the new unlimited address
      */
-    function addUnlimited(address newUnlimited_) external onlyOwner {
+    function addUnlimited(address newUnlimited_) external onlyOwnerOrFactory {
         // Add this to the enumerated list:
         _unlimited.add(newUnlimited_);
         emit UnlimitedAddressAdded(newUnlimited_);
     }
 
     /**
-     * @dev function {removeUnlimited} onlyOwner
+     * @dev function {removeUnlimited} onlyOwnerOrFactory
      *
      * Allows the manager to remove an unlimited address
      *
      * @param removedUnlimited_ The address of the old removed unlimited address
      */
-    function removeUnlimited(address removedUnlimited_) external onlyOwner {
+    function removeUnlimited(
+        address removedUnlimited_
+    ) external onlyOwnerOrFactory {
         // Remove this from the enumerated list:
         _unlimited.remove(removedUnlimited_);
         emit UnlimitedAddressRemoved(removedUnlimited_);
@@ -427,19 +444,21 @@ contract AgentToken is
     }
 
     /**
-     * @dev function {addValidCaller} onlyOwner
+     * @dev function {addValidCaller} onlyOwnerOrFactory
      *
      * Allows the owner to add the hash of a valid caller
      *
      * @param newValidCallerHash_ The hash of the new valid caller
      */
-    function addValidCaller(bytes32 newValidCallerHash_) external onlyOwner {
+    function addValidCaller(
+        bytes32 newValidCallerHash_
+    ) external onlyOwnerOrFactory {
         _validCallerCodeHashes.add(newValidCallerHash_);
         emit ValidCallerAdded(newValidCallerHash_);
     }
 
     /**
-     * @dev function {removeValidCaller} onlyOwner
+     * @dev function {removeValidCaller} onlyOwnerOrFactory
      *
      * Allows the owner to remove a valid caller
      *
@@ -447,14 +466,14 @@ contract AgentToken is
      */
     function removeValidCaller(
         bytes32 removedValidCallerHash_
-    ) external onlyOwner {
+    ) external onlyOwnerOrFactory {
         // Remove this from the enumerated list:
         _validCallerCodeHashes.remove(removedValidCallerHash_);
         emit ValidCallerRemoved(removedValidCallerHash_);
     }
 
     /**
-     * @dev function {setProjectTaxRecipient} onlyOwner
+     * @dev function {setProjectTaxRecipient} onlyOwnerOrFactory
      *
      * Allows the manager to set the project tax recipient address
      *
@@ -462,13 +481,13 @@ contract AgentToken is
      */
     function setProjectTaxRecipient(
         address projectTaxRecipient_
-    ) external onlyOwner {
+    ) external onlyOwnerOrFactory {
         projectTaxRecipient = projectTaxRecipient_;
         emit ProjectTaxRecipientUpdated(projectTaxRecipient_);
     }
 
     /**
-     * @dev function {setSwapThresholdBasisPoints} onlyOwner
+     * @dev function {setSwapThresholdBasisPoints} onlyOwnerOrFactory
      *
      * Allows the manager to set the autoswap threshold
      *
@@ -476,7 +495,7 @@ contract AgentToken is
      */
     function setSwapThresholdBasisPoints(
         uint16 swapThresholdBasisPoints_
-    ) external onlyOwner {
+    ) external onlyOwnerOrFactory {
         uint256 oldswapThresholdBasisPoints = swapThresholdBasisPoints;
         swapThresholdBasisPoints = swapThresholdBasisPoints_;
         emit AutoSwapThresholdUpdated(
@@ -486,7 +505,7 @@ contract AgentToken is
     }
 
     /**
-     * @dev function {setProjectTaxRates} onlyOwner
+     * @dev function {setProjectTaxRates} onlyOwnerOrFactory
      *
      * Change the tax rates, subject to only ever decreasing
      *
@@ -496,7 +515,7 @@ contract AgentToken is
     function setProjectTaxRates(
         uint16 newProjectBuyTaxBasisPoints_,
         uint16 newProjectSellTaxBasisPoints_
-    ) external onlyOwner {
+    ) external onlyOwnerOrFactory {
         uint16 oldBuyTaxBasisPoints = projectBuyTaxBasisPoints;
         uint16 oldSellTaxBasisPoints = projectSellTaxBasisPoints;
 
@@ -512,7 +531,7 @@ contract AgentToken is
     }
 
     /**
-     * @dev function {setLimits} onlyOwner
+     * @dev function {setLimits} onlyOwnerOrFactory
      *
      * Change the limits on transactions and holdings
      *
@@ -522,7 +541,7 @@ contract AgentToken is
     function setLimits(
         uint256 newMaxTokensPerTransaction_,
         uint256 newMaxTokensPerWallet_
-    ) external onlyOwner {
+    ) external onlyOwnerOrFactory {
         uint256 oldMaxTokensPerTransaction = maxTokensPerTransaction;
         uint256 oldMaxTokensPerWallet = maxTokensPerWallet;
         // Limit can only be increased:
@@ -984,7 +1003,7 @@ contract AgentToken is
         }
         return (amountLessTax_);
     }
-
+    
     /**
      * @dev function {_autoSwap}
      *
@@ -993,6 +1012,7 @@ contract AgentToken is
      * @param from_ The sender of the token
      * @param to_ The recipient of the token
      */
+
     function _autoSwap(address from_, address to_) internal {
         if (_tokenHasTax) {
             uint256 contractBalance = balanceOf(address(this));
@@ -1055,33 +1075,21 @@ contract AgentToken is
      * @param contractBalance_ The current accumulated total tax balance
      */
     function _swapTax(uint256 swapBalance_, uint256 contractBalance_) internal {
-        uint256 preSwapBalance = IERC20(pairToken).balanceOf(address(this));
-
         address[] memory path = new address[](2);
         path[0] = address(this);
         path[1] = pairToken;
 
         // Wrap external calls in try / catch to handle errors
         try
-            _uniswapRouter.swapTokensForExactTokens(
-                swapBalance_,
-                0,
-                path,
-                address(this),
-                block.timestamp + 600
-            )
+            _uniswapRouter
+                .swapExactTokensForTokensSupportingFeeOnTransferTokens(
+                    swapBalance_,
+                    0,
+                    path,
+                    projectTaxRecipient,
+                    block.timestamp + 600
+                )
         {
-            uint256 postSwapBalance = IERC20(pairToken).balanceOf(
-                address(this)
-            );
-
-            uint256 balanceToDistribute = postSwapBalance - preSwapBalance;
-
-            uint256 totalPendingSwap = projectTaxPendingSwap;
-
-            uint256 projectBalanceToDistribute = (balanceToDistribute *
-                projectTaxPendingSwap) / totalPendingSwap;
-
             // We will not have swapped all tax tokens IF the amount was greater than the max auto swap.
             // We therefore cannot just set the pending swap counters to 0. Instead, in this scenario,
             // we must reduce them in proportion to the swap amount vs the remaining balance + swap
@@ -1103,23 +1111,6 @@ contract AgentToken is
                 );
             } else {
                 projectTaxPendingSwap = 0;
-            }
-            // Distribute to treasuries:
-            bool success;
-            address weth;
-            uint256 gas;
-
-            if (projectBalanceToDistribute > 0) {
-                // If no gas limit was provided or provided gas limit greater than gas left, just use the remaining gas.
-                gas = (CALL_GAS_LIMIT == 0 || CALL_GAS_LIMIT > gasleft())
-                    ? gasleft()
-                    : CALL_GAS_LIMIT;
-
-                // We limit the gas passed so that a called address cannot cause a block out of gas error:
-                IERC20(pairToken).transfer{gas: gas}(
-                    projectTaxRecipient,
-                    projectBalanceToDistribute
-                );
             }
         } catch {
             // Dont allow a failed external call (in this case to uniswap) to stop a transfer.
@@ -1162,7 +1153,7 @@ contract AgentToken is
     }
 
     /**
-     * @dev function {withdrawETH} onlyOwner
+     * @dev function {withdrawETH} onlyOwnerOrFactory
      *
      * A withdraw function to allow ETH to be withdrawn by the manager
      *
@@ -1175,7 +1166,7 @@ contract AgentToken is
      *
      * @param amount_ The amount to withdraw
      */
-    function withdrawETH(uint256 amount_) external onlyOwner {
+    function withdrawETH(uint256 amount_) external onlyOwnerOrFactory {
         (bool success, ) = _msgSender().call{value: amount_}("");
         if (!success) {
             revert TransferFailed();
@@ -1183,7 +1174,7 @@ contract AgentToken is
     }
 
     /**
-     * @dev function {withdrawERC20} onlyOwner
+     * @dev function {withdrawERC20} onlyOwnerOrFactory
      *
      * A withdraw function to allow ERC20s (except address(this)) to be withdrawn.
      *
@@ -1198,7 +1189,10 @@ contract AgentToken is
      * @param token_ The ERC20 contract
      * @param amount_ The amount to withdraw
      */
-    function withdrawERC20(address token_, uint256 amount_) external onlyOwner {
+    function withdrawERC20(
+        address token_,
+        uint256 amount_
+    ) external onlyOwnerOrFactory {
         if (token_ == address(this)) {
             revert CannotWithdrawThisToken();
         }

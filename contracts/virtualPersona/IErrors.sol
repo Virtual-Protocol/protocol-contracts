@@ -204,6 +204,8 @@ interface IErrors {
 
   error OwnerQueryForNonexistentToken(); //                 The token does not exist.
 
+  error CallerIsNotAdminNorFactory();   //                  The caller of this function must match the factory address or be an admin.
+
   error ParametersDoNotMatchSignedMessage(); //             The parameters passed with the signed message do not match the message itself.
 
   error ParamTooLargeStartDate(); //                        The passed parameter exceeds the var type max.

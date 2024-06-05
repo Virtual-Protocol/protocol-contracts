@@ -28,7 +28,7 @@ function getDescHash(str) {
   return ethers.keccak256(ethers.toUtf8Bytes(str));
 }
 
-describe("RewardsV2", function () {
+describe("AgentDAO", function () {
   const PROPOSAL_THRESHOLD = parseEther("100000"); //100k
   const MATURITY_SCORE = toBeHex(2000, 32); // 20%
   const IP_SHARE = 1000; // 10%
@@ -58,6 +58,7 @@ describe("RewardsV2", function () {
       validator1,
       validator2,
       treasury,
+      trader,
     ] = await ethers.getSigners();
     return {
       deployer,
@@ -68,6 +69,7 @@ describe("RewardsV2", function () {
       validator1,
       validator2,
       treasury,
+      trader,
     };
   };
 
@@ -146,6 +148,7 @@ describe("RewardsV2", function () {
       process.env.SWAP_THRESHOLD,
       treasury.address
     );
+    await agentFactory.setDefaultDelegatee(deployer.address);
 
     return {
       virtualToken,
@@ -214,60 +217,6 @@ describe("RewardsV2", function () {
     };
   }
 
-  async function stakeAndVote() {
-    const signers = await ethers.getSigners();
-    const [validator1, staker1, validator2, staker2] = signers;
-    const base = await deployGenesisVirtual();
-    const Token = await ethers.getContractFactory("AgentToken");
-    const token = Token.attach(base.persona.token);
-    const { persona, demoToken, personaNft, reward } = base;
-    // Staking
-    await personaNft.addValidator(1, validator2.address);
-    await demoToken.mint(staker1.address, STAKE_AMOUNTS[1]);
-    await demoToken.connect(staker1).approve(persona.token, STAKE_AMOUNTS[1]);
-    await token
-      .connect(staker1)
-      .stake(STAKE_AMOUNTS[1], staker1.address, validator1.address);
-    await demoToken.mint(validator2.address, STAKE_AMOUNTS[2]);
-    await demoToken
-      .connect(validator2)
-      .approve(persona.token, STAKE_AMOUNTS[2]);
-    await token
-      .connect(validator2)
-      .stake(STAKE_AMOUNTS[2], validator2.address, validator2.address);
-    await demoToken.mint(staker2.address, STAKE_AMOUNTS[3]);
-    await demoToken.connect(staker2).approve(persona.token, STAKE_AMOUNTS[3]);
-    await token
-      .connect(staker2)
-      .stake(STAKE_AMOUNTS[3], staker2.address, validator2.address);
-
-    // Propose & validate
-    const Dao = await ethers.getContractFactory("AgentDAO");
-    const dao = Dao.attach(persona.dao);
-
-    const proposals = await Promise.all([
-      dao
-        .propose([persona.token], [0], ["0x"], "Proposal 1")
-        .then((tx) => tx.wait())
-        .then((receipt) => receipt.logs[0].args[0]),
-      dao
-        .propose([persona.token], [0], ["0x"], "Proposal 2")
-        .then((tx) => tx.wait())
-        .then((receipt) => receipt.logs[0].args[0]),
-    ]);
-    await dao.castVote(proposals[0], 1);
-    await dao.connect(validator2).castVote(proposals[0], 1);
-    await dao.connect(validator2).castVote(proposals[1], 1);
-
-    // Distribute rewards
-    await demoToken.mint(validator1, REWARD_AMOUNT);
-    await demoToken.approve(reward.target, REWARD_AMOUNT);
-    await reward.distributeRewards(REWARD_AMOUNT);
-    await reward.distributeRewardsForAgents(0, [1]);
-
-    return { ...base };
-  }
-
   async function createContribution(
     coreId,
     maturity,
@@ -321,140 +270,124 @@ describe("RewardsV2", function () {
     return proposalId;
   }
 
-  async function prepareContributions() {
-    /*
-    NFT 1 (LLM DS)	
-    NFT 2 (LLM Model)	
-    NFT 3 (Voice DS)	
-    NFT 4 (Voice Model *current)
-    NFT 5 (Visual model, no DS)
-    */
-    const base = await stakeAndVote();
-    const signers = await ethers.getSigners();
-    const [validator1, staker1, validator2, staker2] = signers;
-    const contributionList = [];
-    const account = signers[10].address;
-
-    // NFT 1 (LLM DS)
-    let nft = await createContribution(
-      0,
-      0,
-      0,
-      false,
-      0,
-      "LLM DS",
-      base,
-      account
-    );
-    contributionList.push(nft);
-
-    // NFT 2 (LLM Model)
-    nft = await createContribution(
-      0,
-      200,
-      0,
-      true,
-      nft,
-      "LLM Model",
-      base,
-      account
-    );
-    contributionList.push(nft);
-
-    // NFT 3 (Voice DS)
-    nft = await createContribution(
-      1,
-      0,
-      0,
-      false,
-      0,
-      "Voice DS",
-      base,
-      account
-    );
-    contributionList.push(nft);
-
-    // NFT 4 (Voice Model *current)
-    nft = await createContribution(
-      1,
-      100,
-      0,
-      true,
-      nft,
-      "Voice Model",
-      base,
-      account
-    );
-    contributionList.push(nft);
-
-    nft = await createContribution(
-      2,
-      100,
-      0,
-      true,
-      0,
-      "Visual Model",
-      base,
-      account
-    );
-    contributionList.push(nft);
-
-    await base.demoToken.mint(validator1, REWARD_AMOUNT);
-    await base.demoToken.approve(base.reward.target, REWARD_AMOUNT);
-    await base.reward.distributeRewards(REWARD_AMOUNT);
-    await base.reward.distributeRewardsForAgents(1, [1]);
-
-    return { contributionList, ...base };
-  }
-
   before(async function () {});
 
-  it("should mint agent token for successful contribution", async function () {
+  it("should allow early execution when forVotes == totalSupply", async function () {
     const base = await loadFixture(deployWithAgent);
-    const { contributor1 } = await getAccounts();
-    const maturity = 55;
-    const agentToken = await ethers.getContractAt(
-      "AgentToken",
-      base.agent.token
+    const { founder, deployer } = await getAccounts();
+    const {
+      agent,
+      serviceNft,
+      contributionNft,
+      minter,
+      virtualToken,
+      agentFactory,
+    } = base;
+    const agentDAO = await ethers.getContractAt("AgentDAO", agent.dao);
+    const desc = "test";
+    const descHash = getDescHash(desc);
+
+    const mintCalldata = await getMintServiceCalldata(
+      serviceNft,
+      agent.virtualId,
+      descHash
     );
-    const balance1 = await agentToken.balanceOf(contributor1.address);
-    expect(balance1).to.equal(0n);
-    await createContribution(
-      0,
-      maturity,
-      0,
-      true,
-      0,
-      "Test",
-      base,
-      contributor1.address
-    );
-    const balance2 = await agentToken.balanceOf(contributor1.address);
-    expect(balance2).to.equal(parseEther(maturity.toString()));
+
+    await agentDAO.propose([serviceNft.target], [0], [mintCalldata], desc);
+    const filter = agentDAO.filters.ProposalCreated;
+    const events = await agentDAO.queryFilter(filter, -1);
+    const event = events[0];
+    const proposalId = event.args[0];
+
+    await mine(10);
+    await agentDAO.castVoteWithReasonAndParams(proposalId, 1, "lfg", "0x");
+    const state = await agentDAO.state(proposalId);
+    expect(state).to.equal(4n);
+    await expect(agentDAO.execute(proposalId)).to.not.rejected;
   });
 
-  it("should mint agent token for IP owner on successful contribution", async function () {
+  it("should not allow early execution when forVotes < totalSupply although met quorum", async function () {
     const base = await loadFixture(deployWithAgent);
-    const { ipVault, contributor1 } = await getAccounts();
-    const maturity = 55;
-    const agentToken = await ethers.getContractAt(
-      "AgentToken",
-      base.agent.token
-    );
-    const balance1 = await agentToken.balanceOf(ipVault.address);
-    expect(balance1).to.equal(0n);
-    await createContribution(
-      0,
-      maturity,
-      0,
-      true,
-      0,
-      "Test",
-      base,
-      contributor1.address
+    const { founder, deployer, trader, treasury, contributor1 } =
+      await getAccounts();
+    const {
+      agent,
+      serviceNft,
+      contributionNft,
+      minter,
+      virtualToken,
+      agentFactory,
+    } = base;
+    const agentDAO = await ethers.getContractAt("AgentDAO", agent.dao);
+    const agentToken = await ethers.getContractAt("AgentToken", agent.token);
+    const lpToken = await ethers.getContractAt("IUniswapV2Pair", agent.lp);
+    const veToken = await ethers.getContractAt("AgentVeToken", agent.veToken);
+    const desc = "test";
+    const descHash = getDescHash(desc);
+
+    const mintCalldata = await getMintServiceCalldata(
+      serviceNft,
+      agent.virtualId,
+      descHash
     );
 
-    const balance2 = await agentToken.balanceOf(ipVault.address);
-    expect(balance2).to.equal(parseEther((maturity * 0.1).toString()));
+    ///////////////////////////
+    // Buy from LP
+    ///////////////////////////
+    await virtualToken.mint(trader.address, parseEther("10000"));
+    const router = await ethers.getContractAt(
+      "IUniswapV2Router02",
+      process.env.UNISWAP_ROUTER
+    );
+    await virtualToken
+      .connect(trader)
+      .approve(router.target, parseEther("20000"));
+    await agentToken
+      .connect(trader)
+      .approve(router.target, parseEther("20000"));
+    const amountToBuy = parseEther("1000");
+    const capital = parseEther("10000");
+    await router
+      .connect(trader)
+      .swapTokensForExactTokens(
+        amountToBuy,
+        capital,
+        [virtualToken.target, agent.token],
+        trader.address,
+        Math.floor(new Date().getTime() / 1000 + 6000)
+      );
+
+    // Provide liquidity
+    await router
+      .connect(trader)
+      .addLiquidity(
+        agentToken.target,
+        virtualToken.target,
+        parseEther("97"),
+        parseEther("100"),
+        0,
+        0,
+        trader.address,
+        Math.floor(new Date().getTime() / 1000 + 6000)
+      );
+    const lpBalance = await lpToken.balanceOf(trader.address);
+    await lpToken.connect(trader).approve(veToken.target, parseEther("100"));
+    await veToken.connect(founder).setCanStake(true);
+    await veToken
+      .connect(trader)
+      .stake(lpBalance, trader.address, trader.address);
+
+    ///////////////////////////
+    await agentDAO.propose([serviceNft.target], [0], [mintCalldata], desc);
+    const filter = agentDAO.filters.ProposalCreated;
+    const events = await agentDAO.queryFilter(filter, -1);
+    const event = events[0];
+    const proposalId = event.args[0];
+
+    await mine(10);
+    await agentDAO.castVoteWithReasonAndParams(proposalId, 1, "lfg", "0x");
+    const state = await agentDAO.state(proposalId);
+    expect(state).to.equal(1n);
+    await expect(agentDAO.execute(proposalId)).to.be.rejected;
   });
 });

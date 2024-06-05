@@ -11,7 +11,7 @@ import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/token/ERC721/IERC721.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
-contract Minter is IMinter,  Ownable {
+contract Minter is IMinter, Ownable {
     address public serviceNft;
     address public contributionNft;
     address public agentNft;
@@ -23,6 +23,13 @@ contract Minter is IMinter,  Ownable {
     mapping(uint256 => bool) _mintedNfts;
 
     bool internal locked;
+
+    modifier noReentrant() {
+        require(!locked, "cannot reenter");
+        locked = true;
+        _;
+        locked = false;
+    }
 
     address agentFactory;
 
@@ -46,7 +53,6 @@ contract Minter is IMinter,  Ownable {
     modifier onlyFactory() {
         require(_msgSender() == agentFactory, "Caller is not Agent Factory");
         _;
-        
     }
 
     function setServiceNft(address serviceAddress) public onlyOwner {
@@ -73,14 +79,11 @@ contract Minter is IMinter,  Ownable {
         agentFactory = _factory;
     }
 
-    function mintInitial(address token, uint256 amount) public onlyFactory {
-        IAgentToken(token).mint(_msgSender(), amount);
-    }
-
-    function mint(uint256 nftId) public {
+    function mint(uint256 nftId) public noReentrant {
         // Mint configuration:
         // 1. ELO impact amount, to be shared between model and dataset owner
         // 2. IP share amount, ontop of the ELO impact
+        // This is safe to be called by anyone as the minted token will be sent to NFT owner only.
 
         require(!_mintedNfts[nftId], "Already minted");
 
@@ -89,16 +92,13 @@ contract Minter is IMinter,  Ownable {
         );
         require(agentId != 0, "Agent not found");
 
-        address dao = address(IContributionNft(contributionNft).getAgentDAO(agentId));
-        require(_msgSender() == dao, "Caller is not Agent DAO");
-
         _mintedNfts[nftId] = true;
 
         address tokenAddress = IAgentNft(agentNft).virtualInfo(agentId).token;
         uint256 datasetId = IContributionNft(contributionNft).getDatasetId(
             nftId
         );
-        uint256 amount = IServiceNft(serviceNft).getImpact(nftId);
+        uint256 amount = (IServiceNft(serviceNft).getImpact(nftId) * 10 ** 18);
         uint256 ipAmount = (amount * ipShare) / 10000;
         uint256 dataAmount = 0;
 

@@ -92,7 +92,9 @@ contract AgentNft is
         string memory newTokenURI,
         address payable theDAO,
         address founder,
-        uint8[] memory coreTypes
+        uint8[] memory coreTypes,
+        address pool,
+        address token
     ) external onlyRole(MINTER_ROLE) returns (uint256) {
         _nextVirtualId++;
         _mint(to, virtualId);
@@ -102,7 +104,9 @@ contract AgentNft is
         info.coreTypes = coreTypes;
         info.founder = founder;
         IERC5805 daoToken = GovernorVotes(theDAO).token();
-        info.token = address(daoToken);
+        info.veToken = address(daoToken);
+        info.token = token;
+        info.pool = pool;
         _stakingTokenToVirtualId[address(daoToken)] = virtualId;
         _addValidator(virtualId, founder);
         _initValidatorScore(virtualId, founder);

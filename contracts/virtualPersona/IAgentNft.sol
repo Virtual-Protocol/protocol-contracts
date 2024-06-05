@@ -11,6 +11,7 @@ interface IAgentNft is IValidatorRegistry {
         address tba; // Token Bound Address
         uint8[] coreTypes;
         address pool; // Liquidity pool for the agent
+        address veToken; // Voting escrow token
     }
 
     event CoresUpdated(uint256 virtualId, uint8[] coreTypes);
@@ -21,7 +22,9 @@ interface IAgentNft is IValidatorRegistry {
         string memory newTokenURI,
         address payable theDAO,
         address founder,
-        uint8[] memory coreTypes
+        uint8[] memory coreTypes,
+        address pool,
+        address token
     ) external returns (uint256);
 
     function stakingTokenToVirtualId(

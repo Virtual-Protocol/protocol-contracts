@@ -15,9 +15,6 @@ import "./IAgentVeToken.sol";
 import "./IAgentDAO.sol";
 import "./IAgentNft.sol";
 import "../libs/IERC6551Registry.sol";
-import "../pool/IUniswapV2Router02.sol";
-import "../pool/IUniswapV2Factory.sol";
-import "../pool/IUniswapV2Pair.sol";
 import "../token/IMinter.sol";
 
 contract AgentFactoryV2 is IAgentFactory, Initializable, AccessControl {
@@ -98,9 +95,15 @@ contract AgentFactoryV2 is IAgentFactory, Initializable, AccessControl {
     // V2 Storage
     ///////////////////////////////////////////////////////////////
     address[] public allTradingTokens;
-    IUniswapV2Router02 internal _uniswapRouter;
+    address private _uniswapRouter;
     address public veTokenImplementation;
     address private _minter;
+    address private _tokenAdmin;
+
+    // Default agent token params
+    bytes private _tokenSupplyParams;
+    bytes private _tokenTaxParams;
+    uint16 private _tokenMultiplier = 10000;
 
     ///////////////////////////////////////////////////////////////
 
@@ -234,6 +237,8 @@ contract AgentFactoryV2 is IAgentFactory, Initializable, AccessControl {
             "Application is not active"
         );
 
+        require(_tokenAdmin != address(0), "Token admin not set");
+
         Application storage application = _applications[id];
 
         require(
@@ -242,7 +247,8 @@ contract AgentFactoryV2 is IAgentFactory, Initializable, AccessControl {
             "Not proposer"
         );
 
-        uint256 initialSupply = application.withdrawableAmount; // Initial LP supply
+        uint256 initialSupply = (application.withdrawableAmount *
+            _tokenMultiplier) / 10000; // Initial LP supply
 
         application.withdrawableAmount = 0;
         application.status = ApplicationStatus.Executed;
@@ -250,11 +256,10 @@ contract AgentFactoryV2 is IAgentFactory, Initializable, AccessControl {
         // C1
         address token = _createNewAgentToken(
             application.name,
-            application.symbol
+            application.symbol,
+            initialSupply
         );
-
-        // C2
-        address lp = _createLP(token, assetToken);
+        address lp = IAgentToken(token).liquidityPools()[0];
 
         // C3
         address veToken = _createNewAgentVeToken(
@@ -283,7 +288,9 @@ contract AgentFactoryV2 is IAgentFactory, Initializable, AccessControl {
             application.tokenURI,
             dao,
             application.proposer,
-            application.cores
+            application.cores,
+            lp,
+            token
         );
         application.virtualId = virtualId;
 
@@ -301,11 +308,8 @@ contract AgentFactoryV2 is IAgentFactory, Initializable, AccessControl {
         );
         IAgentNft(nft).setTBA(virtualId, tbaAddress);
 
-        // C7
-        IMinter(_minter).mintInitial(token, initialSupply);
-
         // C8
-        IERC20(assetToken).approve(address(_uniswapRouter), initialSupply);
+        /*IERC20(assetToken).approve(address(_uniswapRouter), initialSupply);
         IERC20(token).approve(address(_uniswapRouter), initialSupply);
         (, , uint liquidity) = _uniswapRouter.addLiquidity(
             token,
@@ -316,29 +320,17 @@ contract AgentFactoryV2 is IAgentFactory, Initializable, AccessControl {
             0,
             address(this),
             block.timestamp + 60
-        );
+        );*/
 
         // C9
-        IERC20(lp).approve(veToken, liquidity);
-        IAgentVeToken(veToken).stake(
-            liquidity,
-            application.proposer,
-            application.proposer
-        );
+        // IERC20(lp).approve(veToken, liquidity);
+        // IAgentVeToken(veToken).stake(
+        //     liquidity,
+        //     application.proposer,
+        //     application.proposer
+        // );
 
         emit NewPersona(virtualId, token, veToken, dao, tbaAddress, lp);
-    }
-
-    function _createLP(
-        address token_,
-        address assetToken_
-    ) internal returns (address uniswapV2Pair) {
-        uniswapV2Pair = IUniswapV2Factory(_uniswapRouter.factory()).createPair(
-            token_,
-            assetToken_
-        );
-
-        return uniswapV2Pair;
     }
 
     function _createNewDAO(
@@ -362,10 +354,17 @@ contract AgentFactoryV2 is IAgentFactory, Initializable, AccessControl {
 
     function _createNewAgentToken(
         string memory name,
-        string memory symbol
+        string memory symbol,
+        uint256 initialSupply
     ) internal returns (address instance) {
         instance = Clones.clone(tokenImplementation);
-        IAgentToken(instance).initialize(name, symbol);
+        IAgentToken(instance).initialize(
+            [_tokenAdmin, _uniswapRouter, assetToken],
+            abi.encode(name, symbol),
+            _tokenSupplyParams,
+            _tokenTaxParams,
+            initialSupply
+        );
 
         allTradingTokens.push(instance);
         return instance;
@@ -431,6 +430,44 @@ contract AgentFactoryV2 is IAgentFactory, Initializable, AccessControl {
     function setUniswapRouter(
         address router
     ) public onlyRole(DEFAULT_ADMIN_ROLE) {
-        _uniswapRouter = IUniswapV2Router02(router);
+        _uniswapRouter = router;
+    }
+
+    function setTokenAdmin(
+        address newTokenAdmin
+    ) public onlyRole(DEFAULT_ADMIN_ROLE) {
+        _tokenAdmin = newTokenAdmin;
+    }
+
+    function setTokenSupplyParams(
+        uint256 maxTokensPerWallet,
+        uint256 maxTokensPerTxn,
+        uint256 botProtectionDurationInSeconds
+    ) public onlyRole(DEFAULT_ADMIN_ROLE) {
+        _tokenSupplyParams = abi.encode(
+            maxTokensPerWallet,
+            maxTokensPerTxn,
+            botProtectionDurationInSeconds
+        );
+    }
+
+    function setTokenTaxParams(
+        uint256 projectBuyTaxBasisPoints,
+        uint256 projectSellTaxBasisPoints,
+        uint256 taxSwapThresholdBasisPoints,
+        address projectTaxRecipient
+    ) public onlyRole(DEFAULT_ADMIN_ROLE) {
+        _tokenTaxParams = abi.encode(
+            projectBuyTaxBasisPoints,
+            projectSellTaxBasisPoints,
+            taxSwapThresholdBasisPoints,
+            projectTaxRecipient
+        );
+    }
+
+    function setTokenMultiplier(
+        uint16 newMultiplier
+    ) public onlyRole(DEFAULT_ADMIN_ROLE) {
+        _tokenMultiplier = newMultiplier;
     }
 }

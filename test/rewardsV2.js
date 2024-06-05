@@ -29,16 +29,9 @@ function getDescHash(str) {
 }
 
 describe("RewardsV2", function () {
-  const PROPOSAL_THRESHOLD = parseEther("5000");
-  const QUORUM = parseEther("10000");
-  const STAKE_AMOUNTS = [
-    parseEther("5000"),
-    parseEther("100000"),
-    parseEther("5000"),
-    parseEther("2000"),
-  ];
-  const UPTIME = [3, 1];
-  const REWARD_AMOUNT = parseEther("2000");
+  const PROPOSAL_THRESHOLD = parseEther("100000"); //100k
+  const MATURITY_SCORE = toBeHex(2000, 32); // 20%
+  const IP_SHARE = 1000; // 10%
 
   const TOKEN_URI = "http://jessica";
 
@@ -50,170 +43,161 @@ describe("RewardsV2", function () {
     cores: [0, 1, 2],
     tbaSalt:
       "0xa7647ac9429fdce477ebd9a95510385b756c757c26149e740abbab0ad1be2f16",
-    tbaImplementation: ethers.ZeroAddress,
+    tbaImplementation: process.env.TBA_IMPLEMENTATION,
     daoVotingPeriod: 600,
     daoThreshold: 1000000000000000000000n,
   };
 
+  const getAccounts = async () => {
+    const [
+      deployer,
+      ipVault,
+      founder,
+      contributor1,
+      contributor2,
+      validator1,
+      validator2,
+    ] = await ethers.getSigners();
+    return {
+      deployer,
+      ipVault,
+      founder,
+      contributor1,
+      contributor2,
+      validator1,
+      validator2,
+    };
+  };
+
   async function deployBaseContracts() {
-    const signers = await ethers.getSigners();
+    const { deployer, ipVault } = await getAccounts();
 
-    const [deployer] = await ethers.getSigners();
-    const veToken = await ethers.deployContract(
-      "veVirtualToken",
-      [deployer.address],
+    const virtualToken = await ethers.deployContract(
+      "VirtualToken",
+      [PROPOSAL_THRESHOLD, deployer.address],
       {}
     );
-    await veToken.waitForDeployment();
-
-    const demoToken = await ethers.deployContract(
-      "BMWToken",
-      [deployer.address],
-      {}
-    );
-    await demoToken.waitForDeployment();
-
-    const protocolDAO = await ethers.deployContract(
-      "VirtualGenesisDAO",
-      [veToken.target, 0, 100, 0],
-      {}
-    );
-    await protocolDAO.waitForDeployment();
+    await virtualToken.waitForDeployment();
 
     const AgentNft = await ethers.getContractFactory("AgentNft");
-    const personaNft = await upgrades.deployProxy(AgentNft, [deployer.address]);
+    const agentNft = await upgrades.deployProxy(AgentNft, [deployer.address]);
 
-    const personaToken = await ethers.deployContract("AgentToken");
-    await personaToken.waitForDeployment();
-    const personaDAO = await ethers.deployContract("AgentDAO");
-    await personaDAO.waitForDeployment();
+    const contribution = await upgrades.deployProxy(
+      await ethers.getContractFactory("ContributionNft"),
+      [agentNft.target],
+      {}
+    );
 
-    const tba = await ethers.deployContract("ERC6551Registry");
+    const service = await upgrades.deployProxy(
+      await ethers.getContractFactory("ServiceNft"),
+      [agentNft.target, contribution.target, process.env.DATASET_SHARES],
+      {}
+    );
 
-    const personaFactory = await upgrades.deployProxy(
-      await ethers.getContractFactory("AgentFactory"),
+    await agentNft.setContributionService(contribution.target, service.target);
+
+    // Implementation contracts
+    const agentToken = await ethers.deployContract("AgentToken");
+    await agentToken.waitForDeployment();
+    const agentDAO = await ethers.deployContract("AgentDAO");
+    await agentDAO.waitForDeployment();
+    const agentVeToken = await ethers.deployContract("AgentVeToken");
+    await agentVeToken.waitForDeployment();
+
+    const agentFactory = await upgrades.deployProxy(
+      await ethers.getContractFactory("AgentFactoryV2"),
       [
-        personaToken.target,
-        personaDAO.target,
-        tba.target,
-        demoToken.target,
-        personaNft.target,
+        agentToken.target,
+        agentVeToken.target,
+        agentDAO.target,
+        process.env.TBA_REGISTRY,
+        virtualToken.target,
+        agentNft.target,
         PROPOSAL_THRESHOLD,
-        5,
-        protocolDAO.target,
         deployer.address,
       ]
     );
-
-    await personaNft.grantRole(
-      await personaNft.MINTER_ROLE(),
-      personaFactory.target
-    );
-
-    const reward = await ethers.deployContract("AgentRewardX2", [], {});
-    await reward.waitForDeployment();
-
-    const contributionNft = await upgrades.deployProxy(
-      await ethers.getContractFactory("ContributionNft"),
-      [personaNft.target],
-      {}
-    );
-
-    const serviceNft = await upgrades.deployProxy(
-      await ethers.getContractFactory("ServiceNft"),
-      [personaNft.target, contributionNft.target, process.env.DATASET_SHARES],
-      {}
-    );
-
-    await personaNft.setContributionService(
-      contributionNft.target,
-      serviceNft.target
-    );
-
-    await reward.initialize(
-      demoToken.target,
-      personaNft.target,
-      contributionNft.target,
-      serviceNft.target,
-      {
-        protocolShares: 1000,
-        contributorShares: 5000,
-        stakerShares: 9000,
-        parentShares: 2000,
-        stakeThreshold: "1000000000000000000000",
-      }
-    );
-    const role = await reward.GOV_ROLE();
-    await reward.grantRole(role, signers[0].address);
+    await agentFactory.waitForDeployment();
+    await agentNft.grantRole(await agentNft.MINTER_ROLE(), agentFactory.target);
+    const minter = await ethers.deployContract("Minter", [
+      service.target,
+      contribution.target,
+      agentNft.target,
+      IP_SHARE,
+      ipVault.address,
+      agentFactory.target,
+      deployer.address,
+    ]);
+    await minter.waitForDeployment();
+    await agentFactory.setMinter(minter.target);
+    await agentFactory.setMaturityDuration(86400 * 365 * 10); // 100years
+    await agentFactory.setUniswapRouter(process.env.UNISWAP_ROUTER);
 
     return {
-      reward,
-      veToken,
-      protocolDAO,
-      demoToken,
-      personaFactory,
-      personaNft,
-      contributionNft,
-      serviceNft,
+      virtualToken,
+      agentFactory,
+      agentNft,
+      serviceNft: service,
+      contributionNft: contribution,
+      minter,
     };
   }
 
-  async function deployGenesisVirtual() {
-    const contracts = await deployBaseContracts();
-    const { personaFactory, veToken, protocolDAO, demoToken } = contracts;
-    const [deployer] = await ethers.getSigners();
+  async function deployWithApplication() {
+    const base = await deployBaseContracts();
+    const { agentFactory, virtualToken } = base;
+    const { founder } = await getAccounts();
 
     // Prepare tokens for proposal
-    await demoToken.mint(deployer.address, PROPOSAL_THRESHOLD);
-    await demoToken.approve(personaFactory.target, PROPOSAL_THRESHOLD);
+    await virtualToken.mint(founder.address, PROPOSAL_THRESHOLD);
+    await virtualToken
+      .connect(founder)
+      .approve(agentFactory.target, PROPOSAL_THRESHOLD);
 
-    await personaFactory.proposePersona(
-      genesisInput.name,
-      genesisInput.symbol,
-      genesisInput.tokenURI,
-      genesisInput.cores,
-      genesisInput.tbaSalt,
-      genesisInput.tbaImplementation,
-      genesisInput.daoVotingPeriod,
-      genesisInput.daoThreshold
-    );
+    const tx = await agentFactory
+      .connect(founder)
+      .proposeAgent(
+        genesisInput.name,
+        genesisInput.symbol,
+        genesisInput.tokenURI,
+        genesisInput.cores,
+        genesisInput.tbaSalt,
+        genesisInput.tbaImplementation,
+        genesisInput.daoVotingPeriod,
+        genesisInput.daoThreshold
+      );
 
-    const filter = personaFactory.filters.NewApplication;
-    const events = await personaFactory.queryFilter(filter, -1);
+    const filter = agentFactory.filters.NewApplication;
+    const events = await agentFactory.queryFilter(filter, -1);
     const event = events[0];
     const { id } = event.args;
+    return { applicationId: id, ...base };
+  }
 
-    // Create proposal
-    await veToken.oracleTransfer(
-      [ethers.ZeroAddress],
-      [deployer.address],
-      [parseEther("100000000")]
-    );
-    await veToken.delegate(deployer.address);
+  async function deployWithAgent() {
+    const base = await deployWithApplication();
+    const { agentFactory, applicationId } = base;
 
-    await protocolDAO.propose(
-      [personaFactory.target],
-      [0],
-      [getExecuteCallData(personaFactory, id)],
-      "Create Jessica"
-    );
+    const { founder } = await getAccounts();
+    await agentFactory.connect(founder).executeApplication(applicationId);
 
-    const daoFilter = protocolDAO.filters.ProposalCreated;
-    const daoEvents = await protocolDAO.queryFilter(daoFilter, -1);
-    const daoEvent = daoEvents[0];
-    const daoProposalId = daoEvent.args[0];
-
-    await protocolDAO.castVote(daoProposalId, 1);
-    await mine(600);
-
-    await protocolDAO.execute(daoProposalId);
-    const factoryFilter = personaFactory.filters.NewPersona;
-    const factoryEvents = await personaFactory.queryFilter(factoryFilter, -1);
+    const factoryFilter = agentFactory.filters.NewPersona;
+    const factoryEvents = await agentFactory.queryFilter(factoryFilter, -1);
     const factoryEvent = factoryEvents[0];
 
-    const { virtualId, token, dao } = factoryEvent.args;
-    const persona = { virtualId, token, dao };
-    return { ...contracts, persona };
+    const { virtualId, token, veToken, dao, tba, lp } = await factoryEvent.args;
+
+    return {
+      ...base,
+      agent: {
+        virtualId,
+        token,
+        veToken,
+        dao,
+        tba,
+        lp,
+      },
+    };
   }
 
   async function stakeAndVote() {
@@ -280,27 +264,27 @@ describe("RewardsV2", function () {
     base,
     account
   ) {
-    const signers = await ethers.getSigners();
-    const { persona, serviceNft, contributionNft } = base;
-    const personaDAO = await ethers.getContractAt("AgentDAO", persona.dao);
+    const { founder } = await getAccounts();
+    const { agent, serviceNft, contributionNft, minter } = base;
+    const agentDAO = await ethers.getContractAt("AgentDAO", agent.dao);
 
     const descHash = getDescHash(desc);
 
     const mintCalldata = await getMintServiceCalldata(
       serviceNft,
-      persona.virtualId,
+      agent.virtualId,
       descHash
     );
 
-    await personaDAO.propose([serviceNft.target], [0], [mintCalldata], desc);
-    const filter = personaDAO.filters.ProposalCreated;
-    const events = await personaDAO.queryFilter(filter, -1);
+    await agentDAO.propose([serviceNft.target], [0], [mintCalldata], desc);
+    const filter = agentDAO.filters.ProposalCreated;
+    const events = await agentDAO.queryFilter(filter, -1);
     const event = events[0];
     const proposalId = event.args[0];
 
     await contributionNft.mint(
       account,
-      persona.virtualId,
+      agent.virtualId,
       coreId,
       TOKEN_URI,
       proposalId,
@@ -312,18 +296,13 @@ describe("RewardsV2", function () {
     const voteParams = isModel
       ? abi.encode(["uint256", "uint8[] memory"], [maturity, [0, 1, 1, 0, 2]])
       : "0x";
-    await personaDAO.castVoteWithReasonAndParams(
-      proposalId,
-      1,
-      "lfg",
-      voteParams
-    );
-    await personaDAO
-      .connect(signers[2])
+    await agentDAO
+      .connect(founder)
       .castVoteWithReasonAndParams(proposalId, 1, "lfg", voteParams);
     await mine(600);
 
-    await personaDAO.execute(proposalId);
+    await agentDAO.execute(proposalId);
+    await minter.mint(proposalId);
 
     return proposalId;
   }
@@ -414,295 +393,54 @@ describe("RewardsV2", function () {
     return { contributionList, ...base };
   }
 
-  before(async function () {
-    const signers = await ethers.getSigners();
-    this.accounts = signers.map((signer) => signer.address);
-    this.signers = signers;
+  before(async function () {});
+
+  it("should mint agent token for successful contribution", async function () {
+    const base = await loadFixture(deployWithAgent);
+    const { contributor1 } = await getAccounts();
+    const maturity = 55;
+    const agentToken = await ethers.getContractAt(
+      "AgentToken",
+      base.agent.token
+    );
+    const balance1 = await agentToken.balanceOf(contributor1.address);
+    expect(balance1).to.equal(0n);
+    await createContribution(
+      0,
+      maturity,
+      0,
+      true,
+      0,
+      "Test",
+      base,
+      contributor1.address
+    );
+    const balance2 = await agentToken.balanceOf(contributor1.address);
+    expect(balance2).to.equal(parseEther(maturity.toString()));
   });
 
-  it("should be able to retrieve past reward settings", async function () {
-    const { reward } = await loadFixture(deployBaseContracts);
-    const settings = [1000n, 5000n, 9000n, 2000n, 1000000000000000000000n];
-    expect(await reward.getRewardSettings()).to.deep.equal(settings);
-    let blockNumber = await ethers.provider.getBlockNumber();
-    expect(await reward.getPastRewardSettings(blockNumber - 1)).to.deep.equal(
-      settings
+  it("should mint agent token for IP owner on successful contribution", async function () {
+    const base = await loadFixture(deployWithAgent);
+    const { ipVault, contributor1 } = await getAccounts();
+    const maturity = 55;
+    const agentToken = await ethers.getContractAt(
+      "AgentToken",
+      base.agent.token
     );
-    for (let i = 0; i < 10; i++) {
-      const val = i + 2;
-      let blockNumber = await ethers.provider.getBlockNumber();
-      await reward.setRewardSettings(val, val, val, val, val);
-      await mine(1);
-      expect(await reward.getPastRewardSettings(blockNumber + 1)).to.deep.equal(
-        [BigInt(val), BigInt(val), BigInt(val), BigInt(val), BigInt(val)]
-      );
-    }
-    expect(await reward.getRewardSettings()).to.deep.equal([
-      11n,
-      11n,
-      11n,
-      11n,
-      11n,
-    ]);
-  });
-
-  it("should calculate correct staker and validator rewards", async function () {
-    const { reward, persona } = await loadFixture(stakeAndVote);
-    const [validator1, staker1, validator2, staker2] = this.accounts;
-    await mine(1);
-
-    expect(
-      parseFloat(
-        formatEther(await reward.getTotalClaimableRewards(validator1, [1], []))
-      ).toFixed(4)
-    ).to.be.equal("60.2679");
-    expect(
-      parseFloat(
-        formatEther(await reward.getTotalClaimableRewards(staker1, [1], []))
-      ).toFixed(4)
-    ).to.be.equal("361.6071");
-    expect(
-      parseFloat(
-        formatEther(await reward.getTotalClaimableRewards(validator2, [1], []))
-      ).toFixed(4)
-    ).to.be.equal("41.7857");
-    expect(
-      parseFloat(
-        formatEther(await reward.getTotalClaimableRewards(staker2, [1], []))
-      ).toFixed(4)
-    ).to.be.equal("14.4643");
-  });
-
-  it("should withdraw correct staker and validator rewards", async function () {
-    const { reward, demoToken } = await loadFixture(stakeAndVote);
-    const [validator1, staker1, validator2, staker2] = this.signers;
-    await mine(1);
-
-    expect(await demoToken.balanceOf(reward.target)).to.be.equal(
-      parseEther("2000")
+    const balance1 = await agentToken.balanceOf(ipVault.address);
+    expect(balance1).to.equal(0n);
+    await createContribution(
+      0,
+      maturity,
+      0,
+      true,
+      0,
+      "Test",
+      base,
+      contributor1.address
     );
 
-    expect(await demoToken.balanceOf(validator1.address)).to.be.equal(
-      parseEther("0")
-    );
-    expect(await demoToken.balanceOf(staker1.address)).to.be.equal(
-      parseEther("0")
-    );
-    expect(await demoToken.balanceOf(validator2.address)).to.be.equal(
-      parseEther("0")
-    );
-    expect(await demoToken.balanceOf(staker2.address)).to.be.equal(
-      parseEther("0")
-    );
-
-    await reward.claimAllRewards([1], []);
-    expect(
-      parseFloat(formatEther(await demoToken.balanceOf(validator1))).toFixed(4)
-    ).to.be.equal("60.2679");
-
-    await reward.connect(staker1).claimAllRewards([1], []);
-    expect(
-      parseFloat(formatEther(await demoToken.balanceOf(staker1))).toFixed(4)
-    ).to.be.equal("361.6071");
-
-    await reward.connect(validator2).claimAllRewards([1], []);
-    expect(
-      parseFloat(formatEther(await demoToken.balanceOf(validator2))).toFixed(4)
-    ).to.be.equal("41.7857");
-
-    await reward.connect(staker2).claimAllRewards([1], []);
-    expect(
-      parseFloat(formatEther(await demoToken.balanceOf(staker2))).toFixed(4)
-    ).to.be.equal("14.4643");
-
-    // Prevent double claim
-    await reward.claimAllRewards([1], []);
-    expect(
-      parseFloat(formatEther(await demoToken.balanceOf(validator1))).toFixed(4)
-    ).to.be.equal("60.2679");
-    await expect(reward.connect(staker1).claimAllRewards([1], []));
-    expect(
-      parseFloat(formatEther(await demoToken.balanceOf(staker1))).toFixed(4)
-    ).to.be.equal("361.6071");
-    await expect(reward.connect(validator2).claimAllRewards([1], []));
-    expect(
-      parseFloat(formatEther(await demoToken.balanceOf(validator2))).toFixed(4)
-    ).to.be.equal("41.7857");
-    await expect(reward.connect(staker2).claimAllRewards([1], []));
-    expect(
-      parseFloat(formatEther(await demoToken.balanceOf(staker2))).toFixed(4)
-    ).to.be.equal("14.4643");
-  });
-
-  it("should calculate correct contributor rewards", async function () {
-    const { contributionList, demoToken, reward, serviceNft } =
-      await loadFixture(prepareContributions);
-    const taxCollector = this.signers[10];
-    expect(await serviceNft.getMaturity(contributionList[0])).to.equal(200n);
-    expect(await serviceNft.getMaturity(contributionList[1])).to.equal(200n);
-    expect(await serviceNft.getMaturity(contributionList[2])).to.equal(100n);
-    expect(await serviceNft.getMaturity(contributionList[3])).to.equal(100n);
-
-    expect(await serviceNft.getImpact(contributionList[0])).to.equal(140n);
-    expect(await serviceNft.getImpact(contributionList[1])).to.equal(60n);
-    expect(await serviceNft.getImpact(contributionList[2])).to.equal(70n);
-    expect(await serviceNft.getImpact(contributionList[3])).to.equal(30n);
-
-    expect(
-      formatEther(
-        await reward.getTotalClaimableRewards(
-          taxCollector.address,
-          [],
-          [contributionList[0]]
-        )
-      )
-    ).to.be.equal("210.0");
-    expect(
-      formatEther(
-        await reward.getTotalClaimableRewards(
-          taxCollector.address,
-          [],
-          [contributionList[1]]
-        )
-      )
-    ).to.be.equal("90.0");
-    expect(
-      formatEther(
-        await reward.getTotalClaimableRewards(
-          taxCollector.address,
-          [],
-          [contributionList[2]]
-        )
-      )
-    ).to.be.equal("210.0");
-    expect(
-      formatEther(
-        await reward.getTotalClaimableRewards(
-          taxCollector.address,
-          [],
-          [contributionList[3]]
-        )
-      )
-    ).to.be.equal("90.0");
-    expect(
-      formatEther(
-        await reward.getTotalClaimableRewards(
-          taxCollector.address,
-          [],
-          [contributionList[4]]
-        )
-      )
-    ).to.be.equal("300.0");
-  });
-
-  it("should claim correct model contributor rewards", async function () {
-    const { contributionList, reward, serviceNft, demoToken } =
-      await loadFixture(prepareContributions);
-
-    const taxCollector = this.signers[10];
-    expect(await demoToken.balanceOf(taxCollector.address)).to.be.equal(0);
-
-    await expect(
-      reward.connect(taxCollector).claimAllRewards([], [contributionList[0]])
-    ).to.be.fulfilled;
-    expect(
-      formatEther(await demoToken.balanceOf(taxCollector.address))
-    ).to.be.equal("210.0");
-    await expect(
-      reward.connect(taxCollector).claimAllRewards([], [contributionList[1]])
-    ).to.be.fulfilled;
-    expect(
-      formatEther(await demoToken.balanceOf(taxCollector.address))
-    ).to.be.equal("300.0");
-    await expect(
-      reward.connect(taxCollector).claimAllRewards([], [contributionList[2]])
-    ).to.be.fulfilled;
-    expect(
-      formatEther(await demoToken.balanceOf(taxCollector.address))
-    ).to.be.equal("510.0");
-    await expect(
-      reward.connect(taxCollector).claimAllRewards([], [contributionList[3]])
-    ).to.be.fulfilled;
-    expect(
-      formatEther(await demoToken.balanceOf(taxCollector.address))
-    ).to.be.equal("600.0");
-    await expect(
-      reward.connect(taxCollector).claimAllRewards([], [contributionList[4]])
-    ).to.be.fulfilled;
-    expect(
-      formatEther(await demoToken.balanceOf(taxCollector.address))
-    ).to.be.equal("900.0");
-
-    // Prevent double claim
-    await expect(
-      reward.connect(taxCollector).claimAllRewards([], contributionList)
-    ).to.be.fulfilled;
-    expect(
-      formatEther(await demoToken.balanceOf(taxCollector.address))
-    ).to.be.equal("900.0");
-  });
-
-  it("should claim correct total rewards", async function () {
-    const { contributionList, reward, serviceNft, demoToken } =
-      await loadFixture(prepareContributions);
-    const [validator1, staker1, validator2, staker2] = this.signers;
-    const taxCollector = this.signers[10];
-    await mine(1);
-
-    await reward.connect(validator1).claimAllRewards([1], []);
-    expect(
-      parseFloat(formatEther(await demoToken.balanceOf(validator1))).toFixed(4)
-    ).to.be.equal("163.5842");
-    await reward.connect(staker1).claimAllRewards([1], []);
-    expect(
-      parseFloat(formatEther(await demoToken.balanceOf(staker1))).toFixed(4)
-    ).to.be.equal("981.5051");
-    await reward.connect(validator2).claimAllRewards([1], []);
-    expect(
-      parseFloat(formatEther(await demoToken.balanceOf(validator2))).toFixed(4)
-    ).to.be.equal("83.5714");
-    await reward.connect(staker2).claimAllRewards([1], []);
-    expect(
-      parseFloat(formatEther(await demoToken.balanceOf(staker2))).toFixed(4)
-    ).to.be.equal("28.9286");
-
-    await expect(
-      reward.connect(taxCollector).claimAllRewards([], contributionList)
-    ).to.be.fulfilled;
-    expect(
-      parseFloat(formatEther(await demoToken.balanceOf(taxCollector))).toFixed(
-        4
-      )
-    ).to.be.equal("900.0000");
-  });
-
-  it("should withdraw correct protocol rewards", async function () {
-    const { contributionList, reward, serviceNft, demoToken } =
-      await loadFixture(prepareContributions);
-    const treasury = this.signers[9];
-
-    expect(await demoToken.balanceOf(treasury.address)).to.be.equal(
-      parseEther("0")
-    );
-    await reward.withdrawProtocolRewards(treasury.address);
-    expect(await demoToken.balanceOf(treasury.address)).to.be.equal(
-      parseEther("400")
-    );
-  });
-
-  it("should withdraw correct validator pool rewards", async function () {
-    const { contributionList, reward, serviceNft, demoToken } =
-      await loadFixture(prepareContributions);
-    const treasury = this.signers[9];
-
-    expect(await demoToken.balanceOf(treasury.address)).to.be.equal(
-      parseEther("0")
-    );
-    await reward.withdrawValidatorPoolRewards(treasury.address);
-    expect(
-      parseFloat(
-        formatEther(await demoToken.balanceOf(treasury.address))
-      ).toFixed(4)
-    ).to.be.equal("542.4107");
+    const balance2 = await agentToken.balanceOf(ipVault.address);
+    expect(balance2).to.equal(parseEther((maturity * 0.1).toString()));
   });
 });

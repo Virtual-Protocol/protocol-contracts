@@ -1,6 +1,6 @@
 import { ethers } from "hardhat";
 
-const deployParams = require("./arguments/genesisDaoArguments.js");
+const deployParams = require("../arguments/genesisDaoArguments.js");
 
 (async () => {
   try {

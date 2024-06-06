@@ -1,5 +1,5 @@
 import { ethers, upgrades } from "hardhat";
-const deployParams = require("./arguments/personaFactoryArguments.js");
+const deployParams = require("../arguments/personaFactoryArguments.js");
 
 (async () => {
   try {

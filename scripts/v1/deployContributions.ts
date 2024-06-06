@@ -2,7 +2,7 @@ import { ethers, upgrades } from "hardhat";
 
 (async () => {
   try {
-    const args = require("./arguments/contributionNft");
+    const args = require("../arguments/contributionNft");
     const Contribution = await ethers.getContractFactory("ContributionNft");
     const contribution = await upgrades.deployProxy(
       Contribution,

@@ -1,6 +1,6 @@
 import { ethers, upgrades } from "hardhat";
 
-const deployParams = require("./arguments/nft.js");
+const deployParams = require("../arguments/nft.js");
 
 (async () => {
   try {

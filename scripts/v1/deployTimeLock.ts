@@ -1,5 +1,5 @@
 import { ethers } from "hardhat";
-const deployArguments = require("./arguments/lockArguments");
+const deployArguments = require("../arguments/lockArguments");
 
 (async () => {
   try {

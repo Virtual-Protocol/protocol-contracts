@@ -1,5 +1,5 @@
 import { ethers } from "hardhat";
-const deployArguments = require("./arguments/rewardTreasuryArguments");
+const deployArguments = require("../arguments/rewardTreasuryArguments");
 
 (async () => {
   try {

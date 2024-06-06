@@ -4,6 +4,7 @@ require("@nomicfoundation/hardhat-toolbox");
 require("hardhat-deploy");
 require("@openzeppelin/hardhat-upgrades");
 require("@fireblocks/hardhat-fireblocks");
+
 const { ApiBaseUrl } = require("@fireblocks/fireblocks-web3-provider");
 
 module.exports = {

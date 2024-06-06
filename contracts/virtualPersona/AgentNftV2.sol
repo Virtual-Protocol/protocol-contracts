@@ -15,7 +15,7 @@ import "./CoreRegistry.sol";
 import "./ValidatorRegistry.sol";
 import "./IAgentDAO.sol";
 
-contract AgentNft is
+contract AgentNftV2 is
     IAgentNft,
     Initializable,
     ERC721Upgradeable,
@@ -50,9 +50,9 @@ contract AgentNft is
     address private _serviceNft;
 
     // V2 Storage
-    bytes32 public constant ADMIN_ROLE =
-        keccak256("ADMIN_ROLE");
+    bytes32 public constant ADMIN_ROLE = keccak256("ADMIN_ROLE");
     mapping(uint256 => bool) private _blacklists;
+    mapping(uint256 => VirtualLP) public virtualLPs;
 
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() {
@@ -104,9 +104,12 @@ contract AgentNft is
         info.coreTypes = coreTypes;
         info.founder = founder;
         IERC5805 daoToken = GovernorVotes(theDAO).token();
-        info.veToken = address(daoToken);
         info.token = token;
-        info.pool = pool;
+
+        VirtualLP storage lp = virtualLPs[virtualId];
+        lp.pool = pool;
+        lp.veToken = address(daoToken);
+
         _stakingTokenToVirtualId[address(daoToken)] = virtualId;
         _addValidator(virtualId, founder);
         _initValidatorScore(virtualId, founder);
@@ -123,6 +126,12 @@ contract AgentNft is
         uint256 virtualId
     ) public view returns (VirtualInfo memory) {
         return virtualInfos[virtualId];
+    }
+
+    function virtualLP(
+        uint256 virtualId
+    ) public view returns (VirtualLP memory) {
+        return virtualLPs[virtualId];
     }
 
     // Get VIRTUAL ID of a staking token
@@ -267,7 +276,10 @@ contract AgentNft is
         return _blacklists[virtualId];
     }
 
-    function setBlacklist(uint256 virtualId, bool value) public onlyRole(ADMIN_ROLE) {
+    function setBlacklist(
+        uint256 virtualId,
+        bool value
+    ) public onlyRole(ADMIN_ROLE) {
         _blacklists[virtualId] = value;
     }
 }

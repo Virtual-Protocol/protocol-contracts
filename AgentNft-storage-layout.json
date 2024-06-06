@@ -1,0 +1,265 @@
+{
+  "storage": [
+    {
+      "astId": 11021,
+      "contract": "contracts/virtualPersona/AgentNft.sol:AgentNft",
+      "label": "coreTypes",
+      "offset": 0,
+      "slot": "0",
+      "type": "t_mapping(t_uint8,t_string_storage)"
+    },
+    {
+      "astId": 11023,
+      "contract": "contracts/virtualPersona/AgentNft.sol:AgentNft",
+      "label": "_nextCoreType",
+      "offset": 0,
+      "slot": "1",
+      "type": "t_uint8"
+    },
+    {
+      "astId": 11335,
+      "contract": "contracts/virtualPersona/AgentNft.sol:AgentNft",
+      "label": "_validatorsMap",
+      "offset": 0,
+      "slot": "2",
+      "type": "t_mapping(t_uint256,t_mapping(t_address,t_bool))"
+    },
+    {
+      "astId": 11341,
+      "contract": "contracts/virtualPersona/AgentNft.sol:AgentNft",
+      "label": "_baseValidatorScore",
+      "offset": 0,
+      "slot": "3",
+      "type": "t_mapping(t_address,t_mapping(t_uint256,t_uint256))"
+    },
+    {
+      "astId": 11346,
+      "contract": "contracts/virtualPersona/AgentNft.sol:AgentNft",
+      "label": "_validators",
+      "offset": 0,
+      "slot": "4",
+      "type": "t_mapping(t_uint256,t_array(t_address)dyn_storage)"
+    },
+    {
+      "astId": 11356,
+      "contract": "contracts/virtualPersona/AgentNft.sol:AgentNft",
+      "label": "_getScoreOf",
+      "offset": 0,
+      "slot": "5",
+      "type": "t_function_internal_view(t_uint256,t_address)returns(t_uint256)"
+    },
+    {
+      "astId": 11364,
+      "contract": "contracts/virtualPersona/AgentNft.sol:AgentNft",
+      "label": "_getMaxScore",
+      "offset": 8,
+      "slot": "5",
+      "type": "t_function_internal_view(t_uint256)returns(t_uint256)"
+    },
+    {
+      "astId": 11376,
+      "contract": "contracts/virtualPersona/AgentNft.sol:AgentNft",
+      "label": "_getPastScore",
+      "offset": 16,
+      "slot": "5",
+      "type": "t_function_internal_view(t_uint256,t_address,t_uint256)returns(t_uint256)"
+    },
+    {
+      "astId": 10364,
+      "contract": "contracts/virtualPersona/AgentNft.sol:AgentNft",
+      "label": "_nextVirtualId",
+      "offset": 0,
+      "slot": "6",
+      "type": "t_uint256"
+    },
+    {
+      "astId": 10368,
+      "contract": "contracts/virtualPersona/AgentNft.sol:AgentNft",
+      "label": "_stakingTokenToVirtualId",
+      "offset": 0,
+      "slot": "7",
+      "type": "t_mapping(t_address,t_uint256)"
+    },
+    {
+      "astId": 10412,
+      "contract": "contracts/virtualPersona/AgentNft.sol:AgentNft",
+      "label": "virtualInfos",
+      "offset": 0,
+      "slot": "8",
+      "type": "t_mapping(t_uint256,t_struct(VirtualInfo)11161_storage)"
+    },
+    {
+      "astId": 10414,
+      "contract": "contracts/virtualPersona/AgentNft.sol:AgentNft",
+      "label": "_contributionNft",
+      "offset": 0,
+      "slot": "9",
+      "type": "t_address"
+    },
+    {
+      "astId": 10416,
+      "contract": "contracts/virtualPersona/AgentNft.sol:AgentNft",
+      "label": "_serviceNft",
+      "offset": 0,
+      "slot": "10",
+      "type": "t_address"
+    }
+  ],
+  "types": {
+    "t_address": {
+      "encoding": "inplace",
+      "label": "address",
+      "numberOfBytes": "20"
+    },
+    "t_array(t_address)dyn_storage": {
+      "base": "t_address",
+      "encoding": "dynamic_array",
+      "label": "address[]",
+      "numberOfBytes": "32"
+    },
+    "t_array(t_uint8)dyn_storage": {
+      "base": "t_uint8",
+      "encoding": "dynamic_array",
+      "label": "uint8[]",
+      "numberOfBytes": "32"
+    },
+    "t_bool": {
+      "encoding": "inplace",
+      "label": "bool",
+      "numberOfBytes": "1"
+    },
+    "t_function_internal_view(t_uint256)returns(t_uint256)": {
+      "encoding": "inplace",
+      "label": "function (uint256) view returns (uint256)",
+      "numberOfBytes": "8"
+    },
+    "t_function_internal_view(t_uint256,t_address)returns(t_uint256)": {
+      "encoding": "inplace",
+      "label": "function (uint256,address) view returns (uint256)",
+      "numberOfBytes": "8"
+    },
+    "t_function_internal_view(t_uint256,t_address,t_uint256)returns(t_uint256)": {
+      "encoding": "inplace",
+      "label": "function (uint256,address,uint256) view returns (uint256)",
+      "numberOfBytes": "8"
+    },
+    "t_mapping(t_address,t_bool)": {
+      "encoding": "mapping",
+      "key": "t_address",
+      "label": "mapping(address => bool)",
+      "numberOfBytes": "32",
+      "value": "t_bool"
+    },
+    "t_mapping(t_address,t_mapping(t_uint256,t_uint256))": {
+      "encoding": "mapping",
+      "key": "t_address",
+      "label": "mapping(address => mapping(uint256 => uint256))",
+      "numberOfBytes": "32",
+      "value": "t_mapping(t_uint256,t_uint256)"
+    },
+    "t_mapping(t_address,t_uint256)": {
+      "encoding": "mapping",
+      "key": "t_address",
+      "label": "mapping(address => uint256)",
+      "numberOfBytes": "32",
+      "value": "t_uint256"
+    },
+    "t_mapping(t_uint256,t_array(t_address)dyn_storage)": {
+      "encoding": "mapping",
+      "key": "t_uint256",
+      "label": "mapping(uint256 => address[])",
+      "numberOfBytes": "32",
+      "value": "t_array(t_address)dyn_storage"
+    },
+    "t_mapping(t_uint256,t_mapping(t_address,t_bool))": {
+      "encoding": "mapping",
+      "key": "t_uint256",
+      "label": "mapping(uint256 => mapping(address => bool))",
+      "numberOfBytes": "32",
+      "value": "t_mapping(t_address,t_bool)"
+    },
+    "t_mapping(t_uint256,t_struct(VirtualInfo)11161_storage)": {
+      "encoding": "mapping",
+      "key": "t_uint256",
+      "label": "mapping(uint256 => struct IAgentNft.VirtualInfo)",
+      "numberOfBytes": "32",
+      "value": "t_struct(VirtualInfo)11161_storage"
+    },
+    "t_mapping(t_uint256,t_uint256)": {
+      "encoding": "mapping",
+      "key": "t_uint256",
+      "label": "mapping(uint256 => uint256)",
+      "numberOfBytes": "32",
+      "value": "t_uint256"
+    },
+    "t_mapping(t_uint8,t_string_storage)": {
+      "encoding": "mapping",
+      "key": "t_uint8",
+      "label": "mapping(uint8 => string)",
+      "numberOfBytes": "32",
+      "value": "t_string_storage"
+    },
+    "t_string_storage": {
+      "encoding": "bytes",
+      "label": "string",
+      "numberOfBytes": "32"
+    },
+    "t_struct(VirtualInfo)11161_storage": {
+      "encoding": "inplace",
+      "label": "struct IAgentNft.VirtualInfo",
+      "members": [
+        {
+          "astId": 11151,
+          "contract": "contracts/virtualPersona/AgentNft.sol:AgentNft",
+          "label": "dao",
+          "offset": 0,
+          "slot": "0",
+          "type": "t_address"
+        },
+        {
+          "astId": 11153,
+          "contract": "contracts/virtualPersona/AgentNft.sol:AgentNft",
+          "label": "token",
+          "offset": 0,
+          "slot": "1",
+          "type": "t_address"
+        },
+        {
+          "astId": 11155,
+          "contract": "contracts/virtualPersona/AgentNft.sol:AgentNft",
+          "label": "founder",
+          "offset": 0,
+          "slot": "2",
+          "type": "t_address"
+        },
+        {
+          "astId": 11157,
+          "contract": "contracts/virtualPersona/AgentNft.sol:AgentNft",
+          "label": "tba",
+          "offset": 0,
+          "slot": "3",
+          "type": "t_address"
+        },
+        {
+          "astId": 11160,
+          "contract": "contracts/virtualPersona/AgentNft.sol:AgentNft",
+          "label": "coreTypes",
+          "offset": 0,
+          "slot": "4",
+          "type": "t_array(t_uint8)dyn_storage"
+        }
+      ],
+      "numberOfBytes": "160"
+    },
+    "t_uint256": {
+      "encoding": "inplace",
+      "label": "uint256",
+      "numberOfBytes": "32"
+    },
+    "t_uint8": {
+      "encoding": "inplace",
+      "label": "uint8",
+      "numberOfBytes": "1"
+    }
+  }
+}

@@ -10,11 +10,14 @@ interface IAgentNft is IValidatorRegistry {
         address founder;
         address tba; // Token Bound Address
         uint8[] coreTypes;
-        address pool; // Liquidity pool for the agent
-        address veToken; // Voting escrow token
     }
 
     event CoresUpdated(uint256 virtualId, uint8[] coreTypes);
+
+    struct VirtualLP {
+        address pool; // Liquidity pool for the agent
+        address veToken; // Voting escrow token
+    }
 
     function mint(
         uint256 id,

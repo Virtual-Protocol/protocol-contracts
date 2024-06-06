@@ -38,9 +38,9 @@ contract AgentFactoryV2 is IAgentFactory, Initializable, AccessControl {
     event NewPersona(
         uint256 virtualId,
         address token,
-        address veToken,
         address dao,
         address tba,
+        address veToken,
         address lp
     );
     event NewApplication(uint256 id);
@@ -259,7 +259,7 @@ contract AgentFactoryV2 is IAgentFactory, Initializable, AccessControl {
             application.symbol,
             initialSupply
         );
-        
+
         // C2
         address lp = IAgentToken(token).liquidityPools()[0];
         IERC20(assetToken).transfer(token, initialAmount);
@@ -272,7 +272,6 @@ contract AgentFactoryV2 is IAgentFactory, Initializable, AccessControl {
             lp,
             application.proposer
         );
-        
 
         // C4
         string memory daoName = string.concat(application.name, " DAO");
@@ -286,17 +285,17 @@ contract AgentFactoryV2 is IAgentFactory, Initializable, AccessControl {
         );
 
         // C5
-        uint256 virtualId = IAgentNft(nft).nextVirtualId();
-        IAgentNft(nft).mint(
-            virtualId,
-            _vault,
-            application.tokenURI,
-            dao,
-            application.proposer,
-            application.cores,
-            lp,
-            token
-        );
+        uint256 virtualId = 1;//IAgentNft(nft).nextVirtualId();
+        // IAgentNft(nft).mint(
+        //     virtualId,
+        //     _vault,
+        //     application.tokenURI,
+        //     dao,
+        //     application.proposer,
+        //     application.cores,
+        //     lp,
+        //     token
+        // );
         application.virtualId = virtualId;
 
         // C6
@@ -320,7 +319,7 @@ contract AgentFactoryV2 is IAgentFactory, Initializable, AccessControl {
             application.proposer,
             defaultDelegatee
         );
-        
+
         emit NewPersona(virtualId, token, veToken, dao, tbaAddress, lp);
     }
 
@@ -398,10 +397,12 @@ contract AgentFactoryV2 is IAgentFactory, Initializable, AccessControl {
 
     function setImplementations(
         address token,
+        address veToken,
         address dao
     ) public onlyRole(DEFAULT_ADMIN_ROLE) {
         tokenImplementation = token;
         daoImplementation = dao;
+        veTokenImplementation = veToken;
     }
 
     function setMinter(address newMinter) public onlyRole(DEFAULT_ADMIN_ROLE) {

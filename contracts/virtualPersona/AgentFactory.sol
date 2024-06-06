@@ -285,17 +285,17 @@ contract AgentFactoryV2 is IAgentFactory, Initializable, AccessControl {
         );
 
         // C5
-        uint256 virtualId = 1;//IAgentNft(nft).nextVirtualId();
-        // IAgentNft(nft).mint(
-        //     virtualId,
-        //     _vault,
-        //     application.tokenURI,
-        //     dao,
-        //     application.proposer,
-        //     application.cores,
-        //     lp,
-        //     token
-        // );
+        uint256 virtualId = IAgentNft(nft).nextVirtualId();
+        IAgentNft(nft).mint(
+            virtualId,
+            _vault,
+            application.tokenURI,
+            dao,
+            application.proposer,
+            application.cores,
+            lp,
+            token
+        );
         application.virtualId = virtualId;
 
         // C6
@@ -320,7 +320,7 @@ contract AgentFactoryV2 is IAgentFactory, Initializable, AccessControl {
             defaultDelegatee
         );
 
-        emit NewPersona(virtualId, token, veToken, dao, tbaAddress, lp);
+        emit NewPersona(virtualId, token, dao, tbaAddress, veToken, lp);
     }
 
     function _createNewDAO(

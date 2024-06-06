@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
+import "@openzeppelin/contracts/governance/IGovernor.sol";
+
 interface IContributionNft {
     function tokenVirtualId(uint256 tokenId) external view returns (uint256);
     function tokenURI(uint256 tokenId) external view returns (string memory);
@@ -10,4 +12,5 @@ interface IContributionNft {
     function isModel(uint256 tokenId) external view returns (bool);
     function getAdmin() external view returns (address);
     function getDatasetId(uint256 tokenId) external view returns (uint256);
+    function getAgentDAO(uint256 virtualId) external view returns (IGovernor);
 }

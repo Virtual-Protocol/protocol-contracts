@@ -9,12 +9,15 @@ import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/access/AccessControl.sol";
 
+import "./IAgentFactory.sol";
 import "./IAgentToken.sol";
+import "./IAgentVeToken.sol";
 import "./IAgentDAO.sol";
 import "./IAgentNft.sol";
 import "../libs/IERC6551Registry.sol";
+import "../token/IMinter.sol";
 
-contract AgentFactory is Initializable, AccessControl {
+contract AgentFactoryV2 is IAgentFactory, Initializable, AccessControl {
     using SafeERC20 for IERC20;
 
     uint256 private _nextId;
@@ -27,16 +30,18 @@ contract AgentFactory is Initializable, AccessControl {
     address[] public allTokens;
     address[] public allDAOs;
 
-    address public assetToken; // Staked token
-    uint256 public maturityDuration; // Maturity duration in seconds
+    address public assetToken; // Base currency
+    uint256 public maturityDuration; // Staking duration in seconds for initial LP. eg: 10years
 
-    bytes32 public constant WITHDRAW_ROLE = keccak256("WITHDRAW_ROLE");
+    bytes32 public constant WITHDRAW_ROLE = keccak256("WITHDRAW_ROLE"); // Able to withdraw and execute applications
 
     event NewPersona(
         uint256 virtualId,
         address token,
+        address veToken,
         address dao,
-        address tba
+        address tba,
+        address lp
     );
     event NewApplication(uint256 id);
 
@@ -64,7 +69,7 @@ contract AgentFactory is Initializable, AccessControl {
 
     mapping(uint256 => Application) private _applications;
 
-    address public gov;
+    address public gov; // Deprecated in v2, execution of application does not require DAO decision anymore
 
     modifier onlyGov() {
         require(msg.sender == gov, "Only DAO can execute proposal");
@@ -86,6 +91,23 @@ contract AgentFactory is Initializable, AccessControl {
         locked = false;
     }
 
+    ///////////////////////////////////////////////////////////////
+    // V2 Storage
+    ///////////////////////////////////////////////////////////////
+    address[] public allTradingTokens;
+    address private _uniswapRouter;
+    address public veTokenImplementation;
+    address private _minter;
+    address private _tokenAdmin;
+    address public defaultDelegatee;
+
+    // Default agent token params
+    bytes private _tokenSupplyParams;
+    bytes private _tokenTaxParams;
+    uint16 private _tokenMultiplier;
+
+    ///////////////////////////////////////////////////////////////
+
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() {
         _disableInitializers();
@@ -93,27 +115,25 @@ contract AgentFactory is Initializable, AccessControl {
 
     function initialize(
         address tokenImplementation_,
+        address veTokenImplementation_,
         address daoImplementation_,
         address tbaRegistry_,
         address assetToken_,
         address nft_,
         uint256 applicationThreshold_,
-        uint256 maturityDuration_,
-        address gov_,
         address vault_
     ) public initializer {
         tokenImplementation = tokenImplementation_;
+        veTokenImplementation = veTokenImplementation_;
         daoImplementation = daoImplementation_;
         assetToken = assetToken_;
         tbaRegistry = tbaRegistry_;
         nft = nft_;
         applicationThreshold = applicationThreshold_;
-        maturityDuration = maturityDuration_;
         _nextId = 1;
         _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
-        _grantRole(WITHDRAW_ROLE, msg.sender);
-        gov = gov_;
         _vault = vault_;
+        _tokenMultiplier = 10000;
     }
 
     function getApplication(
@@ -122,7 +142,7 @@ contract AgentFactory is Initializable, AccessControl {
         return _applications[proposalId];
     }
 
-    function proposePersona(
+    function proposeAgent(
         string memory name,
         string memory symbol,
         string memory tokenURI,
@@ -131,8 +151,8 @@ contract AgentFactory is Initializable, AccessControl {
         address tbaImplementation,
         uint32 daoVotingPeriod,
         uint256 daoThreshold
-    ) external returns (uint256) {
-        address sender = msg.sender;
+    ) public returns (uint256) {
+        address sender = _msgSender();
         require(
             IERC20(assetToken).balanceOf(sender) >= applicationThreshold,
             "Insufficient asset token"
@@ -151,9 +171,7 @@ contract AgentFactory is Initializable, AccessControl {
         );
 
         uint256 id = _nextId++;
-        uint256 proposalEndBlock = block.number +
-            IGovernor(gov).votingPeriod() +
-            IGovernor(gov).votingDelay();
+        uint256 proposalEndBlock = block.number; // No longer required in v2
         Application memory application = Application(
             name,
             symbol,
@@ -194,50 +212,94 @@ contract AgentFactory is Initializable, AccessControl {
             "Application is not matured yet"
         );
 
+        uint256 withdrawableAmount = application.withdrawableAmount;
+
         application.withdrawableAmount = 0;
         application.status = ApplicationStatus.Withdrawn;
 
         IERC20(assetToken).safeTransfer(
             application.proposer,
-            application.withdrawableAmount
+            withdrawableAmount
         );
     }
 
-    function executeApplication(uint256 id) public onlyGov {
+    function executeApplication(uint256 id) public noReentrant {
+        // This will bootstrap an Agent with following components:
+        // C1: Agent Token
+        // C2: LP Pool + Initial liquidity
+        // C3: Agent veToken
+        // C4: Agent DAO
+        // C5: Agent NFT
+        // C6: TBA
+        // C7: Stake liquidity token to get veToken
         require(
             _applications[id].status == ApplicationStatus.Active,
             "Application is not active"
         );
 
+        require(_tokenAdmin != address(0), "Token admin not set");
+
         Application storage application = _applications[id];
+
+        require(
+            msg.sender == application.proposer ||
+                hasRole(WITHDRAW_ROLE, msg.sender),
+            "Not proposer"
+        );
+
+        uint256 initialAmount = application.withdrawableAmount;
+        uint256 initialSupply = (initialAmount * _tokenMultiplier) / 10000; // Initial LP supply
+
+        application.withdrawableAmount = 0;
+        application.status = ApplicationStatus.Executed;
+
+        // C1
         address token = _createNewAgentToken(
             application.name,
             application.symbol,
+            initialSupply
+        );
+        
+        // C2
+        address lp = IAgentToken(token).liquidityPools()[0];
+        IERC20(assetToken).transfer(token, initialAmount);
+        IAgentToken(token).addInitialLiquidity(address(this));
+
+        // C3
+        address veToken = _createNewAgentVeToken(
+            string.concat("Staked ", application.name),
+            string.concat("s", application.symbol),
+            lp,
             application.proposer
         );
+        
+
+        // C4
         string memory daoName = string.concat(application.name, " DAO");
         address payable dao = payable(
             _createNewDAO(
                 daoName,
-                IVotes(token),
+                IVotes(veToken),
                 application.daoVotingPeriod,
                 application.daoThreshold
             )
         );
-        uint256 virtualId = IAgentNft(nft).mint(
+
+        // C5
+        uint256 virtualId = IAgentNft(nft).nextVirtualId();
+        IAgentNft(nft).mint(
+            virtualId,
             _vault,
             application.tokenURI,
             dao,
             application.proposer,
-            application.cores
+            application.cores,
+            lp,
+            token
         );
+        application.virtualId = virtualId;
 
-        IERC20(assetToken).forceApprove(token, application.withdrawableAmount);
-        IAgentToken(token).stake(
-            application.withdrawableAmount,
-            application.proposer,
-            application.proposer
-        );
+        // C6
         uint256 chainId;
         assembly {
             chainId := chainid()
@@ -249,14 +311,17 @@ contract AgentFactory is Initializable, AccessControl {
             nft,
             virtualId
         );
-
         IAgentNft(nft).setTBA(virtualId, tbaAddress);
 
-        application.withdrawableAmount = 0;
-        application.status = ApplicationStatus.Executed;
-        application.virtualId = virtualId;
-
-        emit NewPersona(virtualId, token, dao, tbaAddress);
+        // C7
+        IERC20(lp).approve(veToken, type(uint256).max);
+        IAgentVeToken(veToken).stake(
+            IERC20(lp).balanceOf(address(this)),
+            application.proposer,
+            defaultDelegatee
+        );
+        
+        emit NewPersona(virtualId, token, veToken, dao, tbaAddress, lp);
     }
 
     function _createNewDAO(
@@ -281,23 +346,42 @@ contract AgentFactory is Initializable, AccessControl {
     function _createNewAgentToken(
         string memory name,
         string memory symbol,
-        address founder
+        uint256 initialSupply
     ) internal returns (address instance) {
         instance = Clones.clone(tokenImplementation);
         IAgentToken(instance).initialize(
+            [_tokenAdmin, _uniswapRouter, assetToken],
+            abi.encode(name, symbol),
+            _tokenSupplyParams,
+            _tokenTaxParams,
+            initialSupply
+        );
+
+        allTradingTokens.push(instance);
+        return instance;
+    }
+
+    function _createNewAgentVeToken(
+        string memory name,
+        string memory symbol,
+        address stakingAsset,
+        address founder
+    ) internal returns (address instance) {
+        instance = Clones.clone(veTokenImplementation);
+        IAgentVeToken(instance).initialize(
             name,
             symbol,
             founder,
-            assetToken,
-            nft,
-            block.timestamp + maturityDuration
+            stakingAsset,
+            block.timestamp + maturityDuration,
+            address(nft)
         );
 
         allTokens.push(instance);
         return instance;
     }
 
-    function totalPersonas() public view returns (uint256) {
+    function totalAgents() public view returns (uint256) {
         return allTokens.length;
     }
 
@@ -306,11 +390,6 @@ contract AgentFactory is Initializable, AccessControl {
     ) public onlyRole(DEFAULT_ADMIN_ROLE) {
         applicationThreshold = newThreshold;
         emit ApplicationThresholdUpdated(newThreshold);
-    }
-
-    function setGov(address newGov) public onlyRole(DEFAULT_ADMIN_ROLE) {
-        gov = newGov;
-        emit GovUpdated(newGov);
     }
 
     function setVault(address newVault) public onlyRole(DEFAULT_ADMIN_ROLE) {
@@ -323,5 +402,69 @@ contract AgentFactory is Initializable, AccessControl {
     ) public onlyRole(DEFAULT_ADMIN_ROLE) {
         tokenImplementation = token;
         daoImplementation = dao;
+    }
+
+    function setMinter(address newMinter) public onlyRole(DEFAULT_ADMIN_ROLE) {
+        _minter = newMinter;
+    }
+
+    function minter() public view override returns (address) {
+        return _minter;
+    }
+
+    function setMaturityDuration(
+        uint256 newDuration
+    ) public onlyRole(DEFAULT_ADMIN_ROLE) {
+        maturityDuration = newDuration;
+    }
+
+    function setUniswapRouter(
+        address router
+    ) public onlyRole(DEFAULT_ADMIN_ROLE) {
+        _uniswapRouter = router;
+    }
+
+    function setTokenAdmin(
+        address newTokenAdmin
+    ) public onlyRole(DEFAULT_ADMIN_ROLE) {
+        _tokenAdmin = newTokenAdmin;
+    }
+
+    function setTokenSupplyParams(
+        uint256 maxTokensPerWallet,
+        uint256 maxTokensPerTxn,
+        uint256 botProtectionDurationInSeconds
+    ) public onlyRole(DEFAULT_ADMIN_ROLE) {
+        _tokenSupplyParams = abi.encode(
+            maxTokensPerWallet,
+            maxTokensPerTxn,
+            botProtectionDurationInSeconds
+        );
+    }
+
+    function setTokenTaxParams(
+        uint256 projectBuyTaxBasisPoints,
+        uint256 projectSellTaxBasisPoints,
+        uint256 taxSwapThresholdBasisPoints,
+        address projectTaxRecipient
+    ) public onlyRole(DEFAULT_ADMIN_ROLE) {
+        _tokenTaxParams = abi.encode(
+            projectBuyTaxBasisPoints,
+            projectSellTaxBasisPoints,
+            taxSwapThresholdBasisPoints,
+            projectTaxRecipient
+        );
+    }
+
+    function setTokenMultiplier(
+        uint16 newMultiplier
+    ) public onlyRole(DEFAULT_ADMIN_ROLE) {
+        _tokenMultiplier = newMultiplier;
+    }
+
+    function setDefaultDelegatee(
+        address newDelegatee
+    ) public onlyRole(DEFAULT_ADMIN_ROLE) {
+        defaultDelegatee = newDelegatee;
     }
 }

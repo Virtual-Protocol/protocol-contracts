@@ -1,10 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
-import "@openzeppelin/contracts-upgradeable/governance/GovernorUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/governance/extensions/GovernorSettingsUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/governance/extensions/GovernorStorageUpgradeable.sol";
-import "@openzeppelin/contracts-upgradeable/governance/extensions/GovernorVotesUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/governance/extensions/GovernorVotesQuorumFractionUpgradeable.sol";
 import "@openzeppelin/contracts/utils/structs/Checkpoints.sol";
 import "./IAgentDAO.sol";
@@ -15,7 +13,6 @@ import "../contribution/IContributionNft.sol";
 
 contract AgentDAO is
     IAgentDAO,
-    GovernorUpgradeable,
     GovernorSettingsUpgradeable,
     GovernorCountingSimpleUpgradeable,
     GovernorStorageUpgradeable,
@@ -223,5 +220,19 @@ contract AgentDAO is
 
     function quorumDenominator() public pure override returns (uint256) {
         return 10000;
+    }
+
+    function state(
+        uint256 proposalId
+    ) public view override(GovernorUpgradeable) returns (ProposalState) {
+        // Allow early execution when reached 100% for votes
+        ProposalState currentState = super.state(proposalId);
+        if (currentState == ProposalState.Active) {
+            (, uint256 forVotes, ) = proposalVotes(proposalId);
+            if (forVotes == token().getPastTotalSupply(proposalSnapshot(proposalId))) {
+                return ProposalState.Succeeded;
+            }
+        }
+        return currentState;
     }
 }

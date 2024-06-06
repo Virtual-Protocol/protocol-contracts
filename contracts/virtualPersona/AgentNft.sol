@@ -49,6 +49,11 @@ contract AgentNft is
     address private _contributionNft;
     address private _serviceNft;
 
+    // V2 Storage
+    bytes32 public constant ADMIN_ROLE =
+        keccak256("ADMIN_ROLE");
+    mapping(uint256 => bool) private _blacklists;
+
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() {
         _disableInitializers();
@@ -77,14 +82,21 @@ contract AgentNft is
         _serviceNft = serviceNft_;
     }
 
+    function nextVirtualId() public view returns (uint256) {
+        return _nextVirtualId;
+    }
+
     function mint(
+        uint256 virtualId,
         address to,
         string memory newTokenURI,
         address payable theDAO,
         address founder,
-        uint8[] memory coreTypes
+        uint8[] memory coreTypes,
+        address pool,
+        address token
     ) external onlyRole(MINTER_ROLE) returns (uint256) {
-        uint256 virtualId = _nextVirtualId++;
+        _nextVirtualId++;
         _mint(to, virtualId);
         _setTokenURI(virtualId, newTokenURI);
         VirtualInfo storage info = virtualInfos[virtualId];
@@ -92,7 +104,9 @@ contract AgentNft is
         info.coreTypes = coreTypes;
         info.founder = founder;
         IERC5805 daoToken = GovernorVotes(theDAO).token();
-        info.token = address(daoToken);
+        info.veToken = address(daoToken);
+        info.token = token;
+        info.pool = pool;
         _stakingTokenToVirtualId[address(daoToken)] = virtualId;
         _addValidator(virtualId, founder);
         _initValidatorScore(virtualId, founder);
@@ -118,10 +132,10 @@ contract AgentNft is
         return _stakingTokenToVirtualId[stakingToken];
     }
 
-    function addValidator(
-        uint256 virtualId,
-        address validator
-    ) public onlyRole(VALIDATOR_ADMIN_ROLE) {
+    function addValidator(uint256 virtualId, address validator) public {
+        if (isValidator(virtualId, validator)) {
+            return;
+        }
         _addValidator(virtualId, validator);
         _initValidatorScore(virtualId, validator);
     }
@@ -247,5 +261,13 @@ contract AgentNft is
 
     function totalSupply() public view returns (uint256) {
         return _nextVirtualId - 1;
+    }
+
+    function isBlacklisted(uint256 virtualId) public view returns (bool) {
+        return _blacklists[virtualId];
+    }
+
+    function setBlacklist(uint256 virtualId, bool value) public onlyRole(ADMIN_ROLE) {
+        _blacklists[virtualId] = value;
     }
 }

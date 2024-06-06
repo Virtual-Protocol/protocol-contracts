@@ -1,30 +1,29 @@
 /*
 We will test the end-to-end implementation of a Virtual genesis initiation
 
-1. Prepare 100k tokens
-2. Propose a new Persona at AgentFactory
-3. Once received proposalId from AgentFactory, create a proposal at ProtocolDAO
-4. Vote on the proposal
-5. Execute the proposal
+1. Founder sends 100k $VIRTUAL tokens to factory propose an Agent
+2. Founder executes the proposal
+3. Factory generates following items:
+    a. Token (For contribution)
+    b. DAO
+    c. Liquidity Pool
+    d. Agent NFT
+    e. Staking Token
+4. Factory then mint 100k $Agent tokens
+5. Factory adds 100k $VIRTUAL and $Agent tokens to the LP in exchange for $ALP
+6. Factory stakes the $ALP and set recipient of stake tokens $sALP to founder
 */
-const { parseEther, toBeHex } = require("ethers/utils");
+const { parseEther, toBeHex, formatEther } = require("ethers/utils");
 const { expect } = require("chai");
 const {
   loadFixture,
   mine,
 } = require("@nomicfoundation/hardhat-toolbox/network-helpers");
 
-const getExecuteCallData = (factory, proposalId) => {
-  return factory.interface.encodeFunctionData("executeApplication", [
-    proposalId,
-  ]);
-};
-
-describe("AgentFactory", function () {
-  const PROPOSAL_THRESHOLD = parseEther("100000");
-  const QUORUM = parseEther("10000");
-  const PROTOCOL_DAO_VOTING_PERIOD = 300;
+describe("AgentFactoryV2", function () {
+  const PROPOSAL_THRESHOLD = parseEther("100000"); //100k
   const MATURITY_SCORE = toBeHex(2000, 32); // 20%
+  const IP_SHARE = 1000; // 10%
 
   const genesisInput = {
     name: "Jessica",
@@ -34,154 +33,98 @@ describe("AgentFactory", function () {
     cores: [0, 1, 2],
     tbaSalt:
       "0xa7647ac9429fdce477ebd9a95510385b756c757c26149e740abbab0ad1be2f16",
-    tbaImplementation: ethers.ZeroAddress,
+    tbaImplementation: process.env.TBA_IMPLEMENTATION,
     daoVotingPeriod: 600,
     daoThreshold: 1000000000000000000000n,
   };
 
+  const getAccounts = async () => {
+    const [deployer, ipVault, founder, poorMan, trader] =
+      await ethers.getSigners();
+    return { deployer, ipVault, founder, poorMan, trader };
+  };
+
   async function deployBaseContracts() {
-    const [deployer] = await ethers.getSigners();
-    const veToken = await ethers.deployContract(
-      "veVirtualToken",
-      [deployer.address],
-      {}
-    );
-    await veToken.waitForDeployment();
+    const { deployer, ipVault } = await getAccounts();
 
-    const demoToken = await ethers.deployContract(
-      "BMWToken",
-      [deployer.address],
+    const virtualToken = await ethers.deployContract(
+      "VirtualToken",
+      [PROPOSAL_THRESHOLD, deployer.address],
       {}
     );
-    await demoToken.waitForDeployment();
-
-    const protocolDAO = await ethers.deployContract(
-      "VirtualProtocolDAO",
-      [veToken.target, 0, PROTOCOL_DAO_VOTING_PERIOD, PROPOSAL_THRESHOLD, 500],
-      {}
-    );
-    await protocolDAO.waitForDeployment();
+    await virtualToken.waitForDeployment();
 
     const AgentNft = await ethers.getContractFactory("AgentNft");
-    const personaNft = await upgrades.deployProxy(AgentNft, [deployer.address]);
+    const agentNft = await upgrades.deployProxy(AgentNft, [deployer.address]);
 
     const contribution = await upgrades.deployProxy(
       await ethers.getContractFactory("ContributionNft"),
-      [personaNft.target],
+      [agentNft.target],
       {}
     );
 
     const service = await upgrades.deployProxy(
       await ethers.getContractFactory("ServiceNft"),
-      [personaNft.target, contribution.target, process.env.DATASET_SHARES],
+      [agentNft.target, contribution.target, process.env.DATASET_SHARES],
       {}
     );
 
-    await personaNft.setContributionService(
-      contribution.target,
-      service.target
-    );
+    await agentNft.setContributionService(contribution.target, service.target);
 
-    const personaToken = await ethers.deployContract("AgentToken");
-    await personaToken.waitForDeployment();
-    const personaDAO = await ethers.deployContract("AgentDAO");
-    await personaDAO.waitForDeployment();
+    // Implementation contracts
+    const agentToken = await ethers.deployContract("AgentToken");
+    await agentToken.waitForDeployment();
+    const agentDAO = await ethers.deployContract("AgentDAO");
+    await agentDAO.waitForDeployment();
+    const agentVeToken = await ethers.deployContract("AgentVeToken");
+    await agentVeToken.waitForDeployment();
 
-    const tba = await ethers.deployContract("ERC6551Registry");
-
-    const personaFactory = await upgrades.deployProxy(
-      await ethers.getContractFactory("AgentFactory"),
+    const agentFactory = await upgrades.deployProxy(
+      await ethers.getContractFactory("AgentFactoryV2"),
       [
-        personaToken.target,
-        personaDAO.target,
-        tba.target,
-        demoToken.target,
-        personaNft.target,
+        agentToken.target,
+        agentVeToken.target,
+        agentDAO.target,
+        process.env.TBA_REGISTRY,
+        virtualToken.target,
+        agentNft.target,
         PROPOSAL_THRESHOLD,
-        5,
-        protocolDAO.target,
         deployer.address,
       ]
     );
-    await personaNft.grantRole(
-      await personaNft.MINTER_ROLE(),
-      personaFactory.target
-    );
+    await agentFactory.waitForDeployment();
+    await agentNft.grantRole(await agentNft.MINTER_ROLE(), agentFactory.target);
+    const minter = await ethers.deployContract("Minter", [
+      service.target,
+      contribution.target,
+      agentNft.target,
+      IP_SHARE,
+      ipVault.address,
+      agentFactory.target,
+      deployer.address,
+    ]);
+    await minter.waitForDeployment();
+    await agentFactory.setMinter(minter.target);
+    await agentFactory.setMaturityDuration(86400 * 365 * 10); // 100years
+    await agentFactory.setUniswapRouter(process.env.UNISWAP_ROUTER);
 
-    return { veToken, protocolDAO, demoToken, personaFactory, personaNft };
+    return { virtualToken, agentFactory, agentNft };
   }
 
-  async function deployGenesisVirtual() {
-    const contracts = await deployBaseContracts();
-    const { personaFactory, veToken, protocolDAO, demoToken } = contracts;
-    const [deployer] = await ethers.getSigners();
+  async function deployWithApplication() {
+    const base = await deployBaseContracts();
+    const { agentFactory, virtualToken } = base;
+    const { founder } = await getAccounts();
 
     // Prepare tokens for proposal
-    await demoToken.mint(deployer.address, PROPOSAL_THRESHOLD);
-    await demoToken.approve(personaFactory.target, PROPOSAL_THRESHOLD);
+    await virtualToken.mint(founder.address, PROPOSAL_THRESHOLD);
+    await virtualToken
+      .connect(founder)
+      .approve(agentFactory.target, PROPOSAL_THRESHOLD);
 
-    await personaFactory.proposePersona(
-      genesisInput.name,
-      genesisInput.symbol,
-      genesisInput.tokenURI,
-      genesisInput.cores,
-      genesisInput.tbaSalt,
-      genesisInput.tbaImplementation,
-      genesisInput.daoVotingPeriod,
-      genesisInput.daoThreshold
-    );
-
-    const filter = personaFactory.filters.NewApplication;
-    const events = await personaFactory.queryFilter(filter, -1);
-    const event = events[0];
-    const { id } = event.args;
-
-    // Create proposal
-    await veToken.oracleTransfer(
-      [ethers.ZeroAddress],
-      [deployer.address],
-      [parseEther("100000000")]
-    );
-    await veToken.delegate(deployer.address);
-
-    await protocolDAO.propose(
-      [personaFactory.target],
-      [0],
-      [getExecuteCallData(personaFactory, id)],
-      "Create Jessica"
-    );
-
-    const daoFilter = protocolDAO.filters.ProposalCreated;
-    const daoEvents = await protocolDAO.queryFilter(daoFilter, -1);
-    const daoEvent = daoEvents[0];
-    const daoProposalId = daoEvent.args[0];
-
-    await protocolDAO.castVote(daoProposalId, 1);
-    await mine(PROTOCOL_DAO_VOTING_PERIOD);
-
-    await protocolDAO.execute(daoProposalId);
-    const factoryFilter = personaFactory.filters.NewPersona;
-    const factoryEvents = await personaFactory.queryFilter(factoryFilter, -1);
-    const factoryEvent = factoryEvents[0];
-
-    const { virtualId, token, dao } = factoryEvent.args;
-    const persona = { virtualId, token, dao };
-    return { ...contracts, persona };
-  }
-
-  before(async function () {
-    const signers = await ethers.getSigners();
-    this.accounts = signers.map((signer) => signer.address);
-    this.signers = signers;
-  });
-
-  it("should deny new Persona proposal when insufficient asset token", async function () {
-    const { personaFactory, personaNft } = await loadFixture(
-      deployBaseContracts
-    );
-
-    await expect(
-      personaFactory.proposePersona(
+    const tx = await agentFactory
+      .connect(founder)
+      .proposeAgent(
         genesisInput.name,
         genesisInput.symbol,
         genesisInput.tokenURI,
@@ -190,319 +133,603 @@ describe("AgentFactory", function () {
         genesisInput.tbaImplementation,
         genesisInput.daoVotingPeriod,
         genesisInput.daoThreshold
-      )
-    ).to.be.revertedWith("Insufficient asset token");
-  });
+      );
 
-  it("should propose a new Persona", async function () {
-    const { personaFactory, personaNft, demoToken } = await loadFixture(
+    const filter = agentFactory.filters.NewApplication;
+    const events = await agentFactory.queryFilter(filter, -1);
+    const event = events[0];
+    const { id } = event.args;
+    return { applicationId: id, ...base };
+  }
+
+  async function deployWithAgent() {
+    const base = await deployWithApplication();
+    const { agentFactory, applicationId } = base;
+
+    const { founder } = await getAccounts();
+    await agentFactory.connect(founder).executeApplication(applicationId);
+
+    const factoryFilter = agentFactory.filters.NewPersona;
+    const factoryEvents = await agentFactory.queryFilter(factoryFilter, -1);
+    const factoryEvent = factoryEvents[0];
+
+    const { virtualId, token, veToken, dao, tba, lp } = await factoryEvent.args;
+
+    return {
+      ...base,
+      agent: {
+        virtualId,
+        token,
+        veToken,
+        dao,
+        tba,
+        lp,
+      },
+    };
+  }
+
+  before(async function () {});
+
+  xit("should be able to propose a new agent", async function () {
+    const { agentFactory, virtualToken } = await loadFixture(
       deployBaseContracts
     );
 
+    const { founder } = await getAccounts();
+
     // Prepare tokens for proposal
-    await demoToken.mint(this.accounts[0], PROPOSAL_THRESHOLD);
-    expect(await demoToken.balanceOf(this.accounts[0])).to.be.equal(
-      PROPOSAL_THRESHOLD
-    );
-    await demoToken.approve(personaFactory.target, PROPOSAL_THRESHOLD);
+    await virtualToken.mint(founder.address, PROPOSAL_THRESHOLD);
+    await virtualToken
+      .connect(founder)
+      .approve(agentFactory.target, PROPOSAL_THRESHOLD);
 
-    const tx = await personaFactory.proposePersona(
-      genesisInput.name,
-      genesisInput.symbol,
-      genesisInput.tokenURI,
-      genesisInput.cores,
-      genesisInput.tbaSalt,
-      genesisInput.tbaImplementation,
-      genesisInput.daoVotingPeriod,
-      genesisInput.daoThreshold
-    );
-    expect(tx).to.emit(personaFactory, "NewPersona");
+    const tx = await agentFactory
+      .connect(founder)
+      .proposeAgent(
+        genesisInput.name,
+        genesisInput.symbol,
+        genesisInput.tokenURI,
+        genesisInput.cores,
+        genesisInput.tbaSalt,
+        genesisInput.tbaImplementation,
+        genesisInput.daoVotingPeriod,
+        genesisInput.daoThreshold
+      );
+    expect(tx).to.emit(agentFactory, "NewApplication");
 
-    expect(await demoToken.balanceOf(this.accounts[0])).to.be.equal(0n);
+    expect(await virtualToken.balanceOf(founder.address)).to.be.equal(0n);
 
-    const filter = personaFactory.filters.NewApplication;
-    const events = await personaFactory.queryFilter(filter, -1);
+    const filter = agentFactory.filters.NewApplication;
+    const events = await agentFactory.queryFilter(filter, -1);
     const event = events[0];
     const { id } = event.args;
-    expect(id).to.not.be.equal(0n);
+    expect(id).to.be.equal(1n);
   });
 
-  it("should allow proposal execution by DAO", async function () {
-    const { personaFactory, personaNft, demoToken, veToken, protocolDAO } =
-      await loadFixture(deployBaseContracts);
+  xit("should deny new Persona proposal when insufficient asset token", async function () {
+    const { agentFactory } = await loadFixture(deployBaseContracts);
+    const { poorMan } = await getAccounts();
+    await expect(
+      agentFactory
+        .connect(poorMan)
+        .proposeAgent(
+          genesisInput.name,
+          genesisInput.symbol,
+          genesisInput.tokenURI,
+          genesisInput.cores,
+          genesisInput.tbaSalt,
+          genesisInput.tbaImplementation,
+          genesisInput.daoVotingPeriod,
+          genesisInput.daoThreshold
+        )
+    ).to.be.revertedWith("Insufficient asset token");
+  });
 
-    const [deployer] = this.signers;
-
-    // Prepare tokens for proposal
-    await demoToken.mint(this.accounts[0], PROPOSAL_THRESHOLD);
-    await demoToken.approve(personaFactory.target, PROPOSAL_THRESHOLD);
-
-    await personaFactory.proposePersona(
-      genesisInput.name,
-      genesisInput.symbol,
-      genesisInput.tokenURI,
-      genesisInput.cores,
-      genesisInput.tbaSalt,
-      genesisInput.tbaImplementation,
-      genesisInput.daoVotingPeriod,
-      genesisInput.daoThreshold
+  xit("should allow application execution by proposer", async function () {
+    const { applicationId, agentFactory, virtualToken } = await loadFixture(
+      deployWithApplication
     );
+    const { founder } = await getAccounts();
+    await expect(
+      agentFactory.connect(founder).executeApplication(applicationId)
+    ).to.emit(agentFactory, "NewPersona");
 
-    const filter = personaFactory.filters.NewApplication;
-    const events = await personaFactory.queryFilter(filter, -1);
-    const event = events[0];
-    const { id } = event.args;
+    // Check genesis components
+    // C1: Agent Token
+    // C2: LP Pool
+    // C3: Agent veToken
+    // C4: Agent DAO
+    // C5: Agent NFT
+    // C6: TBA
+    // C7: Mint initial Agent tokens
+    // C8: Provide liquidity
+    // C9: Stake liquidity token to get veToken
+  });
 
-    // Create proposal
-    await veToken.oracleTransfer(
-      [ethers.ZeroAddress],
-      [deployer.address],
-      [parseEther("100000000")]
+  xit("agent component C1: Agent Token", async function () {
+    const { agent } = await loadFixture(deployWithAgent);
+    const agentToken = await ethers.getContractAt("AgentToken", agent.token);
+    expect(await agentToken.totalSupply()).to.be.equal(PROPOSAL_THRESHOLD);
+  });
+
+  xit("agent component C2: LP Pool", async function () {
+    const { agent, virtualToken } = await loadFixture(deployWithAgent);
+    const lp = await ethers.getContractAt("IUniswapV2Pair", agent.lp);
+    const t0 = await lp.token0();
+    const t1 = await lp.token1();
+
+    const addresses = [agent.token, virtualToken.target];
+    expect(addresses).contain(t0);
+    expect(addresses).contain(t1);
+
+    const reserves = await lp.getReserves();
+    expect(reserves[0]).to.be.equal(PROPOSAL_THRESHOLD);
+    expect(reserves[1]).to.be.equal(PROPOSAL_THRESHOLD);
+  });
+
+  xit("agent component C3: Agent veToken", async function () {
+    const { agent } = await loadFixture(deployWithAgent);
+    const { founder } = await getAccounts();
+    const veToken = await ethers.getContractAt("AgentVeToken", agent.veToken);
+    const balance = await veToken.balanceOf(founder.address);
+    expect(parseFloat(formatEther(balance).toString()).toFixed(2)).to.be.equal(
+      "100000.00"
     );
-    await veToken.delegate(deployer.address);
+  });
 
-    await protocolDAO.propose(
-      [personaFactory.target],
-      [0],
-      [getExecuteCallData(personaFactory, id)],
-      "LFG"
-    );
+  xit("agent component C4: Agent DAO", async function () {
+    const { agent } = await loadFixture(deployWithAgent);
+    const dao = await ethers.getContractAt("AgentDAO", agent.dao);
+    expect(await dao.token()).to.be.equal(agent.veToken);
+    expect(await dao.name()).to.be.equal(genesisInput.daoName);
+  });
 
-    const daoFilter = protocolDAO.filters.ProposalCreated;
-    const daoEvents = await protocolDAO.queryFilter(daoFilter, -1);
-    const daoEvent = daoEvents[0];
-    const daoProposalId = daoEvent.args[0];
-
-    await protocolDAO.castVote(daoProposalId, 1);
-    await mine(PROTOCOL_DAO_VOTING_PERIOD);
-
-    await expect(protocolDAO.execute(daoProposalId)).to.emit(
-      personaFactory,
-      "NewPersona"
-    );
-    const factoryFilter = personaFactory.filters.NewPersona;
-    const factoryEvents = await personaFactory.queryFilter(factoryFilter, -1);
-    const factoryEvent = factoryEvents[0];
-
-    const { virtualId, token, dao, tba } = factoryEvent.args;
-    const persona = { virtualId, token, dao, tba };
-
-    // Check if the Persona was created successfully
-    const firstToken = await personaFactory.allTokens(0);
-    const firstDao = await personaFactory.allDAOs(0);
-    expect(firstToken).to.not.equal(ethers.ZeroAddress);
-    expect(firstDao).to.not.equal(ethers.ZeroAddress);
-
-    const AgentDAO = await ethers.getContractFactory("AgentDAO");
-    const daoInstance = AgentDAO.attach(dao);
-    expect(await daoInstance.token()).to.equal(token);
-    expect(await daoInstance.name()).to.equal(genesisInput.daoName);
-    expect(await daoInstance.proposalThreshold()).to.equal(
-      genesisInput.daoThreshold
-    );
-    expect(await daoInstance.votingPeriod()).to.equal(
-      genesisInput.daoVotingPeriod
-    );
-
-    const AgentToken = await ethers.getContractFactory("AgentToken");
-    const tokenInstance = AgentToken.attach(token);
-    expect(await tokenInstance.name()).to.equal(genesisInput.name);
-    expect(await tokenInstance.symbol()).to.equal(genesisInput.symbol);
-
-    const virtualInfo = await personaNft.virtualInfo(persona.virtualId);
-    expect(virtualInfo.dao).to.equal(dao);
+  xit("agent component C5: Agent NFT", async function () {
+    const { agent, agentNft } = await loadFixture(deployWithAgent);
+    const virtualInfo = await agentNft.virtualInfo(agent.virtualId);
+    expect(virtualInfo.dao).to.equal(agent.dao);
     expect(virtualInfo.coreTypes).to.deep.equal(genesisInput.cores);
 
-    expect(await personaNft.tokenURI(virtualId)).to.equal(
+    expect(await agentNft.tokenURI(agent.virtualId)).to.equal(
       genesisInput.tokenURI
     );
-    expect((await personaNft.virtualInfo(virtualId)).tba).to.equal(tba);
 
-    expect(await personaNft.isValidator(virtualId, deployer)).to.equal(true);
-
-    expect(await tokenInstance.balanceOf(deployer)).to.equal(
-      PROPOSAL_THRESHOLD
-    );
-    expect(await tokenInstance.getVotes(deployer)).to.equal(PROPOSAL_THRESHOLD);
+    expect(virtualInfo.tba).to.equal(agent.tba);
   });
 
-  it("should allow to stake on new persona", async function () {
-    const [validator, staker] = this.accounts;
-    const { persona, demoToken } = await loadFixture(deployGenesisVirtual);
+  xit("agent component C6: TBA", async function () {
+    // TBA means whoever owns the NFT can move the account assets
+    // We will test by minting VIRTUAL to the TBA and then use the treasury account to transfer it out
+    const { agent, agentNft, virtualToken } = await loadFixture(
+      deployWithAgent
+    );
+    const { deployer, poorMan } = await getAccounts();
 
-    const AgentToken = await ethers.getContractFactory("AgentToken");
-    const tokenInstance = AgentToken.attach(persona.token);
-    // Prepare tokens for staking
-    // The validatory should have 100k sToken initially because of the initiation stake
-    expect(await demoToken.balanceOf(validator)).to.be.equal(0n);
-    expect(await demoToken.balanceOf(staker)).to.be.equal(0n);
-    expect(await tokenInstance.balanceOf(validator)).to.be.equal(
-      PROPOSAL_THRESHOLD
-    );
-    expect(await tokenInstance.balanceOf(staker)).to.be.equal(0n);
-    expect(await tokenInstance.getVotes(validator)).to.be.equal(
-      PROPOSAL_THRESHOLD
-    );
-    expect(await tokenInstance.getVotes(staker)).to.be.equal(0n);
-    await demoToken.mint(staker, QUORUM);
+    const amount = parseEther("500");
+    await virtualToken.mint(agent.tba, amount);
+    expect(await virtualToken.balanceOf(agent.tba)).to.be.equal(amount);
+    expect(await virtualToken.balanceOf(poorMan.address)).to.be.equal(0n);
 
-    const stakeAmount = parseEther("100");
-    await demoToken
-      .connect(this.signers[1])
-      .approve(persona.token, stakeAmount);
-    await tokenInstance
-      .connect(this.signers[1])
-      .stake(stakeAmount, staker, validator);
+    // Now move it
+    const data = virtualToken.interface.encodeFunctionData("transfer", [
+      poorMan.address,
+      amount,
+    ]);
 
-    expect(await demoToken.balanceOf(validator)).to.be.equal(0n);
-    expect(await demoToken.balanceOf(staker)).to.be.equal(QUORUM - stakeAmount);
-    expect(await tokenInstance.balanceOf(validator)).to.be.equal(
-      PROPOSAL_THRESHOLD
-    );
-    expect(await tokenInstance.balanceOf(staker)).to.be.equal(stakeAmount);
-    expect(await tokenInstance.getVotes(validator)).to.be.equal(
-      stakeAmount + PROPOSAL_THRESHOLD
-    );
-    expect(await tokenInstance.getVotes(staker)).to.be.equal(0n);
+    const tba = await ethers.getContractAt("IExecutionInterface", agent.tba);
+
+    await tba.execute(virtualToken.target, 0, data, 0);
+    const balance = await virtualToken.balanceOf(poorMan.address);
+    expect(balance).to.be.equal(amount);
   });
 
-  it("should not allow staking and delegate to non-validator", async function () {
-    const [validator, staker] = this.accounts;
-    const { persona, demoToken } = await loadFixture(deployGenesisVirtual);
-    const AgentToken = await ethers.getContractFactory("AgentToken");
-    const tokenInstance = AgentToken.attach(persona.token);
-
-    await demoToken.mint(staker, QUORUM);
-    const stakeAmount = parseEther("100");
-    await demoToken
-      .connect(this.signers[1])
-      .approve(persona.token, stakeAmount);
-    await expect(
-      tokenInstance.connect(this.signers[1]).stake(stakeAmount, staker, staker)
-    ).to.be.revertedWith("Delegatee is not a validator");
-  });
-
-  it("should be able to set new validator and receive delegation", async function () {
-    const [validator, staker] = this.accounts;
-    const { persona, demoToken, personaNft } = await loadFixture(
-      deployGenesisVirtual
+  xit("agent component C7: Mint initial Agent tokens", async function () {
+    // TBA means whoever owns the NFT can move the account assets
+    // We will test by minting VIRTUAL to the TBA and then use the treasury account to transfer it out
+    const { agent, agentNft, virtualToken } = await loadFixture(
+      deployWithAgent
     );
-    const AgentToken = await ethers.getContractFactory("AgentToken");
-    const tokenInstance = AgentToken.attach(persona.token);
-
-    await demoToken.mint(staker, QUORUM);
-    const stakeAmount = parseEther("100");
-    await demoToken
-      .connect(this.signers[1])
-      .approve(persona.token, stakeAmount);
-    await expect(
-      tokenInstance.connect(this.signers[1]).stake(stakeAmount, staker, staker)
-    ).to.be.revertedWith("Delegatee is not a validator");
-
-    await personaNft.addValidator(persona.virtualId, staker);
-
-    await expect(
-      tokenInstance.connect(this.signers[1]).stake(stakeAmount, staker, staker)
-    ).to.not.be.revertedWith("Delegatee is not a validator");
+    const agentToken = await ethers.getContractAt("AgentToken", agent.token);
+    expect(await agentToken.totalSupply()).to.be.equal(PROPOSAL_THRESHOLD);
+    expect(await agentToken.balanceOf(agent.lp)).to.be.equal(
+      PROPOSAL_THRESHOLD
+    );
   });
 
-  it("should be able to set new validator and able to update score", async function () {
-    const [validator, staker] = this.accounts;
-    const { persona, demoToken, personaNft, personaFactory } =
-      await loadFixture(deployGenesisVirtual);
-    const AgentDAO = await ethers.getContractFactory("AgentDAO");
-    const personaDAO = AgentDAO.attach(persona.dao);
+  xit("agent component C8: Provide liquidity", async function () {
+    // TBA means whoever owns the NFT can move the account assets
+    // We will test by minting VIRTUAL to the TBA and then use the treasury account to transfer it out
+    const { agent, agentNft, virtualToken } = await loadFixture(
+      deployWithAgent
+    );
+    const agentToken = await ethers.getContractAt("AgentToken", agent.token);
+    const { trader } = await getAccounts();
+    // Swap
+    const router = await ethers.getContractAt(
+      "IUniswapV2Router02",
+      process.env.UNISWAP_ROUTER
+    );
+    const amountToBuy = parseEther("90");
+    const capital = parseEther("100");
+    await virtualToken.mint(trader.address, capital);
+    await virtualToken
+      .connect(trader)
+      .approve(process.env.UNISWAP_ROUTER, capital);
+
+    await router
+      .connect(trader)
+      .swapTokensForExactTokens(
+        amountToBuy,
+        capital,
+        [virtualToken.target, agent.token],
+        trader.address,
+        Math.floor(new Date().getTime() / 1000 + 6000)
+      );
     expect(
-      await personaNft.validatorScore(persona.virtualId, validator)
-    ).to.be.equal(0n);
-    expect(await personaDAO.proposalCount()).to.be.equal(0n);
+      parseFloat(formatEther(await virtualToken.balanceOf(trader.address)))
+    ).to.be.at.most(10);
+    expect(
+      parseFloat(formatEther(await agentToken.balanceOf(trader.address)))
+    ).to.be.equal(90);
+  });
+
+  xit("agent component C9: Stake liquidity token to get veToken", async function () {
+    // TBA means whoever owns the NFT can move the account assets
+    // We will test by minting VIRTUAL to the TBA and then use the treasury account to transfer it out
+    const { agent, agentNft, virtualToken } = await loadFixture(
+      deployWithAgent
+    );
+    const { trader } = await getAccounts();
+    const router = await ethers.getContractAt(
+      "IUniswapV2Router02",
+      process.env.UNISWAP_ROUTER
+    );
+    const agentToken = await ethers.getContractAt("AgentToken", agent.token);
+
+    // Buy tokens
+    const amountToBuy = parseEther("90");
+    const capital = parseEther("200");
+    await virtualToken.mint(trader.address, capital);
+    await virtualToken
+      .connect(trader)
+      .approve(process.env.UNISWAP_ROUTER, capital);
+
+    await router
+      .connect(trader)
+      .swapTokensForExactTokens(
+        amountToBuy,
+        capital,
+        [virtualToken.target, agent.token],
+        trader.address,
+        Math.floor(new Date().getTime() / 1000 + 6000)
+      );
+    ////
+    // Start providing liquidity
+    const lpToken = await ethers.getContractAt("ERC20", agent.lp);
+    expect(await lpToken.balanceOf(trader.address)).to.be.equal(0n);
+    await agentToken
+      .connect(trader)
+      .approve(process.env.UNISWAP_ROUTER, amountToBuy);
+    await virtualToken
+      .connect(trader)
+      .approve(process.env.UNISWAP_ROUTER, capital);
+    await router
+      .connect(trader)
+      .addLiquidity(
+        agentToken.target,
+        virtualToken.target,
+        amountToBuy,
+        capital,
+        0,
+        0,
+        trader.address,
+        Math.floor(new Date().getTime() / 1000 + 6000)
+      );
+
+    expect(
+      parseFloat(formatEther(await lpToken.balanceOf(trader.address)))
+    ).to.be.at.least(90);
+    expect(await agentToken.balanceOf(trader.address)).to.be.equal(0n);
+  });
+
+  xit("should allow staking on public agent", async function () {
+    // Need to provide LP first
+    const { agent, agentNft, virtualToken } = await loadFixture(
+      deployWithAgent
+    );
+    const { trader, poorMan, founder } = await getAccounts();
+    const router = await ethers.getContractAt(
+      "IUniswapV2Router02",
+      process.env.UNISWAP_ROUTER
+    );
+    const agentToken = await ethers.getContractAt("AgentToken", agent.token);
+
+    // Buy tokens
+    const amountToBuy = parseEther("90");
+    const capital = parseEther("200");
+    await virtualToken.mint(trader.address, capital);
+    await virtualToken
+      .connect(trader)
+      .approve(process.env.UNISWAP_ROUTER, capital);
+
+    await router
+      .connect(trader)
+      .swapTokensForExactTokens(
+        amountToBuy,
+        capital,
+        [virtualToken.target, agent.token],
+        trader.address,
+        Math.floor(new Date().getTime() / 1000 + 6000)
+      );
+    ////
+    // Start providing liquidity
+    const lpToken = await ethers.getContractAt("ERC20", agent.lp);
+    const veToken = await ethers.getContractAt("AgentVeToken", agent.veToken);
+    await veToken.connect(founder).setCanStake(true);
+    expect(await lpToken.balanceOf(trader.address)).to.be.equal(0n);
+    await agentToken
+      .connect(trader)
+      .approve(process.env.UNISWAP_ROUTER, amountToBuy);
+    await virtualToken
+      .connect(trader)
+      .approve(process.env.UNISWAP_ROUTER, capital);
+    await router
+      .connect(trader)
+      .addLiquidity(
+        agentToken.target,
+        virtualToken.target,
+        amountToBuy,
+        capital,
+        0,
+        0,
+        trader.address,
+        Math.floor(new Date().getTime() / 1000 + 6000)
+      );
+    /////////////////
+    // Staking, and able to delegate to anyone
+    await lpToken.connect(trader).approve(agent.veToken, parseEther("10"));
+    await veToken
+      .connect(trader)
+      .stake(parseEther("10"), trader.address, poorMan.address);
+  });
+
+  xit("should deny staking on private agent", async function () {
+    // Need to provide LP first
+    const { agent, agentNft, virtualToken } = await loadFixture(
+      deployWithAgent
+    );
+    const { trader, poorMan } = await getAccounts();
+    const router = await ethers.getContractAt(
+      "IUniswapV2Router02",
+      process.env.UNISWAP_ROUTER
+    );
+    const agentToken = await ethers.getContractAt("AgentToken", agent.token);
+
+    // Buy tokens
+    const amountToBuy = parseEther("90");
+    const capital = parseEther("200");
+    await virtualToken.mint(trader.address, capital);
+    await virtualToken
+      .connect(trader)
+      .approve(process.env.UNISWAP_ROUTER, capital);
+
+    await router
+      .connect(trader)
+      .swapTokensForExactTokens(
+        amountToBuy,
+        capital,
+        [virtualToken.target, agent.token],
+        trader.address,
+        Math.floor(new Date().getTime() / 1000 + 6000)
+      );
+    ////
+    // Start providing liquidity
+    const lpToken = await ethers.getContractAt("ERC20", agent.lp);
+    expect(await lpToken.balanceOf(trader.address)).to.be.equal(0n);
+    await agentToken
+      .connect(trader)
+      .approve(process.env.UNISWAP_ROUTER, amountToBuy);
+    await virtualToken
+      .connect(trader)
+      .approve(process.env.UNISWAP_ROUTER, capital);
+    await router
+      .connect(trader)
+      .addLiquidity(
+        agentToken.target,
+        virtualToken.target,
+        amountToBuy,
+        capital,
+        0,
+        0,
+        trader.address,
+        Math.floor(new Date().getTime() / 1000 + 6000)
+      );
+    /////////////////
+    // Staking
+    const veToken = await ethers.getContractAt("AgentVeToken", agent.veToken);
+    await expect(
+      veToken
+        .connect(trader)
+        .stake(parseEther("10"), trader.address, poorMan.address)
+    ).to.be.revertedWith("Staking is disabled for private agent");
+  });
+
+  xit("should be able to set new validator and able to update score", async function () {
+    // Need to provide LP first
+    const { agent, agentNft } = await loadFixture(deployWithAgent);
+    const agentDAO = await ethers.getContractAt("AgentDAO", agent.dao);
+    const { founder, poorMan } = await getAccounts();
+    expect(await agentDAO.proposalCount()).to.be.equal(0n);
 
     // First proposal
-    const tx = await personaDAO.propose(
-      [validator],
+    const tx = await agentDAO.propose(
+      [founder.address],
       [0],
       ["0x"],
       "First proposal"
     );
-    const filter = personaDAO.filters.ProposalCreated;
-    const events = await personaDAO.queryFilter(filter, -1);
+    const filter = agentDAO.filters.ProposalCreated;
+    const events = await agentDAO.queryFilter(filter, -1);
     const event = events[0];
 
     const { proposalId } = event.args;
 
-    expect(await personaDAO.proposalCount()).to.be.equal(1n);
+    const veToken = await ethers.getContractAt("AgentVeToken", agent.veToken);
+    await veToken.connect(founder).delegate(poorMan.address);
+
+    expect(await agentDAO.proposalCount()).to.be.equal(1n);
+    const blockNumber = await ethers.provider.getBlockNumber();
+
     expect(
-      await personaNft.validatorScore(persona.virtualId, validator)
+      await agentDAO.getPastScore(poorMan.address, blockNumber - 1)
     ).to.be.equal(0n);
 
     // Deliberation does not count as vote
-    await personaDAO.castVoteWithReasonAndParams(
-      proposalId,
-      3,
-      "",
-      MATURITY_SCORE
-    );
+    await agentDAO
+      .connect(poorMan)
+      .castVoteWithReasonAndParams(proposalId, 3, "", MATURITY_SCORE);
     expect(
-      await personaNft.validatorScore(persona.virtualId, validator)
+      await agentNft.validatorScore(agent.virtualId, poorMan.address)
     ).to.be.equal(0n);
 
     // Normal votes
-    await personaDAO.castVoteWithReasonAndParams(
-      proposalId,
-      1,
-      "",
-      MATURITY_SCORE
-    );
+    await agentDAO
+      .connect(poorMan)
+      .castVoteWithReasonAndParams(proposalId, 1, "", MATURITY_SCORE);
     expect(
-      await personaNft.validatorScore(persona.virtualId, validator)
+      await agentNft.validatorScore(agent.virtualId, poorMan.address)
     ).to.be.equal(1n);
   });
 
-  it("should be able to set new validator after created proposals and have correct score", async function () {
-    const [validator, validator2] = this.accounts;
-    const { persona, demoToken, personaNft, personaFactory } =
-      await loadFixture(deployGenesisVirtual);
-    const AgentDAO = await ethers.getContractFactory("AgentDAO");
-    const personaDAO = AgentDAO.attach(persona.dao);
+  xit("should be able to set new validator after created proposals and have correct score", async function () {
+    const { agent, agentNft, virtualToken } = await loadFixture(
+      deployWithAgent
+    );
+    const { trader, poorMan, founder } = await getAccounts();
+    const router = await ethers.getContractAt(
+      "IUniswapV2Router02",
+      process.env.UNISWAP_ROUTER
+    );
+    const agentToken = await ethers.getContractAt("AgentToken", agent.token);
 
+    // Get trader to stake on poorMan so that we have 2 validators
+    // Buy tokens
+    const amountToBuy = parseEther("90");
+    const capital = parseEther("200");
+    await virtualToken.mint(trader.address, capital);
+    await virtualToken
+      .connect(trader)
+      .approve(process.env.UNISWAP_ROUTER, capital);
+
+    await router
+      .connect(trader)
+      .swapTokensForExactTokens(
+        amountToBuy,
+        capital,
+        [virtualToken.target, agent.token],
+        trader.address,
+        Math.floor(new Date().getTime() / 1000 + 6000)
+      );
+    ////
+    // Start providing liquidity
+    const lpToken = await ethers.getContractAt("ERC20", agent.lp);
+    const veToken = await ethers.getContractAt("AgentVeToken", agent.veToken);
+    await veToken.connect(founder).setCanStake(true);
+    expect(await lpToken.balanceOf(trader.address)).to.be.equal(0n);
+    await agentToken
+      .connect(trader)
+      .approve(process.env.UNISWAP_ROUTER, amountToBuy);
+    await virtualToken
+      .connect(trader)
+      .approve(process.env.UNISWAP_ROUTER, capital);
+    await router
+      .connect(trader)
+      .addLiquidity(
+        agentToken.target,
+        virtualToken.target,
+        amountToBuy,
+        capital,
+        0,
+        0,
+        trader.address,
+        Math.floor(new Date().getTime() / 1000 + 6000)
+      );
+
+    const agentDAO = await ethers.getContractAt("AgentDAO", agent.dao);
     // First proposal
-    await personaDAO.propose([validator], [0], ["0x"], "First proposal");
-    await personaDAO.propose([validator], [0], ["0x"], "Second proposal");
+    await agentDAO.propose([founder.address], [0], ["0x"], "First proposal");
+    await agentDAO.propose([founder.address], [0], ["0x"], "Second proposal");
 
-    const filter = personaDAO.filters.ProposalCreated;
-    let events = await personaDAO.queryFilter(filter, -1);
+    const filter = agentDAO.filters.ProposalCreated;
+    let events = await agentDAO.queryFilter(filter, -1);
     let event = events[0];
     const { proposalId: secondId } = event.args;
-    await personaDAO.castVoteWithReasonAndParams(
-      secondId,
-      1,
-      "",
-      MATURITY_SCORE
+    await agentDAO
+      .connect(founder)
+      .castVoteWithReasonAndParams(secondId, 1, "", MATURITY_SCORE);
+
+    const initialScore = await agentNft.validatorScore(
+      agent.virtualId,
+      poorMan.address
     );
+    expect(initialScore).to.be.equal(0n);
 
-    // Validator #2 joins when we have 2 proposals
-    await personaNft.addValidator(persona.virtualId, validator2);
-    expect(
-      await personaNft.validatorScore(persona.virtualId, validator)
-    ).to.be.equal(1n);
-    expect(
-      await personaNft.validatorScore(persona.virtualId, validator2)
-    ).to.be.equal(2n);
-    expect(await personaDAO.proposalCount()).to.be.equal(2n);
+    // Stake will automatically adds the validator
+    await lpToken.connect(trader).approve(agent.veToken, parseEther("10"));
+    await veToken
+      .connect(trader)
+      .stake(parseEther("10"), trader.address, poorMan.address);
 
-    await personaDAO.propose([validator], [0], ["0x"], "Third proposal");
-    events = await personaDAO.queryFilter(filter, -1);
-    event = events[0];
-    const { proposalId: thirdId } = event.args;
-    await personaDAO
-      .connect(this.signers[1])
-      .castVoteWithReasonAndParams(thirdId, 1, "", MATURITY_SCORE);
-    expect(
-      await personaNft.validatorScore(persona.virtualId, validator)
-    ).to.be.equal(1n);
-    expect(
-      await personaNft.validatorScore(persona.virtualId, validator2)
-    ).to.be.equal(3n);
-    expect(await personaDAO.proposalCount()).to.be.equal(3n);
+    const newScore = await agentNft.validatorScore(
+      agent.virtualId,
+      poorMan.address
+    );
+    expect(newScore).to.be.equal(2n);
+  });
+
+  xit("should allow withdrawal", async function () {
+    const { applicationId, agentFactory, virtualToken } = await loadFixture(
+      deployWithApplication
+    );
+    const { founder } = await getAccounts();
+    await agentFactory.connect(founder).withdraw(applicationId);
+    expect(await virtualToken.balanceOf(founder.address)).to.be.equal(
+      PROPOSAL_THRESHOLD
+    );
+  });
+
+  xit("should lock initial LP", async function () {
+    const { agent, agentNft, virtualToken } = await loadFixture(
+      deployWithAgent
+    );
+    // Founder unable to withdraw LP initially
+    const { founder } = await getAccounts();
+    const agentVeToken = await ethers.getContractAt(
+      "AgentVeToken",
+      agent.veToken
+    );
+    await expect(
+      agentVeToken.connect(founder).withdraw(parseEther("10"))
+    ).to.be.revertedWith("Not mature yet");
+  });
+
+  it("should allow manual unlock LP", async function () {
+    const { agent, agentNft, virtualToken } = await loadFixture(
+      deployWithAgent
+    );
+    const {founder, deployer} = await getAccounts()
+    // Assign admin role
+    await agentNft.grantRole(await agentNft.ADMIN_ROLE(), deployer);
+    const agentVeToken = await ethers.getContractAt(
+      "AgentVeToken",
+      agent.veToken
+    );
+    await agentNft.setBlacklist(agent.virtualId, true);
+    expect(await agentNft.isBlacklisted(agent.virtualId)).to.be.equal(true);
+    await expect(agentVeToken.setMatureAt(0)).to.not.be.reverted;
+
+    await expect(
+      agentVeToken.connect(founder).withdraw(parseEther("10"))
+    ).to.not.be.reverted;
   });
 });

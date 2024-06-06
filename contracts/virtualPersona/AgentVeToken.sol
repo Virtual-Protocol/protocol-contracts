@@ -19,6 +19,7 @@ contract AgentVeToken is IAgentVeToken, ERC20Upgradeable, ERC20Votes {
     address public agentNft;
     uint256 public matureAt; // The timestamp when the founder can withdraw the tokens
     bool public canStake; // To control private/public agent mode
+    uint256 private initialLock; // Initial locked amount
 
     constructor() {
         _disableInitializers();
@@ -62,6 +63,10 @@ contract AgentVeToken is IAgentVeToken, ERC20Upgradeable, ERC20Votes {
         address sender = _msgSender();
         require(amount > 0, "Cannot stake 0");
 
+        if (totalSupply() == 0) {
+            initialLock = amount;
+        }
+
         IAgentNft registry = IAgentNft(agentNft);
         uint256 virtualId = registry.stakingTokenToVirtualId(address(this));
         registry.addValidator(virtualId, delegatee);
@@ -92,7 +97,8 @@ contract AgentVeToken is IAgentVeToken, ERC20Upgradeable, ERC20Votes {
     function withdraw(uint256 amount) public noReentrant {
         address sender = _msgSender();
         require(balanceOf(sender) >= amount, "Insufficient balance");
-        if (sender == founder) {
+
+        if ((sender == founder) && ((balanceOf(sender) - amount) < initialLock)) {
             require(block.timestamp >= matureAt, "Not mature yet");
         }
 

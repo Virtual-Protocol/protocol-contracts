@@ -17,6 +17,7 @@ const { parseEther, formatEther } = require("ethers");
 const getExecuteCallData = (factory, proposalId) => {
   return factory.interface.encodeFunctionData("executeApplication", [
     proposalId,
+    false
   ]);
 };
 
@@ -193,7 +194,7 @@ describe("RewardsV2", function () {
     const { agentFactory, applicationId } = base;
 
     const { founder } = await getAccounts();
-    await agentFactory.connect(founder).executeApplication(applicationId);
+    await agentFactory.connect(founder).executeApplication(applicationId, false);
 
     const factoryFilter = agentFactory.filters.NewPersona;
     const factoryEvents = await agentFactory.queryFilter(factoryFilter, -1);

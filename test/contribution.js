@@ -19,6 +19,7 @@ const {
 const getExecuteCallData = (factory, proposalId) => {
   return factory.interface.encodeFunctionData("executeApplication", [
     proposalId,
+    false
   ]);
 };
 

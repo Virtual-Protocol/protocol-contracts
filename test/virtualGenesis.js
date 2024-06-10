@@ -39,13 +39,13 @@ describe("AgentFactoryV2", function () {
   };
 
   const getAccounts = async () => {
-    const [deployer, ipVault, founder, poorMan, trader] =
+    const [deployer, ipVault, founder, poorMan, trader, treasury] =
       await ethers.getSigners();
-    return { deployer, ipVault, founder, poorMan, trader };
+    return { deployer, ipVault, founder, poorMan, trader, treasury };
   };
 
   async function deployBaseContracts() {
-    const { deployer, ipVault } = await getAccounts();
+    const { deployer, ipVault, treasury } = await getAccounts();
 
     const virtualToken = await ethers.deployContract(
       "VirtualToken",
@@ -54,7 +54,7 @@ describe("AgentFactoryV2", function () {
     );
     await virtualToken.waitForDeployment();
 
-    const AgentNft = await ethers.getContractFactory("AgentNft");
+    const AgentNft = await ethers.getContractFactory("AgentNftV2");
     const agentNft = await upgrades.deployProxy(AgentNft, [deployer.address]);
 
     const contribution = await upgrades.deployProxy(
@@ -107,6 +107,19 @@ describe("AgentFactoryV2", function () {
     await agentFactory.setMinter(minter.target);
     await agentFactory.setMaturityDuration(86400 * 365 * 10); // 100years
     await agentFactory.setUniswapRouter(process.env.UNISWAP_ROUTER);
+    await agentFactory.setTokenAdmin(deployer.address);
+    await agentFactory.setTokenSupplyParams(
+      process.env.AGENT_TOKEN_LIMIT,
+      process.env.AGENT_TOKEN_LIMIT,
+      process.env.BOT_PROTECTION
+    );
+    await agentFactory.setTokenTaxParams(
+      process.env.TAX,
+      process.env.TAX,
+      process.env.SWAP_THRESHOLD,
+      treasury.address
+    );
+    await agentFactory.setDefaultDelegatee(deployer.address);
 
     return { virtualToken, agentFactory, agentNft };
   }
@@ -147,7 +160,9 @@ describe("AgentFactoryV2", function () {
     const { agentFactory, applicationId } = base;
 
     const { founder } = await getAccounts();
-    await agentFactory.connect(founder).executeApplication(applicationId, false);
+    await agentFactory
+      .connect(founder)
+      .executeApplication(applicationId, false);
 
     const factoryFilter = agentFactory.filters.NewPersona;
     const factoryEvents = await agentFactory.queryFilter(factoryFilter, -1);
@@ -170,7 +185,7 @@ describe("AgentFactoryV2", function () {
 
   before(async function () {});
 
-  xit("should be able to propose a new agent", async function () {
+  it("should be able to propose a new agent", async function () {
     const { agentFactory, virtualToken } = await loadFixture(
       deployBaseContracts
     );
@@ -206,7 +221,7 @@ describe("AgentFactoryV2", function () {
     expect(id).to.be.equal(1n);
   });
 
-  xit("should deny new Persona proposal when insufficient asset token", async function () {
+  it("should deny new Persona proposal when insufficient asset token", async function () {
     const { agentFactory } = await loadFixture(deployBaseContracts);
     const { poorMan } = await getAccounts();
     await expect(
@@ -225,13 +240,13 @@ describe("AgentFactoryV2", function () {
     ).to.be.revertedWith("Insufficient asset token");
   });
 
-  xit("should allow application execution by proposer", async function () {
+  it("should allow application execution by proposer", async function () {
     const { applicationId, agentFactory, virtualToken } = await loadFixture(
       deployWithApplication
     );
     const { founder } = await getAccounts();
     await expect(
-      agentFactory.connect(founder).executeApplication(applicationId)
+      agentFactory.connect(founder).executeApplication(applicationId, false)
     ).to.emit(agentFactory, "NewPersona");
 
     // Check genesis components
@@ -246,13 +261,13 @@ describe("AgentFactoryV2", function () {
     // C9: Stake liquidity token to get veToken
   });
 
-  xit("agent component C1: Agent Token", async function () {
+  it("agent component C1: Agent Token", async function () {
     const { agent } = await loadFixture(deployWithAgent);
     const agentToken = await ethers.getContractAt("AgentToken", agent.token);
     expect(await agentToken.totalSupply()).to.be.equal(PROPOSAL_THRESHOLD);
   });
 
-  xit("agent component C2: LP Pool", async function () {
+  it("agent component C2: LP Pool", async function () {
     const { agent, virtualToken } = await loadFixture(deployWithAgent);
     const lp = await ethers.getContractAt("IUniswapV2Pair", agent.lp);
     const t0 = await lp.token0();
@@ -267,7 +282,7 @@ describe("AgentFactoryV2", function () {
     expect(reserves[1]).to.be.equal(PROPOSAL_THRESHOLD);
   });
 
-  xit("agent component C3: Agent veToken", async function () {
+  it("agent component C3: Agent veToken", async function () {
     const { agent } = await loadFixture(deployWithAgent);
     const { founder } = await getAccounts();
     const veToken = await ethers.getContractAt("AgentVeToken", agent.veToken);
@@ -277,14 +292,14 @@ describe("AgentFactoryV2", function () {
     );
   });
 
-  xit("agent component C4: Agent DAO", async function () {
+  it("agent component C4: Agent DAO", async function () {
     const { agent } = await loadFixture(deployWithAgent);
     const dao = await ethers.getContractAt("AgentDAO", agent.dao);
     expect(await dao.token()).to.be.equal(agent.veToken);
     expect(await dao.name()).to.be.equal(genesisInput.daoName);
   });
 
-  xit("agent component C5: Agent NFT", async function () {
+  it("agent component C5: Agent NFT", async function () {
     const { agent, agentNft } = await loadFixture(deployWithAgent);
     const virtualInfo = await agentNft.virtualInfo(agent.virtualId);
     expect(virtualInfo.dao).to.equal(agent.dao);
@@ -297,7 +312,7 @@ describe("AgentFactoryV2", function () {
     expect(virtualInfo.tba).to.equal(agent.tba);
   });
 
-  xit("agent component C6: TBA", async function () {
+  it("agent component C6: TBA", async function () {
     // TBA means whoever owns the NFT can move the account assets
     // We will test by minting VIRTUAL to the TBA and then use the treasury account to transfer it out
     const { agent, agentNft, virtualToken } = await loadFixture(
@@ -323,7 +338,7 @@ describe("AgentFactoryV2", function () {
     expect(balance).to.be.equal(amount);
   });
 
-  xit("agent component C7: Mint initial Agent tokens", async function () {
+  it("agent component C7: Mint initial Agent tokens", async function () {
     // TBA means whoever owns the NFT can move the account assets
     // We will test by minting VIRTUAL to the TBA and then use the treasury account to transfer it out
     const { agent, agentNft, virtualToken } = await loadFixture(
@@ -336,7 +351,7 @@ describe("AgentFactoryV2", function () {
     );
   });
 
-  xit("agent component C8: Provide liquidity", async function () {
+  it("agent component C8: Provide liquidity", async function () {
     // TBA means whoever owns the NFT can move the account assets
     // We will test by minting VIRTUAL to the TBA and then use the treasury account to transfer it out
     const { agent, agentNft, virtualToken } = await loadFixture(
@@ -370,10 +385,10 @@ describe("AgentFactoryV2", function () {
     ).to.be.at.most(10);
     expect(
       parseFloat(formatEther(await agentToken.balanceOf(trader.address)))
-    ).to.be.equal(90);
+    ).to.be.equal(87.3); // 90 - 3% tax
   });
 
-  xit("agent component C9: Stake liquidity token to get veToken", async function () {
+  it("agent component C9: Stake liquidity token to get veToken", async function () {
     // TBA means whoever owns the NFT can move the account assets
     // We will test by minting VIRTUAL to the TBA and then use the treasury account to transfer it out
     const { agent, agentNft, virtualToken } = await loadFixture(
@@ -418,8 +433,8 @@ describe("AgentFactoryV2", function () {
       .addLiquidity(
         agentToken.target,
         virtualToken.target,
-        amountToBuy,
-        capital,
+        parseEther("87.3"),
+        parseEther("90"),
         0,
         0,
         trader.address,
@@ -428,11 +443,11 @@ describe("AgentFactoryV2", function () {
 
     expect(
       parseFloat(formatEther(await lpToken.balanceOf(trader.address)))
-    ).to.be.at.least(90);
+    ).to.be.at.least(80);
     expect(await agentToken.balanceOf(trader.address)).to.be.equal(0n);
   });
 
-  xit("should allow staking on public agent", async function () {
+  it("should allow staking on public agent", async function () {
     // Need to provide LP first
     const { agent, agentNft, virtualToken } = await loadFixture(
       deployWithAgent
@@ -478,8 +493,8 @@ describe("AgentFactoryV2", function () {
       .addLiquidity(
         agentToken.target,
         virtualToken.target,
-        amountToBuy,
-        capital,
+        parseEther("87.3"),
+        parseEther("90"),
         0,
         0,
         trader.address,
@@ -493,7 +508,7 @@ describe("AgentFactoryV2", function () {
       .stake(parseEther("10"), trader.address, poorMan.address);
   });
 
-  xit("should deny staking on private agent", async function () {
+  it("should deny staking on private agent", async function () {
     // Need to provide LP first
     const { agent, agentNft, virtualToken } = await loadFixture(
       deployWithAgent
@@ -537,8 +552,8 @@ describe("AgentFactoryV2", function () {
       .addLiquidity(
         agentToken.target,
         virtualToken.target,
-        amountToBuy,
-        capital,
+        parseEther("87.3"),
+        parseEther("90"),
         0,
         0,
         trader.address,
@@ -554,7 +569,7 @@ describe("AgentFactoryV2", function () {
     ).to.be.revertedWith("Staking is disabled for private agent");
   });
 
-  xit("should be able to set new validator and able to update score", async function () {
+  it("should be able to set new validator and able to update score", async function () {
     // Need to provide LP first
     const { agent, agentNft } = await loadFixture(deployWithAgent);
     const agentDAO = await ethers.getContractAt("AgentDAO", agent.dao);
@@ -601,7 +616,7 @@ describe("AgentFactoryV2", function () {
     ).to.be.equal(1n);
   });
 
-  xit("should be able to set new validator after created proposals and have correct score", async function () {
+  it("should be able to set new validator after created proposals and have correct score", async function () {
     const { agent, agentNft, virtualToken } = await loadFixture(
       deployWithAgent
     );
@@ -647,8 +662,8 @@ describe("AgentFactoryV2", function () {
       .addLiquidity(
         agentToken.target,
         virtualToken.target,
-        amountToBuy,
-        capital,
+        parseEther("87.3"),
+        parseEther("90"),
         0,
         0,
         trader.address,
@@ -687,7 +702,7 @@ describe("AgentFactoryV2", function () {
     expect(newScore).to.be.equal(2n);
   });
 
-  xit("should allow withdrawal", async function () {
+  it("should allow withdrawal", async function () {
     const { applicationId, agentFactory, virtualToken } = await loadFixture(
       deployWithApplication
     );
@@ -698,7 +713,7 @@ describe("AgentFactoryV2", function () {
     );
   });
 
-  xit("should lock initial LP", async function () {
+  it("should lock initial LP", async function () {
     const { agent, agentNft, virtualToken } = await loadFixture(
       deployWithAgent
     );
@@ -717,7 +732,7 @@ describe("AgentFactoryV2", function () {
     const { agent, agentNft, virtualToken } = await loadFixture(
       deployWithAgent
     );
-    const {founder, deployer} = await getAccounts()
+    const { founder, deployer } = await getAccounts();
     // Assign admin role
     await agentNft.grantRole(await agentNft.ADMIN_ROLE(), deployer);
     const agentVeToken = await ethers.getContractAt(
@@ -728,8 +743,7 @@ describe("AgentFactoryV2", function () {
     expect(await agentNft.isBlacklisted(agent.virtualId)).to.be.equal(true);
     await expect(agentVeToken.setMatureAt(0)).to.not.be.reverted;
 
-    await expect(
-      agentVeToken.connect(founder).withdraw(parseEther("10"))
-    ).to.not.be.reverted;
+    await expect(agentVeToken.connect(founder).withdraw(parseEther("10"))).to
+      .not.be.reverted;
   });
 });

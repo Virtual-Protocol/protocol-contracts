@@ -84,7 +84,7 @@ describe("AgentDAO", function () {
     );
     await virtualToken.waitForDeployment();
 
-    const AgentNft = await ethers.getContractFactory("AgentNft");
+    const AgentNft = await ethers.getContractFactory("AgentNftV2");
     const agentNft = await upgrades.deployProxy(AgentNft, [deployer.address]);
 
     const contribution = await upgrades.deployProxy(

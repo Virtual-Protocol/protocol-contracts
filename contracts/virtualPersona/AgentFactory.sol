@@ -321,7 +321,7 @@ contract AgentFactoryV2 is IAgentFactory, Initializable, AccessControl {
             defaultDelegatee
         );
 
-        emit NewPersona(virtualId, token, veToken, dao, tbaAddress, lp);
+        emit NewPersona(virtualId, token, dao, tbaAddress, veToken, lp);
     }
 
     function _createNewDAO(
@@ -348,6 +348,7 @@ contract AgentFactoryV2 is IAgentFactory, Initializable, AccessControl {
         string memory symbol,
         uint256 initialSupply
     ) internal returns (address instance) {
+
         instance = Clones.clone(tokenImplementation);
         IAgentToken(instance).initialize(
             [_tokenAdmin, _uniswapRouter, assetToken],
@@ -470,5 +471,11 @@ contract AgentFactoryV2 is IAgentFactory, Initializable, AccessControl {
         address newDelegatee
     ) public onlyRole(DEFAULT_ADMIN_ROLE) {
         defaultDelegatee = newDelegatee;
+    }
+
+    function setAssetToken(
+        address newToken
+    ) public onlyRole(DEFAULT_ADMIN_ROLE) {
+        assetToken = newToken;
     }
 }

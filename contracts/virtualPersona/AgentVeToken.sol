@@ -19,7 +19,7 @@ contract AgentVeToken is IAgentVeToken, ERC20Upgradeable, ERC20Votes {
     address public agentNft;
     uint256 public matureAt; // The timestamp when the founder can withdraw the tokens
     bool public canStake; // To control private/public agent mode
-    uint256 private initialLock; // Initial locked amount
+    uint256 public initialLock; // Initial locked amount
 
     constructor() {
         _disableInitializers();

@@ -94,11 +94,12 @@ contract AgentFactoryV2 is IAgentFactory, Initializable, AccessControl {
     ///////////////////////////////////////////////////////////////
     // V2 Storage
     ///////////////////////////////////////////////////////////////
-    address[] public allTradingTokens;
     address private _uniswapRouter;
-    address public veTokenImplementation;
     address private _minter;
     address private _tokenAdmin;
+
+    address[] public allTradingTokens;
+    address public veTokenImplementation;
     address public defaultDelegatee;
 
     // Default agent token params

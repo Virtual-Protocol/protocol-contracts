@@ -105,7 +105,7 @@ describe("AgentFactoryV2", function () {
     ]);
     await minter.waitForDeployment();
     await agentFactory.setMinter(minter.target);
-    await agentFactory.setMaturityDuration(86400 * 365 * 10); // 100years
+    await agentFactory.setMaturityDuration(86400 * 365 * 10); // 10years
     await agentFactory.setUniswapRouter(process.env.UNISWAP_ROUTER);
     await agentFactory.setTokenAdmin(deployer.address);
     await agentFactory.setTokenSupplyParams(
@@ -251,14 +251,12 @@ describe("AgentFactoryV2", function () {
 
     // Check genesis components
     // C1: Agent Token
-    // C2: LP Pool
+    // C2: LP Pool + Initial liquidity
     // C3: Agent veToken
     // C4: Agent DAO
     // C5: Agent NFT
     // C6: TBA
-    // C7: Mint initial Agent tokens
-    // C8: Provide liquidity
-    // C9: Stake liquidity token to get veToken
+    // C7: Stake liquidity token to get veToken
   });
 
   it("agent component C1: Agent Token", async function () {
@@ -304,6 +302,9 @@ describe("AgentFactoryV2", function () {
     const virtualInfo = await agentNft.virtualInfo(agent.virtualId);
     expect(virtualInfo.dao).to.equal(agent.dao);
     expect(virtualInfo.coreTypes).to.deep.equal(genesisInput.cores);
+    const virtualLP = await agentNft.virtualLP(agent.virtualId);
+    expect(virtualLP.pool).to.be.equal(agent.lp);
+    expect(virtualLP.veToken).to.be.equal(agent.veToken);
 
     expect(await agentNft.tokenURI(agent.virtualId)).to.equal(
       genesisInput.tokenURI
@@ -351,102 +352,6 @@ describe("AgentFactoryV2", function () {
     );
   });
 
-  it("agent component C8: Provide liquidity", async function () {
-    // TBA means whoever owns the NFT can move the account assets
-    // We will test by minting VIRTUAL to the TBA and then use the treasury account to transfer it out
-    const { agent, agentNft, virtualToken } = await loadFixture(
-      deployWithAgent
-    );
-    const agentToken = await ethers.getContractAt("AgentToken", agent.token);
-    const { trader } = await getAccounts();
-    // Swap
-    const router = await ethers.getContractAt(
-      "IUniswapV2Router02",
-      process.env.UNISWAP_ROUTER
-    );
-    const amountToBuy = parseEther("90");
-    const capital = parseEther("100");
-    await virtualToken.mint(trader.address, capital);
-    await virtualToken
-      .connect(trader)
-      .approve(process.env.UNISWAP_ROUTER, capital);
-
-    await router
-      .connect(trader)
-      .swapTokensForExactTokens(
-        amountToBuy,
-        capital,
-        [virtualToken.target, agent.token],
-        trader.address,
-        Math.floor(new Date().getTime() / 1000 + 6000)
-      );
-    expect(
-      parseFloat(formatEther(await virtualToken.balanceOf(trader.address)))
-    ).to.be.at.most(10);
-    expect(
-      parseFloat(formatEther(await agentToken.balanceOf(trader.address)))
-    ).to.be.equal(87.3); // 90 - 3% tax
-  });
-
-  it("agent component C9: Stake liquidity token to get veToken", async function () {
-    // TBA means whoever owns the NFT can move the account assets
-    // We will test by minting VIRTUAL to the TBA and then use the treasury account to transfer it out
-    const { agent, agentNft, virtualToken } = await loadFixture(
-      deployWithAgent
-    );
-    const { trader } = await getAccounts();
-    const router = await ethers.getContractAt(
-      "IUniswapV2Router02",
-      process.env.UNISWAP_ROUTER
-    );
-    const agentToken = await ethers.getContractAt("AgentToken", agent.token);
-
-    // Buy tokens
-    const amountToBuy = parseEther("90");
-    const capital = parseEther("200");
-    await virtualToken.mint(trader.address, capital);
-    await virtualToken
-      .connect(trader)
-      .approve(process.env.UNISWAP_ROUTER, capital);
-
-    await router
-      .connect(trader)
-      .swapTokensForExactTokens(
-        amountToBuy,
-        capital,
-        [virtualToken.target, agent.token],
-        trader.address,
-        Math.floor(new Date().getTime() / 1000 + 6000)
-      );
-    ////
-    // Start providing liquidity
-    const lpToken = await ethers.getContractAt("ERC20", agent.lp);
-    expect(await lpToken.balanceOf(trader.address)).to.be.equal(0n);
-    await agentToken
-      .connect(trader)
-      .approve(process.env.UNISWAP_ROUTER, amountToBuy);
-    await virtualToken
-      .connect(trader)
-      .approve(process.env.UNISWAP_ROUTER, capital);
-    await router
-      .connect(trader)
-      .addLiquidity(
-        agentToken.target,
-        virtualToken.target,
-        parseEther("87.3"),
-        parseEther("90"),
-        0,
-        0,
-        trader.address,
-        Math.floor(new Date().getTime() / 1000 + 6000)
-      );
-
-    expect(
-      parseFloat(formatEther(await lpToken.balanceOf(trader.address)))
-    ).to.be.at.least(80);
-    expect(await agentToken.balanceOf(trader.address)).to.be.equal(0n);
-  });
-
   it("should allow staking on public agent", async function () {
     // Need to provide LP first
     const { agent, agentNft, virtualToken } = await loadFixture(
@@ -484,17 +389,18 @@ describe("AgentFactoryV2", function () {
     expect(await lpToken.balanceOf(trader.address)).to.be.equal(0n);
     await agentToken
       .connect(trader)
-      .approve(process.env.UNISWAP_ROUTER, amountToBuy);
+      .approve(process.env.UNISWAP_ROUTER, parseEther("10000000"));
     await virtualToken
       .connect(trader)
-      .approve(process.env.UNISWAP_ROUTER, capital);
+      .approve(process.env.UNISWAP_ROUTER, parseEther("10000000"));
+
     await router
       .connect(trader)
       .addLiquidity(
         agentToken.target,
         virtualToken.target,
-        parseEther("87.3"),
-        parseEther("90"),
+        await agentToken.balanceOf(trader.address),
+        await virtualToken.balanceOf(trader.address),
         0,
         0,
         trader.address,
@@ -552,8 +458,8 @@ describe("AgentFactoryV2", function () {
       .addLiquidity(
         agentToken.target,
         virtualToken.target,
-        parseEther("87.3"),
-        parseEther("90"),
+        await agentToken.balanceOf(trader.address),
+        await virtualToken.balanceOf(trader.address),
         0,
         0,
         trader.address,
@@ -662,8 +568,8 @@ describe("AgentFactoryV2", function () {
       .addLiquidity(
         agentToken.target,
         virtualToken.target,
-        parseEther("87.3"),
-        parseEther("90"),
+        await agentToken.balanceOf(trader.address),
+        await virtualToken.balanceOf(trader.address),
         0,
         0,
         trader.address,

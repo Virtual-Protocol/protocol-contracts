@@ -232,7 +232,10 @@ contract AgentDAO is
         ProposalState currentState = super.state(proposalId);
         if (currentState == ProposalState.Active) {
             (, uint256 forVotes, ) = proposalVotes(proposalId);
-            if (forVotes == token().getPastTotalSupply(proposalSnapshot(proposalId))) {
+            if (
+                forVotes ==
+                token().getPastTotalSupply(proposalSnapshot(proposalId))
+            ) {
                 return ProposalState.Succeeded;
             }
         }

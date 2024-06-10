@@ -40,6 +40,10 @@ interface IAgentNft is IValidatorRegistry {
         uint256 virtualId
     ) external view returns (VirtualInfo memory);
 
+    function virtualLP(
+        uint256 virtualId
+    ) external view returns (VirtualLP memory);
+
     function totalSupply() external view returns (uint256);
 
     function totalStaked(uint256 virtualId) external view returns (uint256);

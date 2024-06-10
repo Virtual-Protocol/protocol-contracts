@@ -37,20 +37,22 @@ contract AgentVeToken is IAgentVeToken, ERC20Upgradeable, ERC20Votes {
     }
 
     function initialize(
-        string memory name,
-        string memory symbol,
-        address founder_,
-        address assetToken_,
-        uint256 matureAt_,
-        address agentNft_
+        string memory _name,
+        string memory _symbol,
+        address _founder,
+        address _assetToken,
+        uint256 _matureAt,
+        address _agentNft,
+        bool _canStake
     ) external initializer {
-        __ERC20_init(name, symbol);
+        __ERC20_init(_name, _symbol);
         __ERC20Votes_init();
 
-        founder = founder_;
-        matureAt = matureAt_;
-        assetToken = assetToken_;
-        agentNft = agentNft_;
+        founder = _founder;
+        matureAt = _matureAt;
+        assetToken = _assetToken;
+        agentNft = _agentNft;
+        canStake = _canStake;
     }
 
     // Stakers have to stake their tokens and delegate to a validator

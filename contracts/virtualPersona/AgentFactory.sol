@@ -223,7 +223,7 @@ contract AgentFactoryV2 is IAgentFactory, Initializable, AccessControl {
         );
     }
 
-    function executeApplication(uint256 id) public noReentrant {
+    function executeApplication(uint256 id, bool canStake) public noReentrant {
         // This will bootstrap an Agent with following components:
         // C1: Agent Token
         // C2: LP Pool + Initial liquidity
@@ -270,7 +270,8 @@ contract AgentFactoryV2 is IAgentFactory, Initializable, AccessControl {
             string.concat("Staked ", application.name),
             string.concat("s", application.symbol),
             lp,
-            application.proposer
+            application.proposer,
+            canStake
         );
 
         // C4
@@ -285,17 +286,17 @@ contract AgentFactoryV2 is IAgentFactory, Initializable, AccessControl {
         );
 
         // C5
-        uint256 virtualId = 1;//IAgentNft(nft).nextVirtualId();
-        // IAgentNft(nft).mint(
-        //     virtualId,
-        //     _vault,
-        //     application.tokenURI,
-        //     dao,
-        //     application.proposer,
-        //     application.cores,
-        //     lp,
-        //     token
-        // );
+        uint256 virtualId = IAgentNft(nft).nextVirtualId();
+        IAgentNft(nft).mint(
+            virtualId,
+            _vault,
+            application.tokenURI,
+            dao,
+            application.proposer,
+            application.cores,
+            lp,
+            token
+        );
         application.virtualId = virtualId;
 
         // C6
@@ -364,7 +365,8 @@ contract AgentFactoryV2 is IAgentFactory, Initializable, AccessControl {
         string memory name,
         string memory symbol,
         address stakingAsset,
-        address founder
+        address founder,
+        bool canStake
     ) internal returns (address instance) {
         instance = Clones.clone(veTokenImplementation);
         IAgentVeToken(instance).initialize(
@@ -373,7 +375,8 @@ contract AgentFactoryV2 is IAgentFactory, Initializable, AccessControl {
             founder,
             stakingAsset,
             block.timestamp + maturityDuration,
-            address(nft)
+            address(nft),
+            canStake
         );
 
         allTokens.push(instance);

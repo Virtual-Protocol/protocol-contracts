@@ -2,23 +2,20 @@
 pragma solidity ^0.8.20;
 
 interface IAgentReward {
-    struct MainReward {
-        uint32 blockNumber;
+    struct Reward {
+        uint256 blockNumber;
         uint256 amount;
-        uint256 agentCount;
         uint256 totalStaked;
+        uint256[] virtualIds;
     }
 
-    // Virtual specific reward, the amount will be shared between validator pool and contributor pool
-    // Validator pool will be shared by validators and stakers
-    // Contributor pool will be shared by contribution NFT holders
-    struct Reward {
+    // Agent specific reward, the amount will be shared between stakers and validators
+    struct AgentReward {
         uint48 id;
-        uint32 mainIndex;
-        uint256 totalStaked;
+        uint48 rewardIndex;
+        uint256 stakerAmount;
         uint256 validatorAmount;
-        uint256 contributorAmount;
-        uint256 coreAmount; // Rewards per core
+        uint256 totalScore;
     }
 
     struct Claim {
@@ -26,7 +23,23 @@ interface IAgentReward {
         uint32 rewardCount; // Track number of reward blocks claimed to avoid reclaiming
     }
 
-    struct ServiceReward {
+    event NewReward(
+        uint48 pos,
+        uint256 amount,
+        uint256 protocolAmount,
+        uint256 totalStaked
+    );
+
+    event NewAgentReward(
+        uint256 indexed virtualId,
+        uint48 id,
+        uint48 rewardIndex,
+        uint256 stakerAmount,
+        uint256 validatorAmount,
+        uint256 totalScore
+    );
+
+    /*struct ServiceReward {
         uint256 impact;
         uint256 amount;
         uint256 parentAmount;
@@ -34,12 +47,7 @@ interface IAgentReward {
         uint256 totalClaimedParent;
     }
 
-    event NewMainReward(
-        uint32 indexed pos,
-        uint256 amount,
-        uint256 agentCount,
-        uint256 totalStaked
-    );
+    
 
     event RewardSettingsUpdated(
         uint16 protocolShares,
@@ -88,7 +96,7 @@ interface IAgentReward {
     );
 
     event DatasetRewardsClaimed(uint256 nftId, address account, uint256 total);
-
+*/
     error ERC5805FutureLookup(uint256 timepoint, uint32 clock);
 
     error NotGovError();

@@ -72,7 +72,7 @@ async function deployImplementations() {
     // const implementations = await deployImplementations();
     // await upgradeFactory(implementations);
     //await deployAgentNft();
-    await upgradeAgentNft();
+    //await upgradeAgentNft();
   } catch (e) {
     console.log(e);
   }

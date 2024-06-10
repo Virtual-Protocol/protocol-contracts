@@ -17,6 +17,8 @@ interface IAgentDAO {
 
     function scoreOf(address account) external view returns (uint256);
 
+    function totalScore() external view returns (uint256);
+
     function getPastScore(
         address account,
         uint256 timepoint

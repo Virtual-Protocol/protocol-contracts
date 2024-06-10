@@ -3,12 +3,13 @@ pragma solidity ^0.8.20;
 
 interface IAgentVeToken {
     function initialize(
-        string memory name,
-        string memory symbol,
+        string memory _name,
+        string memory _symbol,
         address _founder,
         address _assetToken,
         uint256 _matureAt,
-        address agentNft_
+        address _agentNft,
+        bool _canStake
     ) external;
 
     function stake(

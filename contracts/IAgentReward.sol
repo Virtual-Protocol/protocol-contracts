@@ -5,7 +5,7 @@ interface IAgentReward {
     struct Reward {
         uint256 blockNumber;
         uint256 amount;
-        uint256 totalStaked;
+        uint256[] lpValues;
         uint256[] virtualIds;
     }
 
@@ -15,7 +15,8 @@ interface IAgentReward {
         uint48 rewardIndex;
         uint256 stakerAmount;
         uint256 validatorAmount;
-        uint256 totalScore;
+        uint256 totalProposals;
+        uint256 totalStaked;
     }
 
     struct Claim {
@@ -25,19 +26,10 @@ interface IAgentReward {
 
     event NewReward(
         uint48 pos,
-        uint256 amount,
-        uint256 protocolAmount,
-        uint256 totalStaked
+        uint256[] virtualIds
     );
 
-    event NewAgentReward(
-        uint256 indexed virtualId,
-        uint48 id,
-        uint48 rewardIndex,
-        uint256 stakerAmount,
-        uint256 validatorAmount,
-        uint256 totalScore
-    );
+    event NewAgentReward(uint256 indexed virtualId, uint48 id);
 
     /*struct ServiceReward {
         uint256 impact;

@@ -115,25 +115,26 @@ contract AgentRewardV2 is
     // Helper functions
     // ----------------
     function getTotalStaked(
-        uint256[] memory virtualIds
-    ) internal view returns (uint256 totalStaked) {
-        uint length = virtualIds.length;
-        for (uint i = 0; i < length; i++) {
-            uint256 virtualId = virtualIds[i];
-            uint256 staked = IERC20(
-                IAgentNft(agentNft).virtualLP(virtualId).veToken
-            ).totalSupply();
-            totalStaked += staked;
-        }
+        uint256 virtualId
+    ) public view returns (uint256 totalStaked) {
+        return
+            IERC20(IAgentNft(agentNft).virtualLP(virtualId).veToken)
+                .totalSupply();
+    }
+
+    function getLPValue(uint256 virtualId) public view returns (uint256) {
+        address lp = IAgentNft(agentNft).virtualLP(virtualId).pool;
+        return IERC20(rewardToken).balanceOf(lp);
     }
 
     // ----------------
     // Distribute rewards
     // ----------------
 
+    // Distribute rewards to stakers and validators
+    // Reward source such as virtual specific revenue will share with protocol
     function distributeRewards(
         uint256 amount,
-        uint256 totalStaked,
         uint256[] memory virtualIds,
         bool shouldShareWithProtocol
     ) public onlyGov {
@@ -154,21 +155,33 @@ contract AgentRewardV2 is
 
         uint256 balance = amount - protocolAmount;
 
-        uint32 rewardIndex = SafeCast.toUint32(_rewards.length - 1);
+        uint48 rewardIndex = SafeCast.toUint48(_rewards.length);
 
-        _rewards.push(Reward(block.number, balance, totalStaked, virtualIds));
+        uint virtualCount = virtualIds.length;
 
-        emit NewReward(rewardIndex, balance, protocolAmount, totalStaked);
+        uint256[] memory lpValues = new uint256[](virtualCount);
 
-        // We don't expect too many virtuals here, the loop should not exceed gas limit
-        uint length = virtualIds.length;
-        for (uint i = 0; i < length; i++) {
+        uint256 totalLPValues = 0;
+        for (uint i = 0; i < virtualCount; i++) {
+            lpValues[i] = getLPValue(virtualIds[i]);
+            totalLPValues += lpValues[i];
+        }
+
+        if (totalLPValues <= 0) {
+            revert("Invalid LP values");
+        }
+
+        _rewards.push(Reward(block.number, balance, lpValues, virtualIds));
+
+        emit NewReward(rewardIndex, virtualIds);
+
+        // We expect around 3-5 virtuals here, the loop should not exceed gas limit
+        for (uint i = 0; i < virtualCount; i++) {
             uint256 virtualId = virtualIds[i];
             _distributeAgentReward(
                 virtualId,
                 rewardIndex,
-                balance,
-                totalStaked,
+                (lpValues[i] * balance) / totalLPValues,
                 settings
             );
         }
@@ -177,41 +190,31 @@ contract AgentRewardV2 is
     function _distributeAgentReward(
         uint256 virtualId,
         uint48 rewardIndex,
-        uint256 totalAmount,
-        uint256 totalStaked,
+        uint256 amount,
         RewardSettingsCheckpoints.RewardSettings memory settings
     ) private {
         uint48 agentRewardId = _nextAgentRewardId++;
-        uint256 staked = IERC20(
-            IAgentNft(agentNft).virtualLP(virtualId).veToken
-        ).totalSupply();
 
-        uint256 rewardAmount = (staked * totalAmount) / totalStaked;
+        uint256 totalStaked = getTotalStaked(virtualId);
 
-        uint256 stakerAmount = (rewardAmount * settings.stakerShares) /
-            DENOMINATOR;
+        uint256 stakerAmount = (amount * settings.stakerShares) / DENOMINATOR;
 
-        uint256 totalScore = IAgentDAO(IAgentNft(agentNft).virtualInfo(virtualId).dao)
-            .totalScore();
+        uint256 totalProposals = IAgentDAO(
+            IAgentNft(agentNft).virtualInfo(virtualId).dao
+        ).proposalCount();
 
         _agentRewards[virtualId].push(
             AgentReward(
                 agentRewardId,
                 rewardIndex,
                 stakerAmount,
-                rewardAmount - stakerAmount,
-                totalScore
+                amount - stakerAmount,
+                totalProposals,
+                totalStaked
             )
         );
 
-        emit NewAgentReward(
-            virtualId,
-            agentRewardId,
-            rewardIndex,
-            stakerAmount,
-            rewardAmount - stakerAmount,
-            totalScore
-        );
+        emit NewAgentReward(virtualId, agentRewardId);
     }
 
     function _distributeProtocolRewards(

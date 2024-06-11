@@ -11,8 +11,8 @@ interface IAgentReward {
 
     // Agent specific reward, the amount will be shared between stakers and validators
     struct AgentReward {
-        uint48 id;
-        uint48 rewardIndex;
+        uint256 id;
+        uint256 rewardIndex;
         uint256 stakerAmount;
         uint256 validatorAmount;
         uint256 totalProposals;
@@ -21,74 +21,29 @@ interface IAgentReward {
 
     struct Claim {
         uint256 totalClaimed;
-        uint32 rewardCount; // Track number of reward blocks claimed to avoid reclaiming
+        uint256 rewardCount; // Track number of reward blocks claimed to avoid reclaiming
     }
 
-    event NewReward(
-        uint48 pos,
-        uint256[] virtualIds
-    );
+    event NewReward(uint256 pos, uint256[] virtualIds);
 
-    event NewAgentReward(uint256 indexed virtualId, uint48 id);
+    event NewAgentReward(uint256 indexed virtualId, uint256 id);
 
-    /*struct ServiceReward {
-        uint256 impact;
-        uint256 amount;
-        uint256 parentAmount;
-        uint256 totalClaimed;
-        uint256 totalClaimedParent;
-    }
+    event RewardSettingsUpdated(uint16 protocolShares, uint16 stakerShares);
 
-    
-
-    event RewardSettingsUpdated(
-        uint16 protocolShares,
-        uint16 contributorShares,
-        uint16 stakerShares,
-        uint16 parentShares,
-        uint256 stakeThreshold
-    );
-
-    event RefContractsUpdated(
-        address rewardToken,
-        address agentNft,
-        address contributionNft,
-        address serviceNft
-    );
-
-    event StakeThresholdUpdated(uint256 threshold);
-
-    event ParentSharesUpdated(uint256 shares);
+    event RefContractsUpdated(address rewardToken, address agentNft);
 
     event StakerRewardClaimed(
-        uint256 virtualId,
-        uint256 amount,
-        address staker
+        uint256 indexed virtualId,
+        address indexed staker,
+        uint256 amount
     );
 
     event ValidatorRewardClaimed(
-        uint256 virtualId,
-        uint256 amount,
-        address validator
+        uint256 indexed virtualId,
+        address indexed validator,
+        uint256 amount
     );
-
-    event ServiceRewardsClaimed(
-        uint256 nftId,
-        address account,
-        uint256 total,
-        uint256 childrenAmount
-    );
-
-    event NewAgentReward(
-        uint32 mainIndex,
-        uint256 virtualId,
-        uint256 validatorAmount,
-        uint256 contributorAmount,
-        uint256 coreAmount
-    );
-
-    event DatasetRewardsClaimed(uint256 nftId, address account, uint256 total);
-*/
+    
     error ERC5805FutureLookup(uint256 timepoint, uint32 clock);
 
     error NotGovError();

@@ -6,6 +6,7 @@ import "@openzeppelin/contracts/token/ERC721/IERC721.sol";
 import "@openzeppelin/contracts/utils/math/Math.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/access/AccessControl.sol";
+import "@openzeppelin/contracts/utils/math/Math.sol";
 import {IERC5805} from "@openzeppelin/contracts/interfaces/IERC5805.sol";
 import {SafeCast} from "@openzeppelin/contracts/utils/math/SafeCast.sol";
 import "./virtualPersona/IAgentNft.sol";
@@ -28,7 +29,7 @@ contract AgentRewardV2 is
     using SafeERC20 for IERC20;
     using RewardSettingsCheckpoints for RewardSettingsCheckpoints.Trace;
 
-    uint48 private _nextAgentRewardId;
+    uint256 private _nextAgentRewardId;
 
     uint256 public constant DENOMINATOR = 10000;
     bytes32 public constant GOV_ROLE = keccak256("GOV_ROLE");
@@ -92,13 +93,13 @@ contract AgentRewardV2 is
         return _rewardSettings.upperLookupRecent(timepoint);
     }
 
-    function getReward(uint48 pos) public view returns (Reward memory) {
+    function getReward(uint256 pos) public view returns (Reward memory) {
         return _rewards[pos];
     }
 
     function getAgentReward(
         uint256 virtualId,
-        uint48 pos
+        uint256 pos
     ) public view returns (AgentReward memory) {
         return _agentRewards[virtualId][pos];
     }
@@ -154,11 +155,8 @@ contract AgentRewardV2 is
             : 0;
 
         uint256 balance = amount - protocolAmount;
-
-        uint48 rewardIndex = SafeCast.toUint48(_rewards.length);
-
+        uint256 rewardIndex = _rewards.length;
         uint virtualCount = virtualIds.length;
-
         uint256[] memory lpValues = new uint256[](virtualCount);
 
         uint256 totalLPValues = 0;
@@ -189,11 +187,11 @@ contract AgentRewardV2 is
 
     function _distributeAgentReward(
         uint256 virtualId,
-        uint48 rewardIndex,
+        uint256 rewardIndex,
         uint256 amount,
         RewardSettingsCheckpoints.RewardSettings memory settings
     ) private {
-        uint48 agentRewardId = _nextAgentRewardId++;
+        uint256 agentRewardId = _nextAgentRewardId++;
 
         uint256 totalStaked = getTotalStaked(virtualId);
 
@@ -226,5 +224,235 @@ contract AgentRewardV2 is
             DENOMINATOR;
         protocolRewards += protocolShares;
         return protocolShares;
+    }
+
+    // ----------------
+    // Claim rewards
+    // ----------------
+    mapping(address account => mapping(uint256 virtualId => Claim claim)) _stakerClaims;
+    mapping(address account => mapping(uint256 virtualId => Claim claim)) _validatorClaims;
+
+    function getClaimableStakerRewards(
+        address account,
+        uint256 virtualId,
+        uint256 limit
+    ) public view returns (uint256 totalClaimable, uint256 numRewards) {
+        Claim memory claim = _stakerClaims[account][virtualId];
+        numRewards = Math.min(
+            limit + claim.rewardCount,
+            getAgentRewardCount(virtualId)
+        );
+        IAgentVeToken veToken = IAgentVeToken(
+            IAgentNft(agentNft).virtualLP(virtualId).veToken
+        );
+        IAgentDAO dao = IAgentDAO(
+            IAgentNft(agentNft).virtualInfo(virtualId).dao
+        );
+        for (uint i = claim.rewardCount; i < numRewards; i++) {
+            AgentReward memory agentReward = getAgentReward(virtualId, i);
+            Reward memory reward = getReward(agentReward.rewardIndex);
+            address delegatee = veToken.getPastDelegates(
+                account,
+                reward.blockNumber
+            );
+            uint256 uptime = dao.getPastScore(delegatee, reward.blockNumber);
+            uint256 stakedAmount = veToken.getPastBalanceOf(
+                account,
+                reward.blockNumber
+            );
+            uint256 stakerReward = (agentReward.stakerAmount * stakedAmount) /
+                agentReward.totalStaked;
+            stakerReward =
+                ((stakerReward * uptime * DENOMINATOR) /
+                    agentReward.totalProposals) *
+                DENOMINATOR;
+
+            totalClaimable += stakerReward;
+        }
+    }
+
+    function getClaimableValidatorRewards(
+        address account,
+        uint256 virtualId,
+        uint256 limit
+    ) public view returns (uint256 totalClaimable, uint256 numRewards) {
+        Claim memory claim = _validatorClaims[account][virtualId];
+        numRewards = Math.min(
+            limit + claim.rewardCount,
+            getAgentRewardCount(virtualId)
+        );
+        IVotes veToken = IVotes(
+            IAgentNft(agentNft).virtualLP(virtualId).veToken
+        );
+        IAgentDAO dao = IAgentDAO(
+            IAgentNft(agentNft).virtualInfo(virtualId).dao
+        );
+        for (uint i = claim.rewardCount; i < numRewards; i++) {
+            AgentReward memory agentReward = getAgentReward(virtualId, i);
+            Reward memory reward = getReward(agentReward.rewardIndex);
+            uint256 uptime = dao.getPastScore(account, reward.blockNumber);
+            uint256 votes = veToken.getPastVotes(account, reward.blockNumber);
+            uint256 validatorReward = (agentReward.validatorAmount * votes) /
+                agentReward.totalStaked;
+            validatorReward =
+                ((validatorReward * uptime * DENOMINATOR) /
+                    agentReward.totalProposals) *
+                DENOMINATOR;
+
+            totalClaimable += validatorReward;
+        }
+    }
+
+    function getTotalClaimableStakerRewards(
+        address account,
+        uint256[] memory virtualIds,
+        uint256 limit
+    ) public view returns (uint256 totalClaimable) {
+        for (uint i = 0; i < virtualIds.length; i++) {
+            uint256 virtualId = virtualIds[i];
+            (uint256 claimable, ) = getClaimableStakerRewards(account, virtualId, limit);
+            totalClaimable += claimable;
+        }
+    }
+
+    function getTotalClaimableValidatorRewards(
+        address account,
+        uint256[] memory virtualIds,
+        uint256 limit
+    ) public view returns (uint256 totalClaimable) {
+        for (uint i = 0; i < virtualIds.length; i++) {
+            uint256 virtualId = virtualIds[i];
+            (uint256 claimable, ) = getClaimableValidatorRewards(account, virtualId, limit);
+            totalClaimable += claimable;
+        }
+    }
+
+    function getAgentRewardCount(
+        uint256 virtualId
+    ) public view returns (uint256) {
+        return _agentRewards[virtualId].length;
+    }
+
+    function claimStakerRewards(
+        uint256 virtualId,
+        uint256 limit
+    ) public noReentrant {
+        address account = _msgSender();
+        uint256 totalClaimable;
+        uint256 numRewards;
+        (totalClaimable, numRewards) = getClaimableStakerRewards(
+            account,
+            virtualId,
+            limit
+        );
+
+        Claim storage claim = _stakerClaims[account][virtualId];
+        claim.totalClaimed += totalClaimable;
+        claim.rewardCount = numRewards;
+
+        IERC20(rewardToken).safeTransfer(account, totalClaimable);
+
+        emit StakerRewardClaimed(virtualId, account, totalClaimable);
+    }
+
+    function claimValidatorRewards(
+        uint256 virtualId,
+        uint256 limit
+    ) public noReentrant {
+        address account = _msgSender();
+        uint256 totalClaimable;
+        uint256 numRewards;
+        (totalClaimable, numRewards) = getClaimableValidatorRewards(
+            account,
+            virtualId,
+            limit
+        );
+
+        Claim storage claim = _validatorClaims[account][virtualId];
+        claim.totalClaimed += totalClaimable;
+        claim.rewardCount = numRewards;
+
+        IERC20(rewardToken).safeTransfer(account, totalClaimable);
+
+        emit ValidatorRewardClaimed(virtualId, account, totalClaimable);
+    }
+
+    function claimAllStakerRewards(
+        uint256[] memory virtualIds,
+        uint256 limit
+    ) public noReentrant {
+        address account = _msgSender();
+        uint256 totalClaimable;
+        for (uint i = 0; i < virtualIds.length; i++) {
+            uint256 virtualId = virtualIds[i];
+            uint256 claimable;
+            uint256 numRewards;
+            (claimable, numRewards) = getClaimableStakerRewards(
+                account,
+                virtualId,
+                limit
+            );
+            totalClaimable += claimable;
+
+            Claim storage claim = _stakerClaims[account][virtualId];
+            claim.totalClaimed += claimable;
+            claim.rewardCount = numRewards;
+        }
+
+        IERC20(rewardToken).safeTransfer(account, totalClaimable);
+    }
+
+    function claimAllValidatorRewards(
+        uint256[] memory virtualIds,
+        uint256 limit
+    ) public noReentrant {
+        address account = _msgSender();
+        uint256 totalClaimable;
+        for (uint i = 0; i < virtualIds.length; i++) {
+            uint256 virtualId = virtualIds[i];
+            uint256 claimable;
+            uint256 numRewards;
+            (claimable, numRewards) = getClaimableValidatorRewards(
+                account,
+                virtualId,
+                limit
+            );
+            totalClaimable += claimable;
+
+            Claim storage claim = _validatorClaims[account][virtualId];
+            claim.totalClaimed += claimable;
+            claim.rewardCount = numRewards;
+        }
+
+        IERC20(rewardToken).safeTransfer(account, totalClaimable);
+    }
+
+    // ----------------
+    // Manage parameters
+    // ----------------
+
+    function setRewardSettings(
+        uint16 protocolShares_,
+        uint16 stakerShares_
+    ) public onlyGov {
+        _rewardSettings.push(
+            SafeCast.toUint32(block.number),
+            RewardSettingsCheckpoints.RewardSettings(
+                protocolShares_,
+                stakerShares_
+            )
+        );
+
+        emit RewardSettingsUpdated(protocolShares_, stakerShares_);
+    }
+
+    function updateRefContracts(
+        address rewardToken_,
+        address agentNft_
+    ) external onlyGov {
+        rewardToken = rewardToken_;
+        agentNft = agentNft_;
+
+        emit RefContractsUpdated(rewardToken_, agentNft_);
     }
 }

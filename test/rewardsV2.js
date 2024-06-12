@@ -335,7 +335,7 @@ describe("RewardsV2", function () {
 
   it("should mint agent token for IP owner on successful contribution", async function () {
     const base = await loadFixture(deployWithAgent);
-    const { ipVault, contributor1 } = await getAccounts();
+    const { ipVault, contributor1, founder } = await getAccounts();
     const maturity = 55;
     const agentToken = await ethers.getContractAt(
       "AgentToken",
@@ -442,8 +442,7 @@ describe("RewardsV2", function () {
     const validatorVClaimable = formatEther(
       await rewards.getTotalClaimableValidatorRewards(
         validator1.address,
-        [1],
-        100
+        [1]
       )
     );
     expect(validatorSClaimable).to.equal("0.0");
@@ -453,15 +452,13 @@ describe("RewardsV2", function () {
     const conributorSClaimable = formatEther(
       await rewards.getTotalClaimableStakerRewards(
         contributor1.address,
-        [1],
-        100
+        [1]
       )
     );
     const contributorVClaimable = formatEther(
       await rewards.getTotalClaimableValidatorRewards(
         contributor1.address,
-        [1],
-        100
+        [1]
       )
     );
     expect(conributorSClaimable).to.equal("0.0");
@@ -519,8 +516,7 @@ describe("RewardsV2", function () {
     const validatorVClaimable = formatEther(
       await rewards.getTotalClaimableValidatorRewards(
         validator1.address,
-        [1],
-        100
+        [1]
       )
     );
     expect(validatorSClaimable).to.equal("0.0");
@@ -530,15 +526,13 @@ describe("RewardsV2", function () {
     const conributorSClaimable = formatEther(
       await rewards.getTotalClaimableStakerRewards(
         contributor1.address,
-        [1],
-        100
+        [1]
       )
     );
     const contributorVClaimable = formatEther(
       await rewards.getTotalClaimableValidatorRewards(
         contributor1.address,
-        [1],
-        100
+        [1]
       )
     );
     expect(conributorSClaimable).to.equal("0.0");

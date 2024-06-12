@@ -2,93 +2,49 @@
 pragma solidity ^0.8.20;
 
 interface IAgentReward {
-    struct MainReward {
-        uint32 blockNumber;
+    struct Reward {
+        uint256 blockNumber;
         uint256 amount;
-        uint256 agentCount;
-        uint256 totalStaked;
+        uint256[] lpValues;
+        uint256[] virtualIds;
     }
 
-    // Virtual specific reward, the amount will be shared between validator pool and contributor pool
-    // Validator pool will be shared by validators and stakers
-    // Contributor pool will be shared by contribution NFT holders
-    struct Reward {
-        uint48 id;
-        uint32 mainIndex;
-        uint256 totalStaked;
+    // Agent specific reward, the amount will be shared between stakers and validators
+    struct AgentReward {
+        uint256 id;
+        uint256 rewardIndex;
+        uint256 stakerAmount;
         uint256 validatorAmount;
-        uint256 contributorAmount;
-        uint256 coreAmount; // Rewards per core
+        uint256 totalProposals;
+        uint256 totalStaked;
     }
 
     struct Claim {
         uint256 totalClaimed;
-        uint32 rewardCount; // Track number of reward blocks claimed to avoid reclaiming
+        uint256 rewardCount; // Track number of reward blocks claimed to avoid reclaiming
     }
 
-    struct ServiceReward {
-        uint256 impact;
-        uint256 amount;
-        uint256 parentAmount;
-        uint256 totalClaimed;
-        uint256 totalClaimedParent;
-    }
+    event NewReward(uint256 pos, uint256[] virtualIds);
 
-    event NewMainReward(
-        uint32 indexed pos,
-        uint256 amount,
-        uint256 agentCount,
-        uint256 totalStaked
-    );
+    event NewAgentReward(uint256 indexed virtualId, uint256 id);
 
-    event RewardSettingsUpdated(
-        uint16 protocolShares,
-        uint16 contributorShares,
-        uint16 stakerShares,
-        uint16 parentShares,
-        uint256 stakeThreshold
-    );
+    event RewardSettingsUpdated(uint16 protocolShares, uint16 stakerShares);
 
-    event RefContractsUpdated(
-        address rewardToken,
-        address agentNft,
-        address contributionNft,
-        address serviceNft
-    );
-
-    event StakeThresholdUpdated(uint256 threshold);
-
-    event ParentSharesUpdated(uint256 shares);
+    event RefContractsUpdated(address rewardToken, address agentNft);
 
     event StakerRewardClaimed(
-        uint256 virtualId,
-        uint256 amount,
-        address staker
+        uint256 indexed virtualId,
+        address indexed staker,
+        uint256 numRewards,
+        uint256 amount
     );
 
     event ValidatorRewardClaimed(
-        uint256 virtualId,
-        uint256 amount,
-        address validator
+        uint256 indexed virtualId,
+        address indexed validator,
+        uint256 amount
     );
-
-    event ServiceRewardsClaimed(
-        uint256 nftId,
-        address account,
-        uint256 total,
-        uint256 childrenAmount
-    );
-
-    event NewAgentReward(
-        uint32 mainIndex,
-        uint256 virtualId,
-        uint256 validatorAmount,
-        uint256 contributorAmount,
-        uint256 coreAmount
-    );
-
-    event DatasetRewardsClaimed(uint256 nftId, address account, uint256 total);
-
+    
     error ERC5805FutureLookup(uint256 timepoint, uint32 clock);
 
     error NotGovError();

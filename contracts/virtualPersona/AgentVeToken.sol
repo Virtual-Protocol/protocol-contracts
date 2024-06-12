@@ -19,7 +19,7 @@ contract AgentVeToken is IAgentVeToken, ERC20Upgradeable, ERC20Votes {
     address public agentNft;
     uint256 public matureAt; // The timestamp when the founder can withdraw the tokens
     bool public canStake; // To control private/public agent mode
-    uint256 private initialLock; // Initial locked amount
+    uint256 public initialLock; // Initial locked amount
 
     constructor() {
         _disableInitializers();
@@ -37,20 +37,22 @@ contract AgentVeToken is IAgentVeToken, ERC20Upgradeable, ERC20Votes {
     }
 
     function initialize(
-        string memory name,
-        string memory symbol,
-        address founder_,
-        address assetToken_,
-        uint256 matureAt_,
-        address agentNft_
+        string memory _name,
+        string memory _symbol,
+        address _founder,
+        address _assetToken,
+        uint256 _matureAt,
+        address _agentNft,
+        bool _canStake
     ) external initializer {
-        __ERC20_init(name, symbol);
+        __ERC20_init(_name, _symbol);
         __ERC20Votes_init();
 
-        founder = founder_;
-        matureAt = matureAt_;
-        assetToken = assetToken_;
-        agentNft = agentNft_;
+        founder = _founder;
+        matureAt = _matureAt;
+        assetToken = _assetToken;
+        agentNft = _agentNft;
+        canStake = _canStake;
     }
 
     // Stakers have to stake their tokens and delegate to a validator
@@ -62,6 +64,14 @@ contract AgentVeToken is IAgentVeToken, ERC20Upgradeable, ERC20Votes {
 
         address sender = _msgSender();
         require(amount > 0, "Cannot stake 0");
+        require(
+            IERC20(assetToken).balanceOf(sender) >= amount,
+            "Insufficient asset token balance"
+        );
+        require(
+            IERC20(assetToken).allowance(sender, address(this)) >= amount,
+            "Insufficient asset token allowance"
+        );
 
         if (totalSupply() == 0) {
             initialLock = amount;
@@ -98,7 +108,9 @@ contract AgentVeToken is IAgentVeToken, ERC20Upgradeable, ERC20Votes {
         address sender = _msgSender();
         require(balanceOf(sender) >= amount, "Insufficient balance");
 
-        if ((sender == founder) && ((balanceOf(sender) - amount) < initialLock)) {
+        if (
+            (sender == founder) && ((balanceOf(sender) - amount) < initialLock)
+        ) {
             require(block.timestamp >= matureAt, "Not mature yet");
         }
 

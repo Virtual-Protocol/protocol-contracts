@@ -94,11 +94,12 @@ contract AgentFactoryV2 is IAgentFactory, Initializable, AccessControl {
     ///////////////////////////////////////////////////////////////
     // V2 Storage
     ///////////////////////////////////////////////////////////////
-    address[] public allTradingTokens;
     address private _uniswapRouter;
-    address public veTokenImplementation;
     address private _minter;
     address private _tokenAdmin;
+
+    address[] public allTradingTokens;
+    address public veTokenImplementation;
     address public defaultDelegatee;
 
     // Default agent token params
@@ -223,7 +224,7 @@ contract AgentFactoryV2 is IAgentFactory, Initializable, AccessControl {
         );
     }
 
-    function executeApplication(uint256 id) public noReentrant {
+    function executeApplication(uint256 id, bool canStake) public noReentrant {
         // This will bootstrap an Agent with following components:
         // C1: Agent Token
         // C2: LP Pool + Initial liquidity
@@ -270,7 +271,8 @@ contract AgentFactoryV2 is IAgentFactory, Initializable, AccessControl {
             string.concat("Staked ", application.name),
             string.concat("s", application.symbol),
             lp,
-            application.proposer
+            application.proposer,
+            canStake
         );
 
         // C4
@@ -347,6 +349,7 @@ contract AgentFactoryV2 is IAgentFactory, Initializable, AccessControl {
         string memory symbol,
         uint256 initialSupply
     ) internal returns (address instance) {
+
         instance = Clones.clone(tokenImplementation);
         IAgentToken(instance).initialize(
             [_tokenAdmin, _uniswapRouter, assetToken],
@@ -364,7 +367,8 @@ contract AgentFactoryV2 is IAgentFactory, Initializable, AccessControl {
         string memory name,
         string memory symbol,
         address stakingAsset,
-        address founder
+        address founder,
+        bool canStake
     ) internal returns (address instance) {
         instance = Clones.clone(veTokenImplementation);
         IAgentVeToken(instance).initialize(
@@ -373,7 +377,8 @@ contract AgentFactoryV2 is IAgentFactory, Initializable, AccessControl {
             founder,
             stakingAsset,
             block.timestamp + maturityDuration,
-            address(nft)
+            address(nft),
+            canStake
         );
 
         allTokens.push(instance);
@@ -467,5 +472,11 @@ contract AgentFactoryV2 is IAgentFactory, Initializable, AccessControl {
         address newDelegatee
     ) public onlyRole(DEFAULT_ADMIN_ROLE) {
         defaultDelegatee = newDelegatee;
+    }
+
+    function setAssetToken(
+        address newToken
+    ) public onlyRole(DEFAULT_ADMIN_ROLE) {
+        assetToken = newToken;
     }
 }

@@ -28,6 +28,8 @@ contract AgentDAO is
 
     error ERC5805FutureLookup(uint256 timepoint, uint48 clock);
 
+    uint256 private _totalScore;
+
     constructor() {
         _disableInitializers();
     }
@@ -164,6 +166,7 @@ contract AgentDAO is
         );
 
         if (!votedPreviously && hasVoted(proposalId, account)) {
+            ++_totalScore;
             _scores[account].push(
                 SafeCast.toUint48(block.number),
                 SafeCast.toUint208(scoreOf(account)) + 1
@@ -237,5 +240,9 @@ contract AgentDAO is
             }
         }
         return currentState;
+    }
+
+    function totalScore() public view override returns (uint256) {
+        return _totalScore;
     }
 }

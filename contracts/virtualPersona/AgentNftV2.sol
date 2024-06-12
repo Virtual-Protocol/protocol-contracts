@@ -112,7 +112,6 @@ contract AgentNftV2 is
 
         _stakingTokenToVirtualId[address(daoToken)] = virtualId;
         _addValidator(virtualId, founder);
-        _initValidatorScore(virtualId, founder);
         return virtualId;
     }
 

@@ -98,7 +98,9 @@ describe("AgentFactoryV2", function () {
       service.target,
       contribution.target,
       agentNft.target,
-      IP_SHARE,
+      process.env.IP_SHARES,
+      process.env.DATA_SHARES,
+      process.env.IMPACT_MULTIPLIER,
       ipVault.address,
       agentFactory.target,
       deployer.address,
@@ -160,7 +162,9 @@ describe("AgentFactoryV2", function () {
     const { agentFactory, applicationId } = base;
 
     const { founder } = await getAccounts();
-    await agentFactory.connect(founder).executeApplication(applicationId);
+    await agentFactory
+      .connect(founder)
+      .executeApplication(applicationId, false);
 
     const factoryFilter = agentFactory.filters.NewPersona;
     const factoryEvents = await agentFactory.queryFilter(factoryFilter, -1);
@@ -244,7 +248,7 @@ describe("AgentFactoryV2", function () {
     );
     const { founder } = await getAccounts();
     await expect(
-      agentFactory.connect(founder).executeApplication(applicationId)
+      agentFactory.connect(founder).executeApplication(applicationId, false)
     ).to.emit(agentFactory, "NewPersona");
 
     // Check genesis components

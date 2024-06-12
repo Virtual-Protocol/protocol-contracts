@@ -5,17 +5,42 @@ const adminSigner = new ethers.Wallet(
   ethers.provider
 );
 
-async function upgradeFactory(implementations) {
+const deployerSigner = new ethers.Wallet(
+  process.env.PRIVATE_KEY,
+  ethers.provider
+);
+
+
+async function upgradeFactory(implementations, assetToken) {
   const AgentFactory = await ethers.getContractFactory("AgentFactoryV2");
   const factory = await upgrades.upgradeProxy(
     process.env.VIRTUAL_FACTORY,
     AgentFactory
   );
-  await factory.setImplementations(
-    implementations.tokenImpl.target,
-    implementations.veTokenImpl.target,
-    implementations.daoImpl.target
+  if (implementations) {
+    await factory.setImplementations(
+      implementations.tokenImpl.target,
+      implementations.veTokenImpl.target,
+      implementations.daoImpl.target
+    );
+  }
+  if (assetToken) {
+    await factory.setAssetToken(assetToken);
+  }
+  await factory.setTokenAdmin(process.env.ADMIN);
+  await factory.setTokenSupplyParams(
+    process.env.AGENT_TOKEN_LIMIT,
+    process.env.AGENT_TOKEN_LIMIT,
+    process.env.BOT_PROTECTION
   );
+  await factory.setTokenTaxParams(
+    process.env.TAX,
+    process.env.TAX,
+    process.env.SWAP_THRESHOLD,
+    process.env.TAX_VAULT
+  );
+  await factory.setTokenMultiplier(10000);
+  await factory.setDefaultDelegatee(process.env.ADMIN);
   console.log("Upgraded FactoryV2", factory.target);
 }
 
@@ -25,7 +50,7 @@ async function importContract() {
     adminSigner
   );
   await upgrades.forceImport(
-    "0x7C3454Cb983Ed1D060A4677C02e1126C4a2275B3",
+    "0x8f767259867Cc93df37e59ba445019418871ea57",
     ContractFactory
   );
 }
@@ -67,12 +92,21 @@ async function deployImplementations() {
   return { daoImpl, tokenImpl, veTokenImpl };
 }
 
+async function deployMinter() {
+  const deployParams = require("../arguments/minter")
+  const minter = await ethers.deployContract("Minter", deployParams);
+  await minter.waitForDeployment();
+  console.log("Minter deployed to:", minter.target);
+}
+
+
 (async () => {
   try {
+    // await deployMinter();
     // const implementations = await deployImplementations();
-    // await upgradeFactory(implementations);
-    //await deployAgentNft();
-    await upgradeAgentNft();
+    // await upgradeFactory(implementations, process.env.BRIDGED_TOKEN);
+     await deployAgentNft();
+    //await upgradeAgentNft();
   } catch (e) {
     console.log(e);
   }

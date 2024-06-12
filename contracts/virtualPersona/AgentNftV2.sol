@@ -59,6 +59,10 @@ contract AgentNftV2 is
         _disableInitializers();
     }
 
+    function kk() public pure returns (string memory) {
+        return "kk";
+    }
+
     function initialize(address defaultAdmin) public initializer {
         __ERC721_init("Agent", "AGENT");
         __ERC721URIStorage_init();
@@ -145,6 +149,10 @@ contract AgentNftV2 is
             return;
         }
         _addValidator(virtualId, validator);
+        _initValidatorScore(virtualId, validator);
+    }
+
+    function initValidatorScore(uint256 virtualId, address validator) public {
         _initValidatorScore(virtualId, validator);
     }
 
@@ -280,5 +288,13 @@ contract AgentNftV2 is
         bool value
     ) public onlyRole(ADMIN_ROLE) {
         _blacklists[virtualId] = value;
+    }
+
+    function migrateScoreFunctions() public onlyRole(ADMIN_ROLE) {
+        _migrateScoreFunctions(
+            _validatorScoreOf,
+            totalProposals,
+            _getPastValidatorScore
+        );
     }
 }

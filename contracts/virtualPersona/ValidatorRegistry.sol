@@ -83,4 +83,14 @@ abstract contract ValidatorRegistry is IValidatorRegistry, Initializable {
         }
         return totalScore;
     }
+
+    function _migrateScoreFunctions(
+        function(uint256, address) view returns (uint256) getScoreOf_,
+        function(uint256) view returns (uint256) getMaxScore_,
+        function(uint256, address, uint256) view returns (uint256) getPastScore_
+    ) internal {
+        _getScoreOf = getScoreOf_;
+        _getMaxScore = getMaxScore_;
+        _getPastScore = getPastScore_;
+    }
 }

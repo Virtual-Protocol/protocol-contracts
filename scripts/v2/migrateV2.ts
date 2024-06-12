@@ -10,7 +10,6 @@ const deployerSigner = new ethers.Wallet(
   ethers.provider
 );
 
-
 async function upgradeFactory(implementations, assetToken) {
   const AgentFactory = await ethers.getContractFactory("AgentFactoryV2");
   const factory = await upgrades.upgradeProxy(
@@ -71,9 +70,16 @@ async function updateAgentNftRoles() {
 }
 
 async function upgradeAgentNft() {
-  const Factory = await ethers.getContractFactory("AgentNftV2", adminSigner);
-  const factory = await upgrades.upgradeProxy(process.env.VIRTUAL_NFT, Factory);
-  console.log("Upgraded AgentNftV2", factory.target);
+  const nft = await ethers.deployContract("AgentNftV2");
+  console.log("AgentNft deployed to:", nft.target);
+
+  const proxyAdmin = await ethers.getContractAt(
+    "MyProxyAdmin",
+    process.env.VIRTUAL_NFT_PROXY,
+    adminSigner
+  );
+  await proxyAdmin.upgradeAndCall(process.env.VIRTUAL_NFT, nft.target, "0x");
+  console.log("Upgraded AgentNft");
 }
 
 async function deployImplementations() {
@@ -93,20 +99,18 @@ async function deployImplementations() {
 }
 
 async function deployMinter() {
-  const deployParams = require("../arguments/minter")
+  const deployParams = require("../arguments/minter");
   const minter = await ethers.deployContract("Minter", deployParams);
   await minter.waitForDeployment();
   console.log("Minter deployed to:", minter.target);
 }
 
-
 (async () => {
   try {
-    // await deployMinter();
-    // const implementations = await deployImplementations();
-    // await upgradeFactory(implementations, process.env.BRIDGED_TOKEN);
-     await deployAgentNft();
-    //await upgradeAgentNft();
+    await deployMinter();
+    const implementations = await deployImplementations();
+    await upgradeFactory(implementations, process.env.BRIDGED_TOKEN);
+    await upgradeAgentNft();
   } catch (e) {
     console.log(e);
   }

@@ -32,7 +32,6 @@ function getDescHash(str) {
 describe("AgentDAO", function () {
   const PROPOSAL_THRESHOLD = parseEther("100000"); //100k
   const MATURITY_SCORE = toBeHex(2000, 32); // 20%
-  const IP_SHARE = 1000; // 10%
 
   const TOKEN_URI = "http://jessica";
 
@@ -128,7 +127,9 @@ describe("AgentDAO", function () {
       service.target,
       contribution.target,
       agentNft.target,
-      IP_SHARE,
+      process.env.IP_SHARES,
+      process.env.DATA_SHARES,
+      process.env.IMPACT_MULTIPLIER,
       ipVault.address,
       agentFactory.target,
       deployer.address,

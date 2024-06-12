@@ -64,6 +64,14 @@ contract AgentVeToken is IAgentVeToken, ERC20Upgradeable, ERC20Votes {
 
         address sender = _msgSender();
         require(amount > 0, "Cannot stake 0");
+        require(
+            IERC20(assetToken).balanceOf(sender) >= amount,
+            "Insufficient asset token balance"
+        );
+        require(
+            IERC20(assetToken).allowance(sender, address(this)) >= amount,
+            "Insufficient asset token allowance"
+        );
 
         if (totalSupply() == 0) {
             initialLock = amount;
@@ -100,7 +108,9 @@ contract AgentVeToken is IAgentVeToken, ERC20Upgradeable, ERC20Votes {
         address sender = _msgSender();
         require(balanceOf(sender) >= amount, "Insufficient balance");
 
-        if ((sender == founder) && ((balanceOf(sender) - amount) < initialLock)) {
+        if (
+            (sender == founder) && ((balanceOf(sender) - amount) < initialLock)
+        ) {
             require(block.timestamp >= matureAt, "Not mature yet");
         }
 

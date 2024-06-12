@@ -35,6 +35,7 @@ interface IAgentReward {
     event StakerRewardClaimed(
         uint256 indexed virtualId,
         address indexed staker,
+        uint256 numRewards,
         uint256 amount
     );
 

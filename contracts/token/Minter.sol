@@ -19,6 +19,9 @@ contract Minter is IMinter, Ownable {
 
     uint256 public ipShare; // Share for IP holder
     uint256 public dataShare; // Share for Dataset provider
+    uint256 public impactMultiplier;
+
+    uint256 public constant DENOM = 10000;
 
     mapping(uint256 => bool) _mintedNfts;
 
@@ -38,6 +41,8 @@ contract Minter is IMinter, Ownable {
         address contributionAddress,
         address agentAddress,
         uint256 _ipShare,
+        uint256 _dataShare,
+        uint256 _impactMultiplier,
         address _ipVault,
         address _agentFactory,
         address initialOwner
@@ -46,6 +51,8 @@ contract Minter is IMinter, Ownable {
         contributionNft = contributionAddress;
         agentNft = agentAddress;
         ipShare = _ipShare;
+        dataShare = _dataShare;
+        impactMultiplier = _impactMultiplier;
         ipVault = _ipVault;
         agentFactory = _agentFactory;
     }
@@ -79,6 +86,10 @@ contract Minter is IMinter, Ownable {
         agentFactory = _factory;
     }
 
+    function setImpactMultiplier(uint256 _multiplier) public onlyOwner {
+        impactMultiplier = _multiplier;
+    }
+
     function mint(uint256 nftId) public noReentrant {
         // Mint configuration:
         // 1. ELO impact amount, to be shared between model and dataset owner
@@ -95,15 +106,16 @@ contract Minter is IMinter, Ownable {
         _mintedNfts[nftId] = true;
 
         address tokenAddress = IAgentNft(agentNft).virtualInfo(agentId).token;
-        uint256 datasetId = IContributionNft(contributionNft).getDatasetId(
-            nftId
-        );
-        uint256 amount = (IServiceNft(serviceNft).getImpact(nftId) * 10 ** 18);
-        uint256 ipAmount = (amount * ipShare) / 10000;
+        IContributionNft contribution = IContributionNft(contributionNft);
+        require(contribution.isModel(nftId), "Not a model contribution");
+
+        uint256 datasetId = contribution.getDatasetId(nftId);
+        uint256 amount = (IServiceNft(serviceNft).getImpact(nftId) * impactMultiplier * 10 ** 18) / DENOM;
+        uint256 ipAmount = (amount * ipShare) / DENOM;
         uint256 dataAmount = 0;
 
         if (datasetId != 0) {
-            dataAmount = (amount * ipShare) / 10000;
+            dataAmount = (amount * dataShare) / DENOM;
             amount = amount - dataAmount;
         }
 

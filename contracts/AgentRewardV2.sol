@@ -33,6 +33,7 @@ contract AgentRewardV2 is
 
     uint256 public constant DENOMINATOR = 10000;
     bytes32 public constant GOV_ROLE = keccak256("GOV_ROLE");
+    uint8 public constant LOOP_LIMIT = 100;
 
     // Referencing contracts
     address public rewardToken;
@@ -234,12 +235,11 @@ contract AgentRewardV2 is
 
     function getClaimableStakerRewards(
         address account,
-        uint256 virtualId,
-        uint256 limit
+        uint256 virtualId
     ) public view returns (uint256 totalClaimable, uint256 numRewards) {
         Claim memory claim = _stakerClaims[account][virtualId];
         numRewards = Math.min(
-            limit + claim.rewardCount,
+            LOOP_LIMIT + claim.rewardCount,
             getAgentRewardCount(virtualId)
         );
         IAgentVeToken veToken = IAgentVeToken(
@@ -262,10 +262,7 @@ contract AgentRewardV2 is
             );
             uint256 stakerReward = (agentReward.stakerAmount * stakedAmount) /
                 agentReward.totalStaked;
-            stakerReward =
-                ((stakerReward * uptime * DENOMINATOR) /
-                    agentReward.totalProposals) *
-                DENOMINATOR;
+            stakerReward = (stakerReward * uptime) / agentReward.totalProposals;
 
             totalClaimable += stakerReward;
         }
@@ -273,12 +270,11 @@ contract AgentRewardV2 is
 
     function getClaimableValidatorRewards(
         address account,
-        uint256 virtualId,
-        uint256 limit
+        uint256 virtualId
     ) public view returns (uint256 totalClaimable, uint256 numRewards) {
         Claim memory claim = _validatorClaims[account][virtualId];
         numRewards = Math.min(
-            limit + claim.rewardCount,
+            LOOP_LIMIT + claim.rewardCount,
             getAgentRewardCount(virtualId)
         );
         IVotes veToken = IVotes(
@@ -295,9 +291,8 @@ contract AgentRewardV2 is
             uint256 validatorReward = (agentReward.validatorAmount * votes) /
                 agentReward.totalStaked;
             validatorReward =
-                ((validatorReward * uptime * DENOMINATOR) /
-                    agentReward.totalProposals) *
-                DENOMINATOR;
+                (validatorReward * uptime) /
+                agentReward.totalProposals;
 
             totalClaimable += validatorReward;
         }
@@ -305,24 +300,28 @@ contract AgentRewardV2 is
 
     function getTotalClaimableStakerRewards(
         address account,
-        uint256[] memory virtualIds,
-        uint256 limit
+        uint256[] memory virtualIds
     ) public view returns (uint256 totalClaimable) {
         for (uint i = 0; i < virtualIds.length; i++) {
             uint256 virtualId = virtualIds[i];
-            (uint256 claimable, ) = getClaimableStakerRewards(account, virtualId, limit);
+            (uint256 claimable, ) = getClaimableStakerRewards(
+                account,
+                virtualId
+            );
             totalClaimable += claimable;
         }
     }
 
     function getTotalClaimableValidatorRewards(
         address account,
-        uint256[] memory virtualIds,
-        uint256 limit
+        uint256[] memory virtualIds
     ) public view returns (uint256 totalClaimable) {
         for (uint i = 0; i < virtualIds.length; i++) {
             uint256 virtualId = virtualIds[i];
-            (uint256 claimable, ) = getClaimableValidatorRewards(account, virtualId, limit);
+            (uint256 claimable, ) = getClaimableValidatorRewards(
+                account,
+                virtualId
+            );
             totalClaimable += claimable;
         }
     }
@@ -334,16 +333,14 @@ contract AgentRewardV2 is
     }
 
     function claimStakerRewards(
-        uint256 virtualId,
-        uint256 limit
+        uint256 virtualId
     ) public noReentrant {
         address account = _msgSender();
         uint256 totalClaimable;
         uint256 numRewards;
         (totalClaimable, numRewards) = getClaimableStakerRewards(
             account,
-            virtualId,
-            limit
+            virtualId
         );
 
         Claim storage claim = _stakerClaims[account][virtualId];
@@ -352,20 +349,18 @@ contract AgentRewardV2 is
 
         IERC20(rewardToken).safeTransfer(account, totalClaimable);
 
-        emit StakerRewardClaimed(virtualId, account, totalClaimable);
+        emit StakerRewardClaimed(virtualId, account, numRewards, totalClaimable);
     }
 
     function claimValidatorRewards(
-        uint256 virtualId,
-        uint256 limit
+        uint256 virtualId
     ) public noReentrant {
         address account = _msgSender();
         uint256 totalClaimable;
         uint256 numRewards;
         (totalClaimable, numRewards) = getClaimableValidatorRewards(
             account,
-            virtualId,
-            limit
+            virtualId
         );
 
         Claim storage claim = _validatorClaims[account][virtualId];
@@ -378,8 +373,7 @@ contract AgentRewardV2 is
     }
 
     function claimAllStakerRewards(
-        uint256[] memory virtualIds,
-        uint256 limit
+        uint256[] memory virtualIds
     ) public noReentrant {
         address account = _msgSender();
         uint256 totalClaimable;
@@ -389,8 +383,7 @@ contract AgentRewardV2 is
             uint256 numRewards;
             (claimable, numRewards) = getClaimableStakerRewards(
                 account,
-                virtualId,
-                limit
+                virtualId
             );
             totalClaimable += claimable;
 
@@ -403,8 +396,7 @@ contract AgentRewardV2 is
     }
 
     function claimAllValidatorRewards(
-        uint256[] memory virtualIds,
-        uint256 limit
+        uint256[] memory virtualIds
     ) public noReentrant {
         address account = _msgSender();
         uint256 totalClaimable;
@@ -414,8 +406,7 @@ contract AgentRewardV2 is
             uint256 numRewards;
             (claimable, numRewards) = getClaimableValidatorRewards(
                 account,
-                virtualId,
-                limit
+                virtualId
             );
             totalClaimable += claimable;
 

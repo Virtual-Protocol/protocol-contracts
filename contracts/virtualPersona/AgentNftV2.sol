@@ -54,6 +54,8 @@ contract AgentNftV2 is
     mapping(uint256 => bool) private _blacklists;
     mapping(uint256 => VirtualLP) public virtualLPs;
 
+    event AgentBlacklisted(uint256 indexed virtualId, bool value);
+
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() {
         _disableInitializers();
@@ -288,6 +290,7 @@ contract AgentNftV2 is
         bool value
     ) public onlyRole(ADMIN_ROLE) {
         _blacklists[virtualId] = value;
+        emit AgentBlacklisted(virtualId, value);
     }
 
     function migrateScoreFunctions() public onlyRole(ADMIN_ROLE) {

@@ -73,12 +73,15 @@ contract AgentVeToken is IAgentVeToken, ERC20Upgradeable, ERC20Votes {
             "Insufficient asset token allowance"
         );
 
+        IAgentNft registry = IAgentNft(agentNft);
+        uint256 virtualId = registry.stakingTokenToVirtualId(address(this));
+
+        require(!registry.isBlacklisted(virtualId), "Agent Blacklisted");
+
         if (totalSupply() == 0) {
             initialLock = amount;
         }
-
-        IAgentNft registry = IAgentNft(agentNft);
-        uint256 virtualId = registry.stakingTokenToVirtualId(address(this));
+        
         registry.addValidator(virtualId, delegatee);
 
         IERC20(assetToken).safeTransferFrom(sender, address(this), amount);

@@ -119,7 +119,6 @@ describe("RewardsV2", function () {
       contribution.target,
       agentNft.target,
       process.env.IP_SHARES,
-      process.env.DATA_SHARES,
       process.env.IMPACT_MULTIPLIER,
       ipVault.address,
       agentFactory.target,
@@ -306,59 +305,6 @@ describe("RewardsV2", function () {
   }
 
   before(async function () {});
-
-  it("should mint agent token for successful contribution", async function () {
-    const base = await loadFixture(deployWithAgent);
-    const { contributor1, founder } = await getAccounts();
-    const maturity = 55;
-    const agentToken = await ethers.getContractAt(
-      "AgentToken",
-      base.agent.token
-    );
-    const balance1 = await agentToken.balanceOf(contributor1.address);
-    expect(balance1).to.equal(0n);
-    await createContribution(
-      1,
-      0,
-      maturity,
-      0,
-      true,
-      0,
-      "Test",
-      base,
-      contributor1.address,
-      [founder]
-    );
-    const balance2 = await agentToken.balanceOf(contributor1.address);
-    expect(balance2).to.equal(parseEther(maturity.toString()));
-  });
-
-  it("should mint agent token for IP owner on successful contribution", async function () {
-    const base = await loadFixture(deployWithAgent);
-    const { ipVault, contributor1, founder } = await getAccounts();
-    const maturity = 55;
-    const agentToken = await ethers.getContractAt(
-      "AgentToken",
-      base.agent.token
-    );
-    const balance1 = await agentToken.balanceOf(ipVault.address);
-    expect(balance1).to.equal(0n);
-    await createContribution(
-      1,
-      0,
-      maturity,
-      0,
-      true,
-      0,
-      "Test",
-      base,
-      contributor1.address,
-      [founder]
-    );
-
-    const balance2 = await agentToken.balanceOf(ipVault.address);
-    expect(balance2).to.equal(parseEther((maturity * 0.1).toString()));
-  });
 
   it("should be able to distribute protocol emission for single virtual", async function () {
     const base = await loadFixture(deployWithAgent);

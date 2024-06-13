@@ -18,12 +18,14 @@ contract Minter is IMinter, Ownable {
     address public ipVault;
 
     uint256 public ipShare; // Share for IP holder
-    uint256 public dataShare; // Share for Dataset provider
     uint256 public impactMultiplier;
 
     uint256 public constant DENOM = 10000;
 
     mapping(uint256 => bool) _mintedNfts;
+
+    mapping(uint256 => uint256) public impactMulOverrides;
+    mapping(uint256 => uint256) public ipShareOverrides;
 
     bool internal locked;
 
@@ -34,6 +36,12 @@ contract Minter is IMinter, Ownable {
         locked = false;
     }
 
+    modifier onlyAgentDAO(uint256 virtualId) {
+        address daoAddress = IAgentNft(agentNft).virtualInfo(virtualId).dao;
+        require(daoAddress == _msgSender(), "Only Agent DAO can operate");
+        _;
+    }
+
     address agentFactory;
 
     constructor(
@@ -41,7 +49,6 @@ contract Minter is IMinter, Ownable {
         address contributionAddress,
         address agentAddress,
         uint256 _ipShare,
-        uint256 _dataShare,
         uint256 _impactMultiplier,
         address _ipVault,
         address _agentFactory,
@@ -51,7 +58,6 @@ contract Minter is IMinter, Ownable {
         contributionNft = contributionAddress;
         agentNft = agentAddress;
         ipShare = _ipShare;
-        dataShare = _dataShare;
         impactMultiplier = _impactMultiplier;
         ipVault = _ipVault;
         agentFactory = _agentFactory;
@@ -70,12 +76,17 @@ contract Minter is IMinter, Ownable {
         contributionNft = contributionAddress;
     }
 
-    function setIpShare(uint256 _ipShare) public onlyOwner {
+    function setIPShare(uint256 _ipShare) public onlyOwner {
         ipShare = _ipShare;
+        emit IPShareUpdated(_ipShare);
     }
 
-    function setDataShare(uint256 _dataShare) public onlyOwner {
-        dataShare = _dataShare;
+    function setIPShareOverride(
+        uint256 virtualId,
+        uint256 _ipShare
+    ) public onlyAgentDAO(virtualId) {
+        ipShareOverrides[virtualId] = _ipShare;
+        emit AgentIPShareUpdated(virtualId, _ipShare);
     }
 
     function setIPVault(address _ipVault) public onlyOwner {
@@ -88,6 +99,22 @@ contract Minter is IMinter, Ownable {
 
     function setImpactMultiplier(uint256 _multiplier) public onlyOwner {
         impactMultiplier = _multiplier;
+        emit ImpactMultiplierUpdated(_multiplier);
+    }
+
+    function setImpactMulOverride(uint256 virtualId, uint256 mul) public onlyAgentDAO(virtualId) {
+        impactMulOverrides[virtualId] = mul;
+        emit AgentImpactMultiplierUpdated(virtualId, mul);
+    }
+
+    function _getImpactMultiplier(
+        uint256 virtualId
+    ) internal view returns (uint256) {
+        uint256 mul = impactMulOverrides[virtualId];
+        if (mul == 0) {
+            mul = impactMultiplier;
+        }
+        return mul;
     }
 
     function mint(uint256 nftId) public noReentrant {
@@ -98,26 +125,28 @@ contract Minter is IMinter, Ownable {
 
         require(!_mintedNfts[nftId], "Already minted");
 
-        uint256 agentId = IContributionNft(contributionNft).tokenVirtualId(
+        uint256 virtualId = IContributionNft(contributionNft).tokenVirtualId(
             nftId
         );
-        require(agentId != 0, "Agent not found");
+        require(virtualId != 0, "Agent not found");
 
         _mintedNfts[nftId] = true;
 
-        address tokenAddress = IAgentNft(agentNft).virtualInfo(agentId).token;
+        address tokenAddress = IAgentNft(agentNft).virtualInfo(virtualId).token;
         IContributionNft contribution = IContributionNft(contributionNft);
         require(contribution.isModel(nftId), "Not a model contribution");
 
+        uint256 finalImpactMultiplier = _getImpactMultiplier(virtualId);
         uint256 datasetId = contribution.getDatasetId(nftId);
-        uint256 amount = (IServiceNft(serviceNft).getImpact(nftId) * impactMultiplier * 10 ** 18) / DENOM;
-        uint256 ipAmount = (amount * ipShare) / DENOM;
-        uint256 dataAmount = 0;
-
-        if (datasetId != 0) {
-            dataAmount = (amount * dataShare) / DENOM;
-            amount = amount - dataAmount;
-        }
+        uint256 amount = (IServiceNft(serviceNft).getImpact(nftId) *
+            finalImpactMultiplier *
+            10 ** 18) / DENOM;
+        uint256 dataAmount = datasetId > 0
+            ? (IServiceNft(serviceNft).getImpact(datasetId) *
+                finalImpactMultiplier *
+                10 ** 18) / DENOM
+            : 0;
+        uint256 ipAmount = ((amount + dataAmount) * ipShare) / DENOM;
 
         // Mint to model owner
         if (amount > 0) {
@@ -126,7 +155,7 @@ contract Minter is IMinter, Ownable {
         }
 
         // Mint to Dataset owner
-        if (datasetId != 0 && dataAmount > 0) {
+        if (datasetId != 0) {
             address datasetOwner = IERC721(contributionNft).ownerOf(datasetId);
             IAgentToken(tokenAddress).mint(datasetOwner, dataAmount);
         }

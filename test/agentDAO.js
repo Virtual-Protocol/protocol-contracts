@@ -128,7 +128,6 @@ describe("AgentDAO", function () {
       contribution.target,
       agentNft.target,
       process.env.IP_SHARES,
-      process.env.DATA_SHARES,
       process.env.IMPACT_MULTIPLIER,
       ipVault.address,
       agentFactory.target,

@@ -99,7 +99,6 @@ describe("AgentFactoryV2", function () {
       contribution.target,
       agentNft.target,
       process.env.IP_SHARES,
-      process.env.DATA_SHARES,
       process.env.IMPACT_MULTIPLIER,
       ipVault.address,
       agentFactory.target,
@@ -284,12 +283,18 @@ describe("AgentFactoryV2", function () {
 
   it("agent component C3: Agent veToken", async function () {
     const { agent } = await loadFixture(deployWithAgent);
-    const { founder } = await getAccounts();
+    const { founder, deployer } = await getAccounts();
     const veToken = await ethers.getContractAt("AgentVeToken", agent.veToken);
     const balance = await veToken.balanceOf(founder.address);
     expect(parseFloat(formatEther(balance).toString()).toFixed(2)).to.be.equal(
       "100000.00"
     );
+    // Delegate to default delegatee
+    expect(
+      parseFloat(
+        formatEther(await veToken.getVotes(deployer.address)).toString()
+      ).toFixed(2)
+    ).to.be.equal("100000.00");
   });
 
   it("agent component C4: Agent DAO", async function () {
@@ -381,7 +386,7 @@ describe("AgentFactoryV2", function () {
         capital,
         [virtualToken.target, agent.token],
         trader.address,
-        Math.floor(new Date().getTime() / 1000 + 6000)
+        Math.floor(new Date().getTime() / 1000 + 600000)
       );
     ////
     // Start providing liquidity
@@ -636,7 +641,7 @@ describe("AgentFactoryV2", function () {
     ).to.be.revertedWith("Not mature yet");
   });
 
-  it("should allow manual unlock LP", async function () {
+  it("should allow manual unlock staked LP", async function () {
     const { agent, agentNft, virtualToken } = await loadFixture(
       deployWithAgent
     );
@@ -647,11 +652,94 @@ describe("AgentFactoryV2", function () {
       "AgentVeToken",
       agent.veToken
     );
+    // Unable to withdraw staked LP initially
+    await expect(agentVeToken.connect(founder).withdraw(parseEther("10"))).to.be
+      .reverted;
+
+    // Unlock
+    await expect(agentVeToken.setMatureAt(0)).to.not.be.reverted;
     await agentNft.setBlacklist(agent.virtualId, true);
     expect(await agentNft.isBlacklisted(agent.virtualId)).to.be.equal(true);
-    await expect(agentVeToken.setMatureAt(0)).to.not.be.reverted;
 
+    // Able to withdraw after unlock
     await expect(agentVeToken.connect(founder).withdraw(parseEther("10"))).to
       .not.be.reverted;
+  });
+
+  it("should not allow staking on blacklisted agent", async function () {
+    const { agent, agentNft, virtualToken } = await loadFixture(
+      deployWithAgent
+    );
+    const { founder, deployer, trader } = await getAccounts();
+    // Assign admin role
+    await agentNft.grantRole(await agentNft.ADMIN_ROLE(), deployer);
+    const agentToken = await ethers.getContractAt("AgentToken", agent.token);
+    const agentVeToken = await ethers.getContractAt(
+      "AgentVeToken",
+      agent.veToken
+    );
+    // Unable to withdraw staked LP initially
+    await expect(agentVeToken.connect(founder).withdraw(parseEther("10"))).to.be
+      .reverted;
+
+    // Unlock
+    await agentVeToken.setMatureAt(0);
+    await agentNft.setBlacklist(agent.virtualId, true);
+    await agentNft.isBlacklisted(agent.virtualId);
+
+    // Unable to stake on blacklisted agent
+    // Get trader to stake on poorMan so that we have 2 validators
+    // Buy tokens
+    const router = await ethers.getContractAt(
+      "IUniswapV2Router02",
+      process.env.UNISWAP_ROUTER
+    );
+    const amountToBuy = parseEther("90");
+    const capital = parseEther("200");
+    await virtualToken.mint(trader.address, capital);
+    await virtualToken
+      .connect(trader)
+      .approve(process.env.UNISWAP_ROUTER, capital);
+
+    await router
+      .connect(trader)
+      .swapTokensForExactTokens(
+        amountToBuy,
+        capital,
+        [virtualToken.target, agent.token],
+        trader.address,
+        Math.floor(new Date().getTime() / 1000 + 6000)
+      );
+    ////
+    // Start providing liquidity
+    const lpToken = await ethers.getContractAt("ERC20", agent.lp);
+    const veToken = await ethers.getContractAt("AgentVeToken", agent.veToken);
+    await veToken.connect(founder).setCanStake(true);
+    expect(await lpToken.balanceOf(trader.address)).to.be.equal(0n);
+    await agentToken
+      .connect(trader)
+      .approve(process.env.UNISWAP_ROUTER, amountToBuy);
+    await virtualToken
+      .connect(trader)
+      .approve(process.env.UNISWAP_ROUTER, capital);
+    await router
+      .connect(trader)
+      .addLiquidity(
+        agentToken.target,
+        virtualToken.target,
+        await agentToken.balanceOf(trader.address),
+        await virtualToken.balanceOf(trader.address),
+        0,
+        0,
+        trader.address,
+        Math.floor(new Date().getTime() / 1000 + 6000)
+      );
+    ///
+    await lpToken.connect(trader).approve(agent.veToken, parseEther("10"));
+    await expect(
+      veToken
+        .connect(trader)
+        .stake(parseEther("10"), trader.address, trader.address)
+    ).to.be.revertedWith("Agent Blacklisted");
   });
 });

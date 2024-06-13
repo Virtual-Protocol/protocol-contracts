@@ -147,6 +147,19 @@ contract Minter is IMinter, Ownable {
                 10 ** 18) / DENOM
             : 0;
         uint256 ipAmount = ((amount + dataAmount) * ipShare) / DENOM;
+        address tokenAddress = IAgentNft(agentNft).virtualInfo(agentId).token;
+        IContributionNft contribution = IContributionNft(contributionNft);
+        require(contribution.isModel(nftId), "Not a model contribution");
+
+        uint256 datasetId = contribution.getDatasetId(nftId);
+        uint256 amount = (IServiceNft(serviceNft).getImpact(nftId) * impactMultiplier * 10 ** 18) / DENOM;
+        uint256 ipAmount = (amount * ipShare) / DENOM;
+        uint256 dataAmount = 0;
+
+        if (datasetId != 0) {
+            dataAmount = (amount * dataShare) / DENOM;
+            amount = amount - dataAmount;
+        }
 
         // Mint to model owner
         if (amount > 0) {

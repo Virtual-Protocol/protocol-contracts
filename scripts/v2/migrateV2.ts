@@ -98,18 +98,11 @@ async function deployImplementations() {
   return { daoImpl, tokenImpl, veTokenImpl };
 }
 
-async function deployMinter() {
-  const deployParams = require("../arguments/minter");
-  const minter = await ethers.deployContract("Minter", deployParams);
-  await minter.waitForDeployment();
-  console.log("Minter deployed to:", minter.target);
-}
-
 (async () => {
   try {
-    await deployMinter();
-    const implementations = await deployImplementations();
-    await upgradeFactory(implementations, process.env.BRIDGED_TOKEN);
+    // const implementations = await deployImplementations();
+    // await upgradeFactory(implementations);
+    //await deployAgentNft();
     await upgradeAgentNft();
   } catch (e) {
     console.log(e);

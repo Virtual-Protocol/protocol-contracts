@@ -809,4 +809,508 @@ describe("RewardsV2", function () {
     expect(validator2SClaimable).to.equal("0.0");
     expect(parseFloat(validator2VClaimable)).to.be.greaterThan(1000);
   });
+
+  it("should be able to distribute protocol emission for single virtual", async function () {
+    const base = await loadFixture(deployWithAgent);
+    const { rewards, virtualToken, agent } = base;
+    const { contributor1, founder, validator1 } = await getAccounts();
+    const maturity = 100;
+    // Founder should delegate to another person for us to test the different set of rewards
+    const veToken = await ethers.getContractAt("AgentVeToken", agent.veToken);
+    await veToken.connect(founder).delegate(validator1.address);
+    await mine(1);
+
+    await createContribution(
+      1,
+      0,
+      maturity,
+      0,
+      true,
+      0,
+      "Test",
+      base,
+      contributor1.address,
+      [validator1]
+    );
+    const rewardSize = 100000;
+    await virtualToken.approve(
+      rewards.target,
+      parseEther(rewardSize.toString())
+    );
+    await expect(
+      rewards.distributeRewards(parseEther(rewardSize.toString()), [1], false)
+    ).to.not.be.reverted;
+  });
+
+  it("should be able to claim correct amount for staker and validator (no protocol share)", async function () {
+    const base = await loadFixture(deployWithAgent);
+    const { rewards, virtualToken, agent } = base;
+    const { contributor1, founder, validator1 } = await getAccounts();
+    const maturity = 100;
+    // Founder should delegate to another person for us to test the different set of rewards
+    const veToken = await ethers.getContractAt("AgentVeToken", agent.veToken);
+    await veToken.connect(founder).delegate(validator1.address);
+    await mine(1);
+
+    await createContribution(
+      1,
+      0,
+      maturity,
+      0,
+      true,
+      0,
+      "Test",
+      base,
+      contributor1.address,
+      [validator1]
+    );
+    const rewardSize = 100000;
+    await virtualToken.approve(
+      rewards.target,
+      parseEther(rewardSize.toString())
+    );
+    await rewards.distributeRewards(
+      parseEther(rewardSize.toString()),
+      [1],
+      false
+    );
+    await mine(1);
+    // Founder has 90% of the total rewards
+    const founderSClaimable = formatEther(
+      await rewards.getTotalClaimableStakerRewards(founder.address, [1])
+    );
+    const founderVClaimable = formatEther(
+      await rewards.getTotalClaimableValidatorRewards(founder.address, [1])
+    );
+    expect(founderSClaimable).to.equal("90000.0");
+    expect(founderVClaimable).to.equal("0.0");
+
+    // Validator has 10% of the total rewards
+    const validatorSClaimable = formatEther(
+      await rewards.getTotalClaimableStakerRewards(validator1.address, [1])
+    );
+    const validatorVClaimable = formatEther(
+      await rewards.getTotalClaimableValidatorRewards(
+        validator1.address,
+        [1]
+      )
+    );
+    expect(validatorSClaimable).to.equal("0.0");
+    expect(validatorVClaimable).to.equal("10000.0");
+
+    // Nothing for contributor
+    const conributorSClaimable = formatEther(
+      await rewards.getTotalClaimableStakerRewards(
+        contributor1.address,
+        [1]
+      )
+    );
+    const contributorVClaimable = formatEther(
+      await rewards.getTotalClaimableValidatorRewards(
+        contributor1.address,
+        [1]
+      )
+    );
+    expect(conributorSClaimable).to.equal("0.0");
+    expect(contributorVClaimable).to.equal("0.0");
+  });
+
+  it("should be able to claim correct amount for staker and validator (has protocol share)", async function () {
+    const base = await loadFixture(deployWithAgent);
+    const { rewards, virtualToken, agent } = base;
+    const { contributor1, founder, validator1 } = await getAccounts();
+    const maturity = 100;
+    // Founder should delegate to another person for us to test the different set of rewards
+    const veToken = await ethers.getContractAt("AgentVeToken", agent.veToken);
+    await veToken.connect(founder).delegate(validator1.address);
+    await mine(1);
+
+    await createContribution(
+      1,
+      0,
+      maturity,
+      0,
+      true,
+      0,
+      "Test",
+      base,
+      contributor1.address,
+      [validator1]
+    );
+    const rewardSize = 100000;
+    await virtualToken.approve(
+      rewards.target,
+      parseEther(rewardSize.toString())
+    );
+    await rewards.distributeRewards(
+      parseEther(rewardSize.toString()),
+      [1],
+      true
+    );
+    await mine(1);
+    // Protocol shares = 10% = 10k
+    // Founder has 90% of the remaining rewards = 90% x 90k
+    const founderSClaimable = formatEther(
+      await rewards.getTotalClaimableStakerRewards(founder.address, [1])
+    );
+    const founderVClaimable = formatEther(
+      await rewards.getTotalClaimableValidatorRewards(founder.address, [1])
+    );
+    expect(founderSClaimable).to.equal("81000.0");
+    expect(founderVClaimable).to.equal("0.0");
+
+    // Validator has 10% of the total rewards
+    const validatorSClaimable = formatEther(
+      await rewards.getTotalClaimableStakerRewards(validator1.address, [1])
+    );
+    const validatorVClaimable = formatEther(
+      await rewards.getTotalClaimableValidatorRewards(
+        validator1.address,
+        [1]
+      )
+    );
+    expect(validatorSClaimable).to.equal("0.0");
+    expect(validatorVClaimable).to.equal("9000.0");
+
+    // Nothing for contributor
+    const conributorSClaimable = formatEther(
+      await rewards.getTotalClaimableStakerRewards(
+        contributor1.address,
+        [1]
+      )
+    );
+    const contributorVClaimable = formatEther(
+      await rewards.getTotalClaimableValidatorRewards(
+        contributor1.address,
+        [1]
+      )
+    );
+    expect(conributorSClaimable).to.equal("0.0");
+    expect(contributorVClaimable).to.equal("0.0");
+  });
+
+  it("should be able to distribute protocol emission for multiple virtuals with arbitrary LP values", async function () {
+    const base = await loadFixture(deployWithAgent);
+    const { agent, agentNft, virtualToken, rewards } = base;
+    const {
+      contributor1,
+      contributor2,
+      validator1,
+      validator2,
+      founder,
+      trader,
+    } = await getAccounts();
+    // Create 3 more virtuals to sum up to 4
+    const app2 = await createApplication(base, founder, 1);
+    const agent2 = await createAgent(base, app2);
+    const app3 = await createApplication(base, founder, 2);
+    const agent3 = await createAgent(base, app3);
+    const app4 = await createApplication(base, founder, 3);
+    const agent4 = await createAgent(base, app4);
+
+    // Create contributions for all 4 virtuals
+    for (let i = 1; i <= 4; i++) {
+      let veToken = await ethers.getContractAt(
+        "AgentVeToken",
+        (
+          await agentNft.virtualLP(i)
+        ).veToken
+      );
+
+      await veToken.connect(founder).delegate(validator1.address);
+      await createContribution(
+        i,
+        0,
+        100,
+        0,
+        true,
+        0,
+        `Test ${i}`,
+        base,
+        contributor1.address,
+        [validator1]
+      );
+    }
+
+    const router = await ethers.getContractAt(
+      "IUniswapV2Router02",
+      process.env.UNISWAP_ROUTER
+    );
+    // Trade on different LP
+    await virtualToken.mint(trader.address, parseEther("300"));
+    await virtualToken
+      .connect(trader)
+      .approve(router.target, parseEther("300"));
+    for (let i of [1, 3, 4]) {
+      const agentTokenAddr = (await agentNft.virtualInfo(i)).token;
+      const amountToBuy = parseEther((20 * i).toString());
+      const capital = parseEther("100");
+      await router
+        .connect(trader)
+        .swapTokensForExactTokens(
+          amountToBuy,
+          capital,
+          [virtualToken.target, agentTokenAddr],
+          trader.address,
+          Math.floor(new Date().getTime() / 1000 + 6000000)
+        );
+      await mine(1);
+    }
+
+    // Distribute rewards
+    // Expectations:
+    // virtual 4>3>1
+    // virtual 2 = 0
+    const rewardSize = 300000;
+    await virtualToken.approve(
+      rewards.target,
+      parseEther(rewardSize.toString())
+    );
+    await rewards.distributeRewards(
+      parseEther(rewardSize.toString()),
+      [1, 3, 4],
+      false
+    );
+    await mine(1);
+    const rewards1 = await rewards.getTotalClaimableStakerRewards(
+      founder.address,
+      [1]
+    );
+    const rewards2 = await rewards.getTotalClaimableStakerRewards(
+      founder.address,
+      [2]
+    );
+    const rewards3 = await rewards.getTotalClaimableStakerRewards(
+      founder.address,
+      [3]
+    );
+    const rewards4 = await rewards.getTotalClaimableStakerRewards(
+      founder.address,
+      [4]
+    );
+    expect(rewards4).to.be.greaterThan(rewards3);
+    expect(rewards3).to.be.greaterThan(rewards1);
+    expect(rewards2).to.be.equal(0n);
+  });
+
+  it("should be able to distribute rewards based on validator uptime (validator2 is down)", async function () {
+    const base = await loadFixture(deployWithAgent);
+    const { rewards, virtualToken, agent, agentNft } = base;
+    const { contributor1, founder, validator1, trader, validator2 } =
+      await getAccounts();
+    const maturity = 100;
+    // Founder should delegate to another person for us to test the different set of rewards
+    const veToken = await ethers.getContractAt("AgentVeToken", agent.veToken);
+    await veToken.connect(founder).delegate(validator1.address);
+    await mine(1);
+
+    const router = await ethers.getContractAt(
+      "IUniswapV2Router02",
+      process.env.UNISWAP_ROUTER
+    );
+
+    await virtualToken.mint(trader.address, parseEther("300"));
+    await virtualToken
+      .connect(trader)
+      .approve(router.target, parseEther("300"));
+    const agentTokenAddr = (await agentNft.virtualInfo(1)).token;
+    const amountToBuy = parseEther("100");
+    const capital = parseEther("150");
+    await router
+      .connect(trader)
+      .swapTokensForExactTokens(
+        amountToBuy,
+        capital,
+        [virtualToken.target, agentTokenAddr],
+        trader.address,
+        Math.floor(new Date().getTime() / 1000 + 6000000)
+      );
+    await mine(1);
+    await veToken.connect(trader).delegate(validator2.address);
+    await mine(1);
+
+    // Validator 1 voting
+    await createContribution(
+      1,
+      0,
+      maturity,
+      0,
+      true,
+      0,
+      "Test",
+      base,
+      contributor1.address,
+      [validator1]
+    );
+    const rewardSize = 100000;
+    await virtualToken.approve(
+      rewards.target,
+      parseEther(rewardSize.toString())
+    );
+    await rewards.distributeRewards(
+      parseEther(rewardSize.toString()),
+      [1],
+      false
+    );
+    await mine(1);
+
+    // Staker1 + Validator 1
+    const staker1SClaimable = formatEther(
+      await rewards.getTotalClaimableStakerRewards(founder.address, [1])
+    );
+    const staker1VClaimable = formatEther(
+      await rewards.getTotalClaimableValidatorRewards(founder.address, [1])
+    );
+    expect(staker1SClaimable).to.equal("90000.0");
+    expect(staker1VClaimable).to.equal("0.0");
+
+    const validator1SClaimable = formatEther(
+      await rewards.getTotalClaimableStakerRewards(validator1.address, [1])
+    );
+    const validator1VClaimable = formatEther(
+      await rewards.getTotalClaimableValidatorRewards(validator1.address, [1])
+    );
+    expect(validator1SClaimable).to.equal("0.0");
+    expect(validator1VClaimable).to.equal("10000.0");
+
+    // Staker2 + Validator 2
+    const staker2SClaimable = formatEther(
+      await rewards.getTotalClaimableStakerRewards(trader.address, [1])
+    );
+    const staker2VClaimable = formatEther(
+      await rewards.getTotalClaimableValidatorRewards(trader.address, [1])
+    );
+    expect(staker2SClaimable).to.equal("0.0");
+    expect(staker2VClaimable).to.equal("0.0");
+
+    const validator2SClaimable = formatEther(
+      await rewards.getTotalClaimableStakerRewards(trader.address, [1])
+    );
+    const validator2VClaimable = formatEther(
+      await rewards.getTotalClaimableValidatorRewards(trader.address, [1])
+    );
+    expect(validator2SClaimable).to.equal("0.0");
+    expect(validator2VClaimable).to.equal("0.0");
+  });
+
+  it("should be able to distribute rewards based on validator uptime (validator2 is up)", async function () {
+    const base = await loadFixture(deployWithAgent);
+    const { rewards, virtualToken, agent, agentNft } = base;
+    const { contributor1, founder, validator1, trader, validator2 } =
+      await getAccounts();
+    const maturity = 100;
+
+    const agentToken = await ethers.getContractAt("AgentToken", agent.token);
+    const veToken = await ethers.getContractAt("AgentVeToken", agent.veToken);
+    const lp = await ethers.getContractAt("IERC20", agent.lp);
+    await veToken.connect(founder).delegate(validator1.address);
+    await mine(1);
+
+    const router = await ethers.getContractAt(
+      "IUniswapV2Router02",
+      process.env.UNISWAP_ROUTER
+    );
+
+    await virtualToken.mint(trader.address, parseEther("100000"));
+    await virtualToken
+      .connect(trader)
+      .approve(router.target, parseEther("100000"));
+    const agentTokenAddr = (await agentNft.virtualInfo(1)).token;
+    const amountToBuy = parseEther("40000");
+    const capital = parseEther("100000");
+    await router
+      .connect(trader)
+      .swapTokensForExactTokens(
+        amountToBuy,
+        capital,
+        [virtualToken.target, agentTokenAddr],
+        trader.address,
+        Math.floor(new Date().getTime() / 1000 + 6000000)
+      );
+    await mine(1);
+    await agentToken
+      .connect(trader)
+      .approve(router.target, await agentToken.balanceOf(trader.address));
+    await router
+      .connect(trader)
+      .addLiquidity(
+        agentToken.target,
+        virtualToken.target,
+        await agentToken.balanceOf(trader.address),
+        await virtualToken.balanceOf(trader.address),
+        0,
+        0,
+        trader.address,
+        Math.floor(new Date().getTime() / 1000 + 600000)
+      );
+    await mine(1);
+    await lp.connect(trader).approve(veToken.target, await lp.balanceOf(trader.address));
+    await veToken
+      .connect(trader)
+      .stake(await lp.balanceOf(trader.address), trader.address, validator2.address);
+    await mine(1);
+
+    // Validator 1 voting
+    await createContribution(
+      1,
+      0,
+      maturity,
+      0,
+      true,
+      0,
+      "Test",
+      base,
+      contributor1.address,
+      [validator1, validator2]
+    );
+    const rewardSize = 100000;
+    await virtualToken.approve(
+      rewards.target,
+      parseEther(rewardSize.toString())
+    );
+    await rewards.distributeRewards(
+      parseEther(rewardSize.toString()),
+      [1],
+      false
+    );
+    await mine(1);
+
+    // Staker1 + Validator 1
+    const staker1SClaimable = formatEther(
+      await rewards.getTotalClaimableStakerRewards(founder.address, [1])
+    );
+    const staker1VClaimable = formatEther(
+      await rewards.getTotalClaimableValidatorRewards(founder.address, [1])
+    );
+    expect(parseFloat(staker1SClaimable)).to.be.greaterThan(70000);
+    expect(staker1VClaimable).to.equal("0.0");
+
+    const validator1SClaimable = formatEther(
+      await rewards.getTotalClaimableStakerRewards(validator1.address, [1])
+    );
+    const validator1VClaimable = formatEther(
+      await rewards.getTotalClaimableValidatorRewards(validator1.address, [1])
+    );
+    expect(validator1SClaimable).to.equal("0.0");
+    expect(parseFloat(validator1VClaimable)).to.be.greaterThan(7000);
+
+    // Staker2 + Validator 2
+    const staker2SClaimable = formatEther(
+      await rewards.getTotalClaimableStakerRewards(trader.address, [1])
+    );
+    const staker2VClaimable = formatEther(
+      await rewards.getTotalClaimableValidatorRewards(trader.address, [1])
+    );
+    expect(parseFloat(staker2SClaimable)).to.be.greaterThan(10000);
+    expect(staker2VClaimable).to.equal("0.0");
+
+    const validator2SClaimable = formatEther(
+      await rewards.getTotalClaimableStakerRewards(validator2.address, [1])
+    );
+    const validator2VClaimable = formatEther(
+      await rewards.getTotalClaimableValidatorRewards(validator2.address, [1])
+    );
+    expect(validator2SClaimable).to.equal("0.0");
+    expect(parseFloat(validator2VClaimable)).to.be.greaterThan(1000);
+  });
 });

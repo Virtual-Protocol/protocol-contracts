@@ -306,7 +306,6 @@ describe("Contribution", function () {
 
     await mine(600);
 
-    await agentDAO.execute(proposalId);
     if (isModel) {
       await minter.mint(proposalId);
     }
@@ -546,7 +545,6 @@ describe("Contribution", function () {
     await mine(1);
     await agentDAO.connect(founder).castVote(proposalId, 1);
     await mine(1);
-    await agentDAO.execute(proposalId);
 
     // No agent token minted for dataset contribution
     const c1 = await createContribution(
@@ -693,8 +691,6 @@ describe("Contribution", function () {
   
       await mine(1);
       await agentDAO.connect(founder).castVote(proposalId, 1);
-      await mine(1);
-      await agentDAO.execute(proposalId);
   
       // No agent token minted for dataset contribution
       const c1 = await createContribution(

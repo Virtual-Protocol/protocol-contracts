@@ -176,7 +176,21 @@ contract AgentDAO is
             }
         }
 
+        if (support == 1) {
+            _tryAutoExecute(proposalId);
+        }
+
         return weight;
+    }
+
+    // Auto execute when forVotes == totalSupply
+    function _tryAutoExecute(uint256 proposalId) internal {
+        (, uint256 forVotes, ) = proposalVotes(proposalId);
+        if (
+            forVotes == token().getPastTotalSupply(proposalSnapshot(proposalId))
+        ) {
+            execute(proposalId);
+        }
     }
 
     function _updateMaturity(

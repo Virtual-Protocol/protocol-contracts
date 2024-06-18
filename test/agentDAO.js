@@ -17,7 +17,7 @@ const { parseEther, formatEther } = require("ethers");
 const getExecuteCallData = (factory, proposalId) => {
   return factory.interface.encodeFunctionData("executeApplication", [
     proposalId,
-    false
+    false,
   ]);
 };
 
@@ -197,7 +197,9 @@ describe("AgentDAO", function () {
     const { agentFactory, applicationId } = base;
 
     const { founder } = await getAccounts();
-    await agentFactory.connect(founder).executeApplication(applicationId, false);
+    await agentFactory
+      .connect(founder)
+      .executeApplication(applicationId, false);
 
     const factoryFilter = agentFactory.filters.NewPersona;
     const factoryEvents = await agentFactory.queryFilter(factoryFilter, -1);
@@ -218,62 +220,9 @@ describe("AgentDAO", function () {
     };
   }
 
-  async function createContribution(
-    coreId,
-    maturity,
-    parentId,
-    isModel,
-    datasetId,
-    desc,
-    base,
-    account
-  ) {
-    const { founder } = await getAccounts();
-    const { agent, serviceNft, contributionNft, minter } = base;
-    const agentDAO = await ethers.getContractAt("AgentDAO", agent.dao);
-
-    const descHash = getDescHash(desc);
-
-    const mintCalldata = await getMintServiceCalldata(
-      serviceNft,
-      agent.virtualId,
-      descHash
-    );
-
-    await agentDAO.propose([serviceNft.target], [0], [mintCalldata], desc);
-    const filter = agentDAO.filters.ProposalCreated;
-    const events = await agentDAO.queryFilter(filter, -1);
-    const event = events[0];
-    const proposalId = event.args[0];
-
-    await contributionNft.mint(
-      account,
-      agent.virtualId,
-      coreId,
-      TOKEN_URI,
-      proposalId,
-      parentId,
-      isModel,
-      datasetId
-    );
-
-    const voteParams = isModel
-      ? abi.encode(["uint256", "uint8[] memory"], [maturity, [0, 1, 1, 0, 2]])
-      : "0x";
-    await agentDAO
-      .connect(founder)
-      .castVoteWithReasonAndParams(proposalId, 1, "lfg", voteParams);
-    await mine(600);
-
-    await agentDAO.execute(proposalId);
-    await minter.mint(proposalId);
-
-    return proposalId;
-  }
-
   before(async function () {});
 
-  it("should allow early execution when forVotes == totalSupply", async function () {
+  it("should auto early execution when forVotes == totalSupply", async function () {
     const base = await loadFixture(deployWithAgent);
     const { founder, deployer } = await getAccounts();
     const {
@@ -300,11 +249,17 @@ describe("AgentDAO", function () {
     const event = events[0];
     const proposalId = event.args[0];
 
+    // Proposal not executed yet
+    await expect(serviceNft.ownerOf(proposalId)).to.be.reverted;
+
     await mine(10);
     await agentDAO.castVoteWithReasonAndParams(proposalId, 1, "lfg", "0x");
+
+    // Proposal should be auto executed
+    expect(await serviceNft.ownerOf(proposalId)).to.equal(agent.tba);
     const state = await agentDAO.state(proposalId);
-    expect(state).to.equal(4n);
-    await expect(agentDAO.execute(proposalId)).to.not.rejected;
+    expect(state).to.equal(7n);
+    await expect(agentDAO.execute(proposalId)).to.be.reverted;
   });
 
   it("should not allow early execution when forVotes < totalSupply although met quorum", async function () {

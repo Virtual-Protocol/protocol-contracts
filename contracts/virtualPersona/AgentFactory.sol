@@ -6,8 +6,8 @@ import "@openzeppelin/contracts/governance/IGovernor.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
-import "@openzeppelin/contracts/access/Ownable.sol";
-import "@openzeppelin/contracts/access/AccessControl.sol";
+import "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
 
 import "./IAgentFactory.sol";
 import "./IAgentToken.sol";
@@ -15,9 +15,13 @@ import "./IAgentVeToken.sol";
 import "./IAgentDAO.sol";
 import "./IAgentNft.sol";
 import "../libs/IERC6551Registry.sol";
-import "../token/IMinter.sol";
 
-contract AgentFactoryV2 is IAgentFactory, Initializable, AccessControl {
+contract AgentFactoryV2 is
+    IAgentFactory,
+    Initializable,
+    AccessControlUpgradeable,
+    PausableUpgradeable
+{
     using SafeERC20 for IERC20;
 
     uint256 private _nextId;
@@ -95,7 +99,6 @@ contract AgentFactoryV2 is IAgentFactory, Initializable, AccessControl {
     // V2 Storage
     ///////////////////////////////////////////////////////////////
     address private _uniswapRouter;
-    address private _minter;
     address private _tokenAdmin;
 
     address[] public allTradingTokens;
@@ -104,7 +107,7 @@ contract AgentFactoryV2 is IAgentFactory, Initializable, AccessControl {
     // Default agent token params
     bytes private _tokenSupplyParams;
     bytes private _tokenTaxParams;
-    uint16 private _tokenMultiplier;
+    uint256 private _tokenMultiplier;
 
     ///////////////////////////////////////////////////////////////
 
@@ -123,6 +126,9 @@ contract AgentFactoryV2 is IAgentFactory, Initializable, AccessControl {
         uint256 applicationThreshold_,
         address vault_
     ) public initializer {
+        __Pausable_init();
+        __AccessControl_init();
+        
         tokenImplementation = tokenImplementation_;
         veTokenImplementation = veTokenImplementation_;
         daoImplementation = daoImplementation_;
@@ -133,7 +139,6 @@ contract AgentFactoryV2 is IAgentFactory, Initializable, AccessControl {
         _nextId = 1;
         _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
         _vault = vault_;
-        _tokenMultiplier = 10000;
     }
 
     function getApplication(
@@ -151,7 +156,7 @@ contract AgentFactoryV2 is IAgentFactory, Initializable, AccessControl {
         address tbaImplementation,
         uint32 daoVotingPeriod,
         uint256 daoThreshold
-    ) public returns (uint256) {
+    ) public whenNotPaused returns (uint256) {
         address sender = _msgSender();
         require(
             IERC20(assetToken).balanceOf(sender) >= applicationThreshold,
@@ -248,16 +253,13 @@ contract AgentFactoryV2 is IAgentFactory, Initializable, AccessControl {
         );
 
         uint256 initialAmount = application.withdrawableAmount;
-        uint256 initialSupply = (initialAmount * _tokenMultiplier) / 10000; // Initial LP supply
-
         application.withdrawableAmount = 0;
         application.status = ApplicationStatus.Executed;
 
         // C1
         address token = _createNewAgentToken(
             application.name,
-            application.symbol,
-            initialSupply
+            application.symbol
         );
 
         // C2
@@ -345,17 +347,14 @@ contract AgentFactoryV2 is IAgentFactory, Initializable, AccessControl {
 
     function _createNewAgentToken(
         string memory name,
-        string memory symbol,
-        uint256 initialSupply
+        string memory symbol
     ) internal returns (address instance) {
-
         instance = Clones.clone(tokenImplementation);
         IAgentToken(instance).initialize(
             [_tokenAdmin, _uniswapRouter, assetToken],
             abi.encode(name, symbol),
             _tokenSupplyParams,
-            _tokenTaxParams,
-            initialSupply
+            _tokenTaxParams
         );
 
         allTradingTokens.push(instance);
@@ -409,14 +408,6 @@ contract AgentFactoryV2 is IAgentFactory, Initializable, AccessControl {
         veTokenImplementation = veToken;
     }
 
-    function setMinter(address newMinter) public onlyRole(DEFAULT_ADMIN_ROLE) {
-        _minter = newMinter;
-    }
-
-    function minter() public view override returns (address) {
-        return _minter;
-    }
-
     function setMaturityDuration(
         uint256 newDuration
     ) public onlyRole(DEFAULT_ADMIN_ROLE) {
@@ -436,14 +427,22 @@ contract AgentFactoryV2 is IAgentFactory, Initializable, AccessControl {
     }
 
     function setTokenSupplyParams(
+        uint256 maxSupply,
+        uint256 lpSupply,
+        uint256 vaultSupply,
         uint256 maxTokensPerWallet,
         uint256 maxTokensPerTxn,
-        uint256 botProtectionDurationInSeconds
+        uint256 botProtectionDurationInSeconds,
+        address vault
     ) public onlyRole(DEFAULT_ADMIN_ROLE) {
         _tokenSupplyParams = abi.encode(
+            maxSupply,
+            lpSupply,
+            vaultSupply,
             maxTokensPerWallet,
             maxTokensPerTxn,
-            botProtectionDurationInSeconds
+            botProtectionDurationInSeconds,
+            vault
         );
     }
 
@@ -462,7 +461,7 @@ contract AgentFactoryV2 is IAgentFactory, Initializable, AccessControl {
     }
 
     function setTokenMultiplier(
-        uint16 newMultiplier
+        uint256 newMultiplier
     ) public onlyRole(DEFAULT_ADMIN_ROLE) {
         _tokenMultiplier = newMultiplier;
     }
@@ -471,5 +470,13 @@ contract AgentFactoryV2 is IAgentFactory, Initializable, AccessControl {
         address newToken
     ) public onlyRole(DEFAULT_ADMIN_ROLE) {
         assetToken = newToken;
+    }
+
+    function pause() public onlyRole(DEFAULT_ADMIN_ROLE) {
+        _pause();
+    }
+
+    function unpause() public onlyRole(DEFAULT_ADMIN_ROLE) {
+        _unpause();
     }
 }

@@ -346,17 +346,6 @@ interface IAgentToken is
         address[3] memory integrationAddresses_,
         bytes memory baseParams_,
         bytes memory supplyParams_,
-        bytes memory taxParams_,
-        uint256 lpSupply_
+        bytes memory taxParams_
     ) external;
-
-    /**
-     * @dev {mint}
-     *
-     * Allow minter to mint tokens on contribution
-     *
-     * @param account The recipient
-     * @param value mint amount
-     */
-    function mint(address account, uint256 value) external;
 }

@@ -15,9 +15,13 @@ interface IERC20Config {
   }
 
   struct ERC20SupplyParameters {
+    uint256 maxSupply;
+    uint256 lpSupply;
+    uint256 vaultSupply;
     uint256 maxTokensPerWallet;
     uint256 maxTokensPerTxn;
     uint256 botProtectionDurationInSeconds;
+    address vault;
   }
 
   struct ERC20TaxParameters {

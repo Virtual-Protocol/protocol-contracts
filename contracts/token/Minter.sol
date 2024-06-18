@@ -1,17 +1,18 @@
 pragma solidity ^0.8.20;
 
 // SPDX-License-Identifier: MIT
-
+import "@openzeppelin/contracts/access/Ownable.sol";
+import "@openzeppelin/contracts/token/ERC721/IERC721.sol";
+import {SafeERC20, IERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "./IMinter.sol";
 import "../contribution/IServiceNft.sol";
 import "../contribution/IContributionNft.sol";
 import "../virtualPersona/IAgentNft.sol";
 import "../virtualPersona/IAgentToken.sol";
-import "@openzeppelin/contracts/access/Ownable.sol";
-import "@openzeppelin/contracts/token/ERC721/IERC721.sol";
-import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 contract Minter is IMinter, Ownable {
+    using SafeERC20 for IERC20;
+    
     address public serviceNft;
     address public contributionNft;
     address public agentNft;
@@ -19,6 +20,8 @@ contract Minter is IMinter, Ownable {
 
     uint256 public ipShare; // Share for IP holder
     uint256 public impactMultiplier;
+
+    uint256 public maxImpact;
 
     uint256 public constant DENOM = 10000;
 
@@ -28,6 +31,7 @@ contract Minter is IMinter, Ownable {
     mapping(uint256 => uint256) public ipShareOverrides;
 
     bool internal locked;
+    event TokenSaved(address indexed by, address indexed receiver, address indexed token, uint256 amount);
 
     modifier noReentrant() {
         require(!locked, "cannot reenter");
@@ -48,19 +52,21 @@ contract Minter is IMinter, Ownable {
         address serviceAddress,
         address contributionAddress,
         address agentAddress,
-        uint256 _ipShare,
-        uint256 _impactMultiplier,
-        address _ipVault,
-        address _agentFactory,
-        address initialOwner
+        uint256 ipShare_,
+        uint256 impactMultiplier_,
+        address ipVault_,
+        address agentFactory_,
+        address initialOwner,
+        uint256 maxImpact_
     ) Ownable(initialOwner) {
         serviceNft = serviceAddress;
         contributionNft = contributionAddress;
         agentNft = agentAddress;
-        ipShare = _ipShare;
-        impactMultiplier = _impactMultiplier;
-        ipVault = _ipVault;
-        agentFactory = _agentFactory;
+        ipShare = ipShare_;
+        impactMultiplier = impactMultiplier_;
+        ipVault = ipVault_;
+        agentFactory = agentFactory_;
+        maxImpact = maxImpact_;
     }
 
     modifier onlyFactory() {
@@ -105,9 +111,13 @@ contract Minter is IMinter, Ownable {
     function setImpactMulOverride(
         uint256 virtualId,
         uint256 mul
-    ) public onlyAgentDAO(virtualId) {
+    ) public onlyOwner {
         impactMulOverrides[virtualId] = mul;
         emit AgentImpactMultiplierUpdated(virtualId, mul);
+    }
+
+    function setMaxImpact(uint256 maxImpact_) public onlyOwner {
+        maxImpact = maxImpact_;
     }
 
     function _getImpactMultiplier(
@@ -141,9 +151,11 @@ contract Minter is IMinter, Ownable {
 
         uint256 finalImpactMultiplier = _getImpactMultiplier(virtualId);
         uint256 datasetId = contribution.getDatasetId(nftId);
-        uint256 amount = (IServiceNft(serviceNft).getImpact(nftId) *
-            finalImpactMultiplier *
-            10 ** 18) / DENOM;
+        uint256 impact = IServiceNft(serviceNft).getImpact(nftId);
+        if (impact > maxImpact) {
+            impact = maxImpact;
+        }
+        uint256 amount = (impact * finalImpactMultiplier * 10 ** 18) / DENOM;
         uint256 dataAmount = datasetId > 0
             ? (IServiceNft(serviceNft).getImpact(datasetId) *
                 finalImpactMultiplier *
@@ -154,18 +166,23 @@ contract Minter is IMinter, Ownable {
         // Mint to model owner
         if (amount > 0) {
             address modelOwner = IERC721(contributionNft).ownerOf(nftId);
-            IAgentToken(tokenAddress).mint(modelOwner, amount);
+            IAgentToken(tokenAddress).transfer(modelOwner, amount);
         }
 
         // Mint to Dataset owner
         if (datasetId != 0) {
             address datasetOwner = IERC721(contributionNft).ownerOf(datasetId);
-            IAgentToken(tokenAddress).mint(datasetOwner, dataAmount);
+            IAgentToken(tokenAddress).transfer(datasetOwner, dataAmount);
         }
 
         // To IP vault
         if (ipAmount > 0) {
-            IAgentToken(tokenAddress).mint(ipVault, ipAmount);
+            IAgentToken(tokenAddress).transfer(ipVault, ipAmount);
         }
+    }
+
+    function saveToken(address _token, address _receiver, uint256 _amount) external onlyOwner {
+        IERC20(_token).safeTransfer(_receiver, _amount);
+        emit TokenSaved(_msgSender(), _receiver, _token, _amount);
     }
 }

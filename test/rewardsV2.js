@@ -298,7 +298,6 @@ describe("RewardsV2", function () {
 
     await mine(600);
 
-    await agentDAO.execute(proposalId);
     await minter.mint(proposalId);
 
     return proposalId;

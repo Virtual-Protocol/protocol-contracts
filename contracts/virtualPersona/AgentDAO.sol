@@ -10,6 +10,8 @@ import "./GovernorCountingSimpleUpgradeable.sol";
 import "@openzeppelin/contracts/token/ERC721/IERC721.sol";
 import "@openzeppelin/contracts/utils/Strings.sol";
 import "../contribution/IContributionNft.sol";
+import "./IEloCalculator.sol";
+import "../contribution/IServiceNft.sol";
 
 contract AgentDAO is
     IAgentDAO,
@@ -30,6 +32,9 @@ contract AgentDAO is
 
     uint256 private _totalScore;
 
+    address private _eloCalculator;
+    address private _serviceNft;
+
     constructor() {
         _disableInitializers();
     }
@@ -39,7 +44,9 @@ contract AgentDAO is
         IVotes token,
         address contributionNft,
         uint256 threshold,
-        uint32 votingPeriod_
+        uint32 votingPeriod_,
+        address serviceNft,
+        address eloCalculator
     ) external initializer {
         __Governor_init(name);
         __GovernorSettings_init(0, votingPeriod_, threshold);
@@ -50,6 +57,8 @@ contract AgentDAO is
         __GovernorStorage_init();
 
         _contributionNft = contributionNft;
+        _serviceNft = serviceNft;
+        _eloCalculator = eloCalculator;
     }
 
     // The following functions are overrides required by Solidity.
@@ -210,13 +219,29 @@ contract AgentDAO is
             return;
         }
 
-        (uint256 maturity, uint8[] memory votes) = abi.decode(
-            params,
-            (uint256, uint8[])
-        );
+        uint8[] memory votes = abi.decode(params, (uint8[]));
+        uint256 maturity = _calcMaturity(proposalId, votes);
+
         _proposalMaturities[proposalId] += (maturity * weight);
 
         emit ValidatorEloRating(proposalId, account, maturity, votes);
+    }
+
+    function _calcMaturity(
+        uint256 proposalId,
+        uint8[] memory votes
+    ) internal returns (uint256) {
+        uint256 virtualId = IContributionNft(_contributionNft).tokenVirtualId(
+            proposalId
+        );
+        uint8 core = IContributionNft(_contributionNft).getCore(proposalId);
+        uint256 coreService = IServiceNft(_serviceNft).getCoreService(
+            virtualId,
+            core
+        );
+        uint256 maturity = IServiceNft(_serviceNft).getMaturity(coreService);
+        maturity = IEloCalculator(_eloCalculator).battleElo(maturity, votes);
+        return maturity;
     }
 
     function getMaturity(uint256 proposalId) public view returns (uint256) {

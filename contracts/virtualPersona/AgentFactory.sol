@@ -336,7 +336,7 @@ contract AgentFactoryV2 is
         IAgentDAO(instance).initialize(
             name,
             token,
-            IAgentNft(nft).getContributionNft(),
+            nft,
             daoThreshold,
             daoVotingPeriod
         );

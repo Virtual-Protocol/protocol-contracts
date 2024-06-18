@@ -12,6 +12,7 @@ import "@openzeppelin/contracts/utils/Strings.sol";
 import "../contribution/IContributionNft.sol";
 import "./IEloCalculator.sol";
 import "../contribution/IServiceNft.sol";
+import "./IAgentNft.sol";
 
 contract AgentDAO is
     IAgentDAO,
@@ -32,8 +33,7 @@ contract AgentDAO is
 
     uint256 private _totalScore;
 
-    address private _eloCalculator;
-    address private _serviceNft;
+    address private _agentNft;
 
     constructor() {
         _disableInitializers();
@@ -42,11 +42,9 @@ contract AgentDAO is
     function initialize(
         string memory name,
         IVotes token,
-        address contributionNft,
+        address agentNft,
         uint256 threshold,
-        uint32 votingPeriod_,
-        address serviceNft,
-        address eloCalculator
+        uint32 votingPeriod_
     ) external initializer {
         __Governor_init(name);
         __GovernorSettings_init(0, votingPeriod_, threshold);
@@ -56,9 +54,7 @@ contract AgentDAO is
         __GovernorCountingSimple_init();
         __GovernorStorage_init();
 
-        _contributionNft = contributionNft;
-        _serviceNft = serviceNft;
-        _eloCalculator = eloCalculator;
+        _agentNft = agentNft;
     }
 
     // The following functions are overrides required by Solidity.
@@ -104,9 +100,10 @@ contract AgentDAO is
 
         uint256 proposerVotes = getVotes(proposer, clock() - 1);
         uint256 votesThreshold = proposalThreshold();
+        address contributionNft = IAgentNft(_agentNft).getContributionNft();
         if (
             proposerVotes < votesThreshold &&
-            proposer != IContributionNft(_contributionNft).getAdmin()
+            proposer != IContributionNft(contributionNft).getAdmin()
         ) {
             revert GovernorInsufficientProposerVotes(
                 proposer,
@@ -209,12 +206,13 @@ contract AgentDAO is
         bytes memory params
     ) internal {
         // Check is this a contribution proposal
-        address owner = IERC721(_contributionNft).ownerOf(proposalId);
+        address contributionNft = IAgentNft(_agentNft).getContributionNft();
+        address owner = IERC721(contributionNft).ownerOf(proposalId);
         if (owner == address(0)) {
             return;
         }
 
-        bool isModel = IContributionNft(_contributionNft).isModel(proposalId);
+        bool isModel = IContributionNft(contributionNft).isModel(proposalId);
         if (!isModel) {
             return;
         }
@@ -230,17 +228,19 @@ contract AgentDAO is
     function _calcMaturity(
         uint256 proposalId,
         uint8[] memory votes
-    ) internal returns (uint256) {
-        uint256 virtualId = IContributionNft(_contributionNft).tokenVirtualId(
+    ) internal view returns (uint256) {
+        address contributionNft = IAgentNft(_agentNft).getContributionNft();
+        address serviceNft = IAgentNft(_agentNft).getServiceNft();
+        uint256 virtualId = IContributionNft(contributionNft).tokenVirtualId(
             proposalId
         );
-        uint8 core = IContributionNft(_contributionNft).getCore(proposalId);
-        uint256 coreService = IServiceNft(_serviceNft).getCoreService(
+        uint8 core = IContributionNft(contributionNft).getCore(proposalId);
+        uint256 coreService = IServiceNft(serviceNft).getCoreService(
             virtualId,
             core
         );
-        uint256 maturity = IServiceNft(_serviceNft).getMaturity(coreService);
-        maturity = IEloCalculator(_eloCalculator).battleElo(maturity, votes);
+        uint256 maturity = IServiceNft(serviceNft).getMaturity(coreService);
+        maturity = IEloCalculator(IAgentNft(_agentNft).getEloCalculator()).battleElo(maturity, votes);
         return maturity;
     }
 

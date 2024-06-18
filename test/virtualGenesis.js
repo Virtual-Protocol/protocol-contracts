@@ -120,7 +120,6 @@ describe("AgentFactoryV2", function () {
       process.env.SWAP_THRESHOLD,
       treasury.address
     );
-    await agentFactory.setDefaultDelegatee(deployer.address);
 
     return { virtualToken, agentFactory, agentNft };
   }
@@ -292,7 +291,7 @@ describe("AgentFactoryV2", function () {
     // Delegate to default delegatee
     expect(
       parseFloat(
-        formatEther(await veToken.getVotes(deployer.address)).toString()
+        formatEther(await veToken.getVotes(founder.address)).toString()
       ).toFixed(2)
     ).to.be.equal("100000.00");
   });

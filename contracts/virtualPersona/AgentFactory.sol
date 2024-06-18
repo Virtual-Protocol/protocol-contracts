@@ -100,7 +100,6 @@ contract AgentFactoryV2 is IAgentFactory, Initializable, AccessControl {
 
     address[] public allTradingTokens;
     address public veTokenImplementation;
-    address public defaultDelegatee;
 
     // Default agent token params
     bytes private _tokenSupplyParams;
@@ -319,7 +318,7 @@ contract AgentFactoryV2 is IAgentFactory, Initializable, AccessControl {
         IAgentVeToken(veToken).stake(
             IERC20(lp).balanceOf(address(this)),
             application.proposer,
-            defaultDelegatee
+            application.proposer
         );
 
         emit NewPersona(virtualId, token, dao, tbaAddress, veToken, lp);
@@ -466,12 +465,6 @@ contract AgentFactoryV2 is IAgentFactory, Initializable, AccessControl {
         uint16 newMultiplier
     ) public onlyRole(DEFAULT_ADMIN_ROLE) {
         _tokenMultiplier = newMultiplier;
-    }
-
-    function setDefaultDelegatee(
-        address newDelegatee
-    ) public onlyRole(DEFAULT_ADMIN_ROLE) {
-        defaultDelegatee = newDelegatee;
     }
 
     function setAssetToken(

@@ -39,7 +39,6 @@ async function upgradeFactory(implementations, assetToken) {
     process.env.TAX_VAULT
   );
   await factory.setTokenMultiplier(10000);
-  await factory.setDefaultDelegatee(process.env.ADMIN);
   console.log("Upgraded FactoryV2", factory.target);
 }
 

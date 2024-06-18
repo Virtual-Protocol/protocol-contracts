@@ -116,7 +116,6 @@ describe("Delegation", function () {
       process.env.SWAP_THRESHOLD,
       treasury.address
     );
-    await agentFactory.setDefaultDelegatee(deployer.address);
 
     return { virtualToken, agentFactory, agentNft };
   }

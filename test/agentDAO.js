@@ -149,7 +149,6 @@ describe("AgentDAO", function () {
       process.env.SWAP_THRESHOLD,
       treasury.address
     );
-    await agentFactory.setDefaultDelegatee(deployer.address);
 
     return {
       virtualToken,
@@ -253,7 +252,7 @@ describe("AgentDAO", function () {
     await expect(serviceNft.ownerOf(proposalId)).to.be.reverted;
 
     await mine(10);
-    await agentDAO.castVoteWithReasonAndParams(proposalId, 1, "lfg", "0x");
+    await agentDAO.connect(founder).castVoteWithReasonAndParams(proposalId, 1, "lfg", "0x");
 
     // Proposal should be auto executed
     expect(await serviceNft.ownerOf(proposalId)).to.equal(agent.tba);

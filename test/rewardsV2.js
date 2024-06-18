@@ -1006,7 +1006,9 @@ describe("RewardsV2", function () {
     const app3 = await createApplication(base, founder, 2);
     const agent3 = await createAgent(base, app3);
     const app4 = await createApplication(base, founder, 3);
-    const agent4 = await createAgent(base, app4);
+    const agent4  = await createAgent(base, app4);
+    const lp3 = await rewards.getLPValue(agent3[0]);
+    console.log("Initial LP ", lp3);
 
     // Create contributions for all 4 virtuals
     for (let i = 1; i <= 4; i++) {
@@ -1027,7 +1029,7 @@ describe("RewardsV2", function () {
         0,
         `Test ${i}`,
         base,
-        contributor1.address,
+        trader.address,
         [validator1]
       );
     }
@@ -1036,32 +1038,53 @@ describe("RewardsV2", function () {
       "IUniswapV2Router02",
       process.env.UNISWAP_ROUTER
     );
-    // Trade on different LP
-    await virtualToken.mint(trader.address, parseEther("300"));
+    // Add liquidity of 0.25, 0.75 and 1
+    await virtualToken.mint(trader.address, parseEther("400"));
     await virtualToken
       .connect(trader)
-      .approve(router.target, parseEther("300"));
+      .approve(router.target, parseEther("400"));
     for (let i of [1, 3, 4]) {
       const agentTokenAddr = (await agentNft.virtualInfo(i)).token;
-      const amountToBuy = parseEther((20 * i).toString());
-      const capital = parseEther("100");
+      const agentToken = await ethers.getContractAt("AgentToken", agentTokenAddr);
+      await agentToken.connect(trader).approve(router.target,  parseEther("400"))
+      const amountToAdd = parseEther((0.25 * i).toString());
+      const capital = parseEther("400");
       await router
         .connect(trader)
-        .swapTokensForExactTokens(
-          amountToBuy,
-          capital,
-          [virtualToken.target, agentTokenAddr],
+        .addLiquidity(
+          virtualToken.target,
+          agentTokenAddr,
+          amountToAdd,
+          amountToAdd,
+          amountToAdd,
+          amountToAdd,
           trader.address,
           Math.floor(new Date().getTime() / 1000 + 6000000)
         );
+      const lp_after_buy = await rewards.getLPValue(i);
+      console.log("lp after buy LP ", lp_after_buy);
       await mine(1);
     }
 
     // Distribute rewards
     // Expectations:
-    // virtual 4>3>1
+    // virtual 4 = 100001000000000000000000n,
+    // virtual 3 = 100000750000000000000000n,
+    // virtual 1 = 100000250000000000000000n
     // virtual 2 = 0
+
+    // Using gwei as calculation size due to BigInt limitations
     const rewardSize = 300000;
+    const Lp4 = BigInt(100001000000000);
+    const Lp3 = BigInt(100000750000000);
+    const Lp1 = BigInt(100000250000000);
+    const rewardSizeInGwei = BigInt(rewardSize * 10 ** 9)
+
+
+    const totalLp = Lp1 + Lp3 + Lp4
+    console.log("totallp", totalLp)
+
+
     await virtualToken.approve(
       rewards.target,
       parseEther(rewardSize.toString())
@@ -1076,6 +1099,11 @@ describe("RewardsV2", function () {
       founder.address,
       [1]
     );
+    
+    //99999583336111092592716
+    const rewardSizeAfterProtocol = rewardSizeInGwei * BigInt(process.env.STAKER_SHARES) / BigInt(10000)
+    const expectedRewardLP1Ratio = await (rewardSizeAfterProtocol * Lp1) / totalLp
+
     const rewards2 = await rewards.getTotalClaimableStakerRewards(
       founder.address,
       [2]
@@ -1084,10 +1112,21 @@ describe("RewardsV2", function () {
       founder.address,
       [3]
     );
+    const expectedRewardLP3Ratio = await (rewardSizeAfterProtocol * Lp3) / totalLp
+
+
     const rewards4 = await rewards.getTotalClaimableStakerRewards(
       founder.address,
       [4]
     );
+    const expectedRewardLP4Ratio = (rewardSizeAfterProtocol * Lp4) / totalLp
+
+
+    expect(await parseInt(ethers.formatUnits(rewards1.toString(), "gwei"))).to.be.equal(expectedRewardLP1Ratio);
+    expect(await parseInt(ethers.formatUnits(rewards3.toString(), "gwei"))).to.be.equal(expectedRewardLP3Ratio);
+    expect(await parseInt(ethers.formatUnits(rewards4.toString(), "gwei"))).to.be.equal(expectedRewardLP4Ratio);
+
+
     expect(rewards4).to.be.greaterThan(rewards3);
     expect(rewards3).to.be.greaterThan(rewards1);
     expect(rewards2).to.be.equal(0n);

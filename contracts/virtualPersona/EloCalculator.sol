@@ -15,9 +15,9 @@ contract EloCalculator is IEloCalculator, Initializable, OwnableUpgradeable {
         _disableInitializers();
     }
 
-    function initialize(uint256 k_, address initialOwner) public initializer {
+    function initialize(address initialOwner) public initializer {
         __Ownable_init(initialOwner);
-        k = k_;
+        k = 30;
     }
 
     function mapBattleResultToGameResult(

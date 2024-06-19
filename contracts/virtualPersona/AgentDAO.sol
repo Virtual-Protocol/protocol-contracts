@@ -239,8 +239,14 @@ contract AgentDAO is
             virtualId,
             core
         );
-        uint256 maturity = IServiceNft(serviceNft).getMaturity(coreService);
-        maturity = IEloCalculator(IAgentNft(_agentNft).getEloCalculator()).battleElo(maturity, votes);
+        // All services start with 100 maturity
+        uint256 maturity = 100;
+        if (coreService > 0) {
+            maturity = IServiceNft(serviceNft).getMaturity(coreService);
+            maturity = IEloCalculator(IAgentNft(_agentNft).getEloCalculator())
+                .battleElo(maturity, votes);
+        }
+
         return maturity;
     }
 

@@ -14,10 +14,7 @@ describe("Elo Rating", function () {
   it("should calculate correct elo", async function () {
     const [deployer] = await ethers.getSigners();
     const Contract = await ethers.getContractFactory("EloCalculator");
-    const calculator = await upgrades.deployProxy(Contract, [
-      30,
-      deployer.address,
-    ]);
+    const calculator = await upgrades.deployProxy(Contract, [deployer.address]);
 
     const res = await calculator.battleElo(100, [1, 1, 1, 1, 1, 1, 1, 1, 1, 1]);
     expect(res).to.be.equal(315n);

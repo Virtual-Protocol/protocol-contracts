@@ -74,6 +74,7 @@ contract AgentNftV2 is
         __AccessControl_init();
         _grantRole(DEFAULT_ADMIN_ROLE, defaultAdmin);
         _grantRole(VALIDATOR_ADMIN_ROLE, defaultAdmin);
+        _grantRole(ADMIN_ROLE, defaultAdmin);
         _nextVirtualId = 1;
     }
 
@@ -302,5 +303,9 @@ contract AgentNftV2 is
         address eloCalculator
     ) public onlyRole(ADMIN_ROLE) {
         _eloCalculator = eloCalculator;
+    }
+
+    function getEloCalculator() public view returns (address) {
+        return _eloCalculator;
     }
 }

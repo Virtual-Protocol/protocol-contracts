@@ -99,15 +99,17 @@ contract AgentFactoryV2 is
     // V2 Storage
     ///////////////////////////////////////////////////////////////
     address private _uniswapRouter;
+    address private _minter; // Unused
     address private _tokenAdmin;
 
     address[] public allTradingTokens;
     address public veTokenImplementation;
+    address public defaultDelegatee; // Unused
 
     // Default agent token params
     bytes private _tokenSupplyParams;
     bytes private _tokenTaxParams;
-    uint256 private _tokenMultiplier;
+    uint16 private _tokenMultiplier; // Unused
 
     ///////////////////////////////////////////////////////////////
 
@@ -458,12 +460,6 @@ contract AgentFactoryV2 is
             taxSwapThresholdBasisPoints,
             projectTaxRecipient
         );
-    }
-
-    function setTokenMultiplier(
-        uint256 newMultiplier
-    ) public onlyRole(DEFAULT_ADMIN_ROLE) {
-        _tokenMultiplier = newMultiplier;
     }
 
     function setAssetToken(

@@ -94,17 +94,20 @@ describe("AgentFactoryV2", function () {
     );
     await agentFactory.waitForDeployment();
     await agentNft.grantRole(await agentNft.MINTER_ROLE(), agentFactory.target);
-    const minter = await ethers.deployContract("Minter", [
-      service.target,
-      contribution.target,
-      agentNft.target,
-      process.env.IP_SHARES,
-      process.env.IMPACT_MULTIPLIER,
-      ipVault.address,
-      agentFactory.target,
-      deployer.address,
-      process.env.MAX_IMPACT
-    ]);
+    const minter = await upgrades.deployProxy(
+      await ethers.getContractFactory("Minter"),
+      [
+        service.target,
+        contribution.target,
+        agentNft.target,
+        process.env.IP_SHARES,
+        process.env.IMPACT_MULTIPLIER,
+        ipVault.address,
+        agentFactory.target,
+        deployer.address,
+        process.env.MAX_IMPACT,
+      ]
+    );
     await minter.waitForDeployment();
     await agentFactory.setMaturityDuration(86400 * 365 * 10); // 10years
     await agentFactory.setUniswapRouter(process.env.UNISWAP_ROUTER);

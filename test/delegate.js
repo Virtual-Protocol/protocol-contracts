@@ -80,7 +80,7 @@ describe("Delegation", function () {
     );
     await agentFactory.waitForDeployment();
     await agentNft.grantRole(await agentNft.MINTER_ROLE(), agentFactory.target);
-    const minter = await ethers.deployContract("Minter", [
+    const minter = await upgrades.deployProxy(await ethers.getContractFactory("Minter"), [
       service.target,
       contribution.target,
       agentNft.target,

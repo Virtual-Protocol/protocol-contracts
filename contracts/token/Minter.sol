@@ -1,18 +1,20 @@
 pragma solidity ^0.8.20;
 
 // SPDX-License-Identifier: MIT
-import "@openzeppelin/contracts/access/Ownable.sol";
+import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import "@openzeppelin/contracts/token/ERC721/IERC721.sol";
 import {SafeERC20, IERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
+
 import "./IMinter.sol";
 import "../contribution/IServiceNft.sol";
 import "../contribution/IContributionNft.sol";
 import "../virtualPersona/IAgentNft.sol";
 import "../virtualPersona/IAgentToken.sol";
 
-contract Minter is IMinter, Ownable {
+contract Minter is IMinter, Initializable, OwnableUpgradeable {
     using SafeERC20 for IERC20;
-    
+
     address public serviceNft;
     address public contributionNft;
     address public agentNft;
@@ -31,7 +33,12 @@ contract Minter is IMinter, Ownable {
     mapping(uint256 => uint256) public ipShareOverrides;
 
     bool internal locked;
-    event TokenSaved(address indexed by, address indexed receiver, address indexed token, uint256 amount);
+    event TokenSaved(
+        address indexed by,
+        address indexed receiver,
+        address indexed token,
+        uint256 amount
+    );
 
     modifier noReentrant() {
         require(!locked, "cannot reenter");
@@ -48,7 +55,12 @@ contract Minter is IMinter, Ownable {
 
     address agentFactory;
 
-    constructor(
+    /// @custom:oz-upgrades-unsafe-allow constructor
+    constructor() {
+        _disableInitializers();
+    }
+
+    function initialize(
         address serviceAddress,
         address contributionAddress,
         address agentAddress,
@@ -58,7 +70,9 @@ contract Minter is IMinter, Ownable {
         address agentFactory_,
         address initialOwner,
         uint256 maxImpact_
-    ) Ownable(initialOwner) {
+    ) public initializer {
+        __Ownable_init(initialOwner);
+        
         serviceNft = serviceAddress;
         contributionNft = contributionAddress;
         agentNft = agentAddress;
@@ -181,7 +195,11 @@ contract Minter is IMinter, Ownable {
         }
     }
 
-    function saveToken(address _token, address _receiver, uint256 _amount) external onlyOwner {
+    function saveToken(
+        address _token,
+        address _receiver,
+        uint256 _amount
+    ) external onlyOwner {
         IERC20(_token).safeTransfer(_receiver, _amount);
         emit TokenSaved(_msgSender(), _receiver, _token, _amount);
     }

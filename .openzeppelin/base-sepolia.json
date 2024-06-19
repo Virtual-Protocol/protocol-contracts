@@ -105,6 +105,21 @@
       "address": "0xb997e2f88B187Cd5132c5804F5c800d40f85a16B",
       "txHash": "0xd17f5d2714193a972656e1b000e37740819e8a60bb717cb1c1feba39e5a5b935",
       "kind": "transparent"
+    },
+    {
+      "address": "0x5A4f5224CbFD52164f5fB8981fE515a22a0B3f60",
+      "txHash": "0x18a8a77f56efd0af390c4dad16c35bc145e769091855e727d90c4e2e5a4b3636",
+      "kind": "transparent"
+    },
+    {
+      "address": "0x440Ab85200ee3051462631A49a250943A1dA8520",
+      "txHash": "0xeacab5c53eea2d55601fae46c4cc75a17bff3d4687ff96f623ded8a829ba5b28",
+      "kind": "transparent"
+    },
+    {
+      "address": "0x1515e431d79682fA8bB31216c9747FF45FAd26b1",
+      "txHash": "0x334f81421163340a1fd93e6c2b6cb1b2d2307386354c0b06f6452505795347cc",
+      "kind": "transparent"
     }
   ],
   "impls": {
@@ -10470,6 +10485,649 @@
         "0x7C3454Cb983Ed1D060A4677C02e1126C4a2275B3",
         "0x8f767259867Cc93df37e59ba445019418871ea57"
       ]
+    },
+    "9b9eba25e62b1f13b3d13a806b1def57a01724f9f760b0f254fc6a5225f87bf1": {
+      "address": "0xAA7E2dC2CA07F805dE90b0e638738d7DD34ca388",
+      "txHash": "0x3ecd97fa81fb951f67330ba32a0f50acab139243849f355767254ee356e2cb5e",
+      "layout": {
+        "solcVersion": "0.8.20",
+        "storage": [
+          {
+            "label": "serviceNft",
+            "offset": 0,
+            "slot": "0",
+            "type": "t_address",
+            "contract": "Minter",
+            "src": "contracts/token/Minter.sol:18"
+          },
+          {
+            "label": "contributionNft",
+            "offset": 0,
+            "slot": "1",
+            "type": "t_address",
+            "contract": "Minter",
+            "src": "contracts/token/Minter.sol:19"
+          },
+          {
+            "label": "agentNft",
+            "offset": 0,
+            "slot": "2",
+            "type": "t_address",
+            "contract": "Minter",
+            "src": "contracts/token/Minter.sol:20"
+          },
+          {
+            "label": "ipVault",
+            "offset": 0,
+            "slot": "3",
+            "type": "t_address",
+            "contract": "Minter",
+            "src": "contracts/token/Minter.sol:21"
+          },
+          {
+            "label": "ipShare",
+            "offset": 0,
+            "slot": "4",
+            "type": "t_uint256",
+            "contract": "Minter",
+            "src": "contracts/token/Minter.sol:23"
+          },
+          {
+            "label": "impactMultiplier",
+            "offset": 0,
+            "slot": "5",
+            "type": "t_uint256",
+            "contract": "Minter",
+            "src": "contracts/token/Minter.sol:24"
+          },
+          {
+            "label": "maxImpact",
+            "offset": 0,
+            "slot": "6",
+            "type": "t_uint256",
+            "contract": "Minter",
+            "src": "contracts/token/Minter.sol:26"
+          },
+          {
+            "label": "_mintedNfts",
+            "offset": 0,
+            "slot": "7",
+            "type": "t_mapping(t_uint256,t_bool)",
+            "contract": "Minter",
+            "src": "contracts/token/Minter.sol:30"
+          },
+          {
+            "label": "impactMulOverrides",
+            "offset": 0,
+            "slot": "8",
+            "type": "t_mapping(t_uint256,t_uint256)",
+            "contract": "Minter",
+            "src": "contracts/token/Minter.sol:32"
+          },
+          {
+            "label": "ipShareOverrides",
+            "offset": 0,
+            "slot": "9",
+            "type": "t_mapping(t_uint256,t_uint256)",
+            "contract": "Minter",
+            "src": "contracts/token/Minter.sol:33"
+          },
+          {
+            "label": "locked",
+            "offset": 0,
+            "slot": "10",
+            "type": "t_bool",
+            "contract": "Minter",
+            "src": "contracts/token/Minter.sol:35"
+          },
+          {
+            "label": "agentFactory",
+            "offset": 1,
+            "slot": "10",
+            "type": "t_address",
+            "contract": "Minter",
+            "src": "contracts/token/Minter.sol:56"
+          }
+        ],
+        "types": {
+          "t_address": {
+            "label": "address",
+            "numberOfBytes": "20"
+          },
+          "t_bool": {
+            "label": "bool",
+            "numberOfBytes": "1"
+          },
+          "t_struct(InitializableStorage)64_storage": {
+            "label": "struct Initializable.InitializableStorage",
+            "members": [
+              {
+                "label": "_initialized",
+                "type": "t_uint64",
+                "offset": 0,
+                "slot": "0"
+              },
+              {
+                "label": "_initializing",
+                "type": "t_bool",
+                "offset": 8,
+                "slot": "0"
+              }
+            ],
+            "numberOfBytes": "32"
+          },
+          "t_struct(OwnableStorage)14_storage": {
+            "label": "struct OwnableUpgradeable.OwnableStorage",
+            "members": [
+              {
+                "label": "_owner",
+                "type": "t_address",
+                "offset": 0,
+                "slot": "0"
+              }
+            ],
+            "numberOfBytes": "32"
+          },
+          "t_uint64": {
+            "label": "uint64",
+            "numberOfBytes": "8"
+          },
+          "t_mapping(t_uint256,t_bool)": {
+            "label": "mapping(uint256 => bool)",
+            "numberOfBytes": "32"
+          },
+          "t_mapping(t_uint256,t_uint256)": {
+            "label": "mapping(uint256 => uint256)",
+            "numberOfBytes": "32"
+          },
+          "t_uint256": {
+            "label": "uint256",
+            "numberOfBytes": "32"
+          }
+        },
+        "namespaces": {
+          "erc7201:openzeppelin.storage.Ownable": [
+            {
+              "contract": "OwnableUpgradeable",
+              "label": "_owner",
+              "type": "t_address",
+              "src": "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol:24",
+              "offset": 0,
+              "slot": "0"
+            }
+          ],
+          "erc7201:openzeppelin.storage.Initializable": [
+            {
+              "contract": "Initializable",
+              "label": "_initialized",
+              "type": "t_uint64",
+              "src": "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol:69",
+              "offset": 0,
+              "slot": "0"
+            },
+            {
+              "contract": "Initializable",
+              "label": "_initializing",
+              "type": "t_bool",
+              "src": "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol:73",
+              "offset": 8,
+              "slot": "0"
+            }
+          ]
+        }
+      }
+    },
+    "45974d00413b47b6b2928ea43d901e4bddbc4725d942b62a38adc56c534300ce": {
+      "address": "0x376E1a40b03e1A7c75c6f381C3b9B6249270a42c",
+      "txHash": "0xc77df46b46c782355ba595f65f92aca3e4ed8a9d4ef423bcb96f2fe599e998da",
+      "layout": {
+        "solcVersion": "0.8.20",
+        "storage": [
+          {
+            "label": "k",
+            "offset": 0,
+            "slot": "0",
+            "type": "t_uint256",
+            "contract": "EloCalculator",
+            "src": "contracts/virtualPersona/EloCalculator.sol:11"
+          }
+        ],
+        "types": {
+          "t_address": {
+            "label": "address",
+            "numberOfBytes": "20"
+          },
+          "t_bool": {
+            "label": "bool",
+            "numberOfBytes": "1"
+          },
+          "t_struct(InitializableStorage)744_storage": {
+            "label": "struct Initializable.InitializableStorage",
+            "members": [
+              {
+                "label": "_initialized",
+                "type": "t_uint64",
+                "offset": 0,
+                "slot": "0"
+              },
+              {
+                "label": "_initializing",
+                "type": "t_bool",
+                "offset": 8,
+                "slot": "0"
+              }
+            ],
+            "numberOfBytes": "32"
+          },
+          "t_struct(OwnableStorage)97_storage": {
+            "label": "struct OwnableUpgradeable.OwnableStorage",
+            "members": [
+              {
+                "label": "_owner",
+                "type": "t_address",
+                "offset": 0,
+                "slot": "0"
+              }
+            ],
+            "numberOfBytes": "32"
+          },
+          "t_uint64": {
+            "label": "uint64",
+            "numberOfBytes": "8"
+          },
+          "t_uint256": {
+            "label": "uint256",
+            "numberOfBytes": "32"
+          }
+        },
+        "namespaces": {
+          "erc7201:openzeppelin.storage.Ownable": [
+            {
+              "contract": "OwnableUpgradeable",
+              "label": "_owner",
+              "type": "t_address",
+              "src": "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol:24",
+              "offset": 0,
+              "slot": "0"
+            }
+          ],
+          "erc7201:openzeppelin.storage.Initializable": [
+            {
+              "contract": "Initializable",
+              "label": "_initialized",
+              "type": "t_uint64",
+              "src": "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol:69",
+              "offset": 0,
+              "slot": "0"
+            },
+            {
+              "contract": "Initializable",
+              "label": "_initializing",
+              "type": "t_bool",
+              "src": "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol:73",
+              "offset": 8,
+              "slot": "0"
+            }
+          ]
+        }
+      }
+    },
+    "c3e1a32d88793554b8f60a8684ead89342981cd7aa39742798449806638da580": {
+      "address": "0x80377299Da5eED0C991193dB1a0F28A40AE4607C",
+      "txHash": "0x2ef03f2e0026f33587632f52e7a80695d313a079f702bb8f29c17996e847e612",
+      "layout": {
+        "solcVersion": "0.8.20",
+        "storage": [
+          {
+            "label": "_roles",
+            "offset": 0,
+            "slot": "0",
+            "type": "t_mapping(t_bytes32,t_struct(RoleData)7716_storage)",
+            "contract": "AccessControl",
+            "src": "@openzeppelin/contracts/access/AccessControl.sol:55"
+          },
+          {
+            "label": "_nextAgentRewardId",
+            "offset": 0,
+            "slot": "1",
+            "type": "t_uint256",
+            "contract": "AgentRewardV2",
+            "src": "contracts/AgentRewardV2.sol:32"
+          },
+          {
+            "label": "rewardToken",
+            "offset": 0,
+            "slot": "2",
+            "type": "t_address",
+            "contract": "AgentRewardV2",
+            "src": "contracts/AgentRewardV2.sol:39"
+          },
+          {
+            "label": "agentNft",
+            "offset": 0,
+            "slot": "3",
+            "type": "t_address",
+            "contract": "AgentRewardV2",
+            "src": "contracts/AgentRewardV2.sol:40"
+          },
+          {
+            "label": "_rewards",
+            "offset": 0,
+            "slot": "4",
+            "type": "t_array(t_struct(Reward)19774_storage)dyn_storage",
+            "contract": "AgentRewardV2",
+            "src": "contracts/AgentRewardV2.sol:43"
+          },
+          {
+            "label": "_agentRewards",
+            "offset": 0,
+            "slot": "5",
+            "type": "t_mapping(t_uint256,t_array(t_struct(AgentReward)19787_storage)dyn_storage)",
+            "contract": "AgentRewardV2",
+            "src": "contracts/AgentRewardV2.sol:44"
+          },
+          {
+            "label": "_rewardSettings",
+            "offset": 0,
+            "slot": "6",
+            "type": "t_struct(Trace)21786_storage",
+            "contract": "AgentRewardV2",
+            "src": "contracts/AgentRewardV2.sol:46"
+          },
+          {
+            "label": "protocolRewards",
+            "offset": 0,
+            "slot": "7",
+            "type": "t_uint256",
+            "contract": "AgentRewardV2",
+            "src": "contracts/AgentRewardV2.sol:49"
+          },
+          {
+            "label": "locked",
+            "offset": 0,
+            "slot": "8",
+            "type": "t_bool",
+            "contract": "AgentRewardV2",
+            "src": "contracts/AgentRewardV2.sol:58"
+          },
+          {
+            "label": "_stakerClaims",
+            "offset": 0,
+            "slot": "9",
+            "type": "t_mapping(t_address,t_mapping(t_uint256,t_struct(Claim)19792_storage))",
+            "contract": "AgentRewardV2",
+            "src": "contracts/AgentRewardV2.sol:233"
+          },
+          {
+            "label": "_validatorClaims",
+            "offset": 0,
+            "slot": "10",
+            "type": "t_mapping(t_address,t_mapping(t_uint256,t_struct(Claim)19792_storage))",
+            "contract": "AgentRewardV2",
+            "src": "contracts/AgentRewardV2.sol:234"
+          }
+        ],
+        "types": {
+          "t_bool": {
+            "label": "bool",
+            "numberOfBytes": "1"
+          },
+          "t_struct(InitializableStorage)744_storage": {
+            "label": "struct Initializable.InitializableStorage",
+            "members": [
+              {
+                "label": "_initialized",
+                "type": "t_uint64",
+                "offset": 0,
+                "slot": "0"
+              },
+              {
+                "label": "_initializing",
+                "type": "t_bool",
+                "offset": 8,
+                "slot": "0"
+              }
+            ],
+            "numberOfBytes": "32"
+          },
+          "t_uint64": {
+            "label": "uint64",
+            "numberOfBytes": "8"
+          },
+          "t_address": {
+            "label": "address",
+            "numberOfBytes": "20"
+          },
+          "t_array(t_struct(AgentReward)19787_storage)dyn_storage": {
+            "label": "struct IAgentReward.AgentReward[]",
+            "numberOfBytes": "32"
+          },
+          "t_array(t_struct(Checkpoint)21797_storage)dyn_storage": {
+            "label": "struct RewardSettingsCheckpoints.Checkpoint[]",
+            "numberOfBytes": "32"
+          },
+          "t_array(t_struct(Reward)19774_storage)dyn_storage": {
+            "label": "struct IAgentReward.Reward[]",
+            "numberOfBytes": "32"
+          },
+          "t_array(t_uint256)dyn_storage": {
+            "label": "uint256[]",
+            "numberOfBytes": "32"
+          },
+          "t_bytes32": {
+            "label": "bytes32",
+            "numberOfBytes": "32"
+          },
+          "t_mapping(t_address,t_bool)": {
+            "label": "mapping(address => bool)",
+            "numberOfBytes": "32"
+          },
+          "t_mapping(t_address,t_mapping(t_uint256,t_struct(Claim)19792_storage))": {
+            "label": "mapping(address => mapping(uint256 => struct IAgentReward.Claim))",
+            "numberOfBytes": "32"
+          },
+          "t_mapping(t_bytes32,t_struct(RoleData)7716_storage)": {
+            "label": "mapping(bytes32 => struct AccessControl.RoleData)",
+            "numberOfBytes": "32"
+          },
+          "t_mapping(t_uint256,t_array(t_struct(AgentReward)19787_storage)dyn_storage)": {
+            "label": "mapping(uint256 => struct IAgentReward.AgentReward[])",
+            "numberOfBytes": "32"
+          },
+          "t_mapping(t_uint256,t_struct(Claim)19792_storage)": {
+            "label": "mapping(uint256 => struct IAgentReward.Claim)",
+            "numberOfBytes": "32"
+          },
+          "t_struct(AgentReward)19787_storage": {
+            "label": "struct IAgentReward.AgentReward",
+            "members": [
+              {
+                "label": "id",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "0"
+              },
+              {
+                "label": "rewardIndex",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "1"
+              },
+              {
+                "label": "stakerAmount",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "2"
+              },
+              {
+                "label": "validatorAmount",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "3"
+              },
+              {
+                "label": "totalProposals",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "4"
+              },
+              {
+                "label": "totalStaked",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "5"
+              }
+            ],
+            "numberOfBytes": "192"
+          },
+          "t_struct(Checkpoint)21797_storage": {
+            "label": "struct RewardSettingsCheckpoints.Checkpoint",
+            "members": [
+              {
+                "label": "_key",
+                "type": "t_uint32",
+                "offset": 0,
+                "slot": "0"
+              },
+              {
+                "label": "_value",
+                "type": "t_struct(RewardSettings)21791_storage",
+                "offset": 0,
+                "slot": "1"
+              }
+            ],
+            "numberOfBytes": "64"
+          },
+          "t_struct(Claim)19792_storage": {
+            "label": "struct IAgentReward.Claim",
+            "members": [
+              {
+                "label": "totalClaimed",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "0"
+              },
+              {
+                "label": "rewardCount",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "1"
+              }
+            ],
+            "numberOfBytes": "64"
+          },
+          "t_struct(Reward)19774_storage": {
+            "label": "struct IAgentReward.Reward",
+            "members": [
+              {
+                "label": "blockNumber",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "0"
+              },
+              {
+                "label": "amount",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "1"
+              },
+              {
+                "label": "lpValues",
+                "type": "t_array(t_uint256)dyn_storage",
+                "offset": 0,
+                "slot": "2"
+              },
+              {
+                "label": "virtualIds",
+                "type": "t_array(t_uint256)dyn_storage",
+                "offset": 0,
+                "slot": "3"
+              }
+            ],
+            "numberOfBytes": "128"
+          },
+          "t_struct(RewardSettings)21791_storage": {
+            "label": "struct RewardSettingsCheckpoints.RewardSettings",
+            "members": [
+              {
+                "label": "protocolShares",
+                "type": "t_uint16",
+                "offset": 0,
+                "slot": "0"
+              },
+              {
+                "label": "stakerShares",
+                "type": "t_uint16",
+                "offset": 2,
+                "slot": "0"
+              }
+            ],
+            "numberOfBytes": "32"
+          },
+          "t_struct(RoleData)7716_storage": {
+            "label": "struct AccessControl.RoleData",
+            "members": [
+              {
+                "label": "hasRole",
+                "type": "t_mapping(t_address,t_bool)",
+                "offset": 0,
+                "slot": "0"
+              },
+              {
+                "label": "adminRole",
+                "type": "t_bytes32",
+                "offset": 0,
+                "slot": "1"
+              }
+            ],
+            "numberOfBytes": "64"
+          },
+          "t_struct(Trace)21786_storage": {
+            "label": "struct RewardSettingsCheckpoints.Trace",
+            "members": [
+              {
+                "label": "_checkpoints",
+                "type": "t_array(t_struct(Checkpoint)21797_storage)dyn_storage",
+                "offset": 0,
+                "slot": "0"
+              }
+            ],
+            "numberOfBytes": "32"
+          },
+          "t_uint16": {
+            "label": "uint16",
+            "numberOfBytes": "2"
+          },
+          "t_uint256": {
+            "label": "uint256",
+            "numberOfBytes": "32"
+          },
+          "t_uint32": {
+            "label": "uint32",
+            "numberOfBytes": "4"
+          }
+        },
+        "namespaces": {
+          "erc7201:openzeppelin.storage.Initializable": [
+            {
+              "contract": "Initializable",
+              "label": "_initialized",
+              "type": "t_uint64",
+              "src": "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol:69",
+              "offset": 0,
+              "slot": "0"
+            },
+            {
+              "contract": "Initializable",
+              "label": "_initializing",
+              "type": "t_bool",
+              "src": "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol:73",
+              "offset": 8,
+              "slot": "0"
+            }
+          ]
+        }
+      }
     }
   }
 }

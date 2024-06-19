@@ -7,4 +7,5 @@ module.exports = [
   process.env.IP_VAULT,
   process.env.VIRTUAL_FACTORY,
   process.env.ADMIN,
+  process.env.MAX_IMPACT,
 ];

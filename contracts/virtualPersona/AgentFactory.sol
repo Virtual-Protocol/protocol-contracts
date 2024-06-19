@@ -6,7 +6,7 @@ import "@openzeppelin/contracts/governance/IGovernor.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
-import "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
+import "@openzeppelin/contracts/access/AccessControl.sol";
 import "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
 
 import "./IAgentFactory.sol";
@@ -19,7 +19,7 @@ import "../libs/IERC6551Registry.sol";
 contract AgentFactoryV2 is
     IAgentFactory,
     Initializable,
-    AccessControlUpgradeable,
+    AccessControl,
     PausableUpgradeable
 {
     using SafeERC20 for IERC20;
@@ -98,12 +98,11 @@ contract AgentFactoryV2 is
     ///////////////////////////////////////////////////////////////
     // V2 Storage
     ///////////////////////////////////////////////////////////////
+    address[] public allTradingTokens;
     address private _uniswapRouter;
+    address public veTokenImplementation;
     address private _minter; // Unused
     address private _tokenAdmin;
-
-    address[] public allTradingTokens;
-    address public veTokenImplementation;
     address public defaultDelegatee; // Unused
 
     // Default agent token params
@@ -129,8 +128,7 @@ contract AgentFactoryV2 is
         address vault_
     ) public initializer {
         __Pausable_init();
-        __AccessControl_init();
-        
+
         tokenImplementation = tokenImplementation_;
         veTokenImplementation = veTokenImplementation_;
         daoImplementation = daoImplementation_;
@@ -474,5 +472,23 @@ contract AgentFactoryV2 is
 
     function unpause() public onlyRole(DEFAULT_ADMIN_ROLE) {
         _unpause();
+    }
+
+    function _msgSender()
+        internal
+        view
+        override(Context, ContextUpgradeable)
+        returns (address sender)
+    {
+        sender = ContextUpgradeable._msgSender();
+    }
+
+    function _msgData()
+        internal
+        view
+        override(Context, ContextUpgradeable)
+        returns (bytes calldata)
+    {
+        return ContextUpgradeable._msgData();
     }
 }

@@ -23,23 +23,12 @@ async function upgradeFactory(implementations, assetToken) {
       implementations.daoImpl.target
     );
   }
-  else{
-    await factory.setImplementations(
-      process.env.VIRTUAL_TOKEN_IMPL,
-      process.env.VIRTUAL_VETOKEN_IMPL,
-      process.env.VIRTUAL_DAO_IMPL
-    );
-  }
+
   if (assetToken) {
     await factory.setAssetToken(assetToken);
   }
   await factory.setTokenAdmin(process.env.ADMIN);
   await factory.setTokenSupplyParams(
-    process.env.AGENT_TOKEN_LIMIT,
-    process.env.AGENT_TOKEN_LIMIT,
-    process.env.BOT_PROTECTION
-  );
-  await factory.setTokenTaxParams(
     process.env.AGENT_TOKEN_LIMIT,
     process.env.AGENT_TOKEN_LP_SUPPLY,
     process.env.AGENT_TOKEN_VAULT_SUPPLY,
@@ -48,7 +37,13 @@ async function upgradeFactory(implementations, assetToken) {
     process.env.BOT_PROTECTION,
     process.env.MINTER
   );
-  await factory.setTokenMultiplier(10000);
+  await factory.setTokenTaxParams(
+    process.env.TAX,
+    process.env.TAX,
+    process.env.SWAP_THRESHOLD,
+    process.env.TAX_VAULT
+  );
+
   console.log("Upgraded FactoryV2", factory.target);
 }
 
@@ -115,7 +110,7 @@ async function deployImplementations() {
 
 (async () => {
   try {
-    const implementations = await deployImplementations();
+    //const implementations = await deployImplementations();
     await upgradeFactory();
     //await deployAgentNft();
     //await upgradeAgentNft();

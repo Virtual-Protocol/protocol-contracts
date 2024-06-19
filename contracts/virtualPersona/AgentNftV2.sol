@@ -308,4 +308,20 @@ contract AgentNftV2 is
     function getEloCalculator() public view returns (address) {
         return _eloCalculator;
     }
+
+    function migrateVirtual(
+        uint256 virtualId,
+        address dao,
+        address token,
+        address pool,
+        address veToken
+    ) public onlyRole(ADMIN_ROLE) {
+        VirtualInfo storage info = virtualInfos[virtualId];
+        info.dao = dao;
+        info.token = token;
+
+        VirtualLP storage lp = virtualLPs[virtualId];
+        lp.pool = pool;
+        lp.veToken = veToken;
+    }
 }

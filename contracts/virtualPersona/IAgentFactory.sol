@@ -18,6 +18,4 @@ interface IAgentFactory {
     function withdraw(uint256 id) external;
 
     function totalAgents() external view returns (uint256);
-
-    function minter() external view returns (address);
 }

@@ -13,4 +13,5 @@ interface IContributionNft {
     function getAdmin() external view returns (address);
     function getDatasetId(uint256 tokenId) external view returns (uint256);
     function getAgentDAO(uint256 virtualId) external view returns (IGovernor);
+    function getEloCalculator() external view returns (address);
 }

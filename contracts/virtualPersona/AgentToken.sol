@@ -46,6 +46,7 @@ contract AgentToken is
     uint128 public maxTokensPerWallet;
     address public projectTaxRecipient;
     uint128 public projectTaxPendingSwap;
+    address public vault; // Project supply vault
 
     string private _name;
     string private _symbol;
@@ -68,11 +69,6 @@ contract AgentToken is
 
     IAgentFactory private _factory; // Single source of truth
 
-    modifier onlyMinter() {
-        require(_msgSender() == _factory.minter(), "Caller is not the minter");
-        _;
-    }
-
     /**
      * @dev {onlyOwnerOrFactory}
      *
@@ -93,8 +89,7 @@ contract AgentToken is
         address[3] memory integrationAddresses_,
         bytes memory baseParams_,
         bytes memory supplyParams_,
-        bytes memory taxParams_,
-        uint256 lpSupply_
+        bytes memory taxParams_
     ) external initializer {
         _decodeBaseParams(integrationAddresses_[0], baseParams_);
         _uniswapRouter = IUniswapV2Router02(integrationAddresses_[1]);
@@ -110,6 +105,10 @@ contract AgentToken is
             (ERC20TaxParameters)
         );
 
+        _processSupplyParams(supplyParams);
+
+        uint256 lpSupply = supplyParams.lpSupply * (10 ** decimals());
+        uint256 vaultSupply = supplyParams.vaultSupply * (10 ** decimals());
         maxTokensPerWallet = uint128(
             supplyParams.maxTokensPerWallet * (10 ** decimals())
         );
@@ -126,7 +125,7 @@ contract AgentToken is
         );
         projectTaxRecipient = taxParams.projectTaxRecipient;
 
-        _mintBalances(lpSupply_);
+        _mintBalances(lpSupply, vaultSupply);
 
         uniswapV2Pair = _createPair();
 
@@ -161,9 +160,24 @@ contract AgentToken is
     function _processSupplyParams(
         ERC20SupplyParameters memory erc20SupplyParameters_
     ) internal {
+        if (
+            erc20SupplyParameters_.maxSupply !=
+            (erc20SupplyParameters_.vaultSupply +
+                erc20SupplyParameters_.lpSupply)
+        ) {
+            revert SupplyTotalMismatch();
+        }
+
+        if (erc20SupplyParameters_.maxSupply > type(uint128).max) {
+            revert MaxSupplyTooHigh();
+        }
+
         _unlimited.add(owner());
         _unlimited.add(address(this));
         _unlimited.add(address(0));
+
+        vault = erc20SupplyParameters_.vault;
+        _unlimited.add(vault);
     }
 
     /**
@@ -204,9 +218,13 @@ contract AgentToken is
      *
      * @param lpMint_ The number of tokens for liquidity
      */
-    function _mintBalances(uint256 lpMint_) internal {
+    function _mintBalances(uint256 lpMint_, uint256 vaultMint_) internal {
         if (lpMint_ > 0) {
             _mint(address(this), lpMint_);
+        }
+
+        if (vaultMint_ > 0) {
+            _mint(vault, vaultMint_);
         }
     }
 
@@ -1003,7 +1021,7 @@ contract AgentToken is
         }
         return (amountLessTax_);
     }
-    
+
     /**
      * @dev function {_autoSwap}
      *
@@ -1380,8 +1398,4 @@ contract AgentToken is
     ) internal virtual {}
 
     receive() external payable {}
-
-    function mint(address account, uint256 value) public onlyMinter {
-        _mint(account, value);
-    }
 }

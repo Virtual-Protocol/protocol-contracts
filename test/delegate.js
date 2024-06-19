@@ -1,25 +1,15 @@
 /*
 Test delegation with history
 */
-const { parseEther, toBeHex } = require("ethers/utils");
+const { parseEther } = require("ethers/utils");
 const { expect } = require("chai");
 const {
   loadFixture,
   mine,
 } = require("@nomicfoundation/hardhat-toolbox/network-helpers");
 
-const getExecuteCallData = (factory, proposalId) => {
-  return factory.interface.encodeFunctionData("executeApplication", [
-    proposalId,
-    false,
-  ]);
-};
-
 describe("Delegation", function () {
   const PROPOSAL_THRESHOLD = parseEther("100000");
-  const QUORUM = parseEther("10000");
-  const PROTOCOL_DAO_VOTING_PERIOD = 300;
-  const MATURITY_SCORE = toBeHex(2000, 32); // 20%
 
   const genesisInput = {
     name: "Jessica",
@@ -90,7 +80,7 @@ describe("Delegation", function () {
     );
     await agentFactory.waitForDeployment();
     await agentNft.grantRole(await agentNft.MINTER_ROLE(), agentFactory.target);
-    const minter = await ethers.deployContract("Minter", [
+    const minter = await upgrades.deployProxy(await ethers.getContractFactory("Minter"), [
       service.target,
       contribution.target,
       agentNft.target,
@@ -99,16 +89,20 @@ describe("Delegation", function () {
       ipVault.address,
       agentFactory.target,
       deployer.address,
+      process.env.MAX_IMPACT,
     ]);
     await minter.waitForDeployment();
-    await agentFactory.setMinter(minter.target);
     await agentFactory.setMaturityDuration(86400 * 365 * 10); // 10years
     await agentFactory.setUniswapRouter(process.env.UNISWAP_ROUTER);
     await agentFactory.setTokenAdmin(deployer.address);
     await agentFactory.setTokenSupplyParams(
       process.env.AGENT_TOKEN_LIMIT,
+      process.env.AGENT_TOKEN_LP_SUPPLY,
+      process.env.AGENT_TOKEN_VAULT_SUPPLY,
       process.env.AGENT_TOKEN_LIMIT,
-      process.env.BOT_PROTECTION
+      process.env.AGENT_TOKEN_LIMIT,
+      process.env.BOT_PROTECTION,
+      minter.target
     );
     await agentFactory.setTokenTaxParams(
       process.env.TAX,
@@ -116,7 +110,6 @@ describe("Delegation", function () {
       process.env.SWAP_THRESHOLD,
       treasury.address
     );
-    await agentFactory.setDefaultDelegatee(deployer.address);
 
     return { virtualToken, agentFactory, agentNft };
   }
@@ -204,15 +197,9 @@ describe("Delegation", function () {
     mine(1);
     const block3 = await ethers.provider.getBlockNumber();
 
-    expect(
-      await veToken.getPastDelegates(account1, block2)
-    ).to.equal(account2);
-    expect(
-      await veToken.getPastDelegates(account1, block3)
-    ).to.equal(account3);
-    expect(
-      await veToken.getPastDelegates(account1, block1)
-    ).to.equal(account1);
+    expect(await veToken.getPastDelegates(account1, block2)).to.equal(account2);
+    expect(await veToken.getPastDelegates(account1, block3)).to.equal(account3);
+    expect(await veToken.getPastDelegates(account1, block1)).to.equal(account1);
     expect(await veToken.delegates(account1)).to.equal(account3);
   });
 
@@ -228,10 +215,7 @@ describe("Delegation", function () {
     await mine(1);
     for (let i = 0; i < 8; i++) {
       expect(
-        await veToken.getPastDelegates(
-          account1,
-          blockNumber + i + 1
-        )
+        await veToken.getPastDelegates(account1, blockNumber + i + 1)
       ).to.equal(this.accounts[i]);
     }
   });

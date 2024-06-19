@@ -74,8 +74,14 @@ describe("RewardsV2", function () {
     );
     await virtualToken.waitForDeployment();
 
+    const EloCalculator = await ethers.getContractFactory("EloCalculator");
+    const eloCalculator = await upgrades.deployProxy(EloCalculator, [
+      deployer.address,
+    ]);
+
     const AgentNft = await ethers.getContractFactory("AgentNftV2");
     const agentNft = await upgrades.deployProxy(AgentNft, [deployer.address]);
+    await agentNft.connect(deployer).setEloCalculator(eloCalculator.target);
 
     const contribution = await upgrades.deployProxy(
       await ethers.getContractFactory("ContributionNft"),
@@ -114,25 +120,32 @@ describe("RewardsV2", function () {
     );
     await agentFactory.waitForDeployment();
     await agentNft.grantRole(await agentNft.MINTER_ROLE(), agentFactory.target);
-    const minter = await ethers.deployContract("Minter", [
-      service.target,
-      contribution.target,
-      agentNft.target,
-      process.env.IP_SHARES,
-      process.env.IMPACT_MULTIPLIER,
-      ipVault.address,
-      agentFactory.target,
-      deployer.address,
-    ]);
+    const minter = await upgrades.deployProxy(
+      await ethers.getContractFactory("Minter"),
+      [
+        service.target,
+        contribution.target,
+        agentNft.target,
+        process.env.IP_SHARES,
+        process.env.IMPACT_MULTIPLIER,
+        ipVault.address,
+        agentFactory.target,
+        deployer.address,
+        process.env.MAX_IMPACT,
+      ]
+    );
     await minter.waitForDeployment();
-    await agentFactory.setMinter(minter.target);
     await agentFactory.setMaturityDuration(86400 * 365 * 10); // 10years
     await agentFactory.setUniswapRouter(process.env.UNISWAP_ROUTER);
     await agentFactory.setTokenAdmin(deployer.address);
     await agentFactory.setTokenSupplyParams(
       process.env.AGENT_TOKEN_LIMIT,
+      process.env.AGENT_TOKEN_LP_SUPPLY,
+      process.env.AGENT_TOKEN_VAULT_SUPPLY,
       process.env.AGENT_TOKEN_LIMIT,
-      process.env.BOT_PROTECTION
+      process.env.AGENT_TOKEN_LIMIT,
+      process.env.BOT_PROTECTION,
+      minter.target
     );
     await agentFactory.setTokenTaxParams(
       process.env.TAX,
@@ -159,7 +172,7 @@ describe("RewardsV2", function () {
     );
     await rewards.waitForDeployment();
     await rewards.grantRole(await rewards.GOV_ROLE(), deployer.address);
-
+    await mine(1);
     return {
       virtualToken,
       agentFactory,
@@ -247,14 +260,14 @@ describe("RewardsV2", function () {
   async function createContribution(
     virtualId,
     coreId,
-    maturity,
     parentId,
     isModel,
     datasetId,
     desc,
     base,
     account,
-    voters
+    voters,
+    votes
   ) {
     const { serviceNft, contributionNft, minter, agentNft } = base;
     const daoAddr = (await agentNft.virtualInfo(virtualId)).dao;
@@ -286,9 +299,7 @@ describe("RewardsV2", function () {
       isModel,
       datasetId
     );
-    const voteParams = isModel
-      ? abi.encode(["uint256", "uint8[] memory"], [maturity, [0, 1, 1, 0, 2]])
-      : "0x";
+    const voteParams = isModel ? abi.encode(["uint8[] memory"], [votes]) : "0x";
 
     for (const voter of voters) {
       await agentDAO
@@ -309,7 +320,6 @@ describe("RewardsV2", function () {
     const base = await loadFixture(deployWithAgent);
     const { rewards, virtualToken, agent } = base;
     const { contributor1, founder, validator1 } = await getAccounts();
-    const maturity = 100;
     // Founder should delegate to another person for us to test the different set of rewards
     const veToken = await ethers.getContractAt("AgentVeToken", agent.veToken);
     await veToken.connect(founder).delegate(validator1.address);
@@ -318,14 +328,14 @@ describe("RewardsV2", function () {
     await createContribution(
       1,
       0,
-      maturity,
       0,
       true,
       0,
       "Test",
       base,
       contributor1.address,
-      [validator1]
+      [validator1],
+      [1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
     );
     const rewardSize = 100000;
     await virtualToken.approve(
@@ -341,23 +351,21 @@ describe("RewardsV2", function () {
     const base = await loadFixture(deployWithAgent);
     const { rewards, virtualToken, agent } = base;
     const { contributor1, founder, validator1 } = await getAccounts();
-    const maturity = 100;
     // Founder should delegate to another person for us to test the different set of rewards
     const veToken = await ethers.getContractAt("AgentVeToken", agent.veToken);
     await veToken.connect(founder).delegate(validator1.address);
     await mine(1);
-
     await createContribution(
       1,
       0,
-      maturity,
       0,
       true,
       0,
       "Test",
       base,
       contributor1.address,
-      [validator1]
+      [validator1],
+      [1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
     );
     const rewardSize = 100000;
     await virtualToken.approve(
@@ -385,26 +393,17 @@ describe("RewardsV2", function () {
       await rewards.getTotalClaimableStakerRewards(validator1.address, [1])
     );
     const validatorVClaimable = formatEther(
-      await rewards.getTotalClaimableValidatorRewards(
-        validator1.address,
-        [1]
-      )
+      await rewards.getTotalClaimableValidatorRewards(validator1.address, [1])
     );
     expect(validatorSClaimable).to.equal("0.0");
     expect(validatorVClaimable).to.equal("10000.0");
 
     // Nothing for contributor
     const conributorSClaimable = formatEther(
-      await rewards.getTotalClaimableStakerRewards(
-        contributor1.address,
-        [1]
-      )
+      await rewards.getTotalClaimableStakerRewards(contributor1.address, [1])
     );
     const contributorVClaimable = formatEther(
-      await rewards.getTotalClaimableValidatorRewards(
-        contributor1.address,
-        [1]
-      )
+      await rewards.getTotalClaimableValidatorRewards(contributor1.address, [1])
     );
     expect(conributorSClaimable).to.equal("0.0");
     expect(contributorVClaimable).to.equal("0.0");
@@ -414,7 +413,6 @@ describe("RewardsV2", function () {
     const base = await loadFixture(deployWithAgent);
     const { rewards, virtualToken, agent } = base;
     const { contributor1, founder, validator1 } = await getAccounts();
-    const maturity = 100;
     // Founder should delegate to another person for us to test the different set of rewards
     const veToken = await ethers.getContractAt("AgentVeToken", agent.veToken);
     await veToken.connect(founder).delegate(validator1.address);
@@ -423,14 +421,14 @@ describe("RewardsV2", function () {
     await createContribution(
       1,
       0,
-      maturity,
       0,
       true,
       0,
       "Test",
       base,
       contributor1.address,
-      [validator1]
+      [validator1],
+      [1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
     );
     const rewardSize = 100000;
     await virtualToken.approve(
@@ -459,26 +457,17 @@ describe("RewardsV2", function () {
       await rewards.getTotalClaimableStakerRewards(validator1.address, [1])
     );
     const validatorVClaimable = formatEther(
-      await rewards.getTotalClaimableValidatorRewards(
-        validator1.address,
-        [1]
-      )
+      await rewards.getTotalClaimableValidatorRewards(validator1.address, [1])
     );
     expect(validatorSClaimable).to.equal("0.0");
     expect(validatorVClaimable).to.equal("9000.0");
 
     // Nothing for contributor
     const conributorSClaimable = formatEther(
-      await rewards.getTotalClaimableStakerRewards(
-        contributor1.address,
-        [1]
-      )
+      await rewards.getTotalClaimableStakerRewards(contributor1.address, [1])
     );
     const contributorVClaimable = formatEther(
-      await rewards.getTotalClaimableValidatorRewards(
-        contributor1.address,
-        [1]
-      )
+      await rewards.getTotalClaimableValidatorRewards(contributor1.address, [1])
     );
     expect(conributorSClaimable).to.equal("0.0");
     expect(contributorVClaimable).to.equal("0.0");
@@ -486,15 +475,8 @@ describe("RewardsV2", function () {
 
   it("should be able to distribute protocol emission for multiple virtuals with arbitrary LP values", async function () {
     const base = await loadFixture(deployWithAgent);
-    const { agent, agentNft, virtualToken, rewards } = base;
-    const {
-      contributor1,
-      contributor2,
-      validator1,
-      validator2,
-      founder,
-      trader,
-    } = await getAccounts();
+    const { agentNft, virtualToken, rewards } = base;
+    const { contributor1, validator1, founder, trader } = await getAccounts();
     // Create 3 more virtuals to sum up to 4
     const app2 = await createApplication(base, founder, 1);
     const agent2 = await createAgent(base, app2);
@@ -516,14 +498,14 @@ describe("RewardsV2", function () {
       await createContribution(
         i,
         0,
-        100,
         0,
         true,
         0,
         `Test ${i}`,
         base,
         contributor1.address,
-        [validator1]
+        [validator1],
+        [1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
       );
     }
 
@@ -593,7 +575,6 @@ describe("RewardsV2", function () {
     const { rewards, virtualToken, agent, agentNft } = base;
     const { contributor1, founder, validator1, trader, validator2 } =
       await getAccounts();
-    const maturity = 100;
     // Founder should delegate to another person for us to test the different set of rewards
     const veToken = await ethers.getContractAt("AgentVeToken", agent.veToken);
     await veToken.connect(founder).delegate(validator1.address);
@@ -628,14 +609,14 @@ describe("RewardsV2", function () {
     await createContribution(
       1,
       0,
-      maturity,
       0,
       true,
       0,
       "Test",
       base,
       contributor1.address,
-      [validator1]
+      [validator1],
+      [1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
     );
     const rewardSize = 100000;
     await virtualToken.approve(
@@ -693,7 +674,6 @@ describe("RewardsV2", function () {
     const { rewards, virtualToken, agent, agentNft } = base;
     const { contributor1, founder, validator1, trader, validator2 } =
       await getAccounts();
-    const maturity = 100;
 
     const agentToken = await ethers.getContractAt("AgentToken", agent.token);
     const veToken = await ethers.getContractAt("AgentVeToken", agent.veToken);
@@ -706,13 +686,14 @@ describe("RewardsV2", function () {
       process.env.UNISWAP_ROUTER
     );
 
-    await virtualToken.mint(trader.address, parseEther("100000"));
+    // Trader buys tokens
+    await virtualToken.mint(trader.address, parseEther("300000"));
     await virtualToken
       .connect(trader)
-      .approve(router.target, parseEther("100000"));
+      .approve(router.target, parseEther("300000"));
     const agentTokenAddr = (await agentNft.virtualInfo(1)).token;
-    const amountToBuy = parseEther("40000");
-    const capital = parseEther("100000");
+    const amountToBuy = parseEther("10000000");
+    const capital = parseEther("300000");
     await router
       .connect(trader)
       .swapTokensForExactTokens(
@@ -726,6 +707,8 @@ describe("RewardsV2", function () {
     await agentToken
       .connect(trader)
       .approve(router.target, await agentToken.balanceOf(trader.address));
+
+    // Add liquidity
     await router
       .connect(trader)
       .addLiquidity(
@@ -739,24 +722,31 @@ describe("RewardsV2", function () {
         Math.floor(new Date().getTime() / 1000 + 600000)
       );
     await mine(1);
-    await lp.connect(trader).approve(veToken.target, await lp.balanceOf(trader.address));
+    // Stake
+    await lp
+      .connect(trader)
+      .approve(veToken.target, await lp.balanceOf(trader.address));
     await veToken
       .connect(trader)
-      .stake(await lp.balanceOf(trader.address), trader.address, validator2.address);
+      .stake(
+        await lp.balanceOf(trader.address),
+        trader.address,
+        validator2.address
+      );
     await mine(1);
 
     // Validator 1 voting
     await createContribution(
       1,
       0,
-      maturity,
       0,
       true,
       0,
       "Test",
       base,
       contributor1.address,
-      [validator1, validator2]
+      [validator1, validator2],
+      [1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
     );
     const rewardSize = 100000;
     await virtualToken.approve(
@@ -770,6 +760,11 @@ describe("RewardsV2", function () {
     );
     await mine(1);
 
+    const v1 = parseFloat(
+      formatEther(await veToken.balanceOf(founder.address))
+    );
+    const v2 = parseFloat(formatEther(await veToken.balanceOf(trader.address)));
+
     // Staker1 + Validator 1
     const staker1SClaimable = formatEther(
       await rewards.getTotalClaimableStakerRewards(founder.address, [1])
@@ -777,7 +772,8 @@ describe("RewardsV2", function () {
     const staker1VClaimable = formatEther(
       await rewards.getTotalClaimableValidatorRewards(founder.address, [1])
     );
-    expect(parseFloat(staker1SClaimable)).to.be.greaterThan(70000);
+
+    expect(parseFloat(staker1SClaimable).toFixed(4)).to.be.equal("72964.6543");
     expect(staker1VClaimable).to.equal("0.0");
 
     const validator1SClaimable = formatEther(
@@ -787,16 +783,19 @@ describe("RewardsV2", function () {
       await rewards.getTotalClaimableValidatorRewards(validator1.address, [1])
     );
     expect(validator1SClaimable).to.equal("0.0");
-    expect(parseFloat(validator1VClaimable)).to.be.greaterThan(7000);
+    expect(parseFloat(validator1VClaimable).toFixed(4)).to.be.equal(
+      "8107.1838"
+    );
 
     // Staker2 + Validator 2
     const staker2SClaimable = formatEther(
       await rewards.getTotalClaimableStakerRewards(trader.address, [1])
     );
+
     const staker2VClaimable = formatEther(
       await rewards.getTotalClaimableValidatorRewards(trader.address, [1])
     );
-    expect(parseFloat(staker2SClaimable)).to.be.greaterThan(10000);
+    expect(parseFloat(staker2SClaimable).toFixed(4)).to.be.equal("17035.3457");
     expect(staker2VClaimable).to.equal("0.0");
 
     const validator2SClaimable = formatEther(
@@ -806,7 +805,9 @@ describe("RewardsV2", function () {
       await rewards.getTotalClaimableValidatorRewards(validator2.address, [1])
     );
     expect(validator2SClaimable).to.equal("0.0");
-    expect(parseFloat(validator2VClaimable)).to.be.greaterThan(1000);
+    expect(parseFloat(validator2VClaimable).toFixed(4)).to.be.equal(
+      "1892.8162"
+    );
   });
 
   it("should be able to distribute protocol emission for single virtual", async function () {
@@ -822,14 +823,14 @@ describe("RewardsV2", function () {
     await createContribution(
       1,
       0,
-      maturity,
       0,
       true,
       0,
       "Test",
       base,
       contributor1.address,
-      [validator1]
+      [validator1],
+      [1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
     );
     const rewardSize = 100000;
     await virtualToken.approve(
@@ -845,7 +846,7 @@ describe("RewardsV2", function () {
     const base = await loadFixture(deployWithAgent);
     const { rewards, virtualToken, agent } = base;
     const { contributor1, founder, validator1 } = await getAccounts();
-    const maturity = 100;
+
     // Founder should delegate to another person for us to test the different set of rewards
     const veToken = await ethers.getContractAt("AgentVeToken", agent.veToken);
     await veToken.connect(founder).delegate(validator1.address);
@@ -854,14 +855,14 @@ describe("RewardsV2", function () {
     await createContribution(
       1,
       0,
-      maturity,
       0,
       true,
       0,
       "Test",
       base,
       contributor1.address,
-      [validator1]
+      [validator1],
+      [1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
     );
     const rewardSize = 100000;
     await virtualToken.approve(
@@ -889,26 +890,17 @@ describe("RewardsV2", function () {
       await rewards.getTotalClaimableStakerRewards(validator1.address, [1])
     );
     const validatorVClaimable = formatEther(
-      await rewards.getTotalClaimableValidatorRewards(
-        validator1.address,
-        [1]
-      )
+      await rewards.getTotalClaimableValidatorRewards(validator1.address, [1])
     );
     expect(validatorSClaimable).to.equal("0.0");
     expect(validatorVClaimable).to.equal("10000.0");
 
     // Nothing for contributor
     const conributorSClaimable = formatEther(
-      await rewards.getTotalClaimableStakerRewards(
-        contributor1.address,
-        [1]
-      )
+      await rewards.getTotalClaimableStakerRewards(contributor1.address, [1])
     );
     const contributorVClaimable = formatEther(
-      await rewards.getTotalClaimableValidatorRewards(
-        contributor1.address,
-        [1]
-      )
+      await rewards.getTotalClaimableValidatorRewards(contributor1.address, [1])
     );
     expect(conributorSClaimable).to.equal("0.0");
     expect(contributorVClaimable).to.equal("0.0");
@@ -918,7 +910,7 @@ describe("RewardsV2", function () {
     const base = await loadFixture(deployWithAgent);
     const { rewards, virtualToken, agent } = base;
     const { contributor1, founder, validator1 } = await getAccounts();
-    const maturity = 100;
+
     // Founder should delegate to another person for us to test the different set of rewards
     const veToken = await ethers.getContractAt("AgentVeToken", agent.veToken);
     await veToken.connect(founder).delegate(validator1.address);
@@ -927,14 +919,14 @@ describe("RewardsV2", function () {
     await createContribution(
       1,
       0,
-      maturity,
       0,
       true,
       0,
       "Test",
       base,
       contributor1.address,
-      [validator1]
+      [validator1],
+      [1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
     );
     const rewardSize = 100000;
     await virtualToken.approve(
@@ -963,26 +955,17 @@ describe("RewardsV2", function () {
       await rewards.getTotalClaimableStakerRewards(validator1.address, [1])
     );
     const validatorVClaimable = formatEther(
-      await rewards.getTotalClaimableValidatorRewards(
-        validator1.address,
-        [1]
-      )
+      await rewards.getTotalClaimableValidatorRewards(validator1.address, [1])
     );
     expect(validatorSClaimable).to.equal("0.0");
     expect(validatorVClaimable).to.equal("9000.0");
 
     // Nothing for contributor
     const conributorSClaimable = formatEther(
-      await rewards.getTotalClaimableStakerRewards(
-        contributor1.address,
-        [1]
-      )
+      await rewards.getTotalClaimableStakerRewards(contributor1.address, [1])
     );
     const contributorVClaimable = formatEther(
-      await rewards.getTotalClaimableValidatorRewards(
-        contributor1.address,
-        [1]
-      )
+      await rewards.getTotalClaimableValidatorRewards(contributor1.address, [1])
     );
     expect(conributorSClaimable).to.equal("0.0");
     expect(contributorVClaimable).to.equal("0.0");
@@ -990,22 +973,15 @@ describe("RewardsV2", function () {
 
   it("should be able to distribute protocol emission for multiple virtuals with arbitrary LP values", async function () {
     const base = await loadFixture(deployWithAgent);
-    const { agent, agentNft, virtualToken, rewards } = base;
-    const {
-      contributor1,
-      contributor2,
-      validator1,
-      validator2,
-      founder,
-      trader,
-    } = await getAccounts();
+    const { agentNft, virtualToken, rewards } = base;
+    const { validator1, founder, trader } = await getAccounts();
     // Create 3 more virtuals to sum up to 4
     const app2 = await createApplication(base, founder, 1);
     const agent2 = await createAgent(base, app2);
     const app3 = await createApplication(base, founder, 2);
     const agent3 = await createAgent(base, app3);
     const app4 = await createApplication(base, founder, 3);
-    const agent4  = await createAgent(base, app4);
+    const agent4 = await createAgent(base, app4);
     const lp3 = await rewards.getLPValue(agent3[0]);
     console.log("Initial LP ", lp3);
 
@@ -1022,14 +998,14 @@ describe("RewardsV2", function () {
       await createContribution(
         i,
         0,
-        100,
         0,
         true,
         0,
         `Test ${i}`,
         base,
         trader.address,
-        [validator1]
+        [validator1],
+        [1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
       );
     }
 
@@ -1044,10 +1020,26 @@ describe("RewardsV2", function () {
       .approve(router.target, parseEther("400"));
     for (let i of [1, 3, 4]) {
       const agentTokenAddr = (await agentNft.virtualInfo(i)).token;
-      const agentToken = await ethers.getContractAt("AgentToken", agentTokenAddr);
-      await agentToken.connect(trader).approve(router.target,  parseEther("400"))
+      const agentToken = await ethers.getContractAt(
+        "AgentToken",
+        agentTokenAddr
+      );
+      await agentToken
+        .connect(trader)
+        .approve(router.target, parseEther("400"));
       const amountToAdd = parseEther((0.25 * i).toString());
       const capital = parseEther("400");
+      console.log(
+        "Adding liquidity for ",
+        i,
+        "AMount",
+        formatEther(amountToAdd),
+        " Balance ",
+        formatEther(await agentToken.balanceOf(trader.address)),
+        " Capital ",
+        formatEther(await virtualToken.balanceOf(trader.address))
+      );
+
       await router
         .connect(trader)
         .addLiquidity(
@@ -1055,10 +1047,13 @@ describe("RewardsV2", function () {
           agentTokenAddr,
           amountToAdd,
           amountToAdd,
-          amountToAdd,
-          amountToAdd,
+          0,
+          0,
           trader.address,
-          Math.floor(new Date().getTime() / 1000 + 6000000)
+          Math.floor(new Date().getTime() / 1000 + 6000000),
+          {
+            gasLimit: 1000000,
+          }
         );
       const lp_after_buy = await rewards.getLPValue(i);
       console.log("lp after buy LP ", lp_after_buy);
@@ -1067,22 +1062,20 @@ describe("RewardsV2", function () {
 
     // Distribute rewards
     // Expectations:
-    // virtual 4 = 100001000000000000000000n,
-    // virtual 3 = 100000750000000000000000n,
-    // virtual 1 = 100000250000000000000000n
+    // virtual 4 = 100000002000000000000000n,
+    // virtual 3 = 100000001500000000000000n,
+    // virtual 1 = 100000000500000000000000n
     // virtual 2 = 0
 
     // Using gwei as calculation size due to BigInt limitations
     const rewardSize = 300000;
-    const Lp4 = BigInt(100001000000000);
-    const Lp3 = BigInt(100000750000000);
-    const Lp1 = BigInt(100000250000000);
-    const rewardSizeInGwei = BigInt(rewardSize * 10 ** 9)
+    const Lp4 = BigInt(100000002000000000000000n);
+    const Lp3 = BigInt(100000001500000000000000n);
+    const Lp1 = BigInt(100000000500000000000000n);
+    const rewardSizeInGwei = BigInt(rewardSize * 10 ** 9);
 
-
-    const totalLp = Lp1 + Lp3 + Lp4
-    console.log("totallp", totalLp)
-
+    const totalLp = Lp1 + Lp3 + Lp4;
+    console.log("totallp", totalLp);
 
     await virtualToken.approve(
       rewards.target,
@@ -1098,10 +1091,12 @@ describe("RewardsV2", function () {
       founder.address,
       [1]
     );
-    
+
     //99999583336111092592716
-    const rewardSizeAfterProtocol = rewardSizeInGwei * BigInt(process.env.STAKER_SHARES) / BigInt(10000)
-    const expectedRewardLP1Ratio = await (rewardSizeAfterProtocol * Lp1) / totalLp
+    const rewardSizeAfterProtocol =
+      (rewardSizeInGwei * BigInt(process.env.STAKER_SHARES)) / BigInt(10000);
+    const expectedRewardLP1Ratio =
+      (await (rewardSizeAfterProtocol * Lp1)) / totalLp;
 
     const rewards2 = await rewards.getTotalClaimableStakerRewards(
       founder.address,
@@ -1111,20 +1106,24 @@ describe("RewardsV2", function () {
       founder.address,
       [3]
     );
-    const expectedRewardLP3Ratio = await (rewardSizeAfterProtocol * Lp3) / totalLp
-
+    const expectedRewardLP3Ratio =
+      (await (rewardSizeAfterProtocol * Lp3)) / totalLp;
 
     const rewards4 = await rewards.getTotalClaimableStakerRewards(
       founder.address,
       [4]
     );
-    const expectedRewardLP4Ratio = (rewardSizeAfterProtocol * Lp4) / totalLp
+    const expectedRewardLP4Ratio = (rewardSizeAfterProtocol * Lp4) / totalLp;
 
-
-    expect(await parseInt(ethers.formatUnits(rewards1.toString(), "gwei"))).to.be.equal(expectedRewardLP1Ratio);
-    expect(await parseInt(ethers.formatUnits(rewards3.toString(), "gwei"))).to.be.equal(expectedRewardLP3Ratio);
-    expect(await parseInt(ethers.formatUnits(rewards4.toString(), "gwei"))).to.be.equal(expectedRewardLP4Ratio);
-
+    expect(
+      await parseInt(ethers.formatUnits(rewards1.toString(), "gwei"))
+    ).to.be.equal(expectedRewardLP1Ratio);
+    expect(
+      await parseInt(ethers.formatUnits(rewards3.toString(), "gwei"))
+    ).to.be.equal(expectedRewardLP3Ratio);
+    expect(
+      await parseInt(ethers.formatUnits(rewards4.toString(), "gwei"))
+    ).to.be.equal(expectedRewardLP4Ratio);
 
     expect(rewards4).to.be.greaterThan(rewards3);
     expect(rewards3).to.be.greaterThan(rewards1);
@@ -1136,7 +1135,6 @@ describe("RewardsV2", function () {
     const { rewards, virtualToken, agent, agentNft } = base;
     const { contributor1, founder, validator1, trader, validator2 } =
       await getAccounts();
-    const maturity = 100;
     // Founder should delegate to another person for us to test the different set of rewards
     const veToken = await ethers.getContractAt("AgentVeToken", agent.veToken);
     await veToken.connect(founder).delegate(validator1.address);
@@ -1171,14 +1169,14 @@ describe("RewardsV2", function () {
     await createContribution(
       1,
       0,
-      maturity,
       0,
       true,
       0,
       "Test",
       base,
       contributor1.address,
-      [validator1]
+      [validator1],
+      [1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
     );
     const rewardSize = 100000;
     await virtualToken.approve(
@@ -1236,7 +1234,6 @@ describe("RewardsV2", function () {
     const { rewards, virtualToken, agent, agentNft } = base;
     const { contributor1, founder, validator1, trader, validator2 } =
       await getAccounts();
-    const maturity = 100;
 
     const agentToken = await ethers.getContractAt("AgentToken", agent.token);
     const veToken = await ethers.getContractAt("AgentVeToken", agent.veToken);
@@ -1249,13 +1246,13 @@ describe("RewardsV2", function () {
       process.env.UNISWAP_ROUTER
     );
 
-    await virtualToken.mint(trader.address, parseEther("100000"));
+    await virtualToken.mint(trader.address, parseEther("200000"));
     await virtualToken
       .connect(trader)
       .approve(router.target, parseEther("100000"));
     const agentTokenAddr = (await agentNft.virtualInfo(1)).token;
-    const amountToBuy = parseEther("40000");
-    const capital = parseEther("100000");
+    const amountToBuy = parseEther("10000000"); // 20% of the pool
+    const capital = parseEther("200000");
     await router
       .connect(trader)
       .swapTokensForExactTokens(
@@ -1269,6 +1266,7 @@ describe("RewardsV2", function () {
     await agentToken
       .connect(trader)
       .approve(router.target, await agentToken.balanceOf(trader.address));
+
     await router
       .connect(trader)
       .addLiquidity(
@@ -1282,24 +1280,30 @@ describe("RewardsV2", function () {
         Math.floor(new Date().getTime() / 1000 + 600000)
       );
     await mine(1);
-    await lp.connect(trader).approve(veToken.target, await lp.balanceOf(trader.address));
+    await lp
+      .connect(trader)
+      .approve(veToken.target, await lp.balanceOf(trader.address));
     await veToken
       .connect(trader)
-      .stake(await lp.balanceOf(trader.address), trader.address, validator2.address);
+      .stake(
+        await lp.balanceOf(trader.address),
+        trader.address,
+        validator2.address
+      );
     await mine(1);
 
     // Validator 1 voting
     await createContribution(
       1,
       0,
-      maturity,
       0,
       true,
       0,
       "Test",
       base,
       contributor1.address,
-      [validator1, validator2]
+      [validator1, validator2],
+      [1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
     );
     const rewardSize = 100000;
     await virtualToken.approve(

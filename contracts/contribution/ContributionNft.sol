@@ -37,6 +37,8 @@ contract ContributionNft is
 
     address private _admin; // Admin is able to create contribution proposal without votes
 
+    address private _eloCalculator;
+
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() {
         _disableInitializers();
@@ -180,9 +182,16 @@ contract ContributionNft is
         return _ownerOf(tokenId);
     }
 
-    function getDatasetId(
-        uint256 tokenId
-    ) external view returns (uint256) {
+    function getDatasetId(uint256 tokenId) external view returns (uint256) {
         return modelDatasets[tokenId];
+    }
+
+    function getEloCalculator() external view returns (address) {
+        return _eloCalculator;
+    }
+
+    function setEloCalculator(address eloCalculator_) public {
+        require(_msgSender() == _admin, "Only admin can set elo calculator");
+        _eloCalculator = eloCalculator_;
     }
 }

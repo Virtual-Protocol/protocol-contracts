@@ -21,7 +21,7 @@ const {
 } = require("@nomicfoundation/hardhat-toolbox/network-helpers");
 
 describe("AgentFactoryV2", function () {
-  const PROPOSAL_THRESHOLD = parseEther("100000"); //100k
+  const PROPOSAL_THRESHOLD = parseEther("50000"); // 50k
   const MATURITY_SCORE = toBeHex(2000, 32); // 20%
   const IP_SHARE = 1000; // 10%
 
@@ -94,35 +94,42 @@ describe("AgentFactoryV2", function () {
     );
     await agentFactory.waitForDeployment();
     await agentNft.grantRole(await agentNft.MINTER_ROLE(), agentFactory.target);
-    const minter = await ethers.deployContract("Minter", [
-      service.target,
-      contribution.target,
-      agentNft.target,
-      process.env.IP_SHARES,
-      process.env.IMPACT_MULTIPLIER,
-      ipVault.address,
-      agentFactory.target,
-      deployer.address,
-    ]);
+    const minter = await upgrades.deployProxy(
+      await ethers.getContractFactory("Minter"),
+      [
+        service.target,
+        contribution.target,
+        agentNft.target,
+        process.env.IP_SHARES,
+        process.env.IMPACT_MULTIPLIER,
+        ipVault.address,
+        agentFactory.target,
+        deployer.address,
+        process.env.MAX_IMPACT,
+      ]
+    );
     await minter.waitForDeployment();
-    await agentFactory.setMinter(minter.target);
     await agentFactory.setMaturityDuration(86400 * 365 * 10); // 10years
     await agentFactory.setUniswapRouter(process.env.UNISWAP_ROUTER);
     await agentFactory.setTokenAdmin(deployer.address);
     await agentFactory.setTokenSupplyParams(
       process.env.AGENT_TOKEN_LIMIT,
+      process.env.AGENT_TOKEN_LP_SUPPLY,
+      process.env.AGENT_TOKEN_VAULT_SUPPLY,
       process.env.AGENT_TOKEN_LIMIT,
-      process.env.BOT_PROTECTION
+      process.env.AGENT_TOKEN_LIMIT,
+      process.env.BOT_PROTECTION,
+      minter.target
     );
+
     await agentFactory.setTokenTaxParams(
       process.env.TAX,
       process.env.TAX,
       process.env.SWAP_THRESHOLD,
       treasury.address
     );
-    await agentFactory.setDefaultDelegatee(deployer.address);
 
-    return { virtualToken, agentFactory, agentNft };
+    return { virtualToken, agentFactory, agentNft, minter };
   }
 
   async function deployWithApplication() {
@@ -261,14 +268,20 @@ describe("AgentFactoryV2", function () {
   });
 
   it("agent component C1: Agent Token", async function () {
-    const { agent } = await loadFixture(deployWithAgent);
+    const { agent, minter } = await loadFixture(deployWithAgent);
     const agentToken = await ethers.getContractAt("AgentToken", agent.token);
-    expect(await agentToken.totalSupply()).to.be.equal(PROPOSAL_THRESHOLD);
+    expect(await agentToken.totalSupply()).to.be.equal(
+      parseEther(process.env.AGENT_TOKEN_LIMIT)
+    );
+    expect(await agentToken.balanceOf(minter.target)).to.be.equal(
+      parseEther(process.env.AGENT_TOKEN_VAULT_SUPPLY)
+    );
   });
 
   it("agent component C2: LP Pool", async function () {
     const { agent, virtualToken } = await loadFixture(deployWithAgent);
     const lp = await ethers.getContractAt("IUniswapV2Pair", agent.lp);
+
     const t0 = await lp.token0();
     const t1 = await lp.token1();
 
@@ -276,25 +289,34 @@ describe("AgentFactoryV2", function () {
     expect(addresses).contain(t0);
     expect(addresses).contain(t1);
 
+    // t0 and t1 will change position dynamically
     const reserves = await lp.getReserves();
-    expect(reserves[0]).to.be.equal(PROPOSAL_THRESHOLD);
-    expect(reserves[1]).to.be.equal(PROPOSAL_THRESHOLD);
+    expect(reserves[0]).to.be.equal(
+      t0 === agent.token
+        ? parseEther(process.env.AGENT_TOKEN_LP_SUPPLY)
+        : PROPOSAL_THRESHOLD
+    );
+    expect(reserves[1]).to.be.equal(
+      t1 === agent.token
+        ? parseEther(process.env.AGENT_TOKEN_LP_SUPPLY)
+        : PROPOSAL_THRESHOLD
+    );
   });
 
   it("agent component C3: Agent veToken", async function () {
     const { agent } = await loadFixture(deployWithAgent);
-    const { founder, deployer } = await getAccounts();
+    const { founder } = await getAccounts();
+
     const veToken = await ethers.getContractAt("AgentVeToken", agent.veToken);
-    const balance = await veToken.balanceOf(founder.address);
-    expect(parseFloat(formatEther(balance).toString()).toFixed(2)).to.be.equal(
-      "100000.00"
-    );
-    // Delegate to default delegatee
-    expect(
-      parseFloat(
-        formatEther(await veToken.getVotes(deployer.address)).toString()
-      ).toFixed(2)
-    ).to.be.equal("100000.00");
+    const balance = parseFloat(
+      formatEther(await veToken.balanceOf(founder.address))
+    ).toFixed(2);
+    const lp = await ethers.getContractAt("ERC20", agent.lp);
+    const votes = parseFloat(
+      formatEther(await veToken.getVotes(founder.address))
+    ).toFixed(2);
+    expect(balance).to.equal("1581138.83");
+    expect(votes).to.equal("1581138.83");
   });
 
   it("agent component C4: Agent DAO", async function () {
@@ -353,9 +375,11 @@ describe("AgentFactoryV2", function () {
       deployWithAgent
     );
     const agentToken = await ethers.getContractAt("AgentToken", agent.token);
-    expect(await agentToken.totalSupply()).to.be.equal(PROPOSAL_THRESHOLD);
+    expect(await agentToken.totalSupply()).to.be.equal(
+      parseEther(process.env.AGENT_TOKEN_LIMIT)
+    );
     expect(await agentToken.balanceOf(agent.lp)).to.be.equal(
-      PROPOSAL_THRESHOLD
+      parseEther(process.env.AGENT_TOKEN_LP_SUPPLY)
     );
   });
 
@@ -372,8 +396,8 @@ describe("AgentFactoryV2", function () {
     const agentToken = await ethers.getContractAt("AgentToken", agent.token);
 
     // Buy tokens
-    const amountToBuy = parseEther("90");
-    const capital = parseEther("200");
+    const amountToBuy = parseEther("10000000");
+    const capital = parseEther("200000000");
     await virtualToken.mint(trader.address, capital);
     await virtualToken
       .connect(trader)
@@ -416,9 +440,11 @@ describe("AgentFactoryV2", function () {
     /////////////////
     // Staking, and able to delegate to anyone
     await lpToken.connect(trader).approve(agent.veToken, parseEther("10"));
-    await veToken
-      .connect(trader)
-      .stake(parseEther("10"), trader.address, poorMan.address);
+    await expect(
+      veToken
+        .connect(trader)
+        .stake(parseEther("10"), trader.address, poorMan.address)
+    ).to.be.not.reverted;
   });
 
   it("should deny staking on private agent", async function () {
@@ -542,8 +568,8 @@ describe("AgentFactoryV2", function () {
 
     // Get trader to stake on poorMan so that we have 2 validators
     // Buy tokens
-    const amountToBuy = parseEther("90");
-    const capital = parseEther("200");
+    const amountToBuy = parseEther("1000000");
+    const capital = parseEther("200000");
     await virtualToken.mint(trader.address, capital);
     await virtualToken
       .connect(trader)
@@ -694,8 +720,8 @@ describe("AgentFactoryV2", function () {
       "IUniswapV2Router02",
       process.env.UNISWAP_ROUTER
     );
-    const amountToBuy = parseEther("90");
-    const capital = parseEther("200");
+    const amountToBuy = parseEther("1000000");
+    const capital = parseEther("2000000");
     await virtualToken.mint(trader.address, capital);
     await virtualToken
       .connect(trader)

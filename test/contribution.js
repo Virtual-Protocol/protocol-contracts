@@ -14,7 +14,6 @@ const getSetImpactMulCalldata = async (minter, virtualId, multiplier) => {
   ]);
 };
 
-
 const getSetIPShareCalldata = async (minter, virtualId, share) => {
   return minter.interface.encodeFunctionData("setIPShareOverride", [
     virtualId,
@@ -82,8 +81,14 @@ describe("Contribution", function () {
     );
     await virtualToken.waitForDeployment();
 
+    const EloCalculator = await ethers.getContractFactory("EloCalculator");
+    const eloCalculator = await upgrades.deployProxy(EloCalculator, [
+      deployer.address,
+    ]);
+
     const AgentNft = await ethers.getContractFactory("AgentNftV2");
     const agentNft = await upgrades.deployProxy(AgentNft, [deployer.address]);
+    await agentNft.connect(deployer).setEloCalculator(eloCalculator.target);
 
     const contribution = await upgrades.deployProxy(
       await ethers.getContractFactory("ContributionNft"),
@@ -122,25 +127,32 @@ describe("Contribution", function () {
     );
     await agentFactory.waitForDeployment();
     await agentNft.grantRole(await agentNft.MINTER_ROLE(), agentFactory.target);
-    const minter = await ethers.deployContract("Minter", [
-      service.target,
-      contribution.target,
-      agentNft.target,
-      process.env.IP_SHARES,
-      process.env.IMPACT_MULTIPLIER,
-      ipVault.address,
-      agentFactory.target,
-      deployer.address
-    ]);
+    const minter = await upgrades.deployProxy(
+      await ethers.getContractFactory("Minter"),
+      [
+        service.target,
+        contribution.target,
+        agentNft.target,
+        process.env.IP_SHARES,
+        process.env.IMPACT_MULTIPLIER,
+        ipVault.address,
+        agentFactory.target,
+        deployer.address,
+        process.env.MAX_IMPACT,
+      ]
+    );
     await minter.waitForDeployment();
-    await agentFactory.setMinter(minter.target);
     await agentFactory.setMaturityDuration(86400 * 365 * 10); // 10years
     await agentFactory.setUniswapRouter(process.env.UNISWAP_ROUTER);
     await agentFactory.setTokenAdmin(deployer.address);
     await agentFactory.setTokenSupplyParams(
       process.env.AGENT_TOKEN_LIMIT,
+      process.env.AGENT_TOKEN_LP_SUPPLY,
+      process.env.AGENT_TOKEN_VAULT_SUPPLY,
       process.env.AGENT_TOKEN_LIMIT,
-      process.env.BOT_PROTECTION
+      process.env.AGENT_TOKEN_LIMIT,
+      process.env.BOT_PROTECTION,
+      minter.target
     );
     await agentFactory.setTokenTaxParams(
       process.env.TAX,
@@ -255,20 +267,19 @@ describe("Contribution", function () {
   async function createContribution(
     virtualId,
     coreId,
-    maturity,
     parentId,
     isModel,
     datasetId,
     desc,
     base,
     account,
-    voters
+    voters,
+    votes
   ) {
     const { serviceNft, contributionNft, minter, agentNft } = base;
     const daoAddr = (await agentNft.virtualInfo(virtualId)).dao;
     const veAddr = (await agentNft.virtualLP(virtualId)).veToken;
     const agentDAO = await ethers.getContractAt("AgentDAO", daoAddr);
-    const veToken = await ethers.getContractAt("AgentVeToken", veAddr);
 
     const descHash = getDescHash(desc);
 
@@ -294,9 +305,7 @@ describe("Contribution", function () {
       isModel,
       datasetId
     );
-    const voteParams = isModel
-      ? abi.encode(["uint256", "uint8[] memory"], [maturity, [0, 1, 1, 0, 2]])
-      : "0x";
+    const voteParams = isModel ? abi.encode(["uint8[] memory"], [votes]) : "0x";
 
     for (const voter of voters) {
       await agentDAO
@@ -323,14 +332,9 @@ describe("Contribution", function () {
     this.signers = signers;
   });
 
-  it("should be able to mint a new contribution", async function () {
+  it("should be able to mint a new contribution NFT", async function () {
     const base = await loadFixture(deployWithAgent);
-    const { contributor1, founder, contributior1 } = await getAccounts();
-    const maturity = 55;
-    const agentToken = await ethers.getContractAt(
-      "AgentToken",
-      base.agent.token
-    );
+    const { contributor1, founder } = await getAccounts();
     const { contributionNft, agent } = base;
     const veAddr = agent.veToken;
     const veToken = await ethers.getContractAt("AgentVeToken", veAddr);
@@ -341,14 +345,14 @@ describe("Contribution", function () {
     const contributionId = await createContribution(
       1,
       0,
-      maturity,
       0,
       true,
       0,
       "Test",
       base,
       contributor1.address,
-      [founder]
+      [founder],
+      [1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
     );
 
     const balance2 = await contributionNft.balanceOf(contributor1.address);
@@ -361,7 +365,6 @@ describe("Contribution", function () {
   it("should mint agent token for successful model contribution", async function () {
     const base = await loadFixture(deployWithAgent);
     const { contributor1, founder } = await getAccounts();
-    const maturity = 55;
     const agentToken = await ethers.getContractAt(
       "AgentToken",
       base.agent.token
@@ -371,164 +374,264 @@ describe("Contribution", function () {
     await createContribution(
       1,
       0,
-      maturity,
       0,
       true,
       0,
       "Test",
       base,
       contributor1.address,
-      [founder]
+      [founder],
+      [1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
     );
     const balance2 = await agentToken.balanceOf(contributor1.address);
-    expect(balance2).to.equal(parseEther(maturity.toString()));
+    expect(balance2).to.equal(parseEther("100000"));
   });
 
   it("should mint agent token for IP owner on successful contribution", async function () {
     const base = await loadFixture(deployWithAgent);
-    const { ipVault, contributor1, founder, agentVeToken } =
-      await getAccounts();
-    const maturity = 55;
+    const { ipVault, contributor1, founder } = await getAccounts();
     const agentToken = await ethers.getContractAt(
       "AgentToken",
       base.agent.token
     );
     const balance1 = await agentToken.balanceOf(ipVault.address);
     expect(balance1).to.equal(0n);
-    await await createContribution(
+    await createContribution(
       1,
       0,
-      maturity,
       0,
       true,
       0,
       "Test",
       base,
       contributor1.address,
-      [founder]
+      [founder],
+      [1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
     );
 
     const balance2 = await agentToken.balanceOf(ipVault.address);
-    expect(balance2).to.equal(parseEther((maturity * 0.1).toString()));
+    expect(balance2).to.equal(parseEther("10000"));
   });
 
   it("should mint agent token for model & dataset contribution", async function () {
     const base = await loadFixture(deployWithAgent);
-    const { ipVault, contributor1, contributor2, founder, agentVeToken } =
-      await getAccounts();
-    const { contributionNft, serviceNft } = base;
-    const maturity = 100;
+    const { contributor1, contributor2, founder } = await getAccounts();
     const agentToken = await ethers.getContractAt(
       "AgentToken",
       base.agent.token
     );
-    const veToken = await ethers.getContractAt(
-      "AgentVeToken",
-      base.agent.veToken
-    );
-    const agentDAO = await ethers.getContractAt("AgentDAO", base.agent.dao);
 
     // No agent token minted for dataset contribution
     const c1 = await createContribution(
       1,
       0,
-      maturity,
       0,
       false,
       0,
       "Dataset",
       base,
       contributor1.address,
-      [founder]
+      [founder],
+      [1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
     );
     const balance1 = await agentToken.balanceOf(contributor1.address);
     expect(balance1).to.equal(0n);
 
-    const c2 = await createContribution(
+    await createContribution(
       1,
       0,
-      maturity,
       0,
       true,
       c1,
       "Test model",
       base,
       contributor2.address,
-      [founder]
+      [founder],
+      [1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
     );
 
     const balance2 = await agentToken.balanceOf(contributor2.address);
-    expect(balance2).to.equal(parseEther("30"));
+    expect(balance2).to.equal(parseEther("30000"));
 
     const balance12 = await agentToken.balanceOf(contributor1.address);
-    expect(balance12).to.equal(parseEther("70"));
+    expect(balance12).to.equal(parseEther("70000"));
   });
 
   it("should allow adjusting global agent token multiplier", async function () {
     const base = await loadFixture(deployWithAgent);
-    const { ipVault, contributor1, contributor2, founder, agentVeToken } =
-      await getAccounts();
-    const { contributionNft, serviceNft, minter } = base;
-    const maturity = 100;
+    const { contributor1, contributor2, founder } = await getAccounts();
+    const { minter } = base;
     const agentToken = await ethers.getContractAt(
       "AgentToken",
       base.agent.token
     );
-    await minter.setImpactMultiplier(20000); //2x
+    await minter.setImpactMultiplier(20000000); //2x
 
     // No agent token minted for dataset contribution
     const c1 = await createContribution(
       1,
       0,
-      maturity,
       0,
       false,
       0,
       "Dataset",
       base,
       contributor1.address,
-      [founder]
+      [founder],
+      [1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
     );
     const balance1 = await agentToken.balanceOf(contributor1.address);
     expect(balance1).to.equal(0n);
 
-    const c2 = await createContribution(
+    await createContribution(
       1,
       0,
-      maturity,
       0,
       true,
       c1,
       "Test model",
       base,
       contributor2.address,
-      [founder]
+      [founder],
+      [1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
     );
 
     const balance2 = await agentToken.balanceOf(contributor2.address);
-    expect(balance2).to.equal(parseEther("60"));
+    expect(balance2).to.equal(parseEther("60000"));
 
     const balance12 = await agentToken.balanceOf(contributor1.address);
-    expect(balance12).to.equal(parseEther("140"));
+    expect(balance12).to.equal(parseEther("140000"));
   });
 
   it("should allow adjusting agent token multiplier", async function () {
     const base = await loadFixture(deployWithAgent);
-    const { ipVault, contributor1, contributor2, founder, agentVeToken } =
+    const { contributor1, contributor2, founder } = await getAccounts();
+    const { minter, agent } = base;
+    const agentToken = await ethers.getContractAt("AgentToken", agent.token);
+    await minter.setImpactMulOverride(agent.virtualId, 20000000); //2x
+    // No agent token minted for dataset contribution
+    const c1 = await createContribution(
+      1,
+      0,
+      0,
+      false,
+      0,
+      "Dataset",
+      base,
+      contributor1.address,
+      [founder],
+      [1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
+    );
+    const balance1 = await agentToken.balanceOf(contributor1.address);
+    expect(balance1).to.equal(0n);
+
+    await createContribution(
+      1,
+      0,
+      0,
+      true,
+      c1,
+      "Test model",
+      base,
+      contributor2.address,
+      [founder],
+      [1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
+    );
+
+    const balance2 = await agentToken.balanceOf(contributor2.address);
+    expect(balance2).to.equal(parseEther("60000"));
+
+    const balance12 = await agentToken.balanceOf(contributor1.address);
+    expect(balance12).to.equal(parseEther("140000"));
+  });
+
+  it("should not allow adjusting agent token multiplier by public", async function () {
+    const base = await loadFixture(deployWithAgent);
+    const { contributor1, contributor2, founder } = await getAccounts();
+    const { minter, agent } = base;
+    const agentToken = await ethers.getContractAt("AgentToken", agent.token);
+
+    await expect(
+      minter.connect(founder).setImpactMulOverride(agent.virtualId, 20000)
+    ).to.be.reverted;
+
+    // No agent token minted for dataset contribution
+    const c1 = await createContribution(
+      1,
+      0,
+      0,
+      false,
+      0,
+      "Dataset",
+      base,
+      contributor1.address,
+      [founder],
+      [1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
+    );
+    const balance1 = await agentToken.balanceOf(contributor1.address);
+    expect(balance1).to.equal(0n);
+
+    await createContribution(
+      1,
+      0,
+      0,
+      true,
+      c1,
+      "Test model",
+      base,
+      contributor2.address,
+      [founder],
+      [1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
+    );
+
+    const balance2 = await agentToken.balanceOf(contributor2.address);
+    expect(balance2).to.equal(parseEther("30000"));
+
+    const balance12 = await agentToken.balanceOf(contributor1.address);
+    expect(balance12).to.equal(parseEther("70000"));
+  });
+
+  it("should be able to adjust the global IP share", async function () {
+    const base = await loadFixture(deployWithAgent);
+    const { deployer, contributor1, ipVault, founder } = await getAccounts();
+    const { minter, agent } = base;
+    const agentToken = await ethers.getContractAt("AgentToken", agent.token);
+
+    await minter.connect(deployer).setIPShare(5000);
+
+    await createContribution(
+      1,
+      0,
+      0,
+      true,
+      0,
+      "Test model",
+      base,
+      contributor1.address,
+      [founder],
+      [1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
+    );
+
+    const balance = await agentToken.balanceOf(ipVault.address);
+    expect(balance).to.equal(parseEther("50000"));
+  });
+
+  it("should be able to adjust the IP share per agent", async function () {
+    const base = await loadFixture(deployWithAgent);
+    const { ipVault, contributor1, contributor2, founder } =
       await getAccounts();
-    const { contributionNft, serviceNft, minter, agent } = base;
+    const { minter, agent } = base;
     const veToken = await ethers.getContractAt("AgentVeToken", agent.veToken);
-    const maturity = 100;
     const agentToken = await ethers.getContractAt("AgentToken", agent.token);
 
     await veToken.connect(founder).delegate(founder.address);
 
     const agentDAO = await ethers.getContractAt("AgentDAO", agent.dao);
 
-    const calldata = await getSetImpactMulCalldata(
+    const calldata = await getSetIPShareCalldata(
       minter,
       agent.virtualId,
-      20000n
+      1000n
     );
 
     await agentDAO.propose(
@@ -544,183 +647,120 @@ describe("Contribution", function () {
 
     await mine(1);
     await agentDAO.connect(founder).castVote(proposalId, 1);
-    await mine(1);
 
     // No agent token minted for dataset contribution
     const c1 = await createContribution(
       1,
       0,
-      maturity,
       0,
       false,
       0,
       "Dataset",
       base,
       contributor1.address,
-      [founder]
+      [founder],
+      [1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
     );
-    const balance1 = await agentToken.balanceOf(contributor1.address);
-    expect(balance1).to.equal(0n);
-
-    const c2 = await createContribution(
-      1,
-      0,
-      maturity,
-      0,
-      true,
-      c1,
-      "Test model",
-      base,
-      contributor2.address,
-      [founder]
-    );
-
-    const balance2 = await agentToken.balanceOf(contributor2.address);
-    expect(balance2).to.equal(parseEther("60"));
-
-    const balance12 = await agentToken.balanceOf(contributor1.address);
-    expect(balance12).to.equal(parseEther("140"));
-  });
-
-  it("should not allow adjusting agent token multiplier by public", async function () {
-    const base = await loadFixture(deployWithAgent);
-    const { ipVault, contributor1, contributor2, founder, agentVeToken } =
-      await getAccounts();
-    const { deployer, minter, agent } = base;
-    const veToken = await ethers.getContractAt("AgentVeToken", agent.veToken);
-    const maturity = 100;
-    const agentToken = await ethers.getContractAt("AgentToken", agent.token);
-
-    await expect(
-      minter.setImpactMulOverride(agent.virtualId, 20000)
-    ).to.be.revertedWith("Only Agent DAO can operate");
-
-    // No agent token minted for dataset contribution
-    const c1 = await createContribution(
-      1,
-      0,
-      maturity,
-      0,
-      false,
-      0,
-      "Dataset",
-      base,
-      contributor1.address,
-      [founder]
-    );
-    const balance1 = await agentToken.balanceOf(contributor1.address);
-    expect(balance1).to.equal(0n);
-
-    const c2 = await createContribution(
-      1,
-      0,
-      maturity,
-      0,
-      true,
-      c1,
-      "Test model",
-      base,
-      contributor2.address,
-      [founder]
-    );
-
-    const balance2 = await agentToken.balanceOf(contributor2.address);
-    expect(balance2).to.equal(parseEther("30"));
-
-    const balance12 = await agentToken.balanceOf(contributor1.address);
-    expect(balance12).to.equal(parseEther("70"));
-  });
-
-  it("should be able to adjust the global IP share", async function () {
-    const base = await loadFixture(deployWithAgent);
-    const { deployer, contributor1, ipVault, founder, agentVeToken } =
-      await getAccounts();
-    const {  serviceNft, minter, agent } = base;
-    const veToken = await ethers.getContractAt("AgentVeToken", agent.veToken);
-    const maturity = 100;
-    const agentToken = await ethers.getContractAt("AgentToken", agent.token);
-
-    await minter.connect(deployer).setIPShare(5000);
 
     await createContribution(
       1,
       0,
-      maturity,
       0,
       true,
-      0,
+      c1,
       "Test model",
       base,
-      contributor1.address,
-      [founder]
+      contributor2.address,
+      [founder],
+      [1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
     );
 
     const balance = await agentToken.balanceOf(ipVault.address);
-    expect(balance).to.equal(parseEther("50"));
+    expect(balance).to.equal(parseEther("10000"));
   });
 
-  it("should be able to adjust the IP share per agent", async function () {
-      const base = await loadFixture(deployWithAgent);
-      const { ipVault, contributor1, contributor2, founder, agentVeToken } =
-        await getAccounts();
-      const { contributionNft, serviceNft, minter, agent } = base;
-      const veToken = await ethers.getContractAt("AgentVeToken", agent.veToken);
-      const maturity = 100;
-      const agentToken = await ethers.getContractAt("AgentToken", agent.token);
-  
-      await veToken.connect(founder).delegate(founder.address);
-  
-      const agentDAO = await ethers.getContractAt("AgentDAO", agent.dao);
-  
-      const calldata = await getSetIPShareCalldata(
-        minter,
-        agent.virtualId,
-        1000n
-      );
-  
-      await agentDAO.propose(
-        [minter.target],
-        [0],
-        [calldata],
-        "Set agent token multiplier"
-      );
-      const filter = agentDAO.filters.ProposalCreated;
-      const events = await agentDAO.queryFilter(filter, -1);
-      const event = events[0];
-      const proposalId = event.args[0];
-  
-      await mine(1);
-      await agentDAO.connect(founder).castVote(proposalId, 1);
-  
-      // No agent token minted for dataset contribution
-      const c1 = await createContribution(
-        1,
-        0,
-        maturity,
-        0,
-        false,
-        0,
-        "Dataset",
-        base,
-        contributor1.address,
-        [founder]
-      );
-  
-      const c2 = await createContribution(
-        1,
-        0,
-        maturity,
-        0,
-        true,
-        c1,
-        "Test model",
-        base,
-        contributor2.address,
-        [founder]
-      );
-  
-      const balance = await agentToken.balanceOf(ipVault.address);
-      expect(balance).to.equal(parseEther("10"));
-  
+  it("should get max 215 elo rating for one sided votes", async function () {
+    const base = await loadFixture(deployWithAgent);
+    const { contributor1, contributor2, founder } = await getAccounts();
+    const agentToken = await ethers.getContractAt(
+      "AgentToken",
+      base.agent.token
+    );
+
+    // First contribution always gets 100 impact
+    await createContribution(
+      1,
+      0,
+      0,
+      true,
+      0,
+      "Test",
+      base,
+      contributor1.address,
+      [founder],
+      [1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
+    );
+
+    expect(await agentToken.balanceOf(contributor2.address)).to.equal(0);
+    // Second contribution gets 215 impact
+    const nftId = await createContribution(
+      1,
+      0,
+      0,
+      true,
+      0,
+      "Test 2",
+      base,
+      contributor2.address,
+      [founder],
+      [1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
+    );
+    expect(await base.serviceNft.getImpact(nftId)).to.be.equal(215n);
+    expect(await base.serviceNft.getMaturity(nftId)).to.be.equal(315n);
+    const balance2 = await agentToken.balanceOf(contributor2.address);
+    expect(balance2).to.equal(parseEther("215000"));
+  });
+
+  it("should calculate correct elo rating", async function () {
+    const base = await loadFixture(deployWithAgent);
+    const { contributor1, contributor2, founder } = await getAccounts();
+    const agentToken = await ethers.getContractAt(
+      "AgentToken",
+      base.agent.token
+    );
+
+    // First contribution always gets 100 impact
+    await createContribution(
+      1,
+      0,
+      0,
+      true,
+      0,
+      "Test",
+      base,
+      contributor1.address,
+      [founder],
+      [1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
+    );
+
+    expect(await agentToken.balanceOf(contributor2.address)).to.equal(0);
+    // Second contribution gets 215 impact
+    const nftId = await createContribution(
+      1,
+      0,
+      0,
+      true,
+      0,
+      "Test 2",
+      base,
+      contributor2.address,
+      [founder],
+      [1, 1, 1, 1, 1, 2, 0, 3, 1, 1]
+    );
+
+    expect(await base.serviceNft.getImpact(nftId)).to.be.equal(142n);
+    expect(await base.serviceNft.getMaturity(nftId)).to.be.equal(242n);
+    const balance2 = await agentToken.balanceOf(contributor2.address);
+    expect(balance2).to.equal(parseEther("142000"));
   });
 });

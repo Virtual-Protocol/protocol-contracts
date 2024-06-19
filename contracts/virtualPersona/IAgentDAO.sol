@@ -8,7 +8,7 @@ interface IAgentDAO {
     function initialize(
         string memory name,
         IVotes token,
-        address contributionNft,
+        address agentNft,
         uint256 threshold,
         uint32 votingPeriod_
     ) external;

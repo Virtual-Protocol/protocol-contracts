@@ -1,25 +1,10 @@
-/*
-Test scenario:
-1. Accounts: [validator1, staker1, validator2, staker2]
-2. Stakes: [100000, 2000, 5000, 20000]
-3. Uptime: [3,1]
-4. All contribution NFTs are owned by account #10
-*/
 const { expect } = require("chai");
 const { toBeHex } = require("ethers/utils");
-const abi = ethers.AbiCoder.defaultAbiCoder();
 const {
   loadFixture,
   mine,
 } = require("@nomicfoundation/hardhat-toolbox/network-helpers");
-const { parseEther, formatEther } = require("ethers");
-
-const getExecuteCallData = (factory, proposalId) => {
-  return factory.interface.encodeFunctionData("executeApplication", [
-    proposalId,
-    false,
-  ]);
-};
+const { parseEther } = require("ethers");
 
 const getMintServiceCalldata = async (serviceNft, virtualId, hash) => {
   return serviceNft.interface.encodeFunctionData("mint", [virtualId, hash]);
@@ -31,9 +16,6 @@ function getDescHash(str) {
 
 describe("AgentDAO", function () {
   const PROPOSAL_THRESHOLD = parseEther("100000"); //100k
-  const MATURITY_SCORE = toBeHex(2000, 32); // 20%
-
-  const TOKEN_URI = "http://jessica";
 
   const genesisInput = {
     name: "Jessica",
@@ -107,7 +89,6 @@ describe("AgentDAO", function () {
     await agentDAO.waitForDeployment();
     const agentVeToken = await ethers.deployContract("AgentVeToken");
     await agentVeToken.waitForDeployment();
-
     const agentFactory = await upgrades.deployProxy(
       await ethers.getContractFactory("AgentFactoryV2"),
       [
@@ -123,25 +104,32 @@ describe("AgentDAO", function () {
     );
     await agentFactory.waitForDeployment();
     await agentNft.grantRole(await agentNft.MINTER_ROLE(), agentFactory.target);
-    const minter = await ethers.deployContract("Minter", [
-      service.target,
-      contribution.target,
-      agentNft.target,
-      process.env.IP_SHARES,
-      process.env.IMPACT_MULTIPLIER,
-      ipVault.address,
-      agentFactory.target,
-      deployer.address,
-    ]);
+    const minter = await upgrades.deployProxy(
+      await ethers.getContractFactory("Minter"),
+      [
+        service.target,
+        contribution.target,
+        agentNft.target,
+        process.env.IP_SHARES,
+        process.env.IMPACT_MULTIPLIER,
+        ipVault.address,
+        agentFactory.target,
+        deployer.address,
+        process.env.MAX_IMPACT,
+      ]
+    );
     await minter.waitForDeployment();
-    await agentFactory.setMinter(minter.target);
     await agentFactory.setMaturityDuration(86400 * 365 * 10); // 10years
     await agentFactory.setUniswapRouter(process.env.UNISWAP_ROUTER);
     await agentFactory.setTokenAdmin(deployer.address);
     await agentFactory.setTokenSupplyParams(
       process.env.AGENT_TOKEN_LIMIT,
+      process.env.AGENT_TOKEN_LP_SUPPLY,
+      process.env.AGENT_TOKEN_VAULT_SUPPLY,
       process.env.AGENT_TOKEN_LIMIT,
-      process.env.BOT_PROTECTION
+      process.env.AGENT_TOKEN_LIMIT,
+      process.env.BOT_PROTECTION,
+      minter.target
     );
     await agentFactory.setTokenTaxParams(
       process.env.TAX,
@@ -149,8 +137,6 @@ describe("AgentDAO", function () {
       process.env.SWAP_THRESHOLD,
       treasury.address
     );
-    await agentFactory.setDefaultDelegatee(deployer.address);
-
     return {
       virtualToken,
       agentFactory,
@@ -224,15 +210,8 @@ describe("AgentDAO", function () {
 
   it("should auto early execution when forVotes == totalSupply", async function () {
     const base = await loadFixture(deployWithAgent);
-    const { founder, deployer } = await getAccounts();
-    const {
-      agent,
-      serviceNft,
-      contributionNft,
-      minter,
-      virtualToken,
-      agentFactory,
-    } = base;
+    const { founder } = await getAccounts();
+    const { agent, serviceNft } = base;
     const agentDAO = await ethers.getContractAt("AgentDAO", agent.dao);
     const desc = "test";
     const descHash = getDescHash(desc);
@@ -251,9 +230,10 @@ describe("AgentDAO", function () {
 
     // Proposal not executed yet
     await expect(serviceNft.ownerOf(proposalId)).to.be.reverted;
-
     await mine(10);
-    await agentDAO.castVoteWithReasonAndParams(proposalId, 1, "lfg", "0x");
+    await agentDAO
+      .connect(founder)
+      .castVoteWithReasonAndParams(proposalId, 1, "lfg", "0x");
 
     // Proposal should be auto executed
     expect(await serviceNft.ownerOf(proposalId)).to.equal(agent.tba);

@@ -198,7 +198,7 @@ describe("ProtocolDAO", function () {
     const voterEtherBalance = await ethers.provider.getBalance(voter);
     expect(voterEtherBalance).to.be.lt(10000000000000000000000n);
     const relayerEtherBalance = await ethers.provider.getBalance(relayer);
-    expect(relayerEtherBalance).to.be.equal(10000000000000000000000n);
+    expect(relayerEtherBalance).to.be.lessThan(10000000000000000000000n);
 
     // Voter sign vote
 

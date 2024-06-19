@@ -66,4 +66,6 @@ interface IAgentNft is IValidatorRegistry {
     function nextVirtualId() external view returns (uint256);
 
     function isBlacklisted(uint256 virtualId) external view returns (bool);
+
+    function getEloCalculator() external view returns (address);
 }

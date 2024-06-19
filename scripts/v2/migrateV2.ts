@@ -23,14 +23,19 @@ async function upgradeFactory(implementations, assetToken) {
       implementations.daoImpl.target
     );
   }
+
   if (assetToken) {
     await factory.setAssetToken(assetToken);
   }
   await factory.setTokenAdmin(process.env.ADMIN);
   await factory.setTokenSupplyParams(
     process.env.AGENT_TOKEN_LIMIT,
+    process.env.AGENT_TOKEN_LP_SUPPLY,
+    process.env.AGENT_TOKEN_VAULT_SUPPLY,
     process.env.AGENT_TOKEN_LIMIT,
-    process.env.BOT_PROTECTION
+    process.env.AGENT_TOKEN_LIMIT,
+    process.env.BOT_PROTECTION,
+    process.env.MINTER
   );
   await factory.setTokenTaxParams(
     process.env.TAX,
@@ -38,8 +43,7 @@ async function upgradeFactory(implementations, assetToken) {
     process.env.SWAP_THRESHOLD,
     process.env.TAX_VAULT
   );
-  await factory.setTokenMultiplier(10000);
-  await factory.setDefaultDelegatee(process.env.ADMIN);
+
   console.log("Upgraded FactoryV2", factory.target);
 }
 
@@ -80,6 +84,12 @@ async function upgradeAgentNft() {
   );
   await proxyAdmin.upgradeAndCall(process.env.VIRTUAL_NFT, nft.target, "0x");
   console.log("Upgraded AgentNft");
+
+  const contract = await ethers.getContractAt(
+    "AgentNftV2",
+    process.env.VIRTUAL_NFT
+  );
+  await contract.setEloCalculator(process.env.ELO);
 }
 
 async function deployImplementations() {
@@ -87,23 +97,23 @@ async function deployImplementations() {
   await daoImpl.waitForDeployment();
   console.log("AgentDAO deployed to:", daoImpl.target);
 
-  const tokenImpl = await ethers.deployContract("AgentToken");
-  await tokenImpl.waitForDeployment();
-  console.log("AgentToken deployed to:", tokenImpl.target);
+  // const tokenImpl = await ethers.deployContract("AgentToken");
+  // await tokenImpl.waitForDeployment();
+  // console.log("AgentToken deployed to:", tokenImpl.target);
 
-  const veTokenImpl = await ethers.deployContract("AgentVeToken");
-  await veTokenImpl.waitForDeployment();
-  console.log("AgentVeToken deployed to:", veTokenImpl.target);
+  // const veTokenImpl = await ethers.deployContract("AgentVeToken");
+  // await veTokenImpl.waitForDeployment();
+  // console.log("AgentVeToken deployed to:", veTokenImpl.target);
 
-  return { daoImpl, tokenImpl, veTokenImpl };
+  return { daoImpl, tokenImpl: null, veTokenImpl: null };
 }
 
 (async () => {
   try {
-    // const implementations = await deployImplementations();
-    // await upgradeFactory(implementations);
+    //const implementations = await deployImplementations();
+    await upgradeFactory();
     //await deployAgentNft();
-    await upgradeAgentNft();
+    //await upgradeAgentNft();
   } catch (e) {
     console.log(e);
   }

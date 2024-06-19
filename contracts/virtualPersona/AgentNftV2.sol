@@ -53,16 +53,13 @@ contract AgentNftV2 is
     bytes32 public constant ADMIN_ROLE = keccak256("ADMIN_ROLE");
     mapping(uint256 => bool) private _blacklists;
     mapping(uint256 => VirtualLP) public virtualLPs;
+    address private _eloCalculator;
 
     event AgentBlacklisted(uint256 indexed virtualId, bool value);
 
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() {
         _disableInitializers();
-    }
-
-    function kk() public pure returns (string memory) {
-        return "kk";
     }
 
     function initialize(address defaultAdmin) public initializer {
@@ -77,6 +74,7 @@ contract AgentNftV2 is
         __AccessControl_init();
         _grantRole(DEFAULT_ADMIN_ROLE, defaultAdmin);
         _grantRole(VALIDATOR_ADMIN_ROLE, defaultAdmin);
+        _grantRole(ADMIN_ROLE, defaultAdmin);
         _nextVirtualId = 1;
     }
 
@@ -299,5 +297,15 @@ contract AgentNftV2 is
             totalProposals,
             _getPastValidatorScore
         );
+    }
+
+    function setEloCalculator(
+        address eloCalculator
+    ) public onlyRole(ADMIN_ROLE) {
+        _eloCalculator = eloCalculator;
+    }
+
+    function getEloCalculator() public view returns (address) {
+        return _eloCalculator;
     }
 }

@@ -46,10 +46,6 @@ interface IAgentToken is
 
     event ProjectTaxRecipientUpdated(address treasury);
 
-    event UnlimitedAddressAdded(address addedUnlimted);
-
-    event UnlimitedAddressRemoved(address removedUnlimted);
-
     event ValidCallerAdded(bytes32 addedValidCaller);
 
     event ValidCallerRemoved(bytes32 removedValidCaller);
@@ -104,46 +100,6 @@ interface IAgentToken is
      * @param removedLiquidityPool_ The address of the old removed liquidity pool
      */
     function removeLiquidityPool(address removedLiquidityPool_) external;
-
-    /**
-     * @dev function {isUnlimited}
-     *
-     * Return if an address is unlimited (is not subject to per txn and per wallet limits)
-     *
-     * @param queryAddress_ The address being queried
-     * @return bool The address is / isn't unlimited
-     */
-    function isUnlimited(address queryAddress_) external view returns (bool);
-
-    /**
-     * @dev function {unlimitedAddresses}
-     *
-     * Returns a list of all unlimited addresses
-     *
-     * @return unlimitedAddresses_ a list of all unlimited addresses
-     */
-    function unlimitedAddresses()
-        external
-        view
-        returns (address[] memory unlimitedAddresses_);
-
-    /**
-     * @dev function {addUnlimited} onlyOwner
-     *
-     * Allows the manager to add an unlimited address
-     *
-     * @param newUnlimited_ The address of the new unlimited address
-     */
-    function addUnlimited(address newUnlimited_) external;
-
-    /**
-     * @dev function {removeUnlimited} onlyOwner
-     *
-     * Allows the manager to remove an unlimited address
-     *
-     * @param removedUnlimited_ The address of the old removed unlimited address
-     */
-    function removeUnlimited(address removedUnlimited_) external;
 
     /**
      * @dev function {isValidCaller}
@@ -217,28 +173,6 @@ interface IAgentToken is
         uint16 newProjectBuyTaxBasisPoints_,
         uint16 newProjectSellTaxBasisPoints_
     ) external;
-
-    /**
-     * @dev function {setLimits} onlyOwner
-     *
-     * Change the limits on transactions and holdings
-     *
-     * @param newMaxTokensPerTransaction_ The new per txn limit
-     * @param newMaxTokensPerWallet_ The new tokens per wallet limit
-     */
-    function setLimits(
-        uint256 newMaxTokensPerTransaction_,
-        uint256 newMaxTokensPerWallet_
-    ) external;
-
-    /**
-     * @dev function {limitsEnforced}
-     *
-     * Return if limits are enforced on this contract
-     *
-     * @return bool : they are / aren't
-     */
-    function limitsEnforced() external view returns (bool);
 
     /**
      * @dev totalBuyTaxBasisPoints

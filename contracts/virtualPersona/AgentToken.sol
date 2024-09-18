@@ -42,8 +42,6 @@ contract AgentToken is
      * from that point onwards. */
     bool private _autoSwapInProgress;
 
-    uint128 public maxTokensPerTransaction;
-    uint128 public maxTokensPerWallet;
     address public projectTaxRecipient;
     uint128 public projectTaxPendingSwap;
     address public vault; // Project supply vault
@@ -64,8 +62,6 @@ contract AgentToken is
     /** @dev {_liquidityPools} Enumerable set for liquidity pool addresses */
     EnumerableSet.AddressSet private _liquidityPools;
 
-    /** @dev {_unlimited} Enumerable set for addresses where limits do not apply */
-    EnumerableSet.AddressSet private _unlimited;
 
     IAgentFactory private _factory; // Single source of truth
 
@@ -109,12 +105,6 @@ contract AgentToken is
 
         uint256 lpSupply = supplyParams.lpSupply * (10 ** decimals());
         uint256 vaultSupply = supplyParams.vaultSupply * (10 ** decimals());
-        maxTokensPerWallet = uint128(
-            supplyParams.maxTokensPerWallet * (10 ** decimals())
-        );
-        maxTokensPerTransaction = uint128(
-            supplyParams.maxTokensPerTxn * (10 ** decimals())
-        );
 
         botProtectionDurationInSeconds = supplyParams
             .botProtectionDurationInSeconds;
@@ -172,12 +162,7 @@ contract AgentToken is
             revert MaxSupplyTooHigh();
         }
 
-        _unlimited.add(owner());
-        _unlimited.add(address(this));
-        _unlimited.add(address(0));
-
         vault = erc20SupplyParameters_.vault;
-        _unlimited.add(vault);
     }
 
     /**
@@ -244,8 +229,6 @@ contract AgentToken is
         _liquidityPools.add(uniswapV2Pair_);
         emit LiquidityPoolCreated(uniswapV2Pair_);
 
-        _unlimited.add(address(_uniswapRouter));
-        _unlimited.add(uniswapV2Pair_);
         return (uniswapV2Pair_);
     }
 
@@ -380,61 +363,6 @@ contract AgentToken is
     }
 
     /**
-     * @dev function {isUnlimited}
-     *
-     * Return if an address is unlimited (is not subject to per txn and per wallet limits)
-     *
-     * @param queryAddress_ The address being queried
-     * @return bool The address is / isn't unlimited
-     */
-    function isUnlimited(address queryAddress_) public view returns (bool) {
-        return (_unlimited.contains(queryAddress_));
-    }
-
-    /**
-     * @dev function {unlimitedAddresses}
-     *
-     * Returns a list of all unlimited addresses
-     *
-     * @return unlimitedAddresses_ a list of all unlimited addresses
-     */
-    function unlimitedAddresses()
-        external
-        view
-        returns (address[] memory unlimitedAddresses_)
-    {
-        return (_unlimited.values());
-    }
-
-    /**
-     * @dev function {addUnlimited} onlyOwnerOrFactory
-     *
-     * Allows the manager to add an unlimited address
-     *
-     * @param newUnlimited_ The address of the new unlimited address
-     */
-    function addUnlimited(address newUnlimited_) external onlyOwnerOrFactory {
-        // Add this to the enumerated list:
-        _unlimited.add(newUnlimited_);
-        emit UnlimitedAddressAdded(newUnlimited_);
-    }
-
-    /**
-     * @dev function {removeUnlimited} onlyOwnerOrFactory
-     *
-     * Allows the manager to remove an unlimited address
-     *
-     * @param removedUnlimited_ The address of the old removed unlimited address
-     */
-    function removeUnlimited(
-        address removedUnlimited_
-    ) external onlyOwnerOrFactory {
-        // Remove this from the enumerated list:
-        _unlimited.remove(removedUnlimited_);
-        emit UnlimitedAddressRemoved(removedUnlimited_);
-    }
-
-    /**
      * @dev function {isValidCaller}
      *
      * Return if an address is a valid caller
@@ -546,79 +474,6 @@ contract AgentToken is
             oldSellTaxBasisPoints,
             newProjectSellTaxBasisPoints_
         );
-    }
-
-    /**
-     * @dev function {setLimits} onlyOwnerOrFactory
-     *
-     * Change the limits on transactions and holdings
-     *
-     * @param newMaxTokensPerTransaction_ The new per txn limit
-     * @param newMaxTokensPerWallet_ The new tokens per wallet limit
-     */
-    function setLimits(
-        uint256 newMaxTokensPerTransaction_,
-        uint256 newMaxTokensPerWallet_
-    ) external onlyOwnerOrFactory {
-        uint256 oldMaxTokensPerTransaction = maxTokensPerTransaction;
-        uint256 oldMaxTokensPerWallet = maxTokensPerWallet;
-        // Limit can only be increased:
-        if (
-            (oldMaxTokensPerTransaction == 0 &&
-                newMaxTokensPerTransaction_ != 0) ||
-            (oldMaxTokensPerWallet == 0 && newMaxTokensPerWallet_ != 0)
-        ) {
-            revert LimitsCanOnlyBeRaised();
-        }
-        if (
-            ((newMaxTokensPerTransaction_ != 0) &&
-                newMaxTokensPerTransaction_ < oldMaxTokensPerTransaction) ||
-            ((newMaxTokensPerWallet_ != 0) &&
-                newMaxTokensPerWallet_ < oldMaxTokensPerWallet)
-        ) {
-            revert LimitsCanOnlyBeRaised();
-        }
-
-        maxTokensPerTransaction = uint128(newMaxTokensPerTransaction_);
-        maxTokensPerWallet = uint128(newMaxTokensPerWallet_);
-
-        emit LimitsUpdated(
-            oldMaxTokensPerTransaction,
-            newMaxTokensPerTransaction_,
-            oldMaxTokensPerWallet,
-            newMaxTokensPerWallet_
-        );
-    }
-
-    /**
-     * @dev function {limitsEnforced}
-     *
-     * Return if limits are enforced on this contract
-     *
-     * @return bool : they are / aren't
-     */
-    function limitsEnforced() public view returns (bool) {
-        // Limits are not enforced if
-        // this is renounced AND after then protection end date
-        // OR prior to LP funding:
-        // The second clause of 'fundedDate == 0' isn't strictly needed, since with a funded
-        // date of 0 we would always expect the block.timestamp to be less than 0 plus
-        // the botProtectionDurationInSeconds. But, to cover the miniscule chance of a user
-        // selecting a truly enormous bot protection period, such that when added to 0 it
-        // is more than the current block.timestamp, we have included this second clause. There
-        // is no permanent gas overhead (the logic will be returning from the first clause after
-        // the bot protection period has expired). During the bot protection period there is a minor
-        // gas overhead from evaluating the fundedDate == 0 (which will be false), but this is minimal.
-        if (
-            (owner() == address(0) &&
-                block.timestamp >
-                fundedDate + botProtectionDurationInSeconds) || fundedDate == 0
-        ) {
-            return false;
-        } else {
-            // LP has been funded AND we are within the protection period:
-            return true;
-        }
     }
 
     /**
@@ -852,9 +707,6 @@ contract AgentToken is
         // Process taxes
         uint256 amountMinusTax = _taxProcessing(applyTax, to, from, amount);
 
-        // Perform post-tax validation (e.g. total balance after post-tax amount applied)
-        _posttaxValidationAndLimits(from, to, amountMinusTax);
-
         _balances[from] = fromBalance - amount;
         _balances[to] += amountMinusTax;
 
@@ -904,69 +756,7 @@ contract AgentToken is
             revert TransferAmountExceedsBalance();
         }
 
-        if (
-            limitsEnforced() &&
-            (maxTokensPerTransaction != 0) &&
-            ((isLiquidityPool(from_) && !isUnlimited(to_)) ||
-                (isLiquidityPool(to_) && !isUnlimited(from_)))
-        ) {
-            // Liquidity pools aren't always going to round cleanly. This can (and does)
-            // mean that a limit of 5,000 tokens (for example) will trigger on a transfer
-            // of 5,000 tokens, as the transfer is actually for 5,000.00000000000000213.
-            // While 4,999 will work fine, it isn't hugely user friendly. So we buffer
-            // the limit with rounding decimals, which in all cases are considerably less
-            // than one whole token:
-            uint256 roundedLimited;
-
-            unchecked {
-                roundedLimited = maxTokensPerTransaction + ROUND_DEC;
-            }
-
-            if (amount_ > roundedLimited) {
-                revert MaxTokensPerTxnExceeded();
-            }
-        }
-
         return (fromBalance_);
-    }
-
-    /**
-     * @dev function {_posttaxValidationAndLimits}
-     *
-     * Perform validation on post-tax amounts
-     *
-     * @param to_ To address for the transaction
-     * @param amount_ Amount of the transaction
-     */
-    function _posttaxValidationAndLimits(
-        address from_,
-        address to_,
-        uint256 amount_
-    ) internal view {
-        if (
-            limitsEnforced() &&
-            (maxTokensPerWallet != 0) &&
-            !isUnlimited(to_) &&
-            // If this is a buy (from a liquidity pool), we apply if the to_
-            // address isn't noted as unlimited:
-            isLiquidityPool(from_)
-        ) {
-            // Liquidity pools aren't always going to round cleanly. This can (and does)
-            // mean that a limit of 5,000 tokens (for example) will trigger on a max holding
-            // of 5,000 tokens, as the transfer to achieve that is actually for
-            // 5,000.00000000000000213. While 4,999 will work fine, it isn't hugely user friendly.
-            // So we buffer the limit with rounding decimals, which in all cases are considerably
-            // less than one whole token:
-            uint256 roundedLimited;
-
-            unchecked {
-                roundedLimited = maxTokensPerWallet + ROUND_DEC;
-            }
-
-            if ((amount_ + balanceOf(to_) > roundedLimited)) {
-                revert MaxTokensPerWalletExceeded();
-            }
-        }
     }
 
     /**

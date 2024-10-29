@@ -37,17 +37,6 @@ contract FRouter is ReentrancyGuard, Initializable, AccessControlUpgradeable {
         assetToken_ = assetToken_;
     }
 
-    function transferETH(
-        address _address,
-        uint256 amount
-    ) private returns (bool) {
-        require(_address != address(0), "Zero addresses are not allowed.");
-
-        (bool os, ) = payable(_address).call{value: amount}("");
-
-        return os;
-    }
-
     function getAmountsOut(
         address token,
         address assetToken_,

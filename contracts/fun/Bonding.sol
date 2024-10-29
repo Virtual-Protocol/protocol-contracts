@@ -98,8 +98,6 @@ contract Bonding is ReentrancyGuard, Initializable, OwnableUpgradeable {
         address router_,
         address feeTo_,
         uint256 fee_,
-        address uniswapRouter_,
-        uint256 mcap_,
         uint256 initialSupply_,
         uint256 assetRate_,
         uint256 maxTx_,

@@ -120,7 +120,7 @@ describe("Bonding", function () {
 
     const fFactory = await upgrades.deployProxy(
       await ethers.getContractFactory("FFactory"),
-      [treasury.address, 1, 1]
+      [treasury.address, 0, 0]
     );
     await fFactory.waitForDeployment();
     await fFactory.grantRole(await fFactory.ADMIN_ROLE(), deployer);
@@ -140,13 +140,19 @@ describe("Bonding", function () {
         treasury.address,
         100000, //100
         "1000000000",
-        3500,
-        5,
+        10000,
+        100,
         agentFactory.target,
         parseEther("85000000"),
       ]
     );
 
+    await bonding.setDeployParams([
+      genesisInput.tbaSalt,
+      genesisInput.tbaImplementation,
+      genesisInput.daoVotingPeriod,
+      genesisInput.daoThreshold,
+    ]);
     await fFactory.grantRole(await fFactory.CREATOR_ROLE(), bonding.target);
     await fRouter.grantRole(await fRouter.EXECUTOR_ROLE(), bonding.target);
     await agentFactory.grantRole(
@@ -218,7 +224,7 @@ describe("Bonding", function () {
 
   before(async function () {});
 
-  xit("should allow application execution by proposer", async function () {
+  it("should allow application execution by proposer", async function () {
     const { applicationId, agentFactory, virtualToken } = await loadFixture(
       deployWithApplication
     );
@@ -229,10 +235,12 @@ describe("Bonding", function () {
   });
 
   it("should be able to launch memecoin", async function () {
-    const { virtualToken, bonding } = await loadFixture(deployBaseContracts);
-    const { founder } = await getAccounts();
+    const { virtualToken, bonding, router } = await loadFixture(
+      deployBaseContracts
+    );
+    const { founder, treasury } = await getAccounts();
 
-    await virtualToken.mint(founder.address, PROPOSAL_THRESHOLD);
+    await virtualToken.mint(founder.address, parseEther("200"));
     await virtualToken
       .connect(founder)
       .approve(bonding.target, parseEther("1000"));
@@ -245,7 +253,78 @@ describe("Bonding", function () {
         "it is a cat",
         "",
         ["", "", "", ""],
-        parseEther("101")
+        parseEther("200")
       );
+    // Treasury should have 100 $V
+    // We bought $CAT with 1$V
+
+    const tokenInfo = await bonding.tokenInfo(bonding.tokenInfos(0));
+    const token = await ethers.getContractAt("ERC20", tokenInfo.token);
+
+    const pair = await ethers.getContractAt("FPair", tokenInfo.pair);
+    const [r1, r2] = await pair.getReserves();
+
+    console.log("Reserves", formatEther(r1), formatEther(r2));
+
+    expect(
+      formatEther(await virtualToken.balanceOf(treasury.address))
+    ).to.be.equal("100.0");
+    expect(
+      formatEther(await virtualToken.balanceOf(tokenInfo.pair))
+    ).to.be.equal("100.0");
+    expect(
+      formatEther(await virtualToken.balanceOf(founder.address))
+    ).to.be.equal("0.0");
+
+    expect(formatEther(await token.balanceOf(founder.address))).to.be.equal(
+      "32258064.516129032258064517"
+    );
+  });
+
+  it("should be able to graduate", async function () {
+    const { virtualToken, bonding, fRouter } = await loadFixture(
+      deployBaseContracts
+    );
+    const { founder, trader, treasury } = await getAccounts();
+
+    await virtualToken.mint(founder.address, parseEther("200"));
+    await virtualToken
+      .connect(founder)
+      .approve(bonding.target, parseEther("1000"));
+    await virtualToken.mint(trader.address, parseEther("120000"));
+    await virtualToken
+      .connect(trader)
+      .approve(fRouter.target, parseEther("120000"));
+
+    await bonding
+      .connect(founder)
+      .launch(
+        "Cat",
+        "$CAT",
+        [0, 1, 2],
+        "it is a cat",
+        "",
+        ["", "", "", ""],
+        parseEther("200")
+      );
+
+    const tokenInfo = await bonding.tokenInfo(await bonding.tokenInfos(0));
+    expect(tokenInfo.agentToken).to.equal(
+      "0x0000000000000000000000000000000000000000"
+    );
+    await expect(
+      bonding.connect(trader).buy(parseEther("35000"), tokenInfo.token)
+    ).to.emit(bonding, "Graduated");
+    const tokenInfo2 = await bonding.tokenInfo(bonding.tokenInfos(0));
+
+    const pair = await ethers.getContractAt("FPair", tokenInfo.pair);
+    const [r1, r2] = await pair.getReserves();
+
+    console.log("Reserves", formatEther(r1), formatEther(r2));
+    expect(tokenInfo2.agentToken).to.not.equal(
+      "0x0000000000000000000000000000000000000000"
+    );
+    expect(tokenInfo2.trading).to.equal(false);
+    expect(tokenInfo2.tradingOnUniswap).to.equal(true);
   });
 });

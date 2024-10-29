@@ -80,10 +80,10 @@ contract Bonding is
     DeployParams private _deployParams;
 
     mapping(address => Profile) public profile;
-    Profile[] public profiles;
+    address[] public profiles;
 
     mapping(address => Token) public tokenInfo;
-    Token[] public tokenInfos;
+    address[] public tokenInfos;
 
     event Launched(address indexed token, address indexed pair, uint);
     event Deployed(address indexed token, uint256 amount0, uint256 amount1);
@@ -129,7 +129,7 @@ contract Bonding is
 
         profile[_user] = _profile;
 
-        profiles.push(_profile);
+        profiles.push(_user);
 
         return true;
     }
@@ -215,11 +215,10 @@ contract Bonding is
         bool approved = _approval(address(router), address(token), supply);
         require(approved);
 
-        uint256 liquidity = supply - gradThreshold;
         uint256 k = ((K * 10000) / assetRate);
+        uint256 liquidity = (((k * 10000 ether) / supply) * 1 ether) / 10000;
 
-        router.addInitialLiquidity(address(token), liquidity, (k * 10000 ether) / liquidity * 1 ether / 10000);
-        token.transfer(_pair, gradThreshold);
+        router.addInitialLiquidity(address(token), supply, liquidity);
 
         Data memory _data = Data({
             token: address(token),
@@ -252,7 +251,7 @@ contract Bonding is
             tradingOnUniswap: false
         });
         tokenInfo[address(token)] = tmpToken;
-        tokenInfos.push(tmpToken);
+        tokenInfos.push(address(token));
 
         bool exists = _checkIfProfileExists(msg.sender);
 
@@ -332,24 +331,6 @@ contract Bonding is
             tokenInfo[tokenAddress].data.lastUpdated = block.timestamp;
         }
 
-        for (uint i = 0; i < tokenInfos.length; i++) {
-            if (tokenInfos[i].token == tokenAddress) {
-                tokenInfos[i].data.price = price;
-                tokenInfos[i].data.marketCap = mCap;
-                tokenInfos[i].data.liquidity = liquidity;
-                tokenInfos[i].data.volume =
-                    tokenInfo[tokenAddress].data.volume +
-                    amount1Out;
-                tokenInfos[i].data.volume24H = volume;
-                tokenInfos[i].data.prevPrice = prevPrice;
-
-                if (duration > 86400) {
-                    tokenInfos[i].data.lastUpdated = block.timestamp;
-                }
-                break;
-            }
-        }
-
         return true;
     }
 
@@ -403,25 +384,7 @@ contract Bonding is
             tokenInfo[tokenAddress].data.lastUpdated = block.timestamp;
         }
 
-        for (uint i = 0; i < tokenInfos.length; i++) {
-            if (tokenInfos[i].token == tokenAddress) {
-                tokenInfos[i].data.price = price;
-                tokenInfos[i].data.marketCap = mCap;
-                tokenInfos[i].data.liquidity = liquidity;
-                tokenInfos[i].data.volume =
-                    tokenInfo[tokenAddress].data.volume +
-                    amount1In;
-                tokenInfos[i].data.volume24H = volume;
-                tokenInfos[i].data.prevPrice = _price;
-
-                if (duration > 86400) {
-                    tokenInfos[i].data.lastUpdated = block.timestamp;
-                }
-                break;
-            }
-        }
-
-        if (newReserveA == 0 && tokenInfo[tokenAddress].trading) {
+        if (newReserveA <= gradThreshold && tokenInfo[tokenAddress].trading) {
             _openTradingOnUniswap(tokenAddress);
         }
 
@@ -438,6 +401,9 @@ contract Bonding is
             "trading is already open"
         );
 
+        _token.trading = false;
+        _token.tradingOnUniswap = true;
+
         // Transfer asset tokens to bonding contract
         address pairAddress = factory.getPair(
             tokenAddress,
@@ -451,6 +417,7 @@ contract Bonding is
 
         router.graduate(tokenAddress);
 
+        IERC20(router.assetToken()).approve(agentFactory, assetBalance);
         uint256 id = IAgentFactoryV3(agentFactory).initFromBondingCurve(
             string.concat(_token.data._name, " by Virtuals"),
             _token.data.ticker,
@@ -465,8 +432,8 @@ contract Bonding is
         address agentToken = IAgentFactoryV3(agentFactory)
             .executeBondingCurveApplication(
                 id,
-                _token.data.supply,
-                tokenBalance,
+                _token.data.supply / (10 ** token_.decimals()),
+                tokenBalance / (10 ** token_.decimals()),
                 pairAddress
             );
         _token.agentToken = agentToken;

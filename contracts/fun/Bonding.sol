@@ -225,11 +225,12 @@ contract Bonding is ReentrancyGuard, Initializable, OwnableUpgradeable {
             IERC20(assetToken).balanceOf(msg.sender) >= purchaseAmount,
             "Insufficient amount for fee."
         );
+        uint256 initialPurchase = (purchaseAmount - fee);
         IERC20(assetToken).safeTransferFrom(msg.sender, _feeTo, fee);
         IERC20(assetToken).safeTransferFrom(
             msg.sender,
             address(this),
-            (purchaseAmount - fee)
+            initialPurchase
         );
 
         FERC20 token = new FERC20(_name, _ticker, initialSupply, maxTx);
@@ -262,6 +263,7 @@ contract Bonding is ReentrancyGuard, Initializable, OwnableUpgradeable {
         Token memory tmpToken = Token({
             creator: msg.sender,
             token: address(token),
+            agentToken: address(0),
             pair: _pair,
             data: _data,
             description: desc,
@@ -296,6 +298,10 @@ contract Bonding is ReentrancyGuard, Initializable, OwnableUpgradeable {
         uint n = tokenInfos.length;
 
         emit Launched(address(token), _pair, n);
+
+        // Make initial purchase
+        router.buy(initialPurchase, address(token), address(this));
+        token.transfer(msg.sender, token.balanceOf(address(this)));
 
         return (address(token), _pair, n);
     }

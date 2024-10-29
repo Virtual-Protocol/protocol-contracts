@@ -9,7 +9,7 @@ import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import "@openzeppelin/contracts/access/AccessControl.sol";
 import "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
 
-import "./IAgentFactoryV3.sol";
+import "./IAgentFactory.sol";
 import "./IAgentToken.sol";
 import "./IAgentVeToken.sol";
 import "./IAgentDAO.sol";
@@ -17,7 +17,7 @@ import "./IAgentNft.sol";
 import "../libs/IERC6551Registry.sol";
 
 contract AgentFactoryV2 is
-    IAgentTokenV3,
+    IAgentFactory,
     Initializable,
     AccessControl,
     PausableUpgradeable
@@ -109,8 +109,6 @@ contract AgentFactoryV2 is
     bytes private _tokenSupplyParams;
     bytes private _tokenTaxParams;
     uint16 private _tokenMultiplier; // Unused
-
-    bytes32 public constant BONDING_ROLE = keccak256("BONDING_ROLE");
 
     ///////////////////////////////////////////////////////////////
 
@@ -492,56 +490,5 @@ contract AgentFactoryV2 is
         returns (bytes calldata)
     {
         return ContextUpgradeable._msgData();
-    }
-
-    function initFromBondingCurve(
-        string memory name,
-        string memory symbol,
-        string memory tokenURI,
-        uint8[] memory cores,
-        bytes32 tbaSalt,
-        address tbaImplementation,
-        uint32 daoVotingPeriod,
-        uint256 daoThreshold
-    ) public whenNotPaused onlyRole(BONDING_ROLE) returns (uint256) {
-        address sender = _msgSender();
-        require(
-            IERC20(assetToken).balanceOf(sender) >= applicationThreshold,
-            "Insufficient asset token"
-        );
-        require(
-            IERC20(assetToken).allowance(sender, address(this)) >=
-                applicationThreshold,
-            "Insufficient asset token allowance"
-        );
-        require(cores.length > 0, "Cores must be provided");
-
-        IERC20(assetToken).safeTransferFrom(
-            sender,
-            address(this),
-            applicationThreshold
-        );
-
-        uint256 id = _nextId++;
-        uint256 proposalEndBlock = block.number; // No longer required in v2
-        Application memory application = Application(
-            name,
-            symbol,
-            tokenURI,
-            ApplicationStatus.Active,
-            applicationThreshold,
-            sender,
-            cores,
-            proposalEndBlock,
-            0,
-            tbaSalt,
-            tbaImplementation,
-            daoVotingPeriod,
-            daoThreshold
-        );
-        _applications[id] = application;
-        emit NewApplication(id);
-
-        return id;
     }
 }

@@ -4,11 +4,7 @@ pragma solidity ^0.8.20;
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
-import "../libs/SafeMath.sol";
-
 contract FERC20 is Context, IERC20, Ownable {
-    using SafeMath for uint256;
-
     uint8 private constant _decimals = 18;
 
     uint256 private _totalSupply;
@@ -38,8 +34,6 @@ contract FERC20 is Context, IERC20, Ownable {
         _symbol = symbol_;
 
         _totalSupply = supply * 10 ** _decimals;
-
-        require(_maxTx <= 5, "Max Transaction cannot exceed 5%.");
 
         maxTx = _maxTx;
 
@@ -107,10 +101,7 @@ contract FERC20 is Context, IERC20, Ownable {
         _approve(
             sender,
             _msgSender(),
-            _allowances[sender][_msgSender()].sub(
-                amount,
-                "ERC20: transfer amount exceeds allowance"
-            )
+            _allowances[sender][_msgSender()] - amount
         );
 
         return true;
@@ -133,18 +124,16 @@ contract FERC20 is Context, IERC20, Ownable {
         uint256 maxTxAmount = (maxTx * _totalSupply) / 100;
 
         if (!isExcludedFromMaxTx[from]) {
-            require(amount <= maxTxAmount, "Exceeds the MaxTxAmount.");
+            require(amount <= maxTxAmount, "Exceeds MaxTx");
         }
 
-        _balances[from] = _balances[from].sub(amount);
-        _balances[to] = _balances[to].add(amount);
+        _balances[from] = _balances[from] - amount;
+        _balances[to] = _balances[to] + amount;
 
         emit Transfer(from, to, amount);
     }
 
     function updateMaxTx(uint256 _maxTx) public onlyOwner {
-        require(_maxTx <= 5, "Max Transaction cannot exceed 5%.");
-
         maxTx = _maxTx;
 
         emit MaxTxUpdated(_maxTx);
@@ -161,12 +150,12 @@ contract FERC20 is Context, IERC20, Ownable {
 
     function _burn(address user, uint256 amount) internal {
         require(user != address(0), "Invalid address");
-        _balances[user] = _balances[user].sub(amount);
+        _balances[user] = _balances[user] - amount;
     }
 
     function burnFrom(address user, uint256 amount) public onlyOwner {
         require(user != address(0), "Invalid address");
-        _balances[user] = _balances[user].sub(amount);
+        _balances[user] = _balances[user] - amount;
         emit Transfer(user, address(0), amount);
     }
 }

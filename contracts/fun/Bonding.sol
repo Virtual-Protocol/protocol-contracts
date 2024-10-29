@@ -7,17 +7,20 @@ import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
 
 import "./FFactory.sol";
-import "./FPair.sol";
+import "./IFPair.sol";
 import "./FRouter.sol";
 import "./FERC20.sol";
 import "../virtualPersona/IAgentFactoryV3.sol";
 
-contract Bonding is ReentrancyGuard, Initializable, OwnableUpgradeable {
+contract Bonding is
+    Initializable,
+    ReentrancyGuardUpgradeable,
+    OwnableUpgradeable
+{
     using SafeERC20 for IERC20;
-
-    receive() external payable {}
 
     address private _feeTo;
 
@@ -25,13 +28,11 @@ contract Bonding is ReentrancyGuard, Initializable, OwnableUpgradeable {
     FRouter public router;
     uint256 public initialSupply;
     uint256 public fee;
-    uint256 public marketCapLimit;
     uint256 public constant K = 3_000_000_000_000;
     uint256 public assetRate;
     uint256 public gradThreshold;
     uint256 public maxTx;
     address public agentFactory;
-
     struct Profile {
         address user;
         address[] tokens;
@@ -101,13 +102,11 @@ contract Bonding is ReentrancyGuard, Initializable, OwnableUpgradeable {
         uint256 initialSupply_,
         uint256 assetRate_,
         uint256 maxTx_,
-        address agentFactory_
+        address agentFactory_,
+        uint256 gradThreshold_
     ) external initializer {
         __Ownable_init(msg.sender);
-
-        require(factory_ != address(0), "Zero addresses are not allowed.");
-        require(router_ != address(0), "Zero addresses are not allowed.");
-        require(feeTo_ != address(0), "Zero addresses are not allowed.");
+        __ReentrancyGuard_init();
 
         factory = FFactory(factory_);
         router = FRouter(router_);
@@ -120,11 +119,10 @@ contract Bonding is ReentrancyGuard, Initializable, OwnableUpgradeable {
         maxTx = maxTx_;
 
         agentFactory = agentFactory_;
+        gradThreshold = gradThreshold_;
     }
 
-    function createUserProfile(address _user) private returns (bool) {
-        require(_user != address(0), "Zero addresses are not allowed.");
-
+    function _createUserProfile(address _user) internal returns (bool) {
         address[] memory _tokens;
 
         Profile memory _profile = Profile({user: _user, tokens: _tokens});
@@ -136,28 +134,15 @@ contract Bonding is ReentrancyGuard, Initializable, OwnableUpgradeable {
         return true;
     }
 
-    function checkIfProfileExists(address _user) private view returns (bool) {
-        require(_user != address(0), "Zero addresses are not allowed.");
-
-        bool exists = false;
-
-        for (uint i = 0; i < profiles.length; i++) {
-            if (profiles[i].user == _user) {
-                return true;
-            }
-        }
-
-        return exists;
+    function _checkIfProfileExists(address _user) internal view returns (bool) {
+        return profile[_user].user == _user;
     }
 
     function _approval(
         address _spender,
         address _token,
         uint256 amount
-    ) private returns (bool) {
-        require(_spender != address(0), "Zero addresses are not allowed.");
-        require(_token != address(0), "Zero addresses are not allowed.");
-
+    ) internal returns (bool) {
         IERC20(_token).approve(_spender, amount);
 
         return true;
@@ -167,13 +152,8 @@ contract Bonding is ReentrancyGuard, Initializable, OwnableUpgradeable {
         initialSupply = newSupply;
     }
 
-    function setLaunchFee(uint256 newFee) public onlyOwner {
+    function setFee(uint256 newFee, address newFeeTo) public onlyOwner {
         fee = newFee;
-    }
-
-    function setFeeTo(address newFeeTo) public onlyOwner {
-        require(newFeeTo != address(0), "Zero addresses are not allowed.");
-
         _feeTo = newFeeTo;
     }
 
@@ -182,7 +162,7 @@ contract Bonding is ReentrancyGuard, Initializable, OwnableUpgradeable {
     }
 
     function setAssetRate(uint256 newRate) public onlyOwner {
-        require(newRate > 0, "Rate cannot be 0");
+        require(newRate > 0, "Rate err");
 
         assetRate = newRate;
     }
@@ -194,15 +174,11 @@ contract Bonding is ReentrancyGuard, Initializable, OwnableUpgradeable {
     function getUserTokens(
         address account
     ) public view returns (address[] memory) {
-        require(checkIfProfileExists(account), "User Profile dose not exist.");
+        require(_checkIfProfileExists(account), "User Profile dose not exist.");
 
         Profile memory _profile = profile[account];
 
         return _profile.tokens;
-    }
-
-    function getTokens() public view returns (Token[] memory) {
-        return tokenInfos;
     }
 
     function launch(
@@ -221,7 +197,7 @@ contract Bonding is ReentrancyGuard, Initializable, OwnableUpgradeable {
         address assetToken = router.assetToken();
         require(
             IERC20(assetToken).balanceOf(msg.sender) >= purchaseAmount,
-            "Insufficient amount for fee."
+            "Insufficient amount"
         );
         uint256 initialPurchase = (purchaseAmount - fee);
         IERC20(assetToken).safeTransferFrom(msg.sender, _feeTo, fee);
@@ -241,7 +217,8 @@ contract Bonding is ReentrancyGuard, Initializable, OwnableUpgradeable {
 
         uint256 liquidity = supply - gradThreshold;
         uint256 k = ((K * 10000) / assetRate);
-        router.addInitialLiquidity(address(token), liquidity, k / liquidity);
+
+        router.addInitialLiquidity(address(token), liquidity, (k * 10000 ether) / liquidity * 1 ether / 10000);
         token.transfer(_pair, gradThreshold);
 
         Data memory _data = Data({
@@ -277,14 +254,14 @@ contract Bonding is ReentrancyGuard, Initializable, OwnableUpgradeable {
         tokenInfo[address(token)] = tmpToken;
         tokenInfos.push(tmpToken);
 
-        bool exists = checkIfProfileExists(msg.sender);
+        bool exists = _checkIfProfileExists(msg.sender);
 
         if (exists) {
             Profile storage _profile = profile[msg.sender];
 
             _profile.tokens.push(address(token));
         } else {
-            bool created = createUserProfile(msg.sender);
+            bool created = _createUserProfile(msg.sender);
 
             if (created) {
                 Profile storage _profile = profile[msg.sender];
@@ -298,6 +275,7 @@ contract Bonding is ReentrancyGuard, Initializable, OwnableUpgradeable {
         emit Launched(address(token), _pair, n);
 
         // Make initial purchase
+        IERC20(assetToken).approve(address(router), initialPurchase);
         router.buy(initialPurchase, address(token), address(this));
         token.transfer(msg.sender, token.balanceOf(address(this)));
 
@@ -315,7 +293,7 @@ contract Bonding is ReentrancyGuard, Initializable, OwnableUpgradeable {
             router.assetToken()
         );
 
-        FPair pair = FPair(pairAddress);
+        IFPair pair = IFPair(pairAddress);
 
         (uint256 reserveA, uint256 reserveB) = pair.getReserves();
 
@@ -379,7 +357,6 @@ contract Bonding is ReentrancyGuard, Initializable, OwnableUpgradeable {
         uint256 amountIn,
         address tokenAddress
     ) public payable returns (bool) {
-        require(tokenAddress != address(0), "Zero addresses are not allowed.");
         require(tokenInfo[tokenAddress].trading, "Token not trading");
 
         address pairAddress = factory.getPair(
@@ -387,7 +364,7 @@ contract Bonding is ReentrancyGuard, Initializable, OwnableUpgradeable {
             router.assetToken()
         );
 
-        FPair pair = FPair(pairAddress);
+        IFPair pair = IFPair(pairAddress);
 
         (uint256 reserveA, uint256 reserveB) = pair.getReserves();
 
@@ -440,10 +417,11 @@ contract Bonding is ReentrancyGuard, Initializable, OwnableUpgradeable {
                 if (duration > 86400) {
                     tokenInfos[i].data.lastUpdated = block.timestamp;
                 }
+                break;
             }
         }
 
-        if (newReserveA == 0) {
+        if (newReserveA == 0 && tokenInfo[tokenAddress].trading) {
             _openTradingOnUniswap(tokenAddress);
         }
 
@@ -451,8 +429,6 @@ contract Bonding is ReentrancyGuard, Initializable, OwnableUpgradeable {
     }
 
     function _openTradingOnUniswap(address tokenAddress) private {
-        require(tokenAddress != address(0), "Zero addresses are not allowed.");
-
         FERC20 token_ = FERC20(tokenAddress);
 
         Token storage _token = tokenInfo[tokenAddress];
@@ -468,7 +444,7 @@ contract Bonding is ReentrancyGuard, Initializable, OwnableUpgradeable {
             router.assetToken()
         );
 
-        FPair pair = FPair(pairAddress);
+        IFPair pair = IFPair(pairAddress);
 
         uint256 assetBalance = pair.assetBalance();
         uint256 tokenBalance = pair.balance();

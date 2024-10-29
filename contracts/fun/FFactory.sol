@@ -1,13 +1,13 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
-import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
 
 import "./FPair.sol";
 
-contract FFactory is ReentrancyGuard, Initializable, AccessControlUpgradeable {
+contract FFactory is Initializable, AccessControlUpgradeable, ReentrancyGuardUpgradeable {
     bytes32 public constant ADMIN_ROLE = keccak256("ADMIN_ROLE");
     bytes32 public constant CREATOR_ROLE = keccak256("CREATOR_ROLE");
 
@@ -39,6 +39,7 @@ contract FFactory is ReentrancyGuard, Initializable, AccessControlUpgradeable {
         uint256 sellTax_
     ) external initializer {
         __AccessControl_init();
+        __ReentrancyGuard_init();
         _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
 
         taxVault = taxVault_;

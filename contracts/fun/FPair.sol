@@ -5,7 +5,9 @@ import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
-contract FPair is ReentrancyGuard {
+import "./IFPair.sol";
+
+contract FPair is IFPair, ReentrancyGuard {
     using SafeERC20 for IERC20;
 
     address public router;

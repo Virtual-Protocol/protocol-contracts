@@ -1,18 +1,20 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
-import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
 
 import "./FFactory.sol";
-import "./FPair.sol";
-import "../libs/SafeMath.sol";
+import "./IFPair.sol";
 
-contract FRouter is ReentrancyGuard, Initializable, AccessControlUpgradeable {
-    using SafeMath for uint256;
+contract FRouter is
+    Initializable,
+    AccessControlUpgradeable,
+    ReentrancyGuardUpgradeable
+{
     using SafeERC20 for IERC20;
 
     bytes32 public constant ADMIN_ROLE = keccak256("ADMIN_ROLE");
@@ -30,11 +32,15 @@ contract FRouter is ReentrancyGuard, Initializable, AccessControlUpgradeable {
         address factory_,
         address assetToken_
     ) external initializer {
+        __ReentrancyGuard_init();
+        __AccessControl_init();
+        _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
+
         require(factory_ != address(0), "Zero addresses are not allowed.");
         require(assetToken_ != address(0), "Zero addresses are not allowed.");
 
         factory = FFactory(factory_);
-        assetToken_ = assetToken_;
+        assetToken = assetToken_;
     }
 
     function getAmountsOut(
@@ -46,7 +52,7 @@ contract FRouter is ReentrancyGuard, Initializable, AccessControlUpgradeable {
 
         address pairAddress = factory.getPair(token, assetToken);
 
-        FPair pair = FPair(pairAddress);
+        IFPair pair = IFPair(pairAddress);
 
         (uint256 reserveA, uint256 reserveB) = pair.getReserves();
 
@@ -55,17 +61,17 @@ contract FRouter is ReentrancyGuard, Initializable, AccessControlUpgradeable {
         uint256 amountOut;
 
         if (assetToken_ == assetToken) {
-            uint256 newReserveB = reserveB.add(amountIn);
+            uint256 newReserveB = reserveB + amountIn;
 
-            uint256 newReserveA = k.div(newReserveB, "Division failed");
+            uint256 newReserveA = k / newReserveB;
 
-            amountOut = reserveA.sub(newReserveA, "Subtraction failed.");
+            amountOut = reserveA - newReserveA;
         } else {
-            uint256 newReserveA = reserveA.add(amountIn);
+            uint256 newReserveA = reserveA + amountIn;
 
-            uint256 newReserveB = k.div(newReserveA, "Division failed");
+            uint256 newReserveB = k / newReserveA;
 
-            amountOut = reserveB.sub(newReserveB, "Subtraction failed.");
+            amountOut = reserveB - newReserveB;
         }
 
         return amountOut;
@@ -80,7 +86,7 @@ contract FRouter is ReentrancyGuard, Initializable, AccessControlUpgradeable {
 
         address pairAddress = factory.getPair(token_, assetToken);
 
-        FPair pair = FPair(pairAddress);
+        IFPair pair = IFPair(pairAddress);
 
         IERC20 token = IERC20(token_);
 
@@ -101,7 +107,7 @@ contract FRouter is ReentrancyGuard, Initializable, AccessControlUpgradeable {
 
         address pairAddress = factory.getPair(tokenAddress, assetToken);
 
-        FPair pair = FPair(pairAddress);
+        IFPair pair = IFPair(pairAddress);
 
         IERC20 token = IERC20(tokenAddress);
 
@@ -146,9 +152,9 @@ contract FRouter is ReentrancyGuard, Initializable, AccessControlUpgradeable {
 
         uint256 amountOut = getAmountsOut(tokenAddress, assetToken, amount);
 
-        FPair(pair).transferTo(to, amountOut);
+        IFPair(pair).transferTo(to, amountOut);
 
-        FPair(pair).swap(0, amountOut, amount, 0);
+        IFPair(pair).swap(0, amountOut, amount, 0);
 
         return (amount, amountOut);
     }
@@ -158,11 +164,11 @@ contract FRouter is ReentrancyGuard, Initializable, AccessControlUpgradeable {
     ) public onlyRole(EXECUTOR_ROLE) nonReentrant {
         require(tokenAddress != address(0), "Zero addresses are not allowed.");
         address pair = factory.getPair(tokenAddress, assetToken);
-        uint256 assetBalance = FPair(pair).assetBalance();
+        uint256 assetBalance = IFPair(pair).assetBalance();
         FPair(pair).transferAsset(msg.sender, assetBalance);
     }
 
-     function approval(
+    function approval(
         address pair,
         address asset,
         address spender,
@@ -170,6 +176,6 @@ contract FRouter is ReentrancyGuard, Initializable, AccessControlUpgradeable {
     ) public onlyRole(EXECUTOR_ROLE) nonReentrant {
         require(spender != address(0), "Zero addresses are not allowed.");
 
-        FPair(pair).approval(spender, asset, amount);
+        IFPair(pair).approval(spender, asset, amount);
     }
 }

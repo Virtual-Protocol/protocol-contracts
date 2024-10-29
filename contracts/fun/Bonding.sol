@@ -240,7 +240,7 @@ contract Bonding is ReentrancyGuard, Initializable, OwnableUpgradeable {
         require(approved);
 
         uint256 liquidity = supply - gradThreshold;
-        uint256 k = K / assetRate;
+        uint256 k = ((K * 100) / assetRate);
         router.addInitialLiquidity(address(token), liquidity, k / liquidity);
         token.transfer(_pair, gradThreshold);
 

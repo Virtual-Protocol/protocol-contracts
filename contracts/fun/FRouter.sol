@@ -9,6 +9,7 @@ import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
 import "./FFactory.sol";
 import "./FPair.sol";
+import "../libs/SafeMath.sol";
 
 contract FRouter is ReentrancyGuard, Initializable, AccessControlUpgradeable {
     using SafeMath for uint256;
@@ -56,7 +57,7 @@ contract FRouter is ReentrancyGuard, Initializable, AccessControlUpgradeable {
 
         address pairAddress = factory.getPair(token, assetToken);
 
-        Pair pair = Pair(pairAddress);
+        FPair pair = FPair(pairAddress);
 
         (uint256 reserveA, uint256 reserveB) = pair.getReserves();
 
@@ -64,7 +65,7 @@ contract FRouter is ReentrancyGuard, Initializable, AccessControlUpgradeable {
 
         uint256 amountOut;
 
-        if(assetToken == assetToken) {
+        if (assetToken_ == assetToken) {
             uint256 newReserveB = reserveB.add(amountIn);
 
             uint256 newReserveA = k.div(newReserveB, "Division failed");
@@ -86,15 +87,15 @@ contract FRouter is ReentrancyGuard, Initializable, AccessControlUpgradeable {
         uint256 amountToken_,
         uint256 amountAsset_
     ) public onlyRole(EXECUTOR_ROLE) returns (uint256, uint256) {
-        require(token != address(0), "Zero addresses are not allowed.");
+        require(token_ != address(0), "Zero addresses are not allowed.");
 
         address pairAddress = factory.getPair(token_, assetToken);
 
-        Pair pair = Pair(pairAddress);
+        FPair pair = FPair(pairAddress);
 
         IERC20 token = IERC20(token_);
 
-        token.safeTransferFrom(msg.sender, pair, amountToken_);
+        token.safeTransferFrom(msg.sender, pairAddress, amountToken_);
 
         pair.mint(amountToken_, amountAsset_);
 
@@ -106,21 +107,18 @@ contract FRouter is ReentrancyGuard, Initializable, AccessControlUpgradeable {
         address tokenAddress,
         address to
     ) public nonReentrant onlyRole(EXECUTOR_ROLE) returns (uint256, uint256) {
-        require(token != address(0), "Zero addresses are not allowed.");
+        require(tokenAddress != address(0), "Zero addresses are not allowed.");
         require(to != address(0), "Zero addresses are not allowed.");
-
-        Factory factory = Factory(factory);
 
         address pairAddress = factory.getPair(tokenAddress, assetToken);
 
-        Pair pair = Pair(pairAddress);
+        FPair pair = FPair(pairAddress);
 
         IERC20 token = IERC20(tokenAddress);
 
         uint256 amountOut = getAmountsOut(tokenAddress, address(0), amountIn);
 
-        bool tres = token.safeTransferFrom(to, pair, amountIn);
-        require(tres, "Transfer of token to pair failed");
+        token.safeTransferFrom(to, pairAddress, amountIn);
 
         uint fee = factory.sellTax();
         uint256 txFee = (fee * amountOut) / 100;
@@ -128,11 +126,8 @@ contract FRouter is ReentrancyGuard, Initializable, AccessControlUpgradeable {
         uint256 amount = amountOut - txFee;
         address feeTo = factory.taxVault();
 
-        bool tres2 = pair.transferAsset(to, amount);
-        require(os2, "Transfer of asset to user failed.");
-
-        bool tres3 = pair.transferAsset(feeTo, txFee);
-        require(os3, "Transfer of asset to fee address failed.");
+        pair.transferAsset(to, amount);
+        pair.transferAsset(feeTo, txFee);
 
         pair.swap(amountIn, 0, 0, amount);
 
@@ -146,33 +141,46 @@ contract FRouter is ReentrancyGuard, Initializable, AccessControlUpgradeable {
     ) public onlyRole(EXECUTOR_ROLE) nonReentrant returns (uint256, uint256) {
         require(tokenAddress != address(0), "Zero addresses are not allowed.");
         require(to != address(0), "Zero addresses are not allowed.");
-        require(amountIn > 0, "amountIn must be greater than 0")
+        require(amountIn > 0, "amountIn must be greater than 0");
 
-        Factory factory = Factory(factory);
         address pair = factory.getPair(tokenAddress, assetToken);
 
-        uint fee = factory.txFee();
+        uint fee = factory.buyTax();
         uint256 txFee = (fee * amountIn) / 100;
         address feeTo = factory.taxVault();
 
-        amount = amountIn - txFee;
+        uint256 amount = amountIn - txFee;
 
-        bool tres1 = IERC20(assetToken).safeTransferFrom(to, pair, amount);
-        require(tres1, "Transfer of asset from user failed.");
+        IERC20(assetToken).safeTransferFrom(to, pair, amount);
 
-        bool tres2 = IERC20(assetToken).safeTransferFrom(to, feeTo, txFee);
-        require(tres2, "Transfer of asset from user failed.");
+        IERC20(assetToken).safeTransferFrom(to, feeTo, txFee);
 
         uint256 amountOut = getAmountsOut(tokenAddress, assetToken, amount);
 
-        bool approved = pair.approval(address(this), tokenAddress, amountOut);
-        require(approved, "Not Approved.");
+        FPair(pair).transferTo(to, amountOut);
 
-        bool tres3 = IERC20(tokenAddress).transferFrom(pair, to, amountOut);
-        require(tres3, "Transfer of token to pair failed.");
-
-        pair.swap(0, amountOut, amount, 0);
+        FPair(pair).swap(0, amountOut, amount, 0);
 
         return (amount, amountOut);
+    }
+
+    function graduate(
+        address tokenAddress
+    ) public onlyRole(EXECUTOR_ROLE) nonReentrant {
+        require(tokenAddress != address(0), "Zero addresses are not allowed.");
+        address pair = factory.getPair(tokenAddress, assetToken);
+        uint256 assetBalance = FPair(pair).assetBalance();
+        FPair(pair).transferAsset(msg.sender, assetBalance);
+    }
+
+     function approval(
+        address pair,
+        address asset,
+        address spender,
+        uint256 amount
+    ) public onlyRole(EXECUTOR_ROLE) nonReentrant {
+        require(spender != address(0), "Zero addresses are not allowed.");
+
+        FPair(pair).approval(spender, asset, amount);
     }
 }

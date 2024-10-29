@@ -4,11 +4,7 @@ pragma solidity ^0.8.20;
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
-abstract contract Context {
-    function _msgSender() internal view virtual returns (address) {
-        return msg.sender;
-    }
-}
+import "../libs/SafeMath.sol";
 
 contract FERC20 is Context, IERC20, Ownable {
     using SafeMath for uint256;
@@ -31,7 +27,12 @@ contract FERC20 is Context, IERC20, Ownable {
 
     event MaxTxUpdated(uint _maxTx);
 
-    constructor(string memory name_, string memory symbol_, uint256 supply, uint _maxTx) {
+    constructor(
+        string memory name_,
+        string memory symbol_,
+        uint256 supply,
+        uint _maxTx
+    ) Ownable(msg.sender) {
         _name = name_;
 
         _symbol = symbol_;
@@ -48,7 +49,7 @@ contract FERC20 is Context, IERC20, Ownable {
 
         isExcludedFromMaxTx[address(this)] = true;
 
-        emit Transfer(address(0), _msgSender(), _tTotal);
+        emit Transfer(address(0), _msgSender(), _totalSupply);
     }
 
     function name() public view returns (string memory) {
@@ -71,26 +72,46 @@ contract FERC20 is Context, IERC20, Ownable {
         return _balances[account];
     }
 
-    function transfer(address recipient, uint256 amount) public override returns (bool) {
+    function transfer(
+        address recipient,
+        uint256 amount
+    ) public override returns (bool) {
         _transfer(_msgSender(), recipient, amount);
 
         return true;
     }
 
-    function allowance(address owner, address spender) public view override returns (uint256) {
+    function allowance(
+        address owner,
+        address spender
+    ) public view override returns (uint256) {
         return _allowances[owner][spender];
     }
 
-    function approve(address spender, uint256 amount) public override returns (bool) {
+    function approve(
+        address spender,
+        uint256 amount
+    ) public override returns (bool) {
         _approve(_msgSender(), spender, amount);
 
         return true;
     }
 
-    function transferFrom(address sender, address recipient, uint256 amount) public override returns (bool) {
+    function transferFrom(
+        address sender,
+        address recipient,
+        uint256 amount
+    ) public override returns (bool) {
         _transfer(sender, recipient, amount);
 
-        _approve(sender, _msgSender(), _allowances[sender][_msgSender()].sub(amount, "ERC20: transfer amount exceeds allowance"));
+        _approve(
+            sender,
+            _msgSender(),
+            _allowances[sender][_msgSender()].sub(
+                amount,
+                "ERC20: transfer amount exceeds allowance"
+            )
+        );
 
         return true;
     }
@@ -109,12 +130,12 @@ contract FERC20 is Context, IERC20, Ownable {
         require(to != address(0), "ERC20: transfer to the zero address");
         require(amount > 0, "Transfer amount must be greater than zero");
 
-        uint256 maxTxAmount = (maxTx * _tTotal) / 100;
+        uint256 maxTxAmount = (maxTx * _totalSupply) / 100;
 
-        if(!isExcludedFromMaxTx[from]) {
+        if (!isExcludedFromMaxTx[from]) {
             require(amount <= maxTxAmount, "Exceeds the MaxTxAmount.");
         }
-       
+
         _balances[from] = _balances[from].sub(amount);
         _balances[to] = _balances[to].add(amount);
 
@@ -130,8 +151,22 @@ contract FERC20 is Context, IERC20, Ownable {
     }
 
     function excludeFromMaxTx(address user) public onlyOwner {
-        require(user != address(0), "ERC20: Exclude Max Tx from the zero address");
+        require(
+            user != address(0),
+            "ERC20: Exclude Max Tx from the zero address"
+        );
 
         isExcludedFromMaxTx[user] = true;
+    }
+
+    function _burn(address user, uint256 amount) internal {
+        require(user != address(0), "Invalid address");
+        _balances[user] = _balances[user].sub(amount);
+    }
+
+    function burnFrom(address user, uint256 amount) public onlyOwner {
+        require(user != address(0), "Invalid address");
+        _balances[user] = _balances[user].sub(amount);
+        emit Transfer(user, address(0), amount);
     }
 }

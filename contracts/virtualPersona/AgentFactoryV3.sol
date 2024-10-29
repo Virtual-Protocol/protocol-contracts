@@ -16,8 +16,8 @@ import "./IAgentDAO.sol";
 import "./IAgentNft.sol";
 import "../libs/IERC6551Registry.sol";
 
-contract AgentFactoryV2 is
-    IAgentTokenV3,
+contract AgentFactoryV3 is
+    IAgentFactoryV3,
     Initializable,
     AccessControl,
     PausableUpgradeable
@@ -127,7 +127,8 @@ contract AgentFactoryV2 is
         address assetToken_,
         address nft_,
         uint256 applicationThreshold_,
-        address vault_
+        address vault_,
+        uint256 nextId_
     ) public initializer {
         __Pausable_init();
 
@@ -138,7 +139,7 @@ contract AgentFactoryV2 is
         tbaRegistry = tbaRegistry_;
         nft = nft_;
         applicationThreshold = applicationThreshold_;
-        _nextId = 1;
+        _nextId = nextId_;
         _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
         _vault = vault_;
     }
@@ -230,15 +231,11 @@ contract AgentFactoryV2 is
         );
     }
 
-    function executeApplication(uint256 id, bool canStake) public noReentrant {
-        // This will bootstrap an Agent with following components:
-        // C1: Agent Token
-        // C2: LP Pool + Initial liquidity
-        // C3: Agent veToken
-        // C4: Agent DAO
-        // C5: Agent NFT
-        // C6: TBA
-        // C7: Stake liquidity token to get veToken
+    function _executeApplication(
+        uint256 id,
+        bool canStake,
+        bytes memory tokenSupplyParams_
+    ) internal {
         require(
             _applications[id].status == ApplicationStatus.Active,
             "Application is not active"
@@ -248,12 +245,6 @@ contract AgentFactoryV2 is
 
         Application storage application = _applications[id];
 
-        require(
-            msg.sender == application.proposer ||
-                hasRole(WITHDRAW_ROLE, msg.sender),
-            "Not proposer"
-        );
-
         uint256 initialAmount = application.withdrawableAmount;
         application.withdrawableAmount = 0;
         application.status = ApplicationStatus.Executed;
@@ -261,7 +252,8 @@ contract AgentFactoryV2 is
         // C1
         address token = _createNewAgentToken(
             application.name,
-            application.symbol
+            application.symbol,
+            tokenSupplyParams_
         );
 
         // C2
@@ -328,6 +320,27 @@ contract AgentFactoryV2 is
         emit NewPersona(virtualId, token, dao, tbaAddress, veToken, lp);
     }
 
+    function executeApplication(uint256 id, bool canStake) public noReentrant {
+        // This will bootstrap an Agent with following components:
+        // C1: Agent Token
+        // C2: LP Pool + Initial liquidity
+        // C3: Agent veToken
+        // C4: Agent DAO
+        // C5: Agent NFT
+        // C6: TBA
+        // C7: Stake liquidity token to get veToken
+
+        Application storage application = _applications[id];
+
+        require(
+            msg.sender == application.proposer ||
+                hasRole(WITHDRAW_ROLE, msg.sender),
+            "Not proposer"
+        );
+
+        _executeApplication(id, canStake, _tokenSupplyParams);
+    }
+
     function _createNewDAO(
         string memory name,
         IVotes token,
@@ -349,13 +362,14 @@ contract AgentFactoryV2 is
 
     function _createNewAgentToken(
         string memory name,
-        string memory symbol
+        string memory symbol,
+        bytes memory tokenSupplyParams_
     ) internal returns (address instance) {
         instance = Clones.clone(tokenImplementation);
         IAgentToken(instance).initialize(
             [_tokenAdmin, _uniswapRouter, assetToken],
             abi.encode(name, symbol),
-            _tokenSupplyParams,
+            tokenSupplyParams_,
             _tokenTaxParams
         );
 
@@ -497,21 +511,21 @@ contract AgentFactoryV2 is
     function initFromBondingCurve(
         string memory name,
         string memory symbol,
-        string memory tokenURI,
         uint8[] memory cores,
         bytes32 tbaSalt,
         address tbaImplementation,
         uint32 daoVotingPeriod,
-        uint256 daoThreshold
+        uint256 daoThreshold,
+        uint256 applicationThreshold_
     ) public whenNotPaused onlyRole(BONDING_ROLE) returns (uint256) {
         address sender = _msgSender();
         require(
-            IERC20(assetToken).balanceOf(sender) >= applicationThreshold,
+            IERC20(assetToken).balanceOf(sender) >= applicationThreshold_,
             "Insufficient asset token"
         );
         require(
             IERC20(assetToken).allowance(sender, address(this)) >=
-                applicationThreshold,
+                applicationThreshold_,
             "Insufficient asset token allowance"
         );
         require(cores.length > 0, "Cores must be provided");
@@ -519,7 +533,7 @@ contract AgentFactoryV2 is
         IERC20(assetToken).safeTransferFrom(
             sender,
             address(this),
-            applicationThreshold
+            applicationThreshold_
         );
 
         uint256 id = _nextId++;
@@ -527,9 +541,9 @@ contract AgentFactoryV2 is
         Application memory application = Application(
             name,
             symbol,
-            tokenURI,
+            "",
             ApplicationStatus.Active,
-            applicationThreshold,
+            applicationThreshold_,
             sender,
             cores,
             proposalEndBlock,
@@ -543,5 +557,33 @@ contract AgentFactoryV2 is
         emit NewApplication(id);
 
         return id;
+    }
+
+    function executeBondingCurveApplication(
+        uint256 id,
+        uint256 totalSupply,
+        uint256 lpSupply,
+        address vault
+    )
+        public
+        onlyRole(BONDING_ROLE)
+        noReentrant
+        returns (address)
+    {
+        bytes memory tokenSupplyParams = abi.encode(
+            totalSupply,
+            lpSupply,
+            totalSupply - lpSupply,
+            totalSupply,
+            totalSupply,
+            0,
+            vault
+        );
+
+        _executeApplication(id, true, tokenSupplyParams);
+
+        Application memory application = _applications[id];
+
+        return IAgentNft(nft).virtualInfo(application.virtualId).token;
     }
 }

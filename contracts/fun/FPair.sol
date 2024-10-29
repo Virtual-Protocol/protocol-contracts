@@ -1,11 +1,12 @@
 // SPDX-License-Identifier: MIT
-
-pragma solidity ^0.8.24;
+pragma solidity ^0.8.20;
 
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
-contract Pair is ReentrancyGuard {
+contract FPair is ReentrancyGuard {
+    using SafeERC20 for IERC20;
 
     address public router;
     address public tokenA;
@@ -30,19 +31,27 @@ contract Pair is ReentrancyGuard {
         tokenB = token1;
     }
 
-    modifier onlyRouter(){
-        require(router == _msgSender(), "Only router can call this function");
+    modifier onlyRouter() {
+        require(router == msg.sender, "Only router can call this function");
         _;
     }
 
     event Mint(uint256 reserve0, uint256 reserve1);
 
-    event Swap(uint256 amount0In, uint256 amount0Out, uint256 amount1In, uint256 amount1Out);
+    event Swap(
+        uint256 amount0In,
+        uint256 amount0Out,
+        uint256 amount1In,
+        uint256 amount1Out
+    );
 
-    function mint(uint256 reserve0, uint256 reserve1) public onlyRouter {
-        require(pool.lastUpdated == 0, "Already minted")
+    function mint(
+        uint256 reserve0,
+        uint256 reserve1
+    ) public onlyRouter returns (bool) {
+        require(_pool.lastUpdated == 0, "Already minted");
 
-        pool = Pool({
+        _pool = Pool({
             reserve0: reserve0,
             reserve1: reserve1,
             k: reserve0 * reserve1,
@@ -54,16 +63,19 @@ contract Pair is ReentrancyGuard {
         return true;
     }
 
-    function swap(uint256 amount0In, uint256 amount0Out, uint256 amount1In, uint256 amount1Out) public onlyRouter returns (bool) {
-        uint256 _reserve0 = (pool.reserve0 + amount0In) - amount0Out;
-        uint256 _reserve1 = (pool.reserve1 + amount1In) - amount1Out;
-        uint256 reserve1_ = (pool._reserve1 + amount1In) - amount1Out;
+    function swap(
+        uint256 amount0In,
+        uint256 amount0Out,
+        uint256 amount1In,
+        uint256 amount1Out
+    ) public onlyRouter returns (bool) {
+        uint256 _reserve0 = (_pool.reserve0 + amount0In) - amount0Out;
+        uint256 _reserve1 = (_pool.reserve1 + amount1In) - amount1Out;
 
-        pool = Pool({
+        _pool = Pool({
             reserve0: _reserve0,
             reserve1: _reserve1,
-            _reserve1: reserve1_,
-            k: pool.k,
+            k: _pool.k,
             lastUpdated: block.timestamp
         });
 
@@ -72,8 +84,11 @@ contract Pair is ReentrancyGuard {
         return true;
     }
 
-
-    function approval(address _user, address _token, uint256 amount) public onlyRouter returns (bool) {
+    function approval(
+        address _user,
+        address _token,
+        uint256 amount
+    ) public onlyRouter returns (bool) {
         require(_user != address(0), "Zero addresses are not allowed.");
         require(_token != address(0), "Zero addresses are not allowed.");
 
@@ -84,29 +99,42 @@ contract Pair is ReentrancyGuard {
         return true;
     }
 
-    function transferAsset(address recipient, uint256 amount) public onlyRouter returns (bool) {
+    function transferAsset(
+        address recipient,
+        uint256 amount
+    ) public onlyRouter {
         require(recipient != address(0), "Zero addresses are not allowed.");
 
-        return IERC20(assetToken).safeTransfer(recipient, amount);
+        IERC20(tokenB).safeTransfer(recipient, amount);
+    }
+
+    function transferTo(address recipient, uint256 amount) public onlyRouter {
+        require(recipient != address(0), "Zero addresses are not allowed.");
+
+        IERC20(tokenA).safeTransfer(recipient, amount);
     }
 
     function getReserves() public view returns (uint256, uint256) {
-        return (pool.reserve0, pool.reserve1);
+        return (_pool.reserve0, _pool.reserve1);
     }
 
     function kLast() public view returns (uint256) {
-        return pool.k;
+        return _pool.k;
     }
 
     function priceALast() public view returns (uint256) {
-        return pool.reserve1 / pool.reserve0;
+        return _pool.reserve1 / _pool.reserve0;
     }
 
     function priceBLast() public view returns (uint256) {
-        return pool.reserve0 / pool.reserve1;
+        return _pool.reserve0 / _pool.reserve1;
     }
 
     function balance() public view returns (uint256) {
+        return IERC20(tokenA).balanceOf(address(this));
+    }
+
+    function assetBalance() public view returns (uint256) {
         return IERC20(tokenB).balanceOf(address(this));
     }
 }

@@ -39,7 +39,6 @@ contract FFactory is ReentrancyGuard, Initializable, AccessControlUpgradeable {
         uint256 sellTax_
     ) external initializer {
         __AccessControl_init();
-        __ReentrancyGuard_init();
         _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
 
         taxVault = taxVault_;
@@ -49,34 +48,33 @@ contract FFactory is ReentrancyGuard, Initializable, AccessControlUpgradeable {
 
     function _createPair(
         address tokenA,
-        address tokenB,
-        uint256 k
+        address tokenB
     ) internal returns (address) {
         require(tokenA != address(0), "Zero addresses are not allowed.");
         require(tokenB != address(0), "Zero addresses are not allowed.");
         require(router != address(0), "No router");
 
-        Pair pair = new Pair(router, tokenA, tokenB);
+        FPair pair_ = new FPair(router, tokenA, tokenB);
 
-        pair[tokenA][tokenB] = address(pair);
-        pair[tokenB][tokenA] = address(pair);
+        _pair[tokenA][tokenB] = address(pair_);
+        _pair[tokenB][tokenA] = address(pair_);
 
-        pairs.push(address(pair));
+        pairs.push(address(pair_));
 
         uint n = pairs.length;
 
-        emit PairCreated(tokenA, tokenB, address(_pair), n);
+        emit PairCreated(tokenA, tokenB, address(pair_), n);
 
-        return address(_pair);
+        return address(pair_);
     }
 
     function createPair(
         address tokenA,
         address tokenB
     ) external onlyRole(CREATOR_ROLE) nonReentrant returns (address) {
-        address _pair = _createPair(tokenA, tokenB);
+        address pair = _createPair(tokenA, tokenB);
 
-        return _pair;
+        return pair;
     }
 
     function getPair(
@@ -95,7 +93,7 @@ contract FFactory is ReentrancyGuard, Initializable, AccessControlUpgradeable {
         uint256 buyTax_,
         uint256 sellTax_
     ) public onlyRole(ADMIN_ROLE) {
-        require(newVault != address(0), "Zero addresses are not allowed.");
+        require(newVault_ != address(0), "Zero addresses are not allowed.");
 
         taxVault = newVault_;
         buyTax = buyTax_;

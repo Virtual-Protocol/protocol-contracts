@@ -124,9 +124,9 @@ contract FRouter is
         pair.transferAsset(to, amount);
         pair.transferAsset(feeTo, txFee);
 
-        pair.swap(amountIn, 0, 0, amount);
+        pair.swap(amountIn, 0, 0, amountOut);
 
-        return (amountIn, amount);
+        return (amountIn, amountOut);
     }
 
     function buy(

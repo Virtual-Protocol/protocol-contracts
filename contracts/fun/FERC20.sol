@@ -15,6 +15,8 @@ contract FERC20 is Context, IERC20, Ownable {
 
     uint public maxTx;
 
+    uint256 private _maxTxAmount;
+
     mapping(address => uint256) private _balances;
 
     mapping(address => mapping(address => uint256)) private _allowances;
@@ -35,13 +37,13 @@ contract FERC20 is Context, IERC20, Ownable {
 
         _totalSupply = supply * 10 ** _decimals;
 
-        maxTx = _maxTx;
-
         _balances[_msgSender()] = _totalSupply;
 
         isExcludedFromMaxTx[_msgSender()] = true;
 
         isExcludedFromMaxTx[address(this)] = true;
+
+        _updateMaxTx(_maxTx);
 
         emit Transfer(address(0), _msgSender(), _totalSupply);
     }
@@ -121,10 +123,8 @@ contract FERC20 is Context, IERC20, Ownable {
         require(to != address(0), "ERC20: transfer to the zero address");
         require(amount > 0, "Transfer amount must be greater than zero");
 
-        uint256 maxTxAmount = (maxTx * _totalSupply) / 100;
-
         if (!isExcludedFromMaxTx[from]) {
-            require(amount <= maxTxAmount, "Exceeds MaxTx");
+            require(amount <= _maxTxAmount, "Exceeds MaxTx");
         }
 
         _balances[from] = _balances[from] - amount;
@@ -133,10 +133,15 @@ contract FERC20 is Context, IERC20, Ownable {
         emit Transfer(from, to, amount);
     }
 
-    function updateMaxTx(uint256 _maxTx) public onlyOwner {
+    function _updateMaxTx(uint _maxTx) internal {
         maxTx = _maxTx;
+        _maxTxAmount = (maxTx * _totalSupply) / 100;
 
         emit MaxTxUpdated(_maxTx);
+    }
+
+    function updateMaxTx(uint256 _maxTx) public onlyOwner {
+        _updateMaxTx(_maxTx);
     }
 
     function excludeFromMaxTx(address user) public onlyOwner {

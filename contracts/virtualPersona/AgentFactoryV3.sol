@@ -258,7 +258,7 @@ contract AgentFactoryV3 is
 
         // C2
         address lp = IAgentToken(token).liquidityPools()[0];
-        IERC20(assetToken).transfer(token, initialAmount);
+        IERC20(assetToken).safeTransfer(token, initialAmount);
         IAgentToken(token).addInitialLiquidity(address(this));
 
         // C3

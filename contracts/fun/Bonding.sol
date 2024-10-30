@@ -143,7 +143,7 @@ contract Bonding is
         address _token,
         uint256 amount
     ) internal returns (bool) {
-        IERC20(_token).approve(_spender, amount);
+        IERC20(_token).forceApprove(_spender, amount);
 
         return true;
     }
@@ -274,7 +274,7 @@ contract Bonding is
         emit Launched(address(token), _pair, n);
 
         // Make initial purchase
-        IERC20(assetToken).approve(address(router), initialPurchase);
+        IERC20(assetToken).forceApprove(address(router), initialPurchase);
         router.buy(initialPurchase, address(token), address(this));
         token.transfer(msg.sender, token.balanceOf(address(this)));
 
@@ -417,7 +417,7 @@ contract Bonding is
 
         router.graduate(tokenAddress);
 
-        IERC20(router.assetToken()).approve(agentFactory, assetBalance);
+        IERC20(router.assetToken()).forceApprove(agentFactory, assetBalance);
         uint256 id = IAgentFactoryV3(agentFactory).initFromBondingCurve(
             string.concat(_token.data._name, " by Virtuals"),
             _token.data.ticker,

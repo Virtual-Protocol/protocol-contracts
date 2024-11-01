@@ -103,7 +103,7 @@ contract AgentFactoryV3 is
     address public veTokenImplementation;
     address private _minter; // Unused
     address private _tokenAdmin;
-    address public defaultDelegatee; // Unused
+    address public defaultDelegatee;
 
     // Default agent token params
     bytes private _tokenSupplyParams;
@@ -314,7 +314,7 @@ contract AgentFactoryV3 is
         IAgentVeToken(veToken).stake(
             IERC20(lp).balanceOf(address(this)),
             application.proposer,
-            application.proposer
+            defaultDelegatee
         );
 
         emit NewPersona(virtualId, token, dao, tbaAddress, veToken, lp);
@@ -564,12 +564,7 @@ contract AgentFactoryV3 is
         uint256 totalSupply,
         uint256 lpSupply,
         address vault
-    )
-        public
-        onlyRole(BONDING_ROLE)
-        noReentrant
-        returns (address)
-    {
+    ) public onlyRole(BONDING_ROLE) noReentrant returns (address) {
         bytes memory tokenSupplyParams = abi.encode(
             totalSupply,
             lpSupply,
@@ -585,5 +580,11 @@ contract AgentFactoryV3 is
         Application memory application = _applications[id];
 
         return IAgentNft(nft).virtualInfo(application.virtualId).token;
+    }
+
+    function setDefaultDelegatee(
+        address newDelegatee
+    ) public onlyRole(DEFAULT_ADMIN_ROLE) {
+        defaultDelegatee = newDelegatee;
     }
 }

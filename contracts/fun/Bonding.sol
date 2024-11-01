@@ -207,7 +207,7 @@ contract Bonding is
             initialPurchase
         );
 
-        FERC20 token = new FERC20(_name, _ticker, initialSupply, maxTx);
+        FERC20 token = new FERC20(string.concat("fun ", _name), _ticker, initialSupply, maxTx);
         uint256 supply = token.totalSupply();
 
         address _pair = factory.createPair(address(token), assetToken);

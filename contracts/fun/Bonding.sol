@@ -156,6 +156,10 @@ contract Bonding is
         K = newK;
     }
 
+    function setGradThreshold(uint256 newThreshold) public onlyOwner {
+        gradThreshold = newThreshold;
+    }
+
     function setFee(uint256 newFee, address newFeeTo) public onlyOwner {
         fee = newFee;
         _feeTo = newFeeTo;

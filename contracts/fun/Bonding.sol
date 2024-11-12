@@ -28,7 +28,7 @@ contract Bonding is
     FRouter public router;
     uint256 public initialSupply;
     uint256 public fee;
-    uint256 public constant K = 3_000_000_000_000;
+    uint256 public K = 3_000_000_000_000;
     uint256 public assetRate;
     uint256 public gradThreshold;
     uint256 public maxTx;
@@ -150,6 +150,10 @@ contract Bonding is
 
     function setInitialSupply(uint256 newSupply) public onlyOwner {
         initialSupply = newSupply;
+    }
+
+    function setK(uint256 newK) public onlyOwner {
+        K = newK;
     }
 
     function setFee(uint256 newFee, address newFeeTo) public onlyOwner {

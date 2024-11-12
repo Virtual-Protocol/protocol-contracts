@@ -239,6 +239,11 @@ contract AgentFactoryV4 is
             withdrawableAmount
         );
 
+        IERC20(_applicationToken[id]).safeTransfer(
+            application.proposer,
+            IERC20(_applicationToken[id]).balanceOf(address(this))
+        );
+
         address customToken = _applicationToken[id];
         if (customToken != address(0)) {
             _tokenApplication[customToken] = 0;
@@ -720,9 +725,9 @@ contract AgentFactoryV4 is
         try IAgentToken(tokenAddr).name() returns (string memory) {
             try IAgentToken(tokenAddr).symbol() returns (string memory) {
                 try IAgentToken(tokenAddr).totalSupply() returns (uint256) {
-                    try IAgentToken(tokenAddr).balanceOf(address(this)) returns (
-                        uint256
-                    ) {
+                    try
+                        IAgentToken(tokenAddr).balanceOf(address(this))
+                    returns (uint256) {
                         return true;
                     } catch {
                         return false;
@@ -741,10 +746,9 @@ contract AgentFactoryV4 is
     function _createPair(
         address tokenAddr
     ) internal returns (address uniswapV2Pair_) {
-        uniswapV2Pair_ = IUniswapV2Factory(IUniswapV2Router02(_uniswapRouter).factory()).createPair(
-            tokenAddr,
-            assetToken
-        );
+        uniswapV2Pair_ = IUniswapV2Factory(
+            IUniswapV2Router02(_uniswapRouter).factory()
+        ).createPair(tokenAddr, assetToken);
 
         return (uniswapV2Pair_);
     }

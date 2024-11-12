@@ -9,13 +9,14 @@ import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import "@openzeppelin/contracts/access/AccessControl.sol";
 import "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
 
-import "./IAgentFactoryV3.sol";
+import "./IAgentFactoryV4.sol";
 import "./IAgentToken.sol";
 import "./IAgentVeToken.sol";
 import "./IAgentDAO.sol";
 import "./IAgentNft.sol";
 import "../libs/IERC6551Registry.sol";
 import "../pool/IUniswapV2Factory.sol";
+import "../pool/IUniswapV2Router02.sol";
 
 contract AgentFactoryV4 is
     IAgentFactoryV4,
@@ -239,7 +240,7 @@ contract AgentFactoryV4 is
         );
 
         address customToken = _applicationToken[id];
-        if(customToken != address(0)){
+        if (customToken != address(0)) {
             _tokenApplication[customToken] = 0;
             _applicationToken[id] = address(0);
         }
@@ -264,9 +265,9 @@ contract AgentFactoryV4 is
         application.status = ApplicationStatus.Executed;
 
         // C1 & C2
-        address token = _applicationToken(id);
+        address token = _applicationToken[id];
         address lp = address(0);
-        if(token == address(0)){
+        if (token == address(0)) {
             token = _createNewAgentToken(
                 application.name,
                 application.symbol,
@@ -275,15 +276,17 @@ contract AgentFactoryV4 is
             lp = IAgentToken(token).liquidityPools()[0];
             IERC20(assetToken).safeTransfer(token, initialAmount);
             IAgentToken(token).addInitialLiquidity(address(this));
-        }
-        else {
+        } else {
             // Custom token
             lp = _createPair(token);
             IERC20(token).approve(_uniswapRouter, type(uint256).max);
             IERC20(assetToken).approve(_uniswapRouter, initialAmount);
             // Add the liquidity:
-            (uint256 amountA, uint256 amountB, uint256 lpTokens) = _uniswapRouter
-                .addLiquidity(
+            (
+                uint256 amountA,
+                uint256 amountB,
+                uint256 lpTokens
+            ) = IUniswapV2Router02(_uniswapRouter).addLiquidity(
                     token,
                     assetToken,
                     IERC20(token).balanceOf(address(this)),
@@ -629,26 +632,30 @@ contract AgentFactoryV4 is
         bytes32 tbaSalt,
         address tbaImplementation,
         uint32 daoVotingPeriod,
-        uint256 daoThreshold
+        uint256 daoThreshold,
+        uint256 initialLP
     ) public whenNotPaused returns (uint256) {
         address sender = _msgSender();
-        require(
-            _tokenApplication[tokenAddr] == 0,
-            "Token already exists"
-        );
+        require(_tokenApplication[tokenAddr] == 0, "Token already exists");
 
-        require(isERC20(tokenAddr), "Unsupported token");
-        
+        require(isCompatibleToken(tokenAddr), "Unsupported token");
+
         require(
             IERC20(assetToken).balanceOf(sender) >= applicationThreshold,
             "Insufficient asset token"
         );
+
         require(
             IERC20(assetToken).allowance(sender, address(this)) >=
                 applicationThreshold,
             "Insufficient asset token allowance"
         );
+
         require(cores.length > 0, "Cores must be provided");
+
+        require(initialLP > 0, "InitialLP must be greater than 0");
+
+        IERC20(tokenAddr).safeTransferFrom(sender, address(this), initialLP);
 
         IERC20(assetToken).safeTransferFrom(
             sender,
@@ -681,7 +688,10 @@ contract AgentFactoryV4 is
         return id;
     }
 
-    function executeTokenApplication(uint256 id, bool canStake, uint256 initialLP) public noReentrant {
+    function executeTokenApplication(
+        uint256 id,
+        bool canStake
+    ) public noReentrant {
         // This will bootstrap an Agent with following components:
         // C2: LP Pool + Initial liquidity
         // C3: Agent veToken
@@ -698,20 +708,21 @@ contract AgentFactoryV4 is
             "Not proposer"
         );
 
-        require(_applicationToken[id] != address(0), "Not custom token application");
-
-        require(initialLP > 0, "InitialLP must be greater than 0");
-
-        IERC20(_applicationToken[id]).safeTransferFrom(application.proposer, address(this), initialLP);
+        require(
+            _applicationToken[id] != address(0),
+            "Not custom token application"
+        );
 
         _executeApplication(id, canStake, _tokenSupplyParams);
     }
 
-    function isERC20(address tokenAddr) public view returns (bool) {
-        try IERC20(tokenAddr).name() returns (string) {
-            try IERC20(tokenAddr).symbol() returns (string) {
-                try IERC20(tokenAddr).totalSupply() returns (uint256) {
-                    try IERC20(tokenAddr).balanceOf(address(this)) returns (uint256) {
+    function isCompatibleToken(address tokenAddr) public view returns (bool) {
+        try IAgentToken(tokenAddr).name() returns (string memory) {
+            try IAgentToken(tokenAddr).symbol() returns (string memory) {
+                try IAgentToken(tokenAddr).totalSupply() returns (uint256) {
+                    try IAgentToken(tokenAddr).balanceOf(address(this)) returns (
+                        uint256
+                    ) {
                         return true;
                     } catch {
                         return false;
@@ -727,11 +738,13 @@ contract AgentFactoryV4 is
         }
     }
 
-    function _createPair(address tokenAddr) internal returns (address uniswapV2Pair_) {
-        uniswapV2Pair_ = IUniswapV2Factory(_uniswapRouter.factory()).createPair(
-                tokenAddr,
-                assetToken
-            );
+    function _createPair(
+        address tokenAddr
+    ) internal returns (address uniswapV2Pair_) {
+        uniswapV2Pair_ = IUniswapV2Factory(IUniswapV2Router02(_uniswapRouter).factory()).createPair(
+            tokenAddr,
+            assetToken
+        );
 
         return (uniswapV2Pair_);
     }

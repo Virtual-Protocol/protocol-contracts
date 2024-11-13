@@ -19,21 +19,18 @@ interface IAgentFactoryV4 {
 
     function totalAgents() external view returns (uint256);
 
-    function initFromBondingCurve(
-        string memory name,
-        string memory symbol,
+    function initFromToken(
+        address tokenAddr,
         uint8[] memory cores,
         bytes32 tbaSalt,
         address tbaImplementation,
         uint32 daoVotingPeriod,
         uint256 daoThreshold,
-        uint256 applicationThreshold_
+        uint256 initialLP
     ) external returns (uint256);
 
-    function executeBondingCurveApplication(
+    function executeTokenApplication(
         uint256 id,
-        uint256 totalSupply,
-        uint256 lpSupply,
-        address vault
-    ) external returns (address);
+        bool canStake
+    ) external;
 }

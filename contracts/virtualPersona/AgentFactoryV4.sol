@@ -75,13 +75,6 @@ contract AgentFactoryV4 is
 
     mapping(uint256 => Application) private _applications;
 
-    address public gov; // Deprecated in v2, execution of application does not require DAO decision anymore
-
-    modifier onlyGov() {
-        require(msg.sender == gov, "Only DAO can execute proposal");
-        _;
-    }
-
     event ApplicationThresholdUpdated(uint256 newThreshold);
     event GovUpdated(address newGov);
     event ImplContractsUpdated(address token, address dao);
@@ -103,16 +96,12 @@ contract AgentFactoryV4 is
     address[] public allTradingTokens;
     address private _uniswapRouter;
     address public veTokenImplementation;
-    address private _minter; // Unused
     address private _tokenAdmin;
     address public defaultDelegatee;
 
     // Default agent token params
     bytes private _tokenSupplyParams;
     bytes private _tokenTaxParams;
-    uint16 private _tokenMultiplier; // Unused
-
-    bytes32 public constant BONDING_ROLE = keccak256("BONDING_ROLE");
 
     ///////////////////////////////////////////////////////////////
     // V4 Storage
@@ -544,80 +533,6 @@ contract AgentFactoryV4 is
         returns (bytes calldata)
     {
         return ContextUpgradeable._msgData();
-    }
-
-    function initFromBondingCurve(
-        string memory name,
-        string memory symbol,
-        uint8[] memory cores,
-        bytes32 tbaSalt,
-        address tbaImplementation,
-        uint32 daoVotingPeriod,
-        uint256 daoThreshold,
-        uint256 applicationThreshold_
-    ) public whenNotPaused onlyRole(BONDING_ROLE) returns (uint256) {
-        address sender = _msgSender();
-        require(
-            IERC20(assetToken).balanceOf(sender) >= applicationThreshold_,
-            "Insufficient asset token"
-        );
-        require(
-            IERC20(assetToken).allowance(sender, address(this)) >=
-                applicationThreshold_,
-            "Insufficient asset token allowance"
-        );
-        require(cores.length > 0, "Cores must be provided");
-
-        IERC20(assetToken).safeTransferFrom(
-            sender,
-            address(this),
-            applicationThreshold_
-        );
-
-        uint256 id = _nextId++;
-        uint256 proposalEndBlock = block.number; // No longer required in v2
-        Application memory application = Application(
-            name,
-            symbol,
-            "",
-            ApplicationStatus.Active,
-            applicationThreshold_,
-            sender,
-            cores,
-            proposalEndBlock,
-            0,
-            tbaSalt,
-            tbaImplementation,
-            daoVotingPeriod,
-            daoThreshold
-        );
-        _applications[id] = application;
-        emit NewApplication(id);
-
-        return id;
-    }
-
-    function executeBondingCurveApplication(
-        uint256 id,
-        uint256 totalSupply,
-        uint256 lpSupply,
-        address vault
-    ) public onlyRole(BONDING_ROLE) noReentrant returns (address) {
-        bytes memory tokenSupplyParams = abi.encode(
-            totalSupply,
-            lpSupply,
-            totalSupply - lpSupply,
-            totalSupply,
-            totalSupply,
-            0,
-            vault
-        );
-
-        _executeApplication(id, true, tokenSupplyParams);
-
-        Application memory application = _applications[id];
-
-        return IAgentNft(nft).virtualInfo(application.virtualId).token;
     }
 
     function setDefaultDelegatee(

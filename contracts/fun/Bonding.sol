@@ -28,7 +28,7 @@ contract Bonding is
     FRouter public router;
     uint256 public initialSupply;
     uint256 public fee;
-    uint256 public K;
+    uint256 public constant K = 3_000_000_000_000;
     uint256 public assetRate;
     uint256 public gradThreshold;
     uint256 public maxTx;
@@ -120,8 +120,6 @@ contract Bonding is
 
         agentFactory = agentFactory_;
         gradThreshold = gradThreshold_;
-
-        K = 3_000_000_000_000;
     }
 
     function _createUserProfile(address _user) internal returns (bool) {
@@ -152,10 +150,6 @@ contract Bonding is
 
     function setInitialSupply(uint256 newSupply) public onlyOwner {
         initialSupply = newSupply;
-    }
-
-    function setK(uint256 newK) public onlyOwner {
-        K = newK;
     }
 
     function setGradThreshold(uint256 newThreshold) public onlyOwner {

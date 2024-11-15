@@ -657,9 +657,17 @@ contract AgentFactoryV4 is
     function _createPair(
         address tokenAddr
     ) internal returns (address uniswapV2Pair_) {
-        uniswapV2Pair_ = IUniswapV2Factory(
+        
+        IUniswapV2Factory factory = IUniswapV2Factory(
             IUniswapV2Router02(_uniswapRouter).factory()
-        ).createPair(tokenAddr, assetToken);
+        );
+
+        require(
+            factory.getPair(tokenAddr, assetToken) == address(0),
+            "pool already exists"
+        );
+
+        uniswapV2Pair_ = factory.createPair(tokenAddr, assetToken);
 
         return (uniswapV2Pair_);
     }

@@ -273,8 +273,8 @@ contract AgentFactoryV4 is
         } else {
             // Custom token
             lp = _createPair(token);
-            IERC20(token).approve(_uniswapRouter, type(uint256).max);
-            IERC20(assetToken).approve(_uniswapRouter, initialAmount);
+            IERC20(token).forceApprove(_uniswapRouter, type(uint256).max);
+            IERC20(assetToken).forceApprove(_uniswapRouter, initialAmount);
             // Add the liquidity:
             IUniswapV2Router02(_uniswapRouter).addLiquidity(
                 token,

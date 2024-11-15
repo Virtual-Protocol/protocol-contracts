@@ -228,13 +228,13 @@ contract AgentFactoryV4 is
             withdrawableAmount
         );
 
-        IERC20(_applicationToken[id]).safeTransfer(
-            application.proposer,
-            IERC20(_applicationToken[id]).balanceOf(address(this))
-        );
-
         address customToken = _applicationToken[id];
         if (customToken != address(0)) {
+            IERC20(customToken).safeTransfer(
+                application.proposer,
+                IERC20(customToken).balanceOf(address(this))
+            );
+
             _tokenApplication[customToken] = 0;
             _applicationToken[id] = address(0);
         }
@@ -277,15 +277,15 @@ contract AgentFactoryV4 is
             IERC20(assetToken).approve(_uniswapRouter, initialAmount);
             // Add the liquidity:
             IUniswapV2Router02(_uniswapRouter).addLiquidity(
-                    token,
-                    assetToken,
-                    IERC20(token).balanceOf(address(this)),
-                    initialAmount,
-                    0,
-                    0,
-                    address(this),
-                    block.timestamp
-                );
+                token,
+                assetToken,
+                IERC20(token).balanceOf(address(this)),
+                initialAmount,
+                0,
+                0,
+                address(this),
+                block.timestamp
+            );
         }
 
         // C3

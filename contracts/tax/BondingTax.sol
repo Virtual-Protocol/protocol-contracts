@@ -45,6 +45,7 @@ contract BondingTax is
     );
     event TreasuryUpdated(address oldTreasury, address newTreasury);
     event SwapExecuted(uint256 taxTokenAmount, uint256 assetTokenAmount);
+    event SwapFailed(uint256 taxTokenAmount);
 
     function initialize(
         address defaultAdmin_,
@@ -113,16 +114,20 @@ contract BondingTax is
         path[0] = taxToken;
         path[1] = assetToken;
 
-        uint256[] memory amounts = router.swapExactTokensForTokens(
-            amount,
-            0,
-            path,
-            treasury,
-            block.timestamp + 300
-        );
-
-        emit SwapExecuted(amount, amounts[1]);
-
-        return (true, amounts[1]);
+        try
+            router.swapExactTokensForTokens(
+                amount,
+                0,
+                path,
+                treasury,
+                block.timestamp + 300
+            )
+        returns (uint256[] memory amounts) {
+            emit SwapExecuted(amount, amounts[1]);
+            return (true, amounts[1]);
+        } catch {
+            emit SwapFailed(amount);
+            return (false, 0);
+        }
     }
 }

@@ -8,16 +8,7 @@ import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
 import "@openzeppelin/contracts/utils/math/Math.sol";
 import "./IBondingTax.sol";
-
-interface IRouter {
-    function swapExactTokensForTokens(
-        uint amountIn,
-        uint amountOutMin,
-        address[] calldata path,
-        address to,
-        uint deadline
-    ) external returns (uint[] memory amounts);
-}
+import "../pool/IRouter.sol";
 
 contract BondingTax is
     Initializable,
@@ -69,12 +60,12 @@ contract BondingTax is
         treasury = treasury_;
         minSwapThreshold = minSwapThreshold_;
         maxSwapThreshold = maxSwapThreshold_;
-        IERC20(taxToken).approve(router_, type(uint256).max);
+        IERC20(taxToken).forceApprove(router_, type(uint256).max);
     }
 
     function updateSwapParams(
         address router_,
-        address assetToken_,
+        address assetToken_
     ) public onlyRole(ADMIN_ROLE) {
         address oldRouter = address(router);
         address oldAsset = assetToken;
@@ -82,23 +73,18 @@ contract BondingTax is
         assetToken = assetToken_;
         router = IRouter(router_);
 
-        IERC20(taxToken).approve(router_, type(uint256).max);
-        IERC20(taxToken).approve(oldRouter, 0);
+        IERC20(taxToken).forceApprove(router_, type(uint256).max);
+        IERC20(taxToken).forceApprove(oldRouter, 0);
 
-        emit SwapParamsUpdated(
-            oldRouter,
-            router_,
-            oldAsset,
-            assetToken_
-        );
+        emit SwapParamsUpdated(oldRouter, router_, oldAsset, assetToken_);
     }
 
     function updateSwapThresholds(
         uint256 minSwapThreshold_,
-        uint256 maxSwapThreshold_,
+        uint256 maxSwapThreshold_
     ) public onlyRole(ADMIN_ROLE) {
-        address oldMin = minSwapThreshold;
-        address oldMax = maxSwapThreshold;
+        uint256 oldMin = minSwapThreshold;
+        uint256 oldMax = maxSwapThreshold;
 
         minSwapThreshold = minSwapThreshold_;
         maxSwapThreshold = maxSwapThreshold_;
@@ -130,11 +116,11 @@ contract BondingTax is
 
         require(amount == 0, "Nothing to be swapped");
 
-        if(amount < minSwapThreshold){
+        if (amount < minSwapThreshold) {
             return (false, 0);
         }
 
-        if(amount > maxSwapThreshold){
+        if (amount > maxSwapThreshold) {
             amount = maxSwapThreshold;
         }
 

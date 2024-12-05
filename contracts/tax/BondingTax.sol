@@ -33,15 +33,20 @@ contract BondingTax is
     address taxToken;
     IRouter router;
     address treasury;
-    uint256 swapThreshold;
+    uint256 minSwapThreshold;
+    uint256 maxSwapThreshold;
 
     event SwapParamsUpdated(
         address oldRouter,
         address newRouter,
         address oldAsset,
-        address newAsset,
-        uint256 oldSwapThreshold,
-        uint256 newSwapThreshold
+        address newAsset
+    );
+    event SwapThresholdUpdated(
+        uint256 oldMinThreshold,
+        uint256 newMinThreshold,
+        uint256 oldMaxThreshold,
+        uint256 newMaxThreshold
     );
     event TreasuryUpdated(address oldTreasury, address newTreasury);
     event SwapExecuted(uint256 taxTokenAmount, uint256 assetTokenAmount);
@@ -53,7 +58,8 @@ contract BondingTax is
         address taxToken_,
         address router_,
         address treasury_,
-        uint256 swapThreshold_
+        uint256 minSwapThreshold_,
+        uint256 maxSwapThreshold_
     ) external initializer {
         _grantRole(ADMIN_ROLE, defaultAdmin_);
         _grantRole(DEFAULT_ADMIN_ROLE, defaultAdmin_);
@@ -61,22 +67,20 @@ contract BondingTax is
         taxToken = taxToken_;
         router = IRouter(router_);
         treasury = treasury_;
-        swapThreshold = swapThreshold_;
+        minSwapThreshold = minSwapThreshold_;
+        maxSwapThreshold = maxSwapThreshold_;
         IERC20(taxToken).approve(router_, type(uint256).max);
     }
 
     function updateSwapParams(
         address router_,
         address assetToken_,
-        uint256 swapThreshold_
     ) public onlyRole(ADMIN_ROLE) {
         address oldRouter = address(router);
         address oldAsset = assetToken;
-        uint256 oldThreshold = swapThreshold;
 
         assetToken = assetToken_;
         router = IRouter(router_);
-        swapThreshold = swapThreshold_;
 
         IERC20(taxToken).approve(router_, type(uint256).max);
         IERC20(taxToken).approve(oldRouter, 0);
@@ -85,9 +89,25 @@ contract BondingTax is
             oldRouter,
             router_,
             oldAsset,
-            assetToken_,
-            oldThreshold,
-            swapThreshold_
+            assetToken_
+        );
+    }
+
+    function updateSwapThresholds(
+        uint256 minSwapThreshold_,
+        uint256 maxSwapThreshold_,
+    ) public onlyRole(ADMIN_ROLE) {
+        address oldMin = minSwapThreshold;
+        address oldMax = maxSwapThreshold;
+
+        minSwapThreshold = minSwapThreshold_;
+        maxSwapThreshold = maxSwapThreshold_;
+
+        emit SwapThresholdUpdated(
+            oldMin,
+            minSwapThreshold_,
+            oldMax,
+            maxSwapThreshold_
         );
     }
 
@@ -98,7 +118,7 @@ contract BondingTax is
         emit TreasuryUpdated(oldTreasury, treasury_);
     }
 
-    function claim(address token) external onlyRole(ADMIN_ROLE) {
+    function withdraw(address token) external onlyRole(ADMIN_ROLE) {
         IERC20(token).safeTransfer(
             treasury,
             IERC20(token).balanceOf(address(this))
@@ -108,7 +128,15 @@ contract BondingTax is
     function swapForAsset() public returns (bool, uint256) {
         uint256 amount = IERC20(taxToken).balanceOf(address(this));
 
-        require(amount > 0, "Nothing to be swapped");
+        require(amount == 0, "Nothing to be swapped");
+
+        if(amount < minSwapThreshold){
+            return (false, 0);
+        }
+
+        if(amount > maxSwapThreshold){
+            amount = maxSwapThreshold;
+        }
 
         address[] memory path;
         path[0] = taxToken;

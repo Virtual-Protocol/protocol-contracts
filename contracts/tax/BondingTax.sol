@@ -26,6 +26,7 @@ contract BondingTax is
     address treasury;
     uint256 minSwapThreshold;
     uint256 maxSwapThreshold;
+    uint16 private _slippage;
 
     event SwapParamsUpdated(
         address oldRouter,
@@ -69,17 +70,21 @@ contract BondingTax is
         minSwapThreshold = minSwapThreshold_;
         maxSwapThreshold = maxSwapThreshold_;
         IERC20(taxToken).forceApprove(router_, type(uint256).max);
+
+        _slippage = 100; // default to 1%
     }
 
     function updateSwapParams(
         address router_,
-        address assetToken_
+        address assetToken_,
+        uint8 slippage_
     ) public onlyRole(ADMIN_ROLE) {
         address oldRouter = address(router);
         address oldAsset = assetToken;
 
         assetToken = assetToken_;
         router = IRouter(router_);
+        _slippage = slippage_;
 
         IERC20(taxToken).forceApprove(router_, type(uint256).max);
         IERC20(taxToken).forceApprove(oldRouter, 0);
@@ -136,10 +141,16 @@ contract BondingTax is
         path[0] = taxToken;
         path[1] = assetToken;
 
+        uint256[] memory amountsOut = router.getAmountsOut(amount, path);
+        require(amountsOut.length > 1, "Failed to fetch token price");
+
+        uint256 expectedOutput = amountsOut[1];
+        uint256 minOutput = (expectedOutput * (10000 - _slippage)) / 10000;
+
         try
             router.swapExactTokensForTokens(
                 amount,
-                0,
+                minOutput,
                 path,
                 treasury,
                 block.timestamp + 300

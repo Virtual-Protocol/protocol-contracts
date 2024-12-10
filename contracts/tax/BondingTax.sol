@@ -43,6 +43,11 @@ contract BondingTax is
     event SwapExecuted(uint256 taxTokenAmount, uint256 assetTokenAmount);
     event SwapFailed(uint256 taxTokenAmount);
 
+    /// @custom:oz-upgrades-unsafe-allow constructor
+    constructor() {
+        _disableInitializers();
+    }
+
     function initialize(
         address defaultAdmin_,
         address assetToken_,
@@ -52,6 +57,9 @@ contract BondingTax is
         uint256 minSwapThreshold_,
         uint256 maxSwapThreshold_
     ) external initializer {
+        __AccessControl_init();
+        __ReentrancyGuard_init();
+
         _grantRole(ADMIN_ROLE, defaultAdmin_);
         _grantRole(DEFAULT_ADMIN_ROLE, defaultAdmin_);
         assetToken = assetToken_;
@@ -114,7 +122,7 @@ contract BondingTax is
     function swapForAsset() public returns (bool, uint256) {
         uint256 amount = IERC20(taxToken).balanceOf(address(this));
 
-        require(amount == 0, "Nothing to be swapped");
+        require(amount > 0, "Nothing to be swapped");
 
         if (amount < minSwapThreshold) {
             return (false, 0);

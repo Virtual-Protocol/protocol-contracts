@@ -9,6 +9,7 @@ import "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol
 
 import "./FFactory.sol";
 import "./IFPair.sol";
+import "../tax/IBondingTax.sol";
 
 contract FRouter is
     Initializable,
@@ -22,6 +23,7 @@ contract FRouter is
 
     FFactory public factory;
     address public assetToken;
+    address public taxManager;
 
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() {
@@ -126,6 +128,10 @@ contract FRouter is
 
         pair.swap(amountIn, 0, 0, amountOut);
 
+        if (feeTo == taxManager) {
+            IBondingTax(taxManager).swapForAsset();
+        }
+
         return (amountIn, amountOut);
     }
 
@@ -156,6 +162,10 @@ contract FRouter is
 
         IFPair(pair).swap(0, amountOut, amount, 0);
 
+        if (feeTo == taxManager) {
+            IBondingTax(taxManager).swapForAsset();
+        }
+
         return (amount, amountOut);
     }
 
@@ -177,5 +187,9 @@ contract FRouter is
         require(spender != address(0), "Zero addresses are not allowed.");
 
         IFPair(pair).approval(spender, asset, amount);
+    }
+
+    function setTaxManager(address newManager) public onlyRole(ADMIN_ROLE) {
+        taxManager = newManager;
     }
 }

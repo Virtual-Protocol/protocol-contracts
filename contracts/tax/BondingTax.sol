@@ -23,6 +23,7 @@ contract BondingTax is
     address assetToken;
     address taxToken;
     IRouter router;
+    address bondingRouter;
     address treasury;
     uint256 minSwapThreshold;
     uint256 maxSwapThreshold;
@@ -31,6 +32,8 @@ contract BondingTax is
     event SwapParamsUpdated(
         address oldRouter,
         address newRouter,
+        address oldBondingRouter,
+        address newBondingRouter,
         address oldAsset,
         address newAsset
     );
@@ -49,8 +52,8 @@ contract BondingTax is
         _disableInitializers();
     }
 
-    modifier onlyRouter() {
-        require(_msgSender() == address(router), "Only router");
+    modifier onlyBondingRouter() {
+        require(_msgSender() == address(bondingRouter), "Only bonding router");
         _;
     }
 
@@ -59,6 +62,7 @@ contract BondingTax is
         address assetToken_,
         address taxToken_,
         address router_,
+        address bondingRouter_,
         address treasury_,
         uint256 minSwapThreshold_,
         uint256 maxSwapThreshold_
@@ -71,6 +75,7 @@ contract BondingTax is
         assetToken = assetToken_;
         taxToken = taxToken_;
         router = IRouter(router_);
+        bondingRouter = bondingRouter_;
         treasury = treasury_;
         minSwapThreshold = minSwapThreshold_;
         maxSwapThreshold = maxSwapThreshold_;
@@ -81,10 +86,12 @@ contract BondingTax is
 
     function updateSwapParams(
         address router_,
+        address bondingRouter_,
         address assetToken_,
         uint8 slippage_
     ) public onlyRole(ADMIN_ROLE) {
         address oldRouter = address(router);
+        address oldBondingRouter = bondingRouter;
         address oldAsset = assetToken;
 
         assetToken = assetToken_;
@@ -94,7 +101,14 @@ contract BondingTax is
         IERC20(taxToken).forceApprove(router_, type(uint256).max);
         IERC20(taxToken).forceApprove(oldRouter, 0);
 
-        emit SwapParamsUpdated(oldRouter, router_, oldAsset, assetToken_);
+        emit SwapParamsUpdated(
+            oldRouter,
+            router_,
+            oldBondingRouter,
+            bondingRouter_,
+            oldAsset,
+            assetToken_
+        );
     }
 
     function updateSwapThresholds(
@@ -129,7 +143,7 @@ contract BondingTax is
         );
     }
 
-    function swapForAsset() public onlyRouter returns (bool, uint256) {
+    function swapForAsset() public onlyBondingRouter returns (bool, uint256) {
         uint256 amount = IERC20(taxToken).balanceOf(address(this));
 
         require(amount > 0, "Nothing to be swapped");

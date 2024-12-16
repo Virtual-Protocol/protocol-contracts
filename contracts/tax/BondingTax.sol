@@ -49,6 +49,11 @@ contract BondingTax is
         _disableInitializers();
     }
 
+    modifier onlyRouter() {
+        require(_msgSender() == address(router), "Only router");
+        _;
+    }
+
     function initialize(
         address defaultAdmin_,
         address assetToken_,
@@ -124,7 +129,7 @@ contract BondingTax is
         );
     }
 
-    function swapForAsset() public returns (bool, uint256) {
+    function swapForAsset() public onlyRouter returns (bool, uint256) {
         uint256 amount = IERC20(taxToken).balanceOf(address(this));
 
         require(amount > 0, "Nothing to be swapped");

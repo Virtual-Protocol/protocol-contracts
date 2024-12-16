@@ -88,7 +88,7 @@ contract BondingTax is
         address router_,
         address bondingRouter_,
         address assetToken_,
-        uint8 slippage_
+        uint16 slippage_
     ) public onlyRole(ADMIN_ROLE) {
         address oldRouter = address(router);
         address oldBondingRouter = bondingRouter;

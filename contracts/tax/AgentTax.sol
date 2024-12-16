@@ -160,7 +160,7 @@ contract AgentTax is
         bytes32[] memory txhashes,
         uint256[] memory amounts
     ) public onlyRole(EXECUTOR_ROLE) {
-        require(txhashes.length = amounts.length, "Unmatched inputs");
+        require(txhashes.length == amounts.length, "Unmatched inputs");
         TaxAmounts storage agentAmounts = agentTaxAmounts[agentId];
         for (uint i = 0; i < txhashes.length; i++) {
             bytes32 txhash = txhashes[i];

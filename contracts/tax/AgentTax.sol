@@ -16,6 +16,15 @@ contract AgentTax is
     ReentrancyGuardUpgradeable
 {
     using SafeERC20 for IERC20;
+    struct TaxHistory {
+        uint256 agentId;
+        uint256 amount;
+    }
+
+    struct TaxAmounts {
+        uint256 amountCollected;
+        uint256 amountSwapped;
+    }
 
     bytes32 public constant ADMIN_ROLE = keccak256("ADMIN_ROLE");
     bytes32 public constant EXECUTOR_ROLE = keccak256("EXECUTOR_ROLE");
@@ -52,17 +61,6 @@ contract AgentTax is
     );
     event SwapFailed(uint256 indexed agentId, uint256 taxTokenAmount);
     event TaxCollected(bytes32 indexed txhash, uint256 agentId, uint256 amount);
-
-    struct TaxHistory {
-        uint256 agentId;
-        uint256 amount;
-        uint256 assetAmount;
-    }
-
-    struct TaxAmounts {
-        uint256 amountCollected;
-        uint256 amountSwapped;
-    }
 
     mapping(uint256 agentId => address tba) private _agentTba; // cache to prevent calling AgentNft frequently
     mapping(bytes32 txhash => TaxHistory history) taxHistory;
@@ -167,6 +165,8 @@ contract AgentTax is
             if (taxHistory[txhash].agentId > 0) {
                 revert TxHashExists(txhash);
             }
+            taxHistory[txhash] = TaxHistory(agentId, amounts[i]);
+
             agentAmounts.amountCollected += amounts[i];
             emit TaxCollected(txhash, agentId, amounts[i]);
         }
@@ -188,8 +188,6 @@ contract AgentTax is
         TaxAmounts storage agentAmounts = agentTaxAmounts[agentId];
         uint256 amountToSwap = agentAmounts.amountCollected -
             agentAmounts.amountSwapped;
-
-        require(amountToSwap > 0, "Nothing to be swapped");
 
         uint256 balance = IERC20(taxToken).balanceOf(address(this));
 
@@ -225,14 +223,14 @@ contract AgentTax is
                 block.timestamp + 300
             )
         returns (uint256[] memory amounts) {
-            uint256 swappedAmount = amounts[1];
-            emit SwapExecuted(agentId, amountToSwap, swappedAmount);
+            uint256 assetReceived = amounts[1];
+            emit SwapExecuted(agentId, amountToSwap, assetReceived);
 
-            uint256 feeAmount = (swappedAmount * (DENOM - feeRate)) / DENOM;
-            IERC20(assetToken).safeTransfer(tba, swappedAmount - feeAmount);
+            uint256 feeAmount = (assetReceived * feeRate) / DENOM;
+            IERC20(assetToken).safeTransfer(tba, assetReceived - feeAmount);
             IERC20(assetToken).safeTransfer(treasury, feeAmount);
 
-            agentAmounts.amountSwapped = swappedAmount;
+            agentAmounts.amountSwapped += amountToSwap;
 
             return (true, amounts[1]);
         } catch {

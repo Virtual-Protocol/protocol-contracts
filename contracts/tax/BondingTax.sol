@@ -20,13 +20,13 @@ contract BondingTax is
 
     bytes32 public constant ADMIN_ROLE = keccak256("ADMIN_ROLE");
 
-    address assetToken;
-    address taxToken;
-    IRouter router;
-    address bondingRouter;
-    address treasury;
-    uint256 minSwapThreshold;
-    uint256 maxSwapThreshold;
+    address public assetToken;
+    address public taxToken;
+    IRouter public router;
+    address public bondingRouter;
+    address public treasury;
+    uint256 public minSwapThreshold;
+    uint256 public maxSwapThreshold;
     uint16 private _slippage;
 
     event SwapParamsUpdated(
@@ -156,7 +156,7 @@ contract BondingTax is
             amount = maxSwapThreshold;
         }
 
-        address[] memory path;
+        address[] memory path = new address[](2);
         path[0] = taxToken;
         path[1] = assetToken;
 

@@ -20,6 +20,11 @@ interface IAeroRouter {
         address to,
         uint256 deadline
     ) external returns (uint256[] memory amounts);
+
+    function getAmountsOut(
+        uint256 amountIn,
+        Route[] memory routes
+    ) external view returns (uint256[] memory amounts);
 }
 
 contract AeroAdaptor is IRouter {
@@ -62,5 +67,14 @@ contract AeroAdaptor is IRouter {
             to,
             deadline
         );
+    }
+
+    function getAmountsOut(
+        uint amountIn,
+        address[] calldata path
+    ) external view returns (uint[] memory amounts) {
+        IAeroRouter.Route[] memory routes = new IAeroRouter.Route[](1);
+        routes[0] = IAeroRouter.Route(tokenIn, tokenOut, false, factory);
+        return IAeroRouter(router).getAmountsOut(amountIn, routes);
     }
 }

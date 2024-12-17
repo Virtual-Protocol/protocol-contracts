@@ -201,7 +201,7 @@ contract AgentTax is
             amountToSwap = maxSwapThreshold;
         }
 
-        address[] memory path;
+        address[] memory path = new address[](2);
         path[0] = taxToken;
         path[1] = assetToken;
 

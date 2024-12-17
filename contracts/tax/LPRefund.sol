@@ -11,7 +11,7 @@ contract LPRefund is Initializable, AccessControlUpgradeable {
     bytes32 public constant ADMIN_ROLE = keccak256("ADMIN_ROLE");
     bytes32 public constant EXECUTOR_ROLE = keccak256("EXECUTOR_ROLE");
 
-    address taxToken;
+    address public taxToken;
 
     event TaxRefunded(
         bytes32 indexed txhash,
@@ -19,7 +19,7 @@ contract LPRefund is Initializable, AccessControlUpgradeable {
         uint256 amount
     );
 
-    mapping(bytes32 txhash => uint256 amount) refunds;
+    mapping(bytes32 txhash => uint256 amount) public refunds;
 
     error TxHashExists(bytes32 txhash);
 

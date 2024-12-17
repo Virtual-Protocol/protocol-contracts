@@ -29,15 +29,15 @@ contract AgentTax is
 
     uint256 internal constant DENOM = 10000;
 
-    address assetToken;
-    address taxToken;
-    IRouter router;
-    address treasury;
-    uint16 feeRate;
-    uint256 minSwapThreshold;
-    uint256 maxSwapThreshold;
+    address public assetToken;
+    address public taxToken;
+    IRouter public router;
+    address public treasury;
+    uint16 public feeRate;
+    uint256 public minSwapThreshold;
+    uint256 public maxSwapThreshold;
     uint16 private _slippage;
-    IAgentNft agentNft;
+    IAgentNft public agentNft;
 
     event SwapParamsUpdated(
         address oldRouter,
@@ -61,8 +61,8 @@ contract AgentTax is
     event TaxCollected(bytes32 indexed txhash, uint256 agentId, uint256 amount);
 
     mapping(uint256 agentId => address tba) private _agentTba; // cache to prevent calling AgentNft frequently
-    mapping(bytes32 txhash => TaxHistory history) taxHistory;
-    mapping(uint256 agentId => TaxAmounts amounts) agentTaxAmounts;
+    mapping(bytes32 txhash => TaxHistory history) public taxHistory;
+    mapping(uint256 agentId => TaxAmounts amounts) public agentTaxAmounts;
 
     error TxHashExists(bytes32 txhash);
 

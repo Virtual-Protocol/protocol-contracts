@@ -6,32 +6,42 @@ import "@openzeppelin/contracts/utils/math/Math.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
 import "@openzeppelin/contracts/utils/math/Math.sol";
-import "./IBondingTax.sol";
 import "../pool/IRouter.sol";
+import "../virtualPersona/IAgentNft.sol";
 
-contract BondingTax is
+contract AgentTax is
     Initializable,
-    AccessControlUpgradeable,
-    IBondingTax
+    AccessControlUpgradeable
 {
     using SafeERC20 for IERC20;
+    struct TaxHistory {
+        uint256 agentId;
+        uint256 amount;
+    }
+
+    struct TaxAmounts {
+        uint256 amountCollected;
+        uint256 amountSwapped;
+    }
 
     bytes32 public constant ADMIN_ROLE = keccak256("ADMIN_ROLE");
+    bytes32 public constant EXECUTOR_ROLE = keccak256("EXECUTOR_ROLE");
+
+    uint256 internal constant DENOM = 10000;
 
     address public assetToken;
     address public taxToken;
     IRouter public router;
-    address public bondingRouter;
     address public treasury;
+    uint16 public feeRate;
     uint256 public minSwapThreshold;
     uint256 public maxSwapThreshold;
     uint16 private _slippage;
+    IAgentNft public agentNft;
 
     event SwapParamsUpdated(
         address oldRouter,
         address newRouter,
-        address oldBondingRouter,
-        address newBondingRouter,
         address oldAsset,
         address newAsset
     );
@@ -42,17 +52,23 @@ contract BondingTax is
         uint256 newMaxThreshold
     );
     event TreasuryUpdated(address oldTreasury, address newTreasury);
-    event SwapExecuted(uint256 taxTokenAmount, uint256 assetTokenAmount);
-    event SwapFailed(uint256 taxTokenAmount);
+    event SwapExecuted(
+        uint256 indexed agentId,
+        uint256 taxTokenAmount,
+        uint256 assetTokenAmount
+    );
+    event SwapFailed(uint256 indexed agentId, uint256 taxTokenAmount);
+    event TaxCollected(bytes32 indexed txhash, uint256 agentId, uint256 amount);
+
+    mapping(uint256 agentId => address tba) private _agentTba; // cache to prevent calling AgentNft frequently
+    mapping(bytes32 txhash => TaxHistory history) public taxHistory;
+    mapping(uint256 agentId => TaxAmounts amounts) public agentTaxAmounts;
+
+    error TxHashExists(bytes32 txhash);
 
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() {
         _disableInitializers();
-    }
-
-    modifier onlyBondingRouter() {
-        require(_msgSender() == address(bondingRouter), "Only bonding router");
-        _;
     }
 
     function initialize(
@@ -60,10 +76,10 @@ contract BondingTax is
         address assetToken_,
         address taxToken_,
         address router_,
-        address bondingRouter_,
         address treasury_,
         uint256 minSwapThreshold_,
-        uint256 maxSwapThreshold_
+        uint256 maxSwapThreshold_,
+        address nft_
     ) external initializer {
         __AccessControl_init();
 
@@ -72,40 +88,34 @@ contract BondingTax is
         assetToken = assetToken_;
         taxToken = taxToken_;
         router = IRouter(router_);
-        bondingRouter = bondingRouter_;
         treasury = treasury_;
         minSwapThreshold = minSwapThreshold_;
         maxSwapThreshold = maxSwapThreshold_;
         IERC20(taxToken).forceApprove(router_, type(uint256).max);
+        agentNft = IAgentNft(nft_);
 
         _slippage = 100; // default to 1%
+        feeRate = 100;
     }
 
     function updateSwapParams(
         address router_,
-        address bondingRouter_,
         address assetToken_,
-        uint16 slippage_
+        uint16 slippage_,
+        uint16 feeRate_
     ) public onlyRole(ADMIN_ROLE) {
         address oldRouter = address(router);
-        address oldBondingRouter = bondingRouter;
         address oldAsset = assetToken;
 
         assetToken = assetToken_;
         router = IRouter(router_);
         _slippage = slippage_;
+        feeRate = feeRate_;
 
         IERC20(taxToken).forceApprove(router_, type(uint256).max);
         IERC20(taxToken).forceApprove(oldRouter, 0);
 
-        emit SwapParamsUpdated(
-            oldRouter,
-            router_,
-            oldBondingRouter,
-            bondingRouter_,
-            oldAsset,
-            assetToken_
-        );
+        emit SwapParamsUpdated(oldRouter, router_, oldAsset, assetToken_);
     }
 
     function updateSwapThresholds(
@@ -140,42 +150,88 @@ contract BondingTax is
         );
     }
 
-    function swapForAsset() public onlyBondingRouter returns (bool, uint256) {
-        uint256 amount = IERC20(taxToken).balanceOf(address(this));
+    function handleAgentTaxes(
+        uint256 agentId,
+        bytes32[] memory txhashes,
+        uint256[] memory amounts
+    ) public onlyRole(EXECUTOR_ROLE) {
+        require(txhashes.length == amounts.length, "Unmatched inputs");
+        TaxAmounts storage agentAmounts = agentTaxAmounts[agentId];
+        for (uint i = 0; i < txhashes.length; i++) {
+            bytes32 txhash = txhashes[i];
+            if (taxHistory[txhash].agentId > 0) {
+                revert TxHashExists(txhash);
+            }
+            taxHistory[txhash] = TaxHistory(agentId, amounts[i]);
 
-        require(amount > 0, "Nothing to be swapped");
+            agentAmounts.amountCollected += amounts[i];
+            emit TaxCollected(txhash, agentId, amounts[i]);
+        }
+        swapForAsset(agentId);
+    }
 
-        if (amount < minSwapThreshold) {
+    function _getTba(uint256 agentId) internal returns (address) {
+        address tba = _agentTba[agentId];
+        if (tba == address(0)) {
+            tba = agentNft.virtualInfo(agentId).tba;
+            _agentTba[agentId] = tba;
+        }
+        return tba;
+    }
+
+    function swapForAsset(
+        uint256 agentId
+    ) public onlyRole(EXECUTOR_ROLE) returns (bool, uint256) {
+        TaxAmounts storage agentAmounts = agentTaxAmounts[agentId];
+        uint256 amountToSwap = agentAmounts.amountCollected -
+            agentAmounts.amountSwapped;
+
+        uint256 balance = IERC20(taxToken).balanceOf(address(this));
+
+        require(balance >= amountToSwap, "Insufficient balance");
+
+        address tba = _getTba(agentId);
+        require(tba != address(0), "Agent does not have TBA");
+
+        if (amountToSwap < minSwapThreshold) {
             return (false, 0);
         }
 
-        if (amount > maxSwapThreshold) {
-            amount = maxSwapThreshold;
+        if (amountToSwap > maxSwapThreshold) {
+            amountToSwap = maxSwapThreshold;
         }
 
         address[] memory path = new address[](2);
         path[0] = taxToken;
         path[1] = assetToken;
 
-        uint256[] memory amountsOut = router.getAmountsOut(amount, path);
+        uint256[] memory amountsOut = router.getAmountsOut(amountToSwap, path);
         require(amountsOut.length > 1, "Failed to fetch token price");
 
         uint256 expectedOutput = amountsOut[1];
-        uint256 minOutput = (expectedOutput * (10000 - _slippage)) / 10000;
+        uint256 minOutput = (expectedOutput * (DENOM - _slippage)) / DENOM;
 
         try
             router.swapExactTokensForTokens(
-                amount,
+                amountToSwap,
                 minOutput,
                 path,
-                treasury,
+                address(this),
                 block.timestamp + 300
             )
         returns (uint256[] memory amounts) {
-            emit SwapExecuted(amount, amounts[1]);
+            uint256 assetReceived = amounts[1];
+            emit SwapExecuted(agentId, amountToSwap, assetReceived);
+
+            uint256 feeAmount = (assetReceived * feeRate) / DENOM;
+            IERC20(assetToken).safeTransfer(tba, assetReceived - feeAmount);
+            IERC20(assetToken).safeTransfer(treasury, feeAmount);
+
+            agentAmounts.amountSwapped += amountToSwap;
+
             return (true, amounts[1]);
         } catch {
-            emit SwapFailed(amount);
+            emit SwapFailed(agentId, amountToSwap);
             return (false, 0);
         }
     }

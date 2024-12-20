@@ -9,10 +9,7 @@ import "@openzeppelin/contracts/utils/math/Math.sol";
 import "../pool/IRouter.sol";
 import "../virtualPersona/IAgentNft.sol";
 
-contract AgentTax is
-    Initializable,
-    AccessControlUpgradeable
-{
+contract AgentTax is Initializable, AccessControlUpgradeable {
     using SafeERC20 for IERC20;
     struct TaxHistory {
         uint256 agentId;
@@ -157,17 +154,18 @@ contract AgentTax is
     ) public onlyRole(EXECUTOR_ROLE) {
         require(txhashes.length == amounts.length, "Unmatched inputs");
         TaxAmounts storage agentAmounts = agentTaxAmounts[agentId];
+        uint256 totalAmount = 0;
         for (uint i = 0; i < txhashes.length; i++) {
             bytes32 txhash = txhashes[i];
             if (taxHistory[txhash].agentId > 0) {
                 revert TxHashExists(txhash);
             }
             taxHistory[txhash] = TaxHistory(agentId, amounts[i]);
-
-            agentAmounts.amountCollected += amounts[i];
+            totalAmount += amounts[i];
             emit TaxCollected(txhash, agentId, amounts[i]);
         }
-        swapForAsset(agentId);
+        agentAmounts.amountCollected += totalAmount;
+        _swapForAsset(agentId);
     }
 
     function _getTba(uint256 agentId) internal returns (address) {
@@ -182,6 +180,10 @@ contract AgentTax is
     function swapForAsset(
         uint256 agentId
     ) public onlyRole(EXECUTOR_ROLE) returns (bool, uint256) {
+        return _swapForAsset(agentId);
+    }
+
+    function _swapForAsset(uint256 agentId) internal returns (bool, uint256) {
         TaxAmounts storage agentAmounts = agentTaxAmounts[agentId];
         uint256 amountToSwap = agentAmounts.amountCollected -
             agentAmounts.amountSwapped;

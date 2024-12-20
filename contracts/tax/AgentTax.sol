@@ -33,14 +33,15 @@ contract AgentTax is Initializable, AccessControlUpgradeable {
     uint16 public feeRate;
     uint256 public minSwapThreshold;
     uint256 public maxSwapThreshold;
-    uint16 private _slippage;
     IAgentNft public agentNft;
 
     event SwapParamsUpdated(
         address oldRouter,
         address newRouter,
         address oldAsset,
-        address newAsset
+        address newAsset,
+        uint16 oldFeeRate,
+        uint16 newFeeRate
     );
     event SwapThresholdUpdated(
         uint256 oldMinThreshold,
@@ -91,28 +92,33 @@ contract AgentTax is Initializable, AccessControlUpgradeable {
         IERC20(taxToken).forceApprove(router_, type(uint256).max);
         agentNft = IAgentNft(nft_);
 
-        _slippage = 100; // default to 1%
         feeRate = 100;
     }
 
     function updateSwapParams(
         address router_,
         address assetToken_,
-        uint16 slippage_,
         uint16 feeRate_
     ) public onlyRole(ADMIN_ROLE) {
         address oldRouter = address(router);
         address oldAsset = assetToken;
+        uint16 oldFee = feeRate;
 
         assetToken = assetToken_;
         router = IRouter(router_);
-        _slippage = slippage_;
         feeRate = feeRate_;
 
         IERC20(taxToken).forceApprove(router_, type(uint256).max);
         IERC20(taxToken).forceApprove(oldRouter, 0);
 
-        emit SwapParamsUpdated(oldRouter, router_, oldAsset, assetToken_);
+        emit SwapParamsUpdated(
+            oldRouter,
+            router_,
+            oldAsset,
+            assetToken_,
+            oldFee,
+            feeRate_
+        );
     }
 
     function updateSwapThresholds(
@@ -150,7 +156,8 @@ contract AgentTax is Initializable, AccessControlUpgradeable {
     function handleAgentTaxes(
         uint256 agentId,
         bytes32[] memory txhashes,
-        uint256[] memory amounts
+        uint256[] memory amounts,
+        uint256 minOutput
     ) public onlyRole(EXECUTOR_ROLE) {
         require(txhashes.length == amounts.length, "Unmatched inputs");
         TaxAmounts storage agentAmounts = agentTaxAmounts[agentId];
@@ -165,7 +172,7 @@ contract AgentTax is Initializable, AccessControlUpgradeable {
             emit TaxCollected(txhash, agentId, amounts[i]);
         }
         agentAmounts.amountCollected += totalAmount;
-        _swapForAsset(agentId);
+        _swapForAsset(agentId, minOutput);
     }
 
     function _getTba(uint256 agentId) internal returns (address) {
@@ -178,12 +185,16 @@ contract AgentTax is Initializable, AccessControlUpgradeable {
     }
 
     function swapForAsset(
-        uint256 agentId
+        uint256 agentId,
+        uint256 minOutput
     ) public onlyRole(EXECUTOR_ROLE) returns (bool, uint256) {
-        return _swapForAsset(agentId);
+        return _swapForAsset(agentId, minOutput);
     }
 
-    function _swapForAsset(uint256 agentId) internal returns (bool, uint256) {
+    function _swapForAsset(
+        uint256 agentId,
+        uint256 minOutput
+    ) internal returns (bool, uint256) {
         TaxAmounts storage agentAmounts = agentTaxAmounts[agentId];
         uint256 amountToSwap = agentAmounts.amountCollected -
             agentAmounts.amountSwapped;
@@ -209,9 +220,6 @@ contract AgentTax is Initializable, AccessControlUpgradeable {
 
         uint256[] memory amountsOut = router.getAmountsOut(amountToSwap, path);
         require(amountsOut.length > 1, "Failed to fetch token price");
-
-        uint256 expectedOutput = amountsOut[1];
-        uint256 minOutput = (expectedOutput * (DENOM - _slippage)) / DENOM;
 
         try
             router.swapExactTokensForTokens(

@@ -93,6 +93,7 @@ contract BondingTax is
 
         assetToken = assetToken_;
         router = IRouter(router_);
+        bondingRouter = bondingRouter_;
         _slippage = slippage_;
 
         IERC20(taxToken).forceApprove(router_, type(uint256).max);

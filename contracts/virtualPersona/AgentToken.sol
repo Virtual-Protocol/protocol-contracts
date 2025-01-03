@@ -62,7 +62,6 @@ contract AgentToken is
     /** @dev {_liquidityPools} Enumerable set for liquidity pool addresses */
     EnumerableSet.AddressSet private _liquidityPools;
 
-
     IAgentFactory private _factory; // Single source of truth
 
     /**
@@ -221,13 +220,19 @@ contract AgentToken is
      * @return uniswapV2Pair_ The pair address
      */
     function _createPair() internal returns (address uniswapV2Pair_) {
-        uniswapV2Pair_ = IUniswapV2Factory(_uniswapRouter.factory()).createPair(
-                address(this),
-                pairToken
-            );
+        uniswapV2Pair_ = IUniswapV2Factory(_uniswapRouter.factory()).getPair(
+            address(this),
+            pairToken
+        );
+
+        if (uniswapV2Pair_ == address(0)) {
+            uniswapV2Pair_ = IUniswapV2Factory(_uniswapRouter.factory())
+                .createPair(address(this), pairToken);
+
+            emit LiquidityPoolCreated(uniswapV2Pair_);
+        }
 
         _liquidityPools.add(uniswapV2Pair_);
-        emit LiquidityPoolCreated(uniswapV2Pair_);
 
         return (uniswapV2Pair_);
     }

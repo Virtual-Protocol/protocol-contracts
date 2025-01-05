@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
-import "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/utils/math/Math.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
@@ -13,20 +12,19 @@ import "../pool/IRouter.sol";
 contract BondingTax is
     Initializable,
     AccessControlUpgradeable,
-    ReentrancyGuardUpgradeable,
     IBondingTax
 {
     using SafeERC20 for IERC20;
 
     bytes32 public constant ADMIN_ROLE = keccak256("ADMIN_ROLE");
 
-    address assetToken;
-    address taxToken;
-    IRouter router;
-    address bondingRouter;
-    address treasury;
-    uint256 minSwapThreshold;
-    uint256 maxSwapThreshold;
+    address public assetToken;
+    address public taxToken;
+    IRouter public router;
+    address public bondingRouter;
+    address public treasury;
+    uint256 public minSwapThreshold;
+    uint256 public maxSwapThreshold;
     uint16 private _slippage;
 
     event SwapParamsUpdated(
@@ -68,7 +66,6 @@ contract BondingTax is
         uint256 maxSwapThreshold_
     ) external initializer {
         __AccessControl_init();
-        __ReentrancyGuard_init();
 
         _grantRole(ADMIN_ROLE, defaultAdmin_);
         _grantRole(DEFAULT_ADMIN_ROLE, defaultAdmin_);
@@ -156,7 +153,7 @@ contract BondingTax is
             amount = maxSwapThreshold;
         }
 
-        address[] memory path;
+        address[] memory path = new address[](2);
         path[0] = taxToken;
         path[1] = assetToken;
 

@@ -17424,6 +17424,1218 @@
           ]
         }
       }
+    },
+    "fd80dcfcf903798bff3114f5430ac61594f110d61861ac3bec1baebee2b00a41": {
+      "address": "0x26aBd5DA86D1AE0455B5055464f2295Aa82DcA6A",
+      "txHash": "0x4fe30cde3d0bc6ec3edcdc100ed063fb0a3b9646c46e381ecda31fafe77e658d",
+      "layout": {
+        "solcVersion": "0.8.20",
+        "storage": [
+          {
+            "label": "assetToken",
+            "offset": 0,
+            "slot": "0",
+            "type": "t_address",
+            "contract": "AgentTax",
+            "src": "contracts/tax/AgentTax.sol:29"
+          },
+          {
+            "label": "taxToken",
+            "offset": 0,
+            "slot": "1",
+            "type": "t_address",
+            "contract": "AgentTax",
+            "src": "contracts/tax/AgentTax.sol:30"
+          },
+          {
+            "label": "router",
+            "offset": 0,
+            "slot": "2",
+            "type": "t_contract(IRouter)2539",
+            "contract": "AgentTax",
+            "src": "contracts/tax/AgentTax.sol:31"
+          },
+          {
+            "label": "treasury",
+            "offset": 0,
+            "slot": "3",
+            "type": "t_address",
+            "contract": "AgentTax",
+            "src": "contracts/tax/AgentTax.sol:32"
+          },
+          {
+            "label": "feeRate",
+            "offset": 20,
+            "slot": "3",
+            "type": "t_uint16",
+            "contract": "AgentTax",
+            "src": "contracts/tax/AgentTax.sol:33"
+          },
+          {
+            "label": "minSwapThreshold",
+            "offset": 0,
+            "slot": "4",
+            "type": "t_uint256",
+            "contract": "AgentTax",
+            "src": "contracts/tax/AgentTax.sol:34"
+          },
+          {
+            "label": "maxSwapThreshold",
+            "offset": 0,
+            "slot": "5",
+            "type": "t_uint256",
+            "contract": "AgentTax",
+            "src": "contracts/tax/AgentTax.sol:35"
+          },
+          {
+            "label": "agentNft",
+            "offset": 0,
+            "slot": "6",
+            "type": "t_contract(IAgentNft)3609",
+            "contract": "AgentTax",
+            "src": "contracts/tax/AgentTax.sol:36"
+          },
+          {
+            "label": "_agentTba",
+            "offset": 0,
+            "slot": "7",
+            "type": "t_mapping(t_uint256,t_address)",
+            "contract": "AgentTax",
+            "src": "contracts/tax/AgentTax.sol:61"
+          },
+          {
+            "label": "taxHistory",
+            "offset": 0,
+            "slot": "8",
+            "type": "t_mapping(t_bytes32,t_struct(TaxHistory)2562_storage)",
+            "contract": "AgentTax",
+            "src": "contracts/tax/AgentTax.sol:62"
+          },
+          {
+            "label": "agentTaxAmounts",
+            "offset": 0,
+            "slot": "9",
+            "type": "t_mapping(t_uint256,t_struct(TaxAmounts)2567_storage)",
+            "contract": "AgentTax",
+            "src": "contracts/tax/AgentTax.sol:63"
+          },
+          {
+            "label": "_agentRecipients",
+            "offset": 0,
+            "slot": "10",
+            "type": "t_mapping(t_uint256,t_struct(TaxRecipient)2673_storage)",
+            "contract": "AgentTax",
+            "src": "contracts/tax/AgentTax.sol:72"
+          },
+          {
+            "label": "creatorFeeRate",
+            "offset": 0,
+            "slot": "11",
+            "type": "t_uint16",
+            "contract": "AgentTax",
+            "src": "contracts/tax/AgentTax.sol:73"
+          }
+        ],
+        "types": {
+          "t_address": {
+            "label": "address",
+            "numberOfBytes": "20"
+          },
+          "t_bool": {
+            "label": "bool",
+            "numberOfBytes": "1"
+          },
+          "t_bytes32": {
+            "label": "bytes32",
+            "numberOfBytes": "32"
+          },
+          "t_mapping(t_address,t_bool)": {
+            "label": "mapping(address => bool)",
+            "numberOfBytes": "32"
+          },
+          "t_mapping(t_bytes32,t_struct(RoleData)25_storage)": {
+            "label": "mapping(bytes32 => struct AccessControlUpgradeable.RoleData)",
+            "numberOfBytes": "32"
+          },
+          "t_struct(AccessControlStorage)34_storage": {
+            "label": "struct AccessControlUpgradeable.AccessControlStorage",
+            "members": [
+              {
+                "label": "_roles",
+                "type": "t_mapping(t_bytes32,t_struct(RoleData)25_storage)",
+                "offset": 0,
+                "slot": "0"
+              }
+            ],
+            "numberOfBytes": "32"
+          },
+          "t_struct(InitializableStorage)93_storage": {
+            "label": "struct Initializable.InitializableStorage",
+            "members": [
+              {
+                "label": "_initialized",
+                "type": "t_uint64",
+                "offset": 0,
+                "slot": "0"
+              },
+              {
+                "label": "_initializing",
+                "type": "t_bool",
+                "offset": 8,
+                "slot": "0"
+              }
+            ],
+            "numberOfBytes": "32"
+          },
+          "t_struct(RoleData)25_storage": {
+            "label": "struct AccessControlUpgradeable.RoleData",
+            "members": [
+              {
+                "label": "hasRole",
+                "type": "t_mapping(t_address,t_bool)",
+                "offset": 0,
+                "slot": "0"
+              },
+              {
+                "label": "adminRole",
+                "type": "t_bytes32",
+                "offset": 0,
+                "slot": "1"
+              }
+            ],
+            "numberOfBytes": "64"
+          },
+          "t_uint64": {
+            "label": "uint64",
+            "numberOfBytes": "8"
+          },
+          "t_contract(IAgentNft)3609": {
+            "label": "contract IAgentNft",
+            "numberOfBytes": "20"
+          },
+          "t_contract(IRouter)2539": {
+            "label": "contract IRouter",
+            "numberOfBytes": "20"
+          },
+          "t_mapping(t_bytes32,t_struct(TaxHistory)2562_storage)": {
+            "label": "mapping(bytes32 => struct AgentTax.TaxHistory)",
+            "numberOfBytes": "32"
+          },
+          "t_mapping(t_uint256,t_address)": {
+            "label": "mapping(uint256 => address)",
+            "numberOfBytes": "32"
+          },
+          "t_mapping(t_uint256,t_struct(TaxAmounts)2567_storage)": {
+            "label": "mapping(uint256 => struct AgentTax.TaxAmounts)",
+            "numberOfBytes": "32"
+          },
+          "t_mapping(t_uint256,t_struct(TaxRecipient)2673_storage)": {
+            "label": "mapping(uint256 => struct AgentTax.TaxRecipient)",
+            "numberOfBytes": "32"
+          },
+          "t_struct(TaxAmounts)2567_storage": {
+            "label": "struct AgentTax.TaxAmounts",
+            "members": [
+              {
+                "label": "amountCollected",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "0"
+              },
+              {
+                "label": "amountSwapped",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "1"
+              }
+            ],
+            "numberOfBytes": "64"
+          },
+          "t_struct(TaxHistory)2562_storage": {
+            "label": "struct AgentTax.TaxHistory",
+            "members": [
+              {
+                "label": "agentId",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "0"
+              },
+              {
+                "label": "amount",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "1"
+              }
+            ],
+            "numberOfBytes": "64"
+          },
+          "t_struct(TaxRecipient)2673_storage": {
+            "label": "struct AgentTax.TaxRecipient",
+            "members": [
+              {
+                "label": "tba",
+                "type": "t_address",
+                "offset": 0,
+                "slot": "0"
+              },
+              {
+                "label": "creator",
+                "type": "t_address",
+                "offset": 0,
+                "slot": "1"
+              }
+            ],
+            "numberOfBytes": "64"
+          },
+          "t_uint16": {
+            "label": "uint16",
+            "numberOfBytes": "2"
+          },
+          "t_uint256": {
+            "label": "uint256",
+            "numberOfBytes": "32"
+          }
+        },
+        "namespaces": {
+          "erc7201:openzeppelin.storage.AccessControl": [
+            {
+              "contract": "AccessControlUpgradeable",
+              "label": "_roles",
+              "type": "t_mapping(t_bytes32,t_struct(RoleData)25_storage)",
+              "src": "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol:61",
+              "offset": 0,
+              "slot": "0"
+            }
+          ],
+          "erc7201:openzeppelin.storage.Initializable": [
+            {
+              "contract": "Initializable",
+              "label": "_initialized",
+              "type": "t_uint64",
+              "src": "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol:69",
+              "offset": 0,
+              "slot": "0"
+            },
+            {
+              "contract": "Initializable",
+              "label": "_initializing",
+              "type": "t_bool",
+              "src": "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol:73",
+              "offset": 8,
+              "slot": "0"
+            }
+          ]
+        }
+      }
+    },
+    "254698df2316ba3767a34732deb65f36352057b9fcbdda9fe7ae95f8232d3f25": {
+      "address": "0x3dB25680D003318594c119c2d5b3DbA2b62c552f",
+      "txHash": "0x952e50e9207b05451bc7684b29b25cd2aefa38b44b2a69372fe29612e337cbe6",
+      "layout": {
+        "solcVersion": "0.8.20",
+        "storage": [
+          {
+            "label": "assetToken",
+            "offset": 0,
+            "slot": "0",
+            "type": "t_address",
+            "contract": "AgentTax",
+            "src": "contracts/tax/AgentTax.sol:29"
+          },
+          {
+            "label": "taxToken",
+            "offset": 0,
+            "slot": "1",
+            "type": "t_address",
+            "contract": "AgentTax",
+            "src": "contracts/tax/AgentTax.sol:30"
+          },
+          {
+            "label": "router",
+            "offset": 0,
+            "slot": "2",
+            "type": "t_contract(IRouter)2539",
+            "contract": "AgentTax",
+            "src": "contracts/tax/AgentTax.sol:31"
+          },
+          {
+            "label": "treasury",
+            "offset": 0,
+            "slot": "3",
+            "type": "t_address",
+            "contract": "AgentTax",
+            "src": "contracts/tax/AgentTax.sol:32"
+          },
+          {
+            "label": "feeRate",
+            "offset": 20,
+            "slot": "3",
+            "type": "t_uint16",
+            "contract": "AgentTax",
+            "src": "contracts/tax/AgentTax.sol:33"
+          },
+          {
+            "label": "minSwapThreshold",
+            "offset": 0,
+            "slot": "4",
+            "type": "t_uint256",
+            "contract": "AgentTax",
+            "src": "contracts/tax/AgentTax.sol:34"
+          },
+          {
+            "label": "maxSwapThreshold",
+            "offset": 0,
+            "slot": "5",
+            "type": "t_uint256",
+            "contract": "AgentTax",
+            "src": "contracts/tax/AgentTax.sol:35"
+          },
+          {
+            "label": "agentNft",
+            "offset": 0,
+            "slot": "6",
+            "type": "t_contract(IAgentNft)3755",
+            "contract": "AgentTax",
+            "src": "contracts/tax/AgentTax.sol:36"
+          },
+          {
+            "label": "_agentTba",
+            "offset": 0,
+            "slot": "7",
+            "type": "t_mapping(t_uint256,t_address)",
+            "contract": "AgentTax",
+            "src": "contracts/tax/AgentTax.sol:61"
+          },
+          {
+            "label": "taxHistory",
+            "offset": 0,
+            "slot": "8",
+            "type": "t_mapping(t_bytes32,t_struct(TaxHistory)2562_storage)",
+            "contract": "AgentTax",
+            "src": "contracts/tax/AgentTax.sol:62"
+          },
+          {
+            "label": "agentTaxAmounts",
+            "offset": 0,
+            "slot": "9",
+            "type": "t_mapping(t_uint256,t_struct(TaxAmounts)2567_storage)",
+            "contract": "AgentTax",
+            "src": "contracts/tax/AgentTax.sol:63"
+          },
+          {
+            "label": "_agentRecipients",
+            "offset": 0,
+            "slot": "10",
+            "type": "t_mapping(t_uint256,t_struct(TaxRecipient)2673_storage)",
+            "contract": "AgentTax",
+            "src": "contracts/tax/AgentTax.sol:72"
+          },
+          {
+            "label": "creatorFeeRate",
+            "offset": 0,
+            "slot": "11",
+            "type": "t_uint16",
+            "contract": "AgentTax",
+            "src": "contracts/tax/AgentTax.sol:73"
+          }
+        ],
+        "types": {
+          "t_address": {
+            "label": "address",
+            "numberOfBytes": "20"
+          },
+          "t_bool": {
+            "label": "bool",
+            "numberOfBytes": "1"
+          },
+          "t_bytes32": {
+            "label": "bytes32",
+            "numberOfBytes": "32"
+          },
+          "t_mapping(t_address,t_bool)": {
+            "label": "mapping(address => bool)",
+            "numberOfBytes": "32"
+          },
+          "t_mapping(t_bytes32,t_struct(RoleData)25_storage)": {
+            "label": "mapping(bytes32 => struct AccessControlUpgradeable.RoleData)",
+            "numberOfBytes": "32"
+          },
+          "t_struct(AccessControlStorage)34_storage": {
+            "label": "struct AccessControlUpgradeable.AccessControlStorage",
+            "members": [
+              {
+                "label": "_roles",
+                "type": "t_mapping(t_bytes32,t_struct(RoleData)25_storage)",
+                "offset": 0,
+                "slot": "0"
+              }
+            ],
+            "numberOfBytes": "32"
+          },
+          "t_struct(InitializableStorage)93_storage": {
+            "label": "struct Initializable.InitializableStorage",
+            "members": [
+              {
+                "label": "_initialized",
+                "type": "t_uint64",
+                "offset": 0,
+                "slot": "0"
+              },
+              {
+                "label": "_initializing",
+                "type": "t_bool",
+                "offset": 8,
+                "slot": "0"
+              }
+            ],
+            "numberOfBytes": "32"
+          },
+          "t_struct(RoleData)25_storage": {
+            "label": "struct AccessControlUpgradeable.RoleData",
+            "members": [
+              {
+                "label": "hasRole",
+                "type": "t_mapping(t_address,t_bool)",
+                "offset": 0,
+                "slot": "0"
+              },
+              {
+                "label": "adminRole",
+                "type": "t_bytes32",
+                "offset": 0,
+                "slot": "1"
+              }
+            ],
+            "numberOfBytes": "64"
+          },
+          "t_uint64": {
+            "label": "uint64",
+            "numberOfBytes": "8"
+          },
+          "t_contract(IAgentNft)3755": {
+            "label": "contract IAgentNft",
+            "numberOfBytes": "20"
+          },
+          "t_contract(IRouter)2539": {
+            "label": "contract IRouter",
+            "numberOfBytes": "20"
+          },
+          "t_mapping(t_bytes32,t_struct(TaxHistory)2562_storage)": {
+            "label": "mapping(bytes32 => struct AgentTax.TaxHistory)",
+            "numberOfBytes": "32"
+          },
+          "t_mapping(t_uint256,t_address)": {
+            "label": "mapping(uint256 => address)",
+            "numberOfBytes": "32"
+          },
+          "t_mapping(t_uint256,t_struct(TaxAmounts)2567_storage)": {
+            "label": "mapping(uint256 => struct AgentTax.TaxAmounts)",
+            "numberOfBytes": "32"
+          },
+          "t_mapping(t_uint256,t_struct(TaxRecipient)2673_storage)": {
+            "label": "mapping(uint256 => struct AgentTax.TaxRecipient)",
+            "numberOfBytes": "32"
+          },
+          "t_struct(TaxAmounts)2567_storage": {
+            "label": "struct AgentTax.TaxAmounts",
+            "members": [
+              {
+                "label": "amountCollected",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "0"
+              },
+              {
+                "label": "amountSwapped",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "1"
+              }
+            ],
+            "numberOfBytes": "64"
+          },
+          "t_struct(TaxHistory)2562_storage": {
+            "label": "struct AgentTax.TaxHistory",
+            "members": [
+              {
+                "label": "agentId",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "0"
+              },
+              {
+                "label": "amount",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "1"
+              }
+            ],
+            "numberOfBytes": "64"
+          },
+          "t_struct(TaxRecipient)2673_storage": {
+            "label": "struct AgentTax.TaxRecipient",
+            "members": [
+              {
+                "label": "tba",
+                "type": "t_address",
+                "offset": 0,
+                "slot": "0"
+              },
+              {
+                "label": "creator",
+                "type": "t_address",
+                "offset": 0,
+                "slot": "1"
+              }
+            ],
+            "numberOfBytes": "64"
+          },
+          "t_uint16": {
+            "label": "uint16",
+            "numberOfBytes": "2"
+          },
+          "t_uint256": {
+            "label": "uint256",
+            "numberOfBytes": "32"
+          }
+        },
+        "namespaces": {
+          "erc7201:openzeppelin.storage.AccessControl": [
+            {
+              "contract": "AccessControlUpgradeable",
+              "label": "_roles",
+              "type": "t_mapping(t_bytes32,t_struct(RoleData)25_storage)",
+              "src": "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol:61",
+              "offset": 0,
+              "slot": "0"
+            }
+          ],
+          "erc7201:openzeppelin.storage.Initializable": [
+            {
+              "contract": "Initializable",
+              "label": "_initialized",
+              "type": "t_uint64",
+              "src": "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol:69",
+              "offset": 0,
+              "slot": "0"
+            },
+            {
+              "contract": "Initializable",
+              "label": "_initializing",
+              "type": "t_bool",
+              "src": "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol:73",
+              "offset": 8,
+              "slot": "0"
+            }
+          ]
+        }
+      }
+    },
+    "af0a061018c91446e86a04ae44bdb41a0986c076910588f183b029bfeb06e231": {
+      "address": "0xCF2D70F9302F5Bc74958e66341Cb159320fa9317",
+      "txHash": "0x251f9d0e54fec96b1c147157f0522db20da05987f6e307f99f8f4307df1c11c2",
+      "layout": {
+        "solcVersion": "0.8.20",
+        "storage": [
+          {
+            "label": "assetToken",
+            "offset": 0,
+            "slot": "0",
+            "type": "t_address",
+            "contract": "AgentTax",
+            "src": "contracts/tax/AgentTax.sol:29"
+          },
+          {
+            "label": "taxToken",
+            "offset": 0,
+            "slot": "1",
+            "type": "t_address",
+            "contract": "AgentTax",
+            "src": "contracts/tax/AgentTax.sol:30"
+          },
+          {
+            "label": "router",
+            "offset": 0,
+            "slot": "2",
+            "type": "t_contract(IRouter)2539",
+            "contract": "AgentTax",
+            "src": "contracts/tax/AgentTax.sol:31"
+          },
+          {
+            "label": "treasury",
+            "offset": 0,
+            "slot": "3",
+            "type": "t_address",
+            "contract": "AgentTax",
+            "src": "contracts/tax/AgentTax.sol:32"
+          },
+          {
+            "label": "feeRate",
+            "offset": 20,
+            "slot": "3",
+            "type": "t_uint16",
+            "contract": "AgentTax",
+            "src": "contracts/tax/AgentTax.sol:33"
+          },
+          {
+            "label": "minSwapThreshold",
+            "offset": 0,
+            "slot": "4",
+            "type": "t_uint256",
+            "contract": "AgentTax",
+            "src": "contracts/tax/AgentTax.sol:34"
+          },
+          {
+            "label": "maxSwapThreshold",
+            "offset": 0,
+            "slot": "5",
+            "type": "t_uint256",
+            "contract": "AgentTax",
+            "src": "contracts/tax/AgentTax.sol:35"
+          },
+          {
+            "label": "agentNft",
+            "offset": 0,
+            "slot": "6",
+            "type": "t_contract(IAgentNft)3755",
+            "contract": "AgentTax",
+            "src": "contracts/tax/AgentTax.sol:36"
+          },
+          {
+            "label": "_agentTba",
+            "offset": 0,
+            "slot": "7",
+            "type": "t_mapping(t_uint256,t_address)",
+            "contract": "AgentTax",
+            "src": "contracts/tax/AgentTax.sol:61"
+          },
+          {
+            "label": "taxHistory",
+            "offset": 0,
+            "slot": "8",
+            "type": "t_mapping(t_bytes32,t_struct(TaxHistory)2562_storage)",
+            "contract": "AgentTax",
+            "src": "contracts/tax/AgentTax.sol:62"
+          },
+          {
+            "label": "agentTaxAmounts",
+            "offset": 0,
+            "slot": "9",
+            "type": "t_mapping(t_uint256,t_struct(TaxAmounts)2567_storage)",
+            "contract": "AgentTax",
+            "src": "contracts/tax/AgentTax.sol:63"
+          },
+          {
+            "label": "_agentRecipients",
+            "offset": 0,
+            "slot": "10",
+            "type": "t_mapping(t_uint256,t_struct(TaxRecipient)2673_storage)",
+            "contract": "AgentTax",
+            "src": "contracts/tax/AgentTax.sol:72"
+          },
+          {
+            "label": "creatorFeeRate",
+            "offset": 0,
+            "slot": "11",
+            "type": "t_uint16",
+            "contract": "AgentTax",
+            "src": "contracts/tax/AgentTax.sol:73"
+          }
+        ],
+        "types": {
+          "t_address": {
+            "label": "address",
+            "numberOfBytes": "20"
+          },
+          "t_bool": {
+            "label": "bool",
+            "numberOfBytes": "1"
+          },
+          "t_bytes32": {
+            "label": "bytes32",
+            "numberOfBytes": "32"
+          },
+          "t_mapping(t_address,t_bool)": {
+            "label": "mapping(address => bool)",
+            "numberOfBytes": "32"
+          },
+          "t_mapping(t_bytes32,t_struct(RoleData)25_storage)": {
+            "label": "mapping(bytes32 => struct AccessControlUpgradeable.RoleData)",
+            "numberOfBytes": "32"
+          },
+          "t_struct(AccessControlStorage)34_storage": {
+            "label": "struct AccessControlUpgradeable.AccessControlStorage",
+            "members": [
+              {
+                "label": "_roles",
+                "type": "t_mapping(t_bytes32,t_struct(RoleData)25_storage)",
+                "offset": 0,
+                "slot": "0"
+              }
+            ],
+            "numberOfBytes": "32"
+          },
+          "t_struct(InitializableStorage)93_storage": {
+            "label": "struct Initializable.InitializableStorage",
+            "members": [
+              {
+                "label": "_initialized",
+                "type": "t_uint64",
+                "offset": 0,
+                "slot": "0"
+              },
+              {
+                "label": "_initializing",
+                "type": "t_bool",
+                "offset": 8,
+                "slot": "0"
+              }
+            ],
+            "numberOfBytes": "32"
+          },
+          "t_struct(RoleData)25_storage": {
+            "label": "struct AccessControlUpgradeable.RoleData",
+            "members": [
+              {
+                "label": "hasRole",
+                "type": "t_mapping(t_address,t_bool)",
+                "offset": 0,
+                "slot": "0"
+              },
+              {
+                "label": "adminRole",
+                "type": "t_bytes32",
+                "offset": 0,
+                "slot": "1"
+              }
+            ],
+            "numberOfBytes": "64"
+          },
+          "t_uint64": {
+            "label": "uint64",
+            "numberOfBytes": "8"
+          },
+          "t_contract(IAgentNft)3755": {
+            "label": "contract IAgentNft",
+            "numberOfBytes": "20"
+          },
+          "t_contract(IRouter)2539": {
+            "label": "contract IRouter",
+            "numberOfBytes": "20"
+          },
+          "t_mapping(t_bytes32,t_struct(TaxHistory)2562_storage)": {
+            "label": "mapping(bytes32 => struct AgentTax.TaxHistory)",
+            "numberOfBytes": "32"
+          },
+          "t_mapping(t_uint256,t_address)": {
+            "label": "mapping(uint256 => address)",
+            "numberOfBytes": "32"
+          },
+          "t_mapping(t_uint256,t_struct(TaxAmounts)2567_storage)": {
+            "label": "mapping(uint256 => struct AgentTax.TaxAmounts)",
+            "numberOfBytes": "32"
+          },
+          "t_mapping(t_uint256,t_struct(TaxRecipient)2673_storage)": {
+            "label": "mapping(uint256 => struct AgentTax.TaxRecipient)",
+            "numberOfBytes": "32"
+          },
+          "t_struct(TaxAmounts)2567_storage": {
+            "label": "struct AgentTax.TaxAmounts",
+            "members": [
+              {
+                "label": "amountCollected",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "0"
+              },
+              {
+                "label": "amountSwapped",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "1"
+              }
+            ],
+            "numberOfBytes": "64"
+          },
+          "t_struct(TaxHistory)2562_storage": {
+            "label": "struct AgentTax.TaxHistory",
+            "members": [
+              {
+                "label": "agentId",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "0"
+              },
+              {
+                "label": "amount",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "1"
+              }
+            ],
+            "numberOfBytes": "64"
+          },
+          "t_struct(TaxRecipient)2673_storage": {
+            "label": "struct AgentTax.TaxRecipient",
+            "members": [
+              {
+                "label": "tba",
+                "type": "t_address",
+                "offset": 0,
+                "slot": "0"
+              },
+              {
+                "label": "creator",
+                "type": "t_address",
+                "offset": 0,
+                "slot": "1"
+              }
+            ],
+            "numberOfBytes": "64"
+          },
+          "t_uint16": {
+            "label": "uint16",
+            "numberOfBytes": "2"
+          },
+          "t_uint256": {
+            "label": "uint256",
+            "numberOfBytes": "32"
+          }
+        },
+        "namespaces": {
+          "erc7201:openzeppelin.storage.AccessControl": [
+            {
+              "contract": "AccessControlUpgradeable",
+              "label": "_roles",
+              "type": "t_mapping(t_bytes32,t_struct(RoleData)25_storage)",
+              "src": "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol:61",
+              "offset": 0,
+              "slot": "0"
+            }
+          ],
+          "erc7201:openzeppelin.storage.Initializable": [
+            {
+              "contract": "Initializable",
+              "label": "_initialized",
+              "type": "t_uint64",
+              "src": "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol:69",
+              "offset": 0,
+              "slot": "0"
+            },
+            {
+              "contract": "Initializable",
+              "label": "_initializing",
+              "type": "t_bool",
+              "src": "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol:73",
+              "offset": 8,
+              "slot": "0"
+            }
+          ]
+        }
+      }
+    },
+    "dd782abc2d6fbe8e704c78c23e012e3fe77efdcfa89e5306a85884f876071186": {
+      "address": "0xe2f4c457522f7850d6D5D39C3Ef6cB25C53DfaDC",
+      "txHash": "0x8c2f9dcac62f3721a43e3987024554538440b07efb2913faf044bab57a5e48f2",
+      "layout": {
+        "solcVersion": "0.8.20",
+        "storage": [
+          {
+            "label": "assetToken",
+            "offset": 0,
+            "slot": "0",
+            "type": "t_address",
+            "contract": "AgentTax",
+            "src": "contracts/tax/AgentTax.sol:29"
+          },
+          {
+            "label": "taxToken",
+            "offset": 0,
+            "slot": "1",
+            "type": "t_address",
+            "contract": "AgentTax",
+            "src": "contracts/tax/AgentTax.sol:30"
+          },
+          {
+            "label": "router",
+            "offset": 0,
+            "slot": "2",
+            "type": "t_contract(IRouter)2539",
+            "contract": "AgentTax",
+            "src": "contracts/tax/AgentTax.sol:31"
+          },
+          {
+            "label": "treasury",
+            "offset": 0,
+            "slot": "3",
+            "type": "t_address",
+            "contract": "AgentTax",
+            "src": "contracts/tax/AgentTax.sol:32"
+          },
+          {
+            "label": "feeRate",
+            "offset": 20,
+            "slot": "3",
+            "type": "t_uint16",
+            "contract": "AgentTax",
+            "src": "contracts/tax/AgentTax.sol:33"
+          },
+          {
+            "label": "minSwapThreshold",
+            "offset": 0,
+            "slot": "4",
+            "type": "t_uint256",
+            "contract": "AgentTax",
+            "src": "contracts/tax/AgentTax.sol:34"
+          },
+          {
+            "label": "maxSwapThreshold",
+            "offset": 0,
+            "slot": "5",
+            "type": "t_uint256",
+            "contract": "AgentTax",
+            "src": "contracts/tax/AgentTax.sol:35"
+          },
+          {
+            "label": "agentNft",
+            "offset": 0,
+            "slot": "6",
+            "type": "t_contract(IAgentNft)3621",
+            "contract": "AgentTax",
+            "src": "contracts/tax/AgentTax.sol:36"
+          },
+          {
+            "label": "_agentTba",
+            "offset": 0,
+            "slot": "7",
+            "type": "t_mapping(t_uint256,t_address)",
+            "contract": "AgentTax",
+            "src": "contracts/tax/AgentTax.sol:61"
+          },
+          {
+            "label": "taxHistory",
+            "offset": 0,
+            "slot": "8",
+            "type": "t_mapping(t_bytes32,t_struct(TaxHistory)2562_storage)",
+            "contract": "AgentTax",
+            "src": "contracts/tax/AgentTax.sol:62"
+          },
+          {
+            "label": "agentTaxAmounts",
+            "offset": 0,
+            "slot": "9",
+            "type": "t_mapping(t_uint256,t_struct(TaxAmounts)2567_storage)",
+            "contract": "AgentTax",
+            "src": "contracts/tax/AgentTax.sol:63"
+          },
+          {
+            "label": "_agentRecipients",
+            "offset": 0,
+            "slot": "10",
+            "type": "t_mapping(t_uint256,t_struct(TaxRecipient)2673_storage)",
+            "contract": "AgentTax",
+            "src": "contracts/tax/AgentTax.sol:72"
+          },
+          {
+            "label": "creatorFeeRate",
+            "offset": 0,
+            "slot": "11",
+            "type": "t_uint16",
+            "contract": "AgentTax",
+            "src": "contracts/tax/AgentTax.sol:73"
+          }
+        ],
+        "types": {
+          "t_address": {
+            "label": "address",
+            "numberOfBytes": "20"
+          },
+          "t_bool": {
+            "label": "bool",
+            "numberOfBytes": "1"
+          },
+          "t_bytes32": {
+            "label": "bytes32",
+            "numberOfBytes": "32"
+          },
+          "t_mapping(t_address,t_bool)": {
+            "label": "mapping(address => bool)",
+            "numberOfBytes": "32"
+          },
+          "t_mapping(t_bytes32,t_struct(RoleData)25_storage)": {
+            "label": "mapping(bytes32 => struct AccessControlUpgradeable.RoleData)",
+            "numberOfBytes": "32"
+          },
+          "t_struct(AccessControlStorage)34_storage": {
+            "label": "struct AccessControlUpgradeable.AccessControlStorage",
+            "members": [
+              {
+                "label": "_roles",
+                "type": "t_mapping(t_bytes32,t_struct(RoleData)25_storage)",
+                "offset": 0,
+                "slot": "0"
+              }
+            ],
+            "numberOfBytes": "32"
+          },
+          "t_struct(InitializableStorage)93_storage": {
+            "label": "struct Initializable.InitializableStorage",
+            "members": [
+              {
+                "label": "_initialized",
+                "type": "t_uint64",
+                "offset": 0,
+                "slot": "0"
+              },
+              {
+                "label": "_initializing",
+                "type": "t_bool",
+                "offset": 8,
+                "slot": "0"
+              }
+            ],
+            "numberOfBytes": "32"
+          },
+          "t_struct(RoleData)25_storage": {
+            "label": "struct AccessControlUpgradeable.RoleData",
+            "members": [
+              {
+                "label": "hasRole",
+                "type": "t_mapping(t_address,t_bool)",
+                "offset": 0,
+                "slot": "0"
+              },
+              {
+                "label": "adminRole",
+                "type": "t_bytes32",
+                "offset": 0,
+                "slot": "1"
+              }
+            ],
+            "numberOfBytes": "64"
+          },
+          "t_uint64": {
+            "label": "uint64",
+            "numberOfBytes": "8"
+          },
+          "t_contract(IAgentNft)3621": {
+            "label": "contract IAgentNft",
+            "numberOfBytes": "20"
+          },
+          "t_contract(IRouter)2539": {
+            "label": "contract IRouter",
+            "numberOfBytes": "20"
+          },
+          "t_mapping(t_bytes32,t_struct(TaxHistory)2562_storage)": {
+            "label": "mapping(bytes32 => struct AgentTax.TaxHistory)",
+            "numberOfBytes": "32"
+          },
+          "t_mapping(t_uint256,t_address)": {
+            "label": "mapping(uint256 => address)",
+            "numberOfBytes": "32"
+          },
+          "t_mapping(t_uint256,t_struct(TaxAmounts)2567_storage)": {
+            "label": "mapping(uint256 => struct AgentTax.TaxAmounts)",
+            "numberOfBytes": "32"
+          },
+          "t_mapping(t_uint256,t_struct(TaxRecipient)2673_storage)": {
+            "label": "mapping(uint256 => struct AgentTax.TaxRecipient)",
+            "numberOfBytes": "32"
+          },
+          "t_struct(TaxAmounts)2567_storage": {
+            "label": "struct AgentTax.TaxAmounts",
+            "members": [
+              {
+                "label": "amountCollected",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "0"
+              },
+              {
+                "label": "amountSwapped",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "1"
+              }
+            ],
+            "numberOfBytes": "64"
+          },
+          "t_struct(TaxHistory)2562_storage": {
+            "label": "struct AgentTax.TaxHistory",
+            "members": [
+              {
+                "label": "agentId",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "0"
+              },
+              {
+                "label": "amount",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "1"
+              }
+            ],
+            "numberOfBytes": "64"
+          },
+          "t_struct(TaxRecipient)2673_storage": {
+            "label": "struct AgentTax.TaxRecipient",
+            "members": [
+              {
+                "label": "tba",
+                "type": "t_address",
+                "offset": 0,
+                "slot": "0"
+              },
+              {
+                "label": "creator",
+                "type": "t_address",
+                "offset": 0,
+                "slot": "1"
+              }
+            ],
+            "numberOfBytes": "64"
+          },
+          "t_uint16": {
+            "label": "uint16",
+            "numberOfBytes": "2"
+          },
+          "t_uint256": {
+            "label": "uint256",
+            "numberOfBytes": "32"
+          }
+        },
+        "namespaces": {
+          "erc7201:openzeppelin.storage.AccessControl": [
+            {
+              "contract": "AccessControlUpgradeable",
+              "label": "_roles",
+              "type": "t_mapping(t_bytes32,t_struct(RoleData)25_storage)",
+              "src": "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol:61",
+              "offset": 0,
+              "slot": "0"
+            }
+          ],
+          "erc7201:openzeppelin.storage.Initializable": [
+            {
+              "contract": "Initializable",
+              "label": "_initialized",
+              "type": "t_uint64",
+              "src": "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol:69",
+              "offset": 0,
+              "slot": "0"
+            },
+            {
+              "contract": "Initializable",
+              "label": "_initializing",
+              "type": "t_bool",
+              "src": "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol:73",
+              "offset": 8,
+              "slot": "0"
+            }
+          ]
+        }
+      }
     }
   }
 }

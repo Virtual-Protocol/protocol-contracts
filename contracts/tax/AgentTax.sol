@@ -125,8 +125,8 @@ contract AgentTax is Initializable, AccessControlUpgradeable {
         feeRate = feeRate_;
         creatorFeeRate = creatorFeeRate_;
 
-        IERC20(taxToken).forceApprove(router_, type(uint256).max);
         IERC20(taxToken).forceApprove(oldRouter, 0);
+        IERC20(taxToken).forceApprove(router_, type(uint256).max);
 
         emit SwapParamsUpdated(
             oldRouter,

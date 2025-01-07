@@ -68,6 +68,16 @@ contract AgentTax is Initializable, AccessControlUpgradeable {
         address tba;
         address creator;
     }
+    event SwapParamsUpdated2(
+        address oldRouter,
+        address newRouter,
+        address oldAsset,
+        address newAsset,
+        uint16 oldFeeRate,
+        uint16 newFeeRate,
+        uint16 oldCreatorFeeRate,
+        uint16 newCreatorFeeRate
+    );
 
     mapping(uint256 agentId => TaxRecipient) private _agentRecipients;
     uint16 public creatorFeeRate;
@@ -119,6 +129,7 @@ contract AgentTax is Initializable, AccessControlUpgradeable {
         address oldRouter = address(router);
         address oldAsset = assetToken;
         uint16 oldFee = feeRate;
+        uint16 oldCreatorFee = creatorFeeRate;
 
         assetToken = assetToken_;
         router = IRouter(router_);
@@ -128,13 +139,15 @@ contract AgentTax is Initializable, AccessControlUpgradeable {
         IERC20(taxToken).forceApprove(oldRouter, 0);
         IERC20(taxToken).forceApprove(router_, type(uint256).max);
 
-        emit SwapParamsUpdated(
+        emit SwapParamsUpdated2(
             oldRouter,
             router_,
             oldAsset,
             assetToken_,
             oldFee,
-            feeRate_
+            feeRate_,
+            oldCreatorFee,
+            creatorFeeRate
         );
     }
 

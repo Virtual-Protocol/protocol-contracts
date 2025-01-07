@@ -113,8 +113,9 @@ contract AgentTax is Initializable, AccessControlUpgradeable {
         address router_,
         address assetToken_,
         uint16 feeRate_,
-        uint16 creatorFee_
+        uint16 creatorFeeRate_
     ) public onlyRole(ADMIN_ROLE) {
+        require((feeRate_ + creatorFeeRate_) <= DENOM, "Fees overflow");
         address oldRouter = address(router);
         address oldAsset = assetToken;
         uint16 oldFee = feeRate;
@@ -122,7 +123,7 @@ contract AgentTax is Initializable, AccessControlUpgradeable {
         assetToken = assetToken_;
         router = IRouter(router_);
         feeRate = feeRate_;
-        creatorFeeRate = creatorFee_;
+        creatorFeeRate = creatorFeeRate_;
 
         IERC20(taxToken).forceApprove(router_, type(uint256).max);
         IERC20(taxToken).forceApprove(oldRouter, 0);
@@ -262,13 +263,10 @@ contract AgentTax is Initializable, AccessControlUpgradeable {
             emit SwapExecuted(agentId, amountToSwap, assetReceived);
 
             uint256 feeAmount = (assetReceived * feeRate) / DENOM;
-            uint256 agentFee = assetReceived - feeAmount;
-            uint256 creatorFee = (agentFee * creatorFeeRate) / DENOM;
+            uint256 creatorFee = (assetReceived * creatorFeeRate) / DENOM;
+            uint256 tbaFee = assetReceived - feeAmount - creatorFee;
 
-            IERC20(assetToken).safeTransfer(
-                taxRecipient.tba,
-                agentFee - creatorFee
-            );
+            IERC20(assetToken).safeTransfer(taxRecipient.tba, tbaFee);
             IERC20(assetToken).safeTransfer(taxRecipient.creator, creatorFee);
             IERC20(assetToken).safeTransfer(treasury, feeAmount);
 

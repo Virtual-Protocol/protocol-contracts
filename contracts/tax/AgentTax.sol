@@ -63,6 +63,20 @@ contract AgentTax is Initializable, AccessControlUpgradeable {
     mapping(uint256 agentId => TaxAmounts amounts) public agentTaxAmounts;
 
     error TxHashExists(bytes32 txhash);
+    // V2 storage
+    struct TaxRecipient {
+        address tba;
+        address creator;
+    }
+
+    mapping(uint256 agentId => TaxRecipient) private _agentRecipients;
+    uint16 public creatorFeeRate;
+
+    event CreatorUpdated(
+        uint256 agentId,
+        address oldCreator,
+        address newCreator
+    );
 
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() {
@@ -98,7 +112,8 @@ contract AgentTax is Initializable, AccessControlUpgradeable {
     function updateSwapParams(
         address router_,
         address assetToken_,
-        uint16 feeRate_
+        uint16 feeRate_,
+        uint16 creatorFee_
     ) public onlyRole(ADMIN_ROLE) {
         address oldRouter = address(router);
         address oldAsset = assetToken;
@@ -107,6 +122,7 @@ contract AgentTax is Initializable, AccessControlUpgradeable {
         assetToken = assetToken_;
         router = IRouter(router_);
         feeRate = feeRate_;
+        creatorFeeRate = creatorFee_;
 
         IERC20(taxToken).forceApprove(router_, type(uint256).max);
         IERC20(taxToken).forceApprove(oldRouter, 0);
@@ -184,6 +200,18 @@ contract AgentTax is Initializable, AccessControlUpgradeable {
         return tba;
     }
 
+    function _getTaxRecipient(
+        uint256 agentId
+    ) internal returns (TaxRecipient memory) {
+        TaxRecipient storage recipient = _agentRecipients[agentId];
+        if (recipient.tba == address(0)) {
+            IAgentNft.VirtualInfo memory info = agentNft.virtualInfo(agentId);
+            recipient.tba = info.tba;
+            recipient.creator = info.founder;
+        }
+        return recipient;
+    }
+
     function swapForAsset(
         uint256 agentId,
         uint256 minOutput
@@ -203,8 +231,8 @@ contract AgentTax is Initializable, AccessControlUpgradeable {
 
         require(balance >= amountToSwap, "Insufficient balance");
 
-        address tba = _getTba(agentId);
-        require(tba != address(0), "Agent does not have TBA");
+        TaxRecipient memory taxRecipient = _getTaxRecipient(agentId);
+        require(taxRecipient.tba != address(0), "Agent does not have TBA");
 
         if (amountToSwap < minSwapThreshold) {
             return (false, 0);
@@ -234,7 +262,14 @@ contract AgentTax is Initializable, AccessControlUpgradeable {
             emit SwapExecuted(agentId, amountToSwap, assetReceived);
 
             uint256 feeAmount = (assetReceived * feeRate) / DENOM;
-            IERC20(assetToken).safeTransfer(tba, assetReceived - feeAmount);
+            uint256 agentFee = assetReceived - feeAmount;
+            uint256 creatorFee = (agentFee * creatorFeeRate) / DENOM;
+
+            IERC20(assetToken).safeTransfer(
+                taxRecipient.tba,
+                agentFee - creatorFee
+            );
+            IERC20(assetToken).safeTransfer(taxRecipient.creator, creatorFee);
             IERC20(assetToken).safeTransfer(treasury, feeAmount);
 
             agentAmounts.amountSwapped += amountToSwap;
@@ -244,5 +279,18 @@ contract AgentTax is Initializable, AccessControlUpgradeable {
             emit SwapFailed(agentId, amountToSwap);
             return (false, 0);
         }
+    }
+
+    function updateCreator(uint256 agentId, address creator) public {
+        TaxRecipient storage recipient = _agentRecipients[agentId];
+        require(recipient.tba != address(0), "Invalid recipient");
+        address sender = _msgSender();
+        address oldCreator = recipient.creator;
+        require(
+            sender == recipient.creator || hasRole(ADMIN_ROLE, sender),
+            "Only creator is allowed to update"
+        );
+        recipient.creator = creator;
+        emit CreatorUpdated(agentId, oldCreator, creator);
     }
 }

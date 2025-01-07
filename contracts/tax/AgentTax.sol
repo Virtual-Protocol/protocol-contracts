@@ -280,13 +280,17 @@ contract AgentTax is Initializable, AccessControlUpgradeable {
     }
 
     function updateCreator(uint256 agentId, address creator) public {
-        TaxRecipient storage recipient = _agentRecipients[agentId];
-        require(recipient.tba != address(0), "Invalid recipient");
         address sender = _msgSender();
+        TaxRecipient storage recipient = _agentRecipients[agentId];
+        if (recipient.tba == address(0)) {
+            IAgentNft.VirtualInfo memory info = agentNft.virtualInfo(agentId);
+            recipient.tba = info.tba;
+            recipient.creator = info.founder;
+        }
         address oldCreator = recipient.creator;
         require(
             sender == recipient.creator || hasRole(ADMIN_ROLE, sender),
-            "Only creator is allowed to update"
+            "Only creator can update"
         );
         recipient.creator = creator;
         emit CreatorUpdated(agentId, oldCreator, creator);

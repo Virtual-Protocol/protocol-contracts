@@ -98,13 +98,12 @@ contract FERC20 is Context, IERC20, Ownable {
         address recipient,
         uint256 amount
     ) public override returns (bool) {
+        uint256 currentAllowance = _allowances[sender][_msgSender()];
+        require(currentAllowance >= amount, "ERC20: transfer amount exceeds allowance");
+
         _transfer(sender, recipient, amount);
 
-        _approve(
-            sender,
-            _msgSender(),
-            _allowances[sender][_msgSender()] - amount
-        );
+        _approve(sender, _msgSender(), currentAllowance - amount);
 
         return true;
     }
@@ -122,12 +121,15 @@ contract FERC20 is Context, IERC20, Ownable {
         require(from != address(0), "ERC20: transfer from the zero address");
         require(to != address(0), "ERC20: transfer to the zero address");
         require(amount > 0, "Transfer amount must be greater than zero");
+        require(_balances[from] >= amount, "ERC20: transfer amount exceeds balance");
 
         if (!isExcludedFromMaxTx[from]) {
             require(amount <= _maxTxAmount, "Exceeds MaxTx");
         }
 
-        _balances[from] = _balances[from] - amount;
+        unchecked {
+            _balances[from] = _balances[from] - amount;
+        }
         _balances[to] = _balances[to] + amount;
 
         emit Transfer(from, to, amount);
@@ -155,12 +157,18 @@ contract FERC20 is Context, IERC20, Ownable {
 
     function _burn(address user, uint256 amount) internal {
         require(user != address(0), "Invalid address");
-        _balances[user] = _balances[user] - amount;
+        require(_balances[user] >= amount, "ERC20: burn amount exceeds balance");
+        unchecked {
+            _balances[user] = _balances[user] - amount;
+        }
     }
 
     function burnFrom(address user, uint256 amount) public onlyOwner {
         require(user != address(0), "Invalid address");
-        _balances[user] = _balances[user] - amount;
+        require(_balances[user] >= amount, "ERC20: burn amount exceeds balance");
+        unchecked {
+            _balances[user] = _balances[user] - amount;
+        }
         emit Transfer(user, address(0), amount);
     }
 }

@@ -5,7 +5,7 @@ import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC721/IERC721.sol";
 import "@openzeppelin/contracts/utils/math/Math.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-import "@openzeppelin/contracts/access/AccessControl.sol";
+import "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
 import {IERC5805} from "@openzeppelin/contracts/interfaces/IERC5805.sol";
 import {SafeCast} from "@openzeppelin/contracts/utils/math/SafeCast.sol";
 import "./virtualPersona/IAgentNft.sol";
@@ -19,7 +19,7 @@ import "./IAgentReward.sol";
 contract AgentRewardV2 is
     IAgentReward,
     Initializable,
-    AccessControl,
+    AccessControlUpgradeable,
     TokenSaver
 {
     using Math for uint256;

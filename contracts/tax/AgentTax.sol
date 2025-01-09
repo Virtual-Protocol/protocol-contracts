@@ -280,9 +280,20 @@ contract AgentTax is Initializable, AccessControlUpgradeable {
             uint256 creatorFee = (assetReceived * creatorFeeRate) / DENOM;
             uint256 tbaFee = assetReceived - feeAmount - creatorFee;
 
-            IERC20(assetToken).safeTransfer(taxRecipient.tba, tbaFee);
-            IERC20(assetToken).safeTransfer(taxRecipient.creator, creatorFee);
-            IERC20(assetToken).safeTransfer(treasury, feeAmount);
+            if (tbaFee > 0) {
+                IERC20(assetToken).safeTransfer(taxRecipient.tba, tbaFee);
+            }
+
+            if (creatorFee > 0) {
+                IERC20(assetToken).safeTransfer(
+                    taxRecipient.creator,
+                    creatorFee
+                );
+            }
+
+            if (feeAmount > 0) {
+                IERC20(assetToken).safeTransfer(treasury, feeAmount);
+            }
 
             agentAmounts.amountSwapped += amountToSwap;
 

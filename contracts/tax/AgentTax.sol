@@ -105,6 +105,11 @@ contract AgentTax is Initializable, AccessControlUpgradeable {
     ) external initializer {
         __AccessControl_init();
 
+        require(
+            assetToken_ != taxToken_,
+            "Asset token cannot be same as tax token"
+        );
+
         _grantRole(ADMIN_ROLE, defaultAdmin_);
         _grantRole(DEFAULT_ADMIN_ROLE, defaultAdmin_);
         assetToken = assetToken_;
@@ -117,6 +122,19 @@ contract AgentTax is Initializable, AccessControlUpgradeable {
         agentNft = IAgentNft(nft_);
 
         feeRate = 100;
+        creatorFeeRate = 3000;
+
+        emit SwapParamsUpdated2(
+            address(0),
+            router_,
+            address(0),
+            assetToken_,
+            0,
+            feeRate,
+            0,
+            creatorFeeRate
+        );
+        emit SwapThresholdUpdated(0, minSwapThreshold_, 0, maxSwapThreshold_);
     }
 
     function updateSwapParams(

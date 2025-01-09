@@ -35,14 +35,6 @@ contract AgentTax is Initializable, AccessControlUpgradeable {
     uint256 public maxSwapThreshold;
     IAgentNft public agentNft;
 
-    event SwapParamsUpdated(
-        address oldRouter,
-        address newRouter,
-        address oldAsset,
-        address newAsset,
-        uint16 oldFeeRate,
-        uint16 newFeeRate
-    );
     event SwapThresholdUpdated(
         uint256 oldMinThreshold,
         uint256 newMinThreshold,
@@ -221,15 +213,6 @@ contract AgentTax is Initializable, AccessControlUpgradeable {
         }
         agentAmounts.amountCollected += totalAmount;
         _swapForAsset(agentId, minOutput);
-    }
-
-    function _getTba(uint256 agentId) internal returns (address) {
-        address tba = _agentTba[agentId];
-        if (tba == address(0)) {
-            tba = agentNft.virtualInfo(agentId).tba;
-            _agentTba[agentId] = tba;
-        }
-        return tba;
     }
 
     function _getTaxRecipient(

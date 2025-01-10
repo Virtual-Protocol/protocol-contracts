@@ -35,14 +35,6 @@ contract AgentTax is Initializable, AccessControlUpgradeable {
     uint256 public maxSwapThreshold;
     IAgentNft public agentNft;
 
-    event SwapParamsUpdated(
-        address oldRouter,
-        address newRouter,
-        address oldAsset,
-        address newAsset,
-        uint16 oldFeeRate,
-        uint16 newFeeRate
-    );
     event SwapThresholdUpdated(
         uint256 oldMinThreshold,
         uint256 newMinThreshold,
@@ -63,6 +55,30 @@ contract AgentTax is Initializable, AccessControlUpgradeable {
     mapping(uint256 agentId => TaxAmounts amounts) public agentTaxAmounts;
 
     error TxHashExists(bytes32 txhash);
+    // V2 storage
+    struct TaxRecipient {
+        address tba;
+        address creator;
+    }
+    event SwapParamsUpdated2(
+        address oldRouter,
+        address newRouter,
+        address oldAsset,
+        address newAsset,
+        uint16 oldFeeRate,
+        uint16 newFeeRate,
+        uint16 oldCreatorFeeRate,
+        uint16 newCreatorFeeRate
+    );
+
+    mapping(uint256 agentId => TaxRecipient) private _agentRecipients;
+    uint16 public creatorFeeRate;
+
+    event CreatorUpdated(
+        uint256 agentId,
+        address oldCreator,
+        address newCreator
+    );
 
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() {
@@ -81,6 +97,11 @@ contract AgentTax is Initializable, AccessControlUpgradeable {
     ) external initializer {
         __AccessControl_init();
 
+        require(
+            assetToken_ != taxToken_,
+            "Asset token cannot be same as tax token"
+        );
+
         _grantRole(ADMIN_ROLE, defaultAdmin_);
         _grantRole(DEFAULT_ADMIN_ROLE, defaultAdmin_);
         assetToken = assetToken_;
@@ -93,31 +114,50 @@ contract AgentTax is Initializable, AccessControlUpgradeable {
         agentNft = IAgentNft(nft_);
 
         feeRate = 100;
+        creatorFeeRate = 3000;
+
+        emit SwapParamsUpdated2(
+            address(0),
+            router_,
+            address(0),
+            assetToken_,
+            0,
+            feeRate,
+            0,
+            creatorFeeRate
+        );
+        emit SwapThresholdUpdated(0, minSwapThreshold_, 0, maxSwapThreshold_);
     }
 
     function updateSwapParams(
         address router_,
         address assetToken_,
-        uint16 feeRate_
+        uint16 feeRate_,
+        uint16 creatorFeeRate_
     ) public onlyRole(ADMIN_ROLE) {
+        require((feeRate_ + creatorFeeRate_) <= DENOM, "Fees overflow");
         address oldRouter = address(router);
         address oldAsset = assetToken;
         uint16 oldFee = feeRate;
+        uint16 oldCreatorFee = creatorFeeRate;
 
         assetToken = assetToken_;
         router = IRouter(router_);
         feeRate = feeRate_;
+        creatorFeeRate = creatorFeeRate_;
 
-        IERC20(taxToken).forceApprove(router_, type(uint256).max);
         IERC20(taxToken).forceApprove(oldRouter, 0);
+        IERC20(taxToken).forceApprove(router_, type(uint256).max);
 
-        emit SwapParamsUpdated(
+        emit SwapParamsUpdated2(
             oldRouter,
             router_,
             oldAsset,
             assetToken_,
             oldFee,
-            feeRate_
+            feeRate_,
+            oldCreatorFee,
+            creatorFeeRate
         );
     }
 
@@ -175,13 +215,16 @@ contract AgentTax is Initializable, AccessControlUpgradeable {
         _swapForAsset(agentId, minOutput);
     }
 
-    function _getTba(uint256 agentId) internal returns (address) {
-        address tba = _agentTba[agentId];
-        if (tba == address(0)) {
-            tba = agentNft.virtualInfo(agentId).tba;
-            _agentTba[agentId] = tba;
+    function _getTaxRecipient(
+        uint256 agentId
+    ) internal returns (TaxRecipient memory) {
+        TaxRecipient storage recipient = _agentRecipients[agentId];
+        if (recipient.tba == address(0)) {
+            IAgentNft.VirtualInfo memory info = agentNft.virtualInfo(agentId);
+            recipient.tba = info.tba;
+            recipient.creator = info.founder;
         }
-        return tba;
+        return recipient;
     }
 
     function swapForAsset(
@@ -203,8 +246,8 @@ contract AgentTax is Initializable, AccessControlUpgradeable {
 
         require(balance >= amountToSwap, "Insufficient balance");
 
-        address tba = _getTba(agentId);
-        require(tba != address(0), "Agent does not have TBA");
+        TaxRecipient memory taxRecipient = _getTaxRecipient(agentId);
+        require(taxRecipient.tba != address(0), "Agent does not have TBA");
 
         if (amountToSwap < minSwapThreshold) {
             return (false, 0);
@@ -234,8 +277,23 @@ contract AgentTax is Initializable, AccessControlUpgradeable {
             emit SwapExecuted(agentId, amountToSwap, assetReceived);
 
             uint256 feeAmount = (assetReceived * feeRate) / DENOM;
-            IERC20(assetToken).safeTransfer(tba, assetReceived - feeAmount);
-            IERC20(assetToken).safeTransfer(treasury, feeAmount);
+            uint256 creatorFee = (assetReceived * creatorFeeRate) / DENOM;
+            uint256 tbaFee = assetReceived - feeAmount - creatorFee;
+
+            if (tbaFee > 0) {
+                IERC20(assetToken).safeTransfer(taxRecipient.tba, tbaFee);
+            }
+
+            if (creatorFee > 0) {
+                IERC20(assetToken).safeTransfer(
+                    taxRecipient.creator,
+                    creatorFee
+                );
+            }
+
+            if (feeAmount > 0) {
+                IERC20(assetToken).safeTransfer(treasury, feeAmount);
+            }
 
             agentAmounts.amountSwapped += amountToSwap;
 
@@ -244,5 +302,22 @@ contract AgentTax is Initializable, AccessControlUpgradeable {
             emit SwapFailed(agentId, amountToSwap);
             return (false, 0);
         }
+    }
+
+    function updateCreator(uint256 agentId, address creator) public {
+        address sender = _msgSender();
+        TaxRecipient storage recipient = _agentRecipients[agentId];
+        if (recipient.tba == address(0)) {
+            IAgentNft.VirtualInfo memory info = agentNft.virtualInfo(agentId);
+            recipient.tba = info.tba;
+            recipient.creator = info.founder;
+        }
+        address oldCreator = recipient.creator;
+        require(
+            sender == recipient.creator || hasRole(ADMIN_ROLE, sender),
+            "Only creator can update"
+        );
+        recipient.creator = creator;
+        emit CreatorUpdated(agentId, oldCreator, creator);
     }
 }

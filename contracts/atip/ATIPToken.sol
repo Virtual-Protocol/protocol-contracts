@@ -343,7 +343,7 @@ contract ATIPToken is
         Memo storage memo = memos[memoId];
         require(canSign(msg.sender, memo.jobId), "Unauthorised");
 
-        Job memory job = jobs[memo.jobId];
+        Job storage job = jobs[memo.jobId];
 
         if (signatories[memoId][msg.sender] > 0) {
             revert("Already signed");

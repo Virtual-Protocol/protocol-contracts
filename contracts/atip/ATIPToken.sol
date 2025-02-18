@@ -241,6 +241,8 @@ contract ATIPToken is
                 msg.sender,
                 job.budget - evaluatorFee
             );
+
+            emit ClaimedProviderFee(id, msg.sender, job.budget - evaluatorFee);
         } else {
             require(
                 msg.sender == job.client && block.timestamp > job.expiredAt,

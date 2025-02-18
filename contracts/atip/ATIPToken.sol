@@ -361,7 +361,10 @@ contract ATIPToken is
                     job.evaluatorCount++;
                 }
             }
-        } else {
+        } else if (
+            !(job.phase == PHASE_TRANSACTION &&
+                memo.nextPhase == PHASE_EVALUATION)
+        ) {
             // For other phases, only counter party can sign
             require(msg.sender != memo.sender, "Only counter party can sign");
         }

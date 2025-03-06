@@ -69,6 +69,13 @@ contract PreSale is
     // Points contract reference
     Points public pointsContract;
 
+    // Simple mappings for tracking points and virtual tokens
+    mapping(address => uint256) public userPointsCommitted;
+    mapping(address => uint256) public userVirtualTokensCommitted;
+
+    // Add array to track all committers
+    address[] public allCommitters;
+
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() {
         _disableInitializers();
@@ -84,8 +91,6 @@ contract PreSale is
         _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
         _grantRole(OPERATOR_ROLE, msg.sender);
 
-        name = name_;
-        symbol = symbol_;
         require(router_ != address(0), "Zero addresses are not allowed");
         require(virtualToken_ != address(0), "Zero addresses are not allowed");
         require(pointsContract_ != address(0), "Zero addresses are not allowed");
@@ -163,6 +168,15 @@ contract PreSale is
             virtualTokenAmount
         );
         
+        // Add to allCommitters if first time (if both amounts are 0)
+        if (userPointsCommitted[msg.sender] == 0 && userVirtualTokensCommitted[msg.sender] == 0) {
+            allCommitters.push(msg.sender);
+        }
+
+        // Update user commitments
+        userPointsCommitted[msg.sender] += pointAmount;
+        userVirtualTokensCommitted[msg.sender] += virtualTokenAmount;
+        
         // Update total virtual tokens deposited
         totalVirtualTokensDeposited = totalVirtualTokensDeposited + virtualTokenAmount;
 
@@ -193,5 +207,34 @@ contract PreSale is
         IERC20(token).safeTransfer(to, withdrawAmount);
         
         emit TokensWithdrawn(token, to, withdrawAmount);
+    }
+
+    // Get user commitment info
+    function getUserCommitments(address user) external view returns (uint256 points, uint256 virtualTokens) {
+        return (userPointsCommitted[user], userVirtualTokensCommitted[user]);
+    }
+
+    // Get all commitments
+    function getAllCommitments() external view returns (
+        address[] memory users,
+        uint256[] memory points,
+        uint256[] memory virtualTokens
+    ) {
+        uint256 length = allCommitters.length;
+        points = new uint256[](length);
+        virtualTokens = new uint256[](length);
+
+        for (uint256 i = 0; i < length; i++) {
+            address user = allCommitters[i];
+            points[i] = userPointsCommitted[user];
+            virtualTokens[i] = userVirtualTokensCommitted[user];
+        }
+
+        return (allCommitters, points, virtualTokens);
+    }
+
+    // Get total number of committers
+    function getTotalCommitters() external view returns (uint256) {
+        return allCommitters.length;
     }
 } 

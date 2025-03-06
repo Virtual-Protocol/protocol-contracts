@@ -85,6 +85,8 @@ contract Bonding is
     mapping(address => Token) public tokenInfo;
     address[] public tokenInfos;
 
+    mapping(address => bool) private _hasLaunched;
+
     event Launched(address indexed token, address indexed pair, uint);
     event Deployed(address indexed token, uint256 amount0, uint256 amount1);
     event Graduated(address indexed token, address agentToken);
@@ -194,6 +196,7 @@ contract Bonding is
         string[4] memory urls,
         uint256 purchaseAmount
     ) public nonReentrant returns (address, address, uint) {
+        require(!_hasLaunched[msg.sender], "User has already launched a token");
         require(
             purchaseAmount > fee,
             "Purchase amount must be greater than fee"
@@ -281,6 +284,8 @@ contract Bonding is
         IERC20(assetToken).forceApprove(address(router), initialPurchase);
         router.buy(initialPurchase, address(token), address(this));
         token.transfer(msg.sender, token.balanceOf(address(this)));
+
+        _hasLaunched[msg.sender] = true;
 
         return (address(token), _pair, n);
     }

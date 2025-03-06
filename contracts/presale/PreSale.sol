@@ -17,8 +17,8 @@ contract PreSale is
     using SafeERC20 for IERC20;
 
     address private _feeTo;
-    string private _name;
-    string private _symbol;
+    string private _name; // name of the token
+    string private _symbol; // symbol of the token
 
     bytes32 public constant ADMIN_ROLE = keccak256("ADMIN_ROLE");
     bytes32 public constant OPERATOR_ROLE = keccak256("OPERATOR_ROLE");
@@ -48,7 +48,8 @@ contract PreSale is
     // Maximum virtual token cap
     uint256 public constant MAX_VIRTUAL_TOKEN_CAP = 42000 * 10**18; // 42K tokens with 18 decimals
     
-    // Track total virtual tokens deposited
+    // Track total points committted and total virtual tokens deposited
+    uint256 public totalPointsCommitted;
     uint256 public totalVirtualTokensDeposited;
 
     event TokensWithdrawn(
@@ -75,6 +76,11 @@ contract PreSale is
 
     // Add array to track all committers
     address[] public allCommitters;
+
+    uint256 devInitialPurchase;
+
+    // Add a flag to track if launch has been called
+    bool private _hasLaunched;
 
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() {
@@ -124,6 +130,7 @@ contract PreSale is
         string memory symbol_,
         uint256 virtualTokenAmount
     ) external nonReentrant {
+        require(!_hasLaunched, "Already launched");
         require(status == PresaleStatus.Initialized, "Presale must be in Initialized status");
         require(virtualTokenAmount >= LAUNCH_FEE, "Virtual Token amount must be at least fee");
         require(
@@ -140,6 +147,21 @@ contract PreSale is
         uint256 initialPurchase = (virtualTokenAmount - LAUNCH_FEE);
         IERC20(virtualToken).safeTransferFrom(msg.sender, _feeTo, LAUNCH_FEE); // no refund for launch fee
         IERC20(virtualToken).safeTransferFrom(msg.sender, address(this), initialPurchase); // Transfer init buy amount of Virtual Token
+
+        // Store dev info
+        devInitialPurchase = initialPurchase;
+
+        // Add dev to allCommitters
+        if (userPointsCommitted[msg.sender] == 0 && userVirtualTokensCommitted[msg.sender] == 0) {
+            allCommitters.push(msg.sender);
+        }
+
+        // Record dev's initial purchase
+        userVirtualTokensCommitted[msg.sender] += initialPurchase;
+        totalVirtualTokensDeposited = totalVirtualTokensDeposited + initialPurchase;
+
+        // Set launch flag
+        _hasLaunched = true;
 
         // Change status to NotStarted
         status = PresaleStatus.NotStarted;
@@ -179,6 +201,7 @@ contract PreSale is
         
         // Update total virtual tokens deposited
         totalVirtualTokensDeposited = totalVirtualTokensDeposited + virtualTokenAmount;
+        totalPointsCommitted = totalPointsCommitted + pointAmount;
 
         // If cap is reached, end the presale early
         if (totalVirtualTokensDeposited >= MAX_VIRTUAL_TOKEN_CAP) {
@@ -236,5 +259,25 @@ contract PreSale is
     // Get total number of committers
     function getTotalCommitters() external view returns (uint256) {
         return allCommitters.length;
+    }
+
+    // Get dev initial purchase
+    function getDevInitialPurchase() external view returns (uint256) {
+        return devInitialPurchase;
+    }
+
+    // Get total points committed
+    function getTotalPointsCommitted() external view returns (uint256) {
+        return totalPointsCommitted;
+    }
+
+    // Get total virtual tokens deposited
+    function getTotalVirtualTokensDeposited() external view returns (uint256) {
+        return totalVirtualTokensDeposited;
+    }
+
+    // Optional: Add a function to check if presale has been launched
+    function hasLaunched() external view returns (bool) {
+        return _hasLaunched;
     }
 } 

@@ -61,6 +61,7 @@ contract PreSale is
 
     event Launched(
         address indexed launcher,
+        address indexed presaleContract,
         uint256 virtualTokenAmount,
         uint256 fee
     );
@@ -138,7 +139,7 @@ contract PreSale is
         // Change status to NotStarted
         status = PresaleStatus.NotStarted;
         
-        emit Launched(msg.sender, virtualTokenAmount, LAUNCH_FEE);
+        emit Launched(msg.sender, address(this), virtualTokenAmount, LAUNCH_FEE);
     }
 
     function buy(

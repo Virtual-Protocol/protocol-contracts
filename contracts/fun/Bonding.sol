@@ -211,7 +211,12 @@ contract Bonding is
             initialPurchase
         );
 
-        FERC20 token = new FERC20(string.concat("fun ", _name), _ticker, initialSupply, maxTx);
+        FERC20 token = new FERC20(
+            string.concat("fun ", _name),
+            _ticker,
+            initialSupply,
+            maxTx
+        );
         uint256 supply = token.totalSupply();
 
         address _pair = factory.createPair(address(token), assetToken);
@@ -279,7 +284,7 @@ contract Bonding is
 
         // Make initial purchase
         IERC20(assetToken).forceApprove(address(router), initialPurchase);
-        router.buy(initialPurchase, address(token), address(this));
+        _buy(address(this), initialPurchase, address(token));
         token.transfer(msg.sender, token.balanceOf(address(this)));
 
         return (address(token), _pair, n);
@@ -338,12 +343,11 @@ contract Bonding is
         return true;
     }
 
-    function buy(
+    function _buy(
+        address buyer,
         uint256 amountIn,
         address tokenAddress
-    ) public payable returns (bool) {
-        require(tokenInfo[tokenAddress].trading, "Token not trading");
-
+    ) internal {
         address pairAddress = factory.getPair(
             tokenAddress,
             router.assetToken()
@@ -356,7 +360,7 @@ contract Bonding is
         (uint256 amount1In, uint256 amount0Out) = router.buy(
             amountIn,
             tokenAddress,
-            msg.sender
+            buyer
         );
 
         uint256 newReserveA = reserveA - amount0Out;
@@ -391,6 +395,15 @@ contract Bonding is
         if (newReserveA <= gradThreshold && tokenInfo[tokenAddress].trading) {
             _openTradingOnUniswap(tokenAddress);
         }
+    }
+
+    function buy(
+        uint256 amountIn,
+        address tokenAddress
+    ) public payable returns (bool) {
+        require(tokenInfo[tokenAddress].trading, "Token not trading");
+
+        _buy(msg.sender, amountIn, tokenAddress);
 
         return true;
     }

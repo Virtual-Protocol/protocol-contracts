@@ -198,6 +198,9 @@ contract Bonding is
             purchaseAmount > fee,
             "Purchase amount must be greater than fee"
         );
+        
+        require(cores.length > 0, "Cores must be provided");
+
         address assetToken = router.assetToken();
         require(
             IERC20(assetToken).balanceOf(msg.sender) >= purchaseAmount,

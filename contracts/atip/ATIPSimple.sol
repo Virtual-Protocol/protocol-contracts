@@ -1,5 +1,9 @@
 // SPDX-License-Identifier: MIT
-// This is sample implementation of ATIP to handle selling of tokens/ NFT
+// This is sample implementation of ATIP
+// - all phases requires counter party approval except for evaluation phase
+// - evaluation phase requires evaluators to sign
+// - payment token is fixed
+
 pragma solidity ^0.8.20;
 
 import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
@@ -10,7 +14,7 @@ import "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol
 import "./IServiceProviderRegistry.sol";
 import "./InteractionLedger.sol";
 
-contract ATIPToken is
+contract ATIPSimple is
     Initializable,
     AccessControlUpgradeable,
     InteractionLedger,
@@ -190,6 +194,8 @@ contract ATIPToken is
                 address(this),
                 job.budget
             );
+        } else if (oldPhase == PHASE_EVALUATION && phase == PHASE_COMPLETED) {
+            claimBudget(jobId);
         }
     }
 
@@ -229,20 +235,19 @@ contract ATIPToken is
         uint256 evaluatorFee = (job.budget * evaluatorFeeBP) / 10000;
 
         if (job.phase == PHASE_COMPLETED) {
-            require(
-                msg.sender == job.provider,
-                "Only provider can claim budget"
-            );
-
             _payToEvaluators(id, evaluatorFee);
 
             paymentToken.safeTransferFrom(
                 address(this),
-                msg.sender,
+                job.provider,
                 job.budget - evaluatorFee
             );
 
-            emit ClaimedProviderFee(id, msg.sender, job.budget - evaluatorFee);
+            emit ClaimedProviderFee(
+                id,
+                job.provider,
+                job.budget - evaluatorFee
+            );
         } else {
             require(
                 msg.sender == job.client && block.timestamp > job.expiredAt,
@@ -283,6 +288,10 @@ contract ATIPToken is
         Job storage job = jobs[jobId];
         job.memoCount++;
         jobMemoIds[jobId][job.phase].push(newMemoId);
+
+        if (nextPhase == PHASE_COMPLETED && job.phase == PHASE_TRANSACTION) {
+            _updateJobPhase(jobId, PHASE_NEGOTIATION);
+        }
 
         return newMemoId;
     }

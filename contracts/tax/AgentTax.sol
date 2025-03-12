@@ -341,8 +341,7 @@ contract AgentTax is Initializable, AccessControlUpgradeable {
                 amountToSwap = maxOverride;
             }
 
-            uint256 minOutput = amountToSwap -
-                ((amountToSwap * (DENOM - slippage)) / DENOM);
+            uint256 minOutput = ((amountToSwap * (DENOM - slippage)) / DENOM);
             _swapForAsset(agentId, minOutput, maxOverride);
         }
     }

@@ -319,7 +319,7 @@ contract AgentTax is Initializable, AccessControlUpgradeable {
         emit CreatorUpdated(agentId, oldCreator, creator);
     }
 
-    function dca(
+    function dcaSell(
         uint256[] memory agentIds,
         uint8 slippage,
         uint256 maxOverride
@@ -336,6 +336,11 @@ contract AgentTax is Initializable, AccessControlUpgradeable {
             if (amountToSwap > maxSwapThreshold) {
                 amountToSwap = maxSwapThreshold;
             }
+
+            if (amountToSwap > maxOverride) {
+                amountToSwap = maxOverride;
+            }
+            
             uint256 minOutput = amountToSwap - ((DENOM - slippage) / DENOM);
             _swapForAsset(agentId, minOutput, maxOverride);
         }

@@ -212,7 +212,7 @@ contract AgentTax is Initializable, AccessControlUpgradeable {
             emit TaxCollected(txhash, agentId, amounts[i]);
         }
         agentAmounts.amountCollected += totalAmount;
-        _swapForAsset(agentId, minOutput);
+        _swapForAsset(agentId, minOutput, maxSwapThreshold);
     }
 
     function _getTaxRecipient(
@@ -227,16 +227,10 @@ contract AgentTax is Initializable, AccessControlUpgradeable {
         return recipient;
     }
 
-    function swapForAsset(
-        uint256 agentId,
-        uint256 minOutput
-    ) public onlyRole(EXECUTOR_ROLE) returns (bool, uint256) {
-        return _swapForAsset(agentId, minOutput);
-    }
-
     function _swapForAsset(
         uint256 agentId,
-        uint256 minOutput
+        uint256 minOutput,
+        uint256 maxOverride
     ) internal returns (bool, uint256) {
         TaxAmounts storage agentAmounts = agentTaxAmounts[agentId];
         uint256 amountToSwap = agentAmounts.amountCollected -
@@ -255,6 +249,10 @@ contract AgentTax is Initializable, AccessControlUpgradeable {
 
         if (amountToSwap > maxSwapThreshold) {
             amountToSwap = maxSwapThreshold;
+        }
+
+        if (amountToSwap > maxOverride) {
+            amountToSwap = maxOverride;
         }
 
         address[] memory path = new address[](2);
@@ -319,5 +317,27 @@ contract AgentTax is Initializable, AccessControlUpgradeable {
         );
         recipient.creator = creator;
         emit CreatorUpdated(agentId, oldCreator, creator);
+    }
+
+    function dca(
+        uint256[] memory agentIds,
+        uint8 slippage,
+        uint256 maxOverride
+    ) public onlyRole(EXECUTOR_ROLE) {
+        require(slippage <= DENOM, "Invalid slippage");
+        uint256 agentId;
+        for (uint i = 0; i < agentIds.length; i++) {
+            agentId = agentIds[i];
+
+            TaxAmounts memory agentAmounts = agentTaxAmounts[agentId];
+            uint256 amountToSwap = agentAmounts.amountCollected -
+                agentAmounts.amountSwapped;
+
+            if (amountToSwap > maxSwapThreshold) {
+                amountToSwap = maxSwapThreshold;
+            }
+            uint256 minOutput = amountToSwap - ((DENOM - slippage) / DENOM);
+            _swapForAsset(agentId, minOutput, maxOverride);
+        }
     }
 }

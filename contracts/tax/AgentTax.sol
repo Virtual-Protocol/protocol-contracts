@@ -329,10 +329,6 @@ contract AgentTax is Initializable, AccessControlUpgradeable {
             uint256 amountToSwap = agentAmounts.amountCollected -
                 agentAmounts.amountSwapped;
 
-            if (amountToSwap > maxSwapThreshold) {
-                amountToSwap = maxSwapThreshold;
-            }
-
             if (amountToSwap > maxOverride) {
                 amountToSwap = maxOverride;
             }

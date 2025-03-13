@@ -317,7 +317,7 @@ contract AgentTax is Initializable, AccessControlUpgradeable {
 
     function dcaSell(
         uint256[] memory agentIds,
-        uint8 slippage,
+        uint256 slippage,
         uint256 maxOverride
     ) public onlyRole(EXECUTOR_ROLE) {
         require(slippage <= DENOM, "Invalid slippage");

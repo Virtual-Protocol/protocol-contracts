@@ -9,8 +9,9 @@ abstract contract InteractionLedger {
         bool isSecured;
         uint8 nextPhase;
         uint256 jobId;
-        uint8 numApprovals;
         address sender;
+        uint8 evalApprovals;
+        uint8 evalRejections;
     }
     uint256 public memoCounter;
 
@@ -49,7 +50,8 @@ abstract contract InteractionLedger {
             isSecured: isSecured,
             nextPhase: nextPhase,
             jobId: jobId,
-            numApprovals: 0,
+            evalApprovals: 0,
+            evalRejections: 0,
             sender: msg.sender
         });
 

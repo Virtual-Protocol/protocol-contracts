@@ -11,7 +11,6 @@ import "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol"
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
-import "./IServiceProviderRegistry.sol";
 import "./InteractionLedger.sol";
 
 contract ACPSimple is
@@ -21,8 +20,6 @@ contract ACPSimple is
     ReentrancyGuardUpgradeable
 {
     using SafeERC20 for IERC20;
-
-    IServiceProviderRegistry public providerRegistry;
 
     bytes32 public constant ADMIN_ROLE = keccak256("ADMIN_ROLE");
 
@@ -38,7 +35,6 @@ contract ACPSimple is
 
     uint256 public evaluatorFeeBP; // 10000 = 100%
     uint8 public numEvaluatorsPerJob;
-    uint8 public minApprovals;
 
     event ClaimedEvaluatorFee(
         uint256 jobId,
@@ -84,33 +80,45 @@ contract ACPSimple is
 
     event RefundedBudget(uint256 jobId, address indexed client, uint256 amount);
 
+    uint256 public platformFeeBP;
+    address public platformTreasury;
+
+    event BudgetSet(uint256 indexed jobId, uint256 newBudget);
+
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() {
         _disableInitializers();
     }
 
     function initialize(
-        address _providerRegistry,
         address paymentTokenAddress,
         uint256 evaluatorFeeBP_,
         uint8 numEvaluatorsPerJob_,
-        uint8 minApprovals_
+        uint256 platformFeeBP_,
+        address platformTreasury_
     ) public initializer {
+        require(
+            paymentTokenAddress != address(0),
+            "Zero address payment token"
+        );
+        require(platformTreasury_ != address(0), "Zero address treasury");
+        require(numEvaluatorsPerJob_ > 0, "Invalid evaluator count");
+
         __AccessControl_init();
         __ReentrancyGuard_init();
 
-        providerRegistry = IServiceProviderRegistry(_providerRegistry);
         jobCounter = 0;
         evaluatorCounter = 0;
         memoCounter = 0;
         evaluatorFeeBP = evaluatorFeeBP_;
         numEvaluatorsPerJob = numEvaluatorsPerJob_;
-        minApprovals = minApprovals_;
         // Setup initial admin
         _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
         _grantRole(ADMIN_ROLE, msg.sender);
 
         paymentToken = IERC20(paymentTokenAddress);
+        platformFeeBP = platformFeeBP_;
+        platformTreasury = platformTreasury_;
     }
 
     modifier jobExists(uint256 jobId) {
@@ -135,12 +143,10 @@ contract ACPSimple is
 
     function updateEvaluatorConfigs(
         uint256 evaluatorFeeBP_,
-        uint8 numEvaluatorsPerJob_,
-        uint8 minApprovals_
+        uint8 numEvaluatorsPerJob_
     ) external onlyRole(ADMIN_ROLE) {
         evaluatorFeeBP = evaluatorFeeBP_;
         numEvaluatorsPerJob = numEvaluatorsPerJob_;
-        minApprovals = minApprovals_;
     }
 
     function getPhases() public pure returns (string[TOTAL_PHASES] memory) {
@@ -159,6 +165,9 @@ contract ACPSimple is
         address provider,
         uint256 expiredAt
     ) external returns (uint256) {
+        require(provider != address(0), "Zero address provider");
+        require(expiredAt > (block.timestamp + 5 minutes), "Expiry too short");
+
         uint256 newJobId = ++jobCounter;
 
         jobs[newJobId] = Job({
@@ -178,6 +187,7 @@ contract ACPSimple is
     }
 
     function _updateJobPhase(uint256 jobId, uint8 phase) internal {
+        require(phase < TOTAL_PHASES, "Invalid phase");
         Job storage job = jobs[jobId];
         if (phase == job.phase) {
             return;
@@ -202,18 +212,31 @@ contract ACPSimple is
     function setBudget(uint256 jobId, uint256 amount) public nonReentrant {
         Job storage job = jobs[jobId];
         require(job.client == msg.sender, "Only client can set budget");
+        require(amount > 0, "Zero amount");
         require(
             job.phase == PHASE_NEGOTIATION,
             "Budget can only be set in negotiation phase"
         );
-        paymentToken.safeIncreaseAllowance(address(this), amount);
 
         job.budget = amount;
+
+        paymentToken.safeIncreaseAllowance(address(this), amount);
+
+        emit BudgetSet(jobId, amount);
     }
 
-    function _payToEvaluators(uint256 jobId, uint256 evaluatorFee) internal {
-        uint256 singleEvaluatorFee = evaluatorFee / numEvaluatorsPerJob;
-        for (uint8 i = 0; i < numEvaluatorsPerJob; i++) {
+    function _payToEvaluators(
+        uint256 jobId,
+        uint256 evaluatorFee
+    ) internal returns (uint256) {
+        uint256 totalEvaluatorFee = 0;
+        uint256 totalEvaluators = jobEvaluators[jobId].length;
+
+        require(totalEvaluators > 0, "No evaluators");
+        uint256 singleEvaluatorFee = evaluatorFee / totalEvaluators;
+        require(singleEvaluatorFee > 0, "Fee too small");
+
+        for (uint256 i = 0; i < totalEvaluators; i++) {
             paymentToken.safeTransferFrom(
                 address(this),
                 jobEvaluators[jobId][i],
@@ -224,7 +247,9 @@ contract ACPSimple is
                 jobEvaluators[jobId][i],
                 singleEvaluatorFee
             );
+            totalEvaluatorFee += singleEvaluatorFee;
         }
+        return totalEvaluatorFee;
     }
 
     function claimBudget(uint256 id) public nonReentrant {
@@ -232,41 +257,44 @@ contract ACPSimple is
         require(job.budget > job.amountClaimed, "No budget to claim");
 
         job.amountClaimed = job.budget;
+        uint256 claimableAmount = job.budget;
         uint256 evaluatorFee = (job.budget * evaluatorFeeBP) / 10000;
+        uint256 platformFee = (job.budget * platformFeeBP) / 10000;
 
         if (job.phase == PHASE_COMPLETED) {
-            _payToEvaluators(id, evaluatorFee);
+            if (platformFee > 0) {
+                paymentToken.safeTransferFrom(
+                    address(this),
+                    platformTreasury,
+                    platformFee
+                );
+            }
+            uint256 paidToEvaluators = _payToEvaluators(id, evaluatorFee);
+            claimableAmount = claimableAmount - platformFee - paidToEvaluators;
 
             paymentToken.safeTransferFrom(
                 address(this),
                 job.provider,
-                job.budget - evaluatorFee
+                claimableAmount
             );
 
-            emit ClaimedProviderFee(
-                id,
-                job.provider,
-                job.budget - evaluatorFee
-            );
+            emit ClaimedProviderFee(id, job.provider, claimableAmount);
         } else {
+            // Refund the budget if job is not completed within expiry or rejected
             require(
-                msg.sender == job.client && block.timestamp > job.expiredAt,
-                "Only client can claim expired budget"
+                (job.phase < PHASE_EVALUATION &&
+                    block.timestamp > job.expiredAt) ||
+                    job.phase == PHASE_REJECTED,
+                "Unable to refund budget"
             );
             _updateJobPhase(id, PHASE_REJECTED);
 
-            uint256 claimableAmount = job.budget;
-            if (job.phase >= PHASE_COMPLETED) {
-                claimableAmount -= evaluatorFee;
-                _payToEvaluators(id, evaluatorFee);
-            }
-
             paymentToken.safeTransferFrom(
                 address(this),
-                msg.sender,
+                job.client,
                 claimableAmount
             );
-            emit RefundedBudget(id, msg.sender, claimableAmount);
+            emit RefundedBudget(id, job.client, claimableAmount);
         }
     }
 
@@ -277,6 +305,12 @@ contract ACPSimple is
         bool isSecured,
         uint8 nextPhase
     ) public returns (uint256) {
+        require(
+            msg.sender == jobs[jobId].client ||
+                msg.sender == jobs[jobId].provider,
+            "Only client or provider can create memo"
+        );
+        require(jobId > 0 && jobId <= jobCounter, "Job does not exist");
         uint256 newMemoId = _createMemo(
             jobId,
             content,
@@ -303,42 +337,61 @@ contract ACPSimple is
         Job memory job = jobs[jobId];
         return
             job.phase < PHASE_COMPLETED &&
-            (isEvaluator(account) ||
+            ((job.phase == PHASE_EVALUATION && isEvaluator(account)) ||
                 (job.client == account || job.provider == account));
     }
 
-    function getAllMemos(uint256 jobId) external view returns (Memo[] memory) {
+    function getAllMemos(
+        uint256 jobId,
+        uint256 offset,
+        uint256 limit
+    ) external view returns (Memo[] memory, uint256 total) {
         uint256 memoCount = jobs[jobId].memoCount;
-        Memo[] memory allMemos = new Memo[](memoCount);
+        require(offset < memoCount, "Offset out of bounds");
+
+        uint256 size = (offset + limit > memoCount)
+            ? memoCount - offset
+            : limit;
+        Memo[] memory allMemos = new Memo[](size);
+
         uint256 k = 0;
-        for (uint8 i = 0; i < TOTAL_PHASES; i++) {
+        uint256 current = 0;
+        for (uint8 i = 0; i < TOTAL_PHASES && k < size; i++) {
             uint256[] memory tmpIds = jobMemoIds[jobId][i];
-            for (uint256 j = 0; j < tmpIds.length; j++) {
-                allMemos[k++] = memos[tmpIds[j]];
+            for (uint256 j = 0; j < tmpIds.length && k < size; j++) {
+                if (current >= offset) {
+                    allMemos[k++] = memos[tmpIds[j]];
+                }
+                current++;
             }
         }
-        return allMemos;
+        return (allMemos, memoCount);
     }
 
     function getMemosForPhase(
         uint256 jobId,
-        uint8 phase
-    ) external view returns (Memo[] memory) {
+        uint8 phase,
+        uint256 offset,
+        uint256 limit
+    ) external view returns (Memo[] memory, uint256 total) {
         uint256 count = jobMemoIds[jobId][phase].length;
-        uint256 memoId = 0;
-        Memo[] memory memosForPhase = new Memo[](count);
-        for (uint256 i = 0; i < count; i++) {
-            memoId = jobMemoIds[jobId][phase][i];
+        require(offset < count, "Offset out of bounds");
+
+        uint256 size = (offset + limit > count) ? count - offset : limit;
+        Memo[] memory memosForPhase = new Memo[](size);
+
+        for (uint256 i = 0; i < size; i++) {
+            uint256 memoId = jobMemoIds[jobId][phase][offset + i];
             memosForPhase[i] = memos[memoId];
         }
-        return memosForPhase;
+        return (memosForPhase, count);
     }
 
     function isJobEvaluator(
         uint256 jobId,
         address account
     ) public view returns (bool) {
-        for (uint8 i = 0; i < jobEvaluators[jobId].length; i++) {
+        for (uint256 i = 0; i < jobEvaluators[jobId].length; i++) {
             if (jobEvaluators[jobId][i] == account) {
                 return true;
             }
@@ -381,15 +434,28 @@ contract ACPSimple is
         }
 
         signatories[memoId][msg.sender] = isApproved ? 1 : 2;
-
-        if (isApproved) {
-            memo.numApprovals++;
-        }
-
         emit MemoSigned(memoId, isApproved, reason);
 
-        if (memo.numApprovals >= minApprovals) {
-            _updateJobPhase(memo.jobId, memo.nextPhase);
+        uint256 mid = numEvaluatorsPerJob / 2;
+        if (isApproved) {
+            memo.evalApprovals++;
+            if (job.phase != PHASE_EVALUATION || memo.evalApprovals > mid) {
+                _updateJobPhase(memo.jobId, memo.nextPhase);
+            }
+        } else {
+            memo.evalRejections++;
+            if (job.phase == PHASE_EVALUATION && memo.evalRejections > mid) {
+                _updateJobPhase(memo.jobId, PHASE_REJECTED);
+                claimBudget(memo.jobId);
+            }
         }
+    }
+
+    function updatePlatformFee(
+        uint256 platformFeeBP_,
+        address platformTreasury_
+    ) external onlyRole(ADMIN_ROLE) {
+        platformFeeBP = platformFeeBP_;
+        platformTreasury = platformTreasury_;
     }
 }

@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-// This is sample implementation of ATIP
+// This is sample implementation of ACP
 // - all phases requires counter party approval except for evaluation phase
 // - evaluation phase requires evaluators to sign
 // - payment token is fixed
@@ -14,7 +14,7 @@ import "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol
 import "./IServiceProviderRegistry.sol";
 import "./InteractionLedger.sol";
 
-contract ATIPSimple is
+contract ACPSimple is
     Initializable,
     AccessControlUpgradeable,
     InteractionLedger,
@@ -290,7 +290,7 @@ contract ATIPSimple is
         jobMemoIds[jobId][job.phase].push(newMemoId);
 
         if (nextPhase == PHASE_COMPLETED && job.phase == PHASE_TRANSACTION) {
-            _updateJobPhase(jobId, PHASE_NEGOTIATION);
+            _updateJobPhase(jobId, PHASE_EVALUATION);
         }
 
         return newMemoId;

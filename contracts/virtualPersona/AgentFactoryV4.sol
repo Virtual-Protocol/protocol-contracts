@@ -556,6 +556,8 @@ contract AgentFactoryV4 is
 
         require(isCompatibleToken(tokenAddr), "Unsupported token");
 
+        require(tokenAddr != assetToken, "Asset token cannot be used");
+
         require(
             IERC20(assetToken).balanceOf(sender) >= applicationThreshold,
             "Insufficient asset token"
@@ -657,7 +659,6 @@ contract AgentFactoryV4 is
     function _createPair(
         address tokenAddr
     ) internal returns (address uniswapV2Pair_) {
-        
         IUniswapV2Factory factory = IUniswapV2Factory(
             IUniswapV2Router02(_uniswapRouter).factory()
         );

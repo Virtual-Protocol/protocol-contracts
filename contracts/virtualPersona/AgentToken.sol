@@ -8,6 +8,7 @@ import "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "../pool/IUniswapV2Router02.sol";
 import "../pool/IUniswapV2Factory.sol";
+import "../pool/IUniswapV2Pair.sol";
 import "./IAgentToken.sol";
 import "./IAgentFactory.sol";
 
@@ -276,17 +277,19 @@ contract AgentToken is
         _approve(address(this), address(_uniswapRouter), type(uint256).max);
         IERC20(pairToken).approve(address(_uniswapRouter), type(uint256).max);
         // Add the liquidity:
-        (uint256 amountA, uint256 amountB, uint256 lpTokens) = _uniswapRouter
-            .addLiquidity(
-                address(this),
-                pairToken,
-                balanceOf(address(this)),
-                IERC20(pairToken).balanceOf(address(this)),
-                0,
-                0,
-                address(this),
-                block.timestamp
-            );
+
+        address pairAddr = IUniswapV2Factory(_uniswapRouter.factory()).getPair(
+            address(this),
+            pairToken
+        );
+
+        uint256 amountA = balanceOf(address(this));
+        uint256 amountB = IERC20(pairToken).balanceOf(address(this));
+
+        transfer(pairAddr, amountA);
+        IERC20(pairToken).transfer(pairAddr, amountB);
+
+        uint256 lpTokens = IUniswapV2Pair(pairAddr).mint(address(this));
 
         emit InitialLiquidityAdded(amountA, amountB, lpTokens);
 

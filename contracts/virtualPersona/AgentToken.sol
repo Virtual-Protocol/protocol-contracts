@@ -879,7 +879,8 @@ contract AgentToken is
             !_autoSwapInProgress &&
             !isLiquidityPool(from_) &&
             from_ != address(_uniswapRouter) &&
-            to_ != address(_uniswapRouter));
+            to_ != address(_uniswapRouter) &&
+            from_ != address(this));
     }
 
     /**

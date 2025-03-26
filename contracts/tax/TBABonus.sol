@@ -74,11 +74,11 @@ contract TBABonus is ITBABonus, Initializable, AccessControlUpgradeable {
         uint256 agentId,
         address recipient,
         uint256 amount
-    ) public onlyRole(EXECUTOR_ROLE) {
+    ) public {
         require(agentId > 0, "Invalid agent ID");
         require(recipient != address(0), "Invalid recipient");
 
-        if (amount == 0) {
+        if (amount == 0 || !hasRole(EXECUTOR_ROLE, msg.sender)) {
             return;
         }
 

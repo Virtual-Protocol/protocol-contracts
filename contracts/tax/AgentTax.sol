@@ -8,6 +8,7 @@ import "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol"
 import "@openzeppelin/contracts/utils/math/Math.sol";
 import "../pool/IRouter.sol";
 import "../virtualPersona/IAgentNft.sol";
+import "./ITBABonus.sol";
 
 contract AgentTax is Initializable, AccessControlUpgradeable {
     using SafeERC20 for IERC20;
@@ -79,6 +80,8 @@ contract AgentTax is Initializable, AccessControlUpgradeable {
         address oldCreator,
         address newCreator
     );
+
+    ITBABonus public tbaBonus;
 
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() {
@@ -283,6 +286,13 @@ contract AgentTax is Initializable, AccessControlUpgradeable {
                     taxRecipient.creator,
                     creatorFee
                 );
+                if (address(tbaBonus) != address(0)) {
+                    tbaBonus.distributeBonus(
+                        agentId,
+                        taxRecipient.creator,
+                        creatorFee
+                    );
+                }
             }
 
             if (feeAmount > 0) {
@@ -336,5 +346,9 @@ contract AgentTax is Initializable, AccessControlUpgradeable {
             uint256 minOutput = ((amountToSwap * (DENOM - slippage)) / DENOM);
             _swapForAsset(agentId, minOutput, maxOverride);
         }
+    }
+
+    function updateTbaBonus(address tbaBonus_) public onlyRole(ADMIN_ROLE) {
+        tbaBonus = ITBABonus(tbaBonus_);
     }
 }

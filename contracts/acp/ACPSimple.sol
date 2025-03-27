@@ -198,8 +198,6 @@ contract ACPSimple is
 
         job.budget = amount;
 
-        paymentToken.safeIncreaseAllowance(address(this), amount);
-
         emit BudgetSet(jobId, amount);
     }
 

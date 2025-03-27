@@ -476,6 +476,9 @@ contract AgentToken is
         projectBuyTaxBasisPoints = newProjectBuyTaxBasisPoints_;
         projectSellTaxBasisPoints = newProjectSellTaxBasisPoints_;
 
+        _tokenHasTax =
+            (projectBuyTaxBasisPoints + projectSellTaxBasisPoints) > 0;
+
         emit ProjectTaxBasisPointsChanged(
             oldBuyTaxBasisPoints,
             newProjectBuyTaxBasisPoints_,

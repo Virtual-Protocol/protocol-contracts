@@ -112,7 +112,7 @@ contract AgentMigrator is Ownable, Pausable {
         string memory name,
         string memory symbol,
         bool canStake
-    ) external noReentrant {
+    ) external noReentrant whenNotPaused {
         require(!migratedAgents[id], "Agent already migrated");
 
         IAgentNft.VirtualInfo memory virtualInfo = _nft.virtualInfo(id);

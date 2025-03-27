@@ -198,7 +198,7 @@ contract Bonding is
             purchaseAmount > fee,
             "Purchase amount must be greater than fee"
         );
-        
+
         require(cores.length > 0, "Cores must be provided");
 
         address assetToken = router.assetToken();
@@ -287,7 +287,13 @@ contract Bonding is
 
         // Make initial purchase
         IERC20(assetToken).forceApprove(address(router), initialPurchase);
-        _buy(address(this), initialPurchase, address(token));
+        _buy(
+            address(this),
+            initialPurchase,
+            address(token),
+            0,
+            block.timestamp + 300
+        );
         token.transfer(msg.sender, token.balanceOf(address(this)));
 
         return (address(token), _pair, n);
@@ -295,9 +301,12 @@ contract Bonding is
 
     function sell(
         uint256 amountIn,
-        address tokenAddress
+        address tokenAddress,
+        uint256 amountOutMin,
+        uint256 deadline
     ) public returns (bool) {
         require(tokenInfo[tokenAddress].trading, "Token not trading");
+        require(block.timestamp <= deadline, "Deadline exceeded");
 
         address pairAddress = factory.getPair(
             tokenAddress,
@@ -313,6 +322,7 @@ contract Bonding is
             tokenAddress,
             msg.sender
         );
+        require(amount1Out >= amountOutMin, "Slippage too high");
 
         uint256 newReserveA = reserveA + amount0In;
         uint256 newReserveB = reserveB - amount1Out;
@@ -349,8 +359,11 @@ contract Bonding is
     function _buy(
         address buyer,
         uint256 amountIn,
-        address tokenAddress
+        address tokenAddress,
+        uint256 amountOutMin,
+        uint256 deadline
     ) internal {
+        require(block.timestamp <= deadline, "Deadline exceeded");
         address pairAddress = factory.getPair(
             tokenAddress,
             router.assetToken()
@@ -365,6 +378,8 @@ contract Bonding is
             tokenAddress,
             buyer
         );
+
+        require(amount0Out >= amountOutMin, "Slippage too high");
 
         uint256 newReserveA = reserveA - amount0Out;
         uint256 newReserveB = reserveB + amount1In;
@@ -402,11 +417,13 @@ contract Bonding is
 
     function buy(
         uint256 amountIn,
-        address tokenAddress
+        address tokenAddress,
+        uint256 amountOutMin,
+        uint256 deadline
     ) public payable returns (bool) {
         require(tokenInfo[tokenAddress].trading, "Token not trading");
 
-        _buy(msg.sender, amountIn, tokenAddress);
+        _buy(msg.sender, amountIn, tokenAddress, amountOutMin, deadline);
 
         return true;
     }

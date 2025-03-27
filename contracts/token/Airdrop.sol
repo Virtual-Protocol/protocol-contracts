@@ -17,6 +17,18 @@ contract Airdrop {
         uint256[] calldata _amounts,
         uint256 _total
     ) external {
+        // Ensure arrays have same length
+        require(_recipients.length == _amounts.length, "Length mismatch");
+        
+        // Calculate sum of amounts
+        uint256 sum;
+        for(uint256 i = 0; i < _amounts.length; i++) {
+            sum += _amounts[i];
+        }
+        
+        // Verify sum equals total
+        require(sum == _total, "Sum != total");
+
         // bytes selector for transferFrom(address,address,uint256)
         bytes4 transferFrom = 0x23b872dd;
         // bytes selector for transfer(address,uint256)

@@ -72,6 +72,7 @@ contract AgentMigrator is Ownable, Pausable {
         uint256 botProtectionDurationInSeconds,
         address vault
     ) public onlyOwner {
+        require((lpSupply + vaultSupply) <= maxSupply, "Invalid supply");
         _tokenSupplyParams = abi.encode(
             maxSupply,
             lpSupply,
@@ -89,6 +90,12 @@ contract AgentMigrator is Ownable, Pausable {
         uint256 taxSwapThresholdBasisPoints,
         address projectTaxRecipient
     ) public onlyOwner {
+        require(
+            projectBuyTaxBasisPoints <= 10000 &&
+                projectSellTaxBasisPoints <= 10000 &&
+                taxSwapThresholdBasisPoints <= 10000,
+            "Invalid tax params"
+        );
         _tokenTaxParams = abi.encode(
             projectBuyTaxBasisPoints,
             projectSellTaxBasisPoints,
@@ -112,7 +119,7 @@ contract AgentMigrator is Ownable, Pausable {
         string memory name,
         string memory symbol,
         bool canStake
-    ) external noReentrant {
+    ) external noReentrant whenNotPaused {
         require(!migratedAgents[id], "Agent already migrated");
 
         IAgentNft.VirtualInfo memory virtualInfo = _nft.virtualInfo(id);

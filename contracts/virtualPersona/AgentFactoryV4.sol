@@ -478,6 +478,7 @@ contract AgentFactoryV4 is
         uint256 botProtectionDurationInSeconds,
         address vault
     ) public onlyRole(DEFAULT_ADMIN_ROLE) {
+        require((lpSupply + vaultSupply) <= maxSupply, "Invalid supply");
         _tokenSupplyParams = abi.encode(
             maxSupply,
             lpSupply,
@@ -495,6 +496,12 @@ contract AgentFactoryV4 is
         uint256 taxSwapThresholdBasisPoints,
         address projectTaxRecipient
     ) public onlyRole(DEFAULT_ADMIN_ROLE) {
+        require(
+            projectBuyTaxBasisPoints <= 10000 &&
+                projectSellTaxBasisPoints <= 10000 &&
+                taxSwapThresholdBasisPoints <= 10000,
+            "Invalid tax params"
+        );
         _tokenTaxParams = abi.encode(
             projectBuyTaxBasisPoints,
             projectSellTaxBasisPoints,

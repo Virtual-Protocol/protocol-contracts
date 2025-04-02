@@ -144,9 +144,7 @@ contract BondingTax is
     function swapForAsset() public onlyBondingRouter returns (bool, uint256) {
         uint256 amount = IERC20(taxToken).balanceOf(address(this));
 
-        require(amount > 0, "Nothing to be swapped");
-
-        if (amount < minSwapThreshold) {
+        if (amount < minSwapThreshold || amount == 0) {
             return (false, 0);
         }
 

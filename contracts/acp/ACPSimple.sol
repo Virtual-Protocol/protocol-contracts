@@ -183,7 +183,7 @@ contract ACPSimple is
                 job.budget
             );
         } else if (oldPhase == PHASE_EVALUATION && phase >= PHASE_COMPLETED) {
-            claimBudget(jobId);
+            _claimBudget(jobId);
         }
     }
 
@@ -202,6 +202,10 @@ contract ACPSimple is
     }
 
     function claimBudget(uint256 id) public nonReentrant {
+        _claimBudget(id);
+    }
+
+    function _claimBudget(uint256 id) internal {
         Job storage job = jobs[id];
         require(job.budget > job.amountClaimed, "No budget to claim");
 

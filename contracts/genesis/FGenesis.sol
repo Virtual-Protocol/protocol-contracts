@@ -2,10 +2,11 @@
 pragma solidity ^0.8.26;
 
 import "./Genesis.sol";
-import "@openzeppelin/contracts/access/Ownable.sol";
+import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 
-contract FGenesis is Ownable {
+contract FGenesis is Initializable, OwnableUpgradeable {
     address public virtualTokenAddress;
     address public virtualsFactory;
     uint256 public reserveAmount;
@@ -13,28 +14,48 @@ contract FGenesis is Ownable {
     address public creationFeeAddress;
     uint256 public creationFeeAmount;
     uint256 public duration;
-    
+
     mapping(uint256 => address) public mapGenesisIDToGenesisContractAddr;
     uint256 public genesisID;
     mapping(address => bool) public isAdmin;
     address[] public adminList;
 
-    event VirtualTokenAddressUpdated(address indexed oldAddress, address indexed newAddress);
-    event VirtualsFactoryUpdated(address indexed oldAddress, address indexed newAddress);
+    event VirtualTokenAddressUpdated(
+        address indexed oldAddress,
+        address indexed newAddress
+    );
+    event VirtualsFactoryUpdated(
+        address indexed oldAddress,
+        address indexed newAddress
+    );
     event ReserveAmountUpdated(uint256 oldAmount, uint256 newAmount);
-    event MaxContributionVirtualAmountUpdated(uint256 oldAmount, uint256 newAmount);
-    event CreationFeeAddressUpdated(address indexed oldAddress, address indexed newAddress);
+    event MaxContributionVirtualAmountUpdated(
+        uint256 oldAmount,
+        uint256 newAmount
+    );
+    event CreationFeeAddressUpdated(
+        address indexed oldAddress,
+        address indexed newAddress
+    );
     event CreationFeeAmountUpdated(uint256 oldAmount, uint256 newAmount);
     event AdminAdded(address indexed admin);
     event AdminRemoved(address indexed admin);
-    event GenesisCreated(uint256 indexed genesisID, address indexed genesisContract);
-    
+    event GenesisCreated(
+        uint256 indexed genesisID,
+        address indexed genesisContract
+    );
+
     modifier onlyAdmin() {
         require(isAdmin[msg.sender] || owner() == msg.sender, "Not an admin");
         _;
     }
 
-    constructor(
+    /// @custom:oz-upgrades-unsafe-allow constructor
+    constructor() {
+        _disableInitializers();
+    }
+
+    function initialize(
         address virtualTokenAddress_,
         address virtualsFactory_,
         uint256 reserveAmount_,
@@ -42,7 +63,9 @@ contract FGenesis is Ownable {
         address creationFeeAddress_,
         uint256 creationFeeAmount_,
         uint256 duration_
-    ) Ownable(msg.sender) {
+    ) external initializer {
+        __Ownable_init(msg.sender);
+
         require(duration_ > 0, "Duration must be greater than 0");
         virtualTokenAddress = virtualTokenAddress_;
         virtualsFactory = virtualsFactory_;
@@ -77,7 +100,9 @@ contract FGenesis is Ownable {
         emit ReserveAmountUpdated(oldAmount, newAmount);
     }
 
-    function setMaxContributionVirtualAmount(uint256 newAmount) external onlyOwner {
+    function setMaxContributionVirtualAmount(
+        uint256 newAmount
+    ) external onlyOwner {
         require(newAmount > 0, "Invalid amount");
         uint256 oldAmount = maxContributionVirtualAmount;
         maxContributionVirtualAmount = newAmount;
@@ -111,9 +136,9 @@ contract FGenesis is Ownable {
     function _setAdmin(address admin, bool status) private {
         require(admin != address(0), "Invalid admin address");
         require(isAdmin[admin] != status, "Admin status not changed");
-        
+
         isAdmin[admin] = status;
-        
+
         if (status) {
             adminList.push(admin);
             emit AdminAdded(admin);
@@ -146,7 +171,11 @@ contract FGenesis is Ownable {
         string[4] memory _genesisUrls
     ) external returns (GenesisInfo memory) {
         require(
-            IERC20(virtualTokenAddress).transferFrom(msg.sender, creationFeeAddress, creationFeeAmount),
+            IERC20(virtualTokenAddress).transferFrom(
+                msg.sender,
+                creationFeeAddress,
+                creationFeeAmount
+            ),
             "Creation fee transfer failed"
         );
 
@@ -165,15 +194,15 @@ contract FGenesis is Ownable {
         );
         address genesisAddr = address(newGenesis);
         mapGenesisIDToGenesisContractAddr[genesisID] = genesisAddr;
-        
+
         emit GenesisCreated(genesisID, genesisAddr);
-        return GenesisInfo({
-            genesisID: genesisID,
-            genesisContract: genesisAddr
-        });
+        return
+            GenesisInfo({genesisID: genesisID, genesisContract: genesisAddr});
     }
 
-    function getGenesisContractByID(uint256 _genesisID) external view returns (address) {
+    function getGenesisContractByID(
+        uint256 _genesisID
+    ) external view returns (address) {
         address contractAddr = mapGenesisIDToGenesisContractAddr[_genesisID];
         require(contractAddr != address(0), "Genesis ID not found");
         return contractAddr;

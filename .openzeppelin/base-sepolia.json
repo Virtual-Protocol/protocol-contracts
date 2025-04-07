@@ -214,6 +214,11 @@
       "address": "0xb06E76aaA4d81Eda444DC28C564D5B8B2aD3F530",
       "txHash": "0x6bfad44a29e6c631c2432fbaff13a296c99672ebc5eaada2f93b181a721b37ff",
       "kind": "transparent"
+    },
+    {
+      "address": "0x21A5E9424B3de7600d1EfC13122dd6833ef7fC96",
+      "txHash": "0x8b6f9e4a20e029beb51f9219c096b6030a3de56ef855ac97e3ddb2860cca8425",
+      "kind": "transparent"
     }
   ],
   "impls": {
@@ -21056,6 +21061,193 @@
               "label": "_roles",
               "type": "t_mapping(t_bytes32,t_struct(RoleData)25_storage)",
               "src": "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol:61",
+              "offset": 0,
+              "slot": "0"
+            }
+          ],
+          "erc7201:openzeppelin.storage.Initializable": [
+            {
+              "contract": "Initializable",
+              "label": "_initialized",
+              "type": "t_uint64",
+              "src": "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol:69",
+              "offset": 0,
+              "slot": "0"
+            },
+            {
+              "contract": "Initializable",
+              "label": "_initializing",
+              "type": "t_bool",
+              "src": "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol:73",
+              "offset": 8,
+              "slot": "0"
+            }
+          ]
+        }
+      }
+    },
+    "b3f78ec29ab2e415cdcf2ff8370648658b8e5a293c00855dd392b29d33881453": {
+      "address": "0x2b5AD0177770758A56800cB3Eabbd285AbF1311B",
+      "txHash": "0xd72c9d223aa3f2d3f7e3294953067390078d81040fddf4d49e584464d02cc1db",
+      "layout": {
+        "solcVersion": "0.8.26",
+        "storage": [
+          {
+            "label": "virtualTokenAddress",
+            "offset": 0,
+            "slot": "0",
+            "type": "t_address",
+            "contract": "FGenesis",
+            "src": "contracts/genesis/FGenesis.sol:10"
+          },
+          {
+            "label": "virtualsFactory",
+            "offset": 0,
+            "slot": "1",
+            "type": "t_address",
+            "contract": "FGenesis",
+            "src": "contracts/genesis/FGenesis.sol:11"
+          },
+          {
+            "label": "reserveAmount",
+            "offset": 0,
+            "slot": "2",
+            "type": "t_uint256",
+            "contract": "FGenesis",
+            "src": "contracts/genesis/FGenesis.sol:12"
+          },
+          {
+            "label": "maxContributionVirtualAmount",
+            "offset": 0,
+            "slot": "3",
+            "type": "t_uint256",
+            "contract": "FGenesis",
+            "src": "contracts/genesis/FGenesis.sol:13"
+          },
+          {
+            "label": "creationFeeAddress",
+            "offset": 0,
+            "slot": "4",
+            "type": "t_address",
+            "contract": "FGenesis",
+            "src": "contracts/genesis/FGenesis.sol:14"
+          },
+          {
+            "label": "creationFeeAmount",
+            "offset": 0,
+            "slot": "5",
+            "type": "t_uint256",
+            "contract": "FGenesis",
+            "src": "contracts/genesis/FGenesis.sol:15"
+          },
+          {
+            "label": "duration",
+            "offset": 0,
+            "slot": "6",
+            "type": "t_uint256",
+            "contract": "FGenesis",
+            "src": "contracts/genesis/FGenesis.sol:16"
+          },
+          {
+            "label": "mapGenesisIDToGenesisContractAddr",
+            "offset": 0,
+            "slot": "7",
+            "type": "t_mapping(t_uint256,t_address)",
+            "contract": "FGenesis",
+            "src": "contracts/genesis/FGenesis.sol:18"
+          },
+          {
+            "label": "genesisID",
+            "offset": 0,
+            "slot": "8",
+            "type": "t_uint256",
+            "contract": "FGenesis",
+            "src": "contracts/genesis/FGenesis.sol:19"
+          },
+          {
+            "label": "isAdmin",
+            "offset": 0,
+            "slot": "9",
+            "type": "t_mapping(t_address,t_bool)",
+            "contract": "FGenesis",
+            "src": "contracts/genesis/FGenesis.sol:20"
+          },
+          {
+            "label": "adminList",
+            "offset": 0,
+            "slot": "10",
+            "type": "t_array(t_address)dyn_storage",
+            "contract": "FGenesis",
+            "src": "contracts/genesis/FGenesis.sol:21"
+          }
+        ],
+        "types": {
+          "t_address": {
+            "label": "address",
+            "numberOfBytes": "20"
+          },
+          "t_bool": {
+            "label": "bool",
+            "numberOfBytes": "1"
+          },
+          "t_struct(InitializableStorage)64_storage": {
+            "label": "struct Initializable.InitializableStorage",
+            "members": [
+              {
+                "label": "_initialized",
+                "type": "t_uint64",
+                "offset": 0,
+                "slot": "0"
+              },
+              {
+                "label": "_initializing",
+                "type": "t_bool",
+                "offset": 8,
+                "slot": "0"
+              }
+            ],
+            "numberOfBytes": "32"
+          },
+          "t_struct(OwnableStorage)14_storage": {
+            "label": "struct OwnableUpgradeable.OwnableStorage",
+            "members": [
+              {
+                "label": "_owner",
+                "type": "t_address",
+                "offset": 0,
+                "slot": "0"
+              }
+            ],
+            "numberOfBytes": "32"
+          },
+          "t_uint64": {
+            "label": "uint64",
+            "numberOfBytes": "8"
+          },
+          "t_array(t_address)dyn_storage": {
+            "label": "address[]",
+            "numberOfBytes": "32"
+          },
+          "t_mapping(t_address,t_bool)": {
+            "label": "mapping(address => bool)",
+            "numberOfBytes": "32"
+          },
+          "t_mapping(t_uint256,t_address)": {
+            "label": "mapping(uint256 => address)",
+            "numberOfBytes": "32"
+          },
+          "t_uint256": {
+            "label": "uint256",
+            "numberOfBytes": "32"
+          }
+        },
+        "namespaces": {
+          "erc7201:openzeppelin.storage.Ownable": [
+            {
+              "contract": "OwnableUpgradeable",
+              "label": "_owner",
+              "type": "t_address",
+              "src": "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol:24",
               "offset": 0,
               "slot": "0"
             }

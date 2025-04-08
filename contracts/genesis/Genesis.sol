@@ -225,10 +225,11 @@ contract Genesis is ReentrancyGuard, Ownable {
 
         emit GenesisFinalized(GENESIS_ID, true);
     }
-    
+
     function onGenesisFailed() external onlyAdmin nonReentrant {
         require(!isFailed, "Genesis already failed");
         require(isEnded(), "Genesis not ended yet");
+        require(agentTokenAddress == address(0), "Cannot fail after agent token launch");
         isFailed = true;
 
         // Return all virtuals to participants

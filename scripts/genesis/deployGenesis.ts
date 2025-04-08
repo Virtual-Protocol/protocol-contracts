@@ -1,9 +1,9 @@
 import { ethers, upgrades } from "hardhat";
 
-const adminSigner = new ethers.Wallet(
-  process.env.ADMIN_PRIVATE_KEY,
-  ethers.provider
-);
+// const adminSigner = new ethers.Wallet(
+//   process.env.ADMIN_PRIVATE_KEY,
+//   ethers.provider
+// );
 
 (async () => {
   try {
@@ -12,6 +12,7 @@ const adminSigner = new ethers.Wallet(
     const contract = await upgrades.deployProxy(Contract, args, {
       initialOwner: process.env.CONTRACT_CONTROLLER,
     });
+    await contract.transferOwnership(process.env.ADMIN);
     await contract.waitForDeployment();
     console.log("FGenesis deployed to:", contract.target);
   } catch (e) {

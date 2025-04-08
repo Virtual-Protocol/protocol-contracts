@@ -61,6 +61,12 @@ contract FGenesis is Initializable, OwnableUpgradeable {
         __Ownable_init(msg.sender);
 
         require(duration_ > 0, "Duration must be greater than 0");
+        require(virtualTokenAddress_ != address(0), "Invalid virtual token address");
+        require(virtualsFactory_ != address(0), "Invalid virtuals factory address");
+        require(reserveAmount_ > 0, "Reserve amount must be greater than 0");
+        require(maxContributionVirtualAmount_ > 0, "Max contribution virtual amount must be greater than 0");
+        require(creationFeeAmount_ > 0, "Creation fee amount must be greater than 0");
+        require(reserveAmount_ >= creationFeeAmount_, "Reserve amount must be greater than or equal to creation fee amount");
         virtualTokenAddress = virtualTokenAddress_;
         virtualsFactory = virtualsFactory_;
         reserveAmount = reserveAmount_;
@@ -88,6 +94,7 @@ contract FGenesis is Initializable, OwnableUpgradeable {
 
     function setReserveAmount(uint256 newAmount) external onlyOwner {
         require(newAmount > 0, "Invalid amount");
+        require(newAmount >= creationFeeAmount, "Reserve amount must be greater than or equal to creation fee amount");
         uint256 oldAmount = reserveAmount;
         reserveAmount = newAmount;
         emit ReserveAmountUpdated(oldAmount, newAmount);
@@ -104,6 +111,7 @@ contract FGenesis is Initializable, OwnableUpgradeable {
 
     function setCreationFeeAmount(uint256 newAmount) external onlyOwner {
         require(newAmount > 0, "Invalid amount");
+        require(newAmount <= reserveAmount, "Creation fee amount must be less than or equal to reserve amount");
         uint256 oldAmount = creationFeeAmount;
         creationFeeAmount = newAmount;
         emit CreationFeeAmountUpdated(oldAmount, newAmount);
@@ -156,6 +164,10 @@ contract FGenesis is Initializable, OwnableUpgradeable {
         string memory _genesisImg,
         string[4] memory _genesisUrls
     ) external returns (GenesisInfo memory) {
+        require(bytes(_genesisName).length > 0, "Name must be greater than 0");
+        require(bytes(_genesisTicker).length > 0, "Ticker must be greater than 0");
+        require(_genesisCores.length > 0, "Cores must be greater than 0");
+        
         genesisID++;
         Genesis newGenesis = new Genesis(
             genesisID,

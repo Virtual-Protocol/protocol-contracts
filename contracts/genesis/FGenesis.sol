@@ -11,7 +11,6 @@ contract FGenesis is Initializable, OwnableUpgradeable {
     address public virtualsFactory;
     uint256 public reserveAmount;
     uint256 public maxContributionVirtualAmount;
-    address public creationFeeAddress;
     uint256 public creationFeeAmount;
     uint256 public duration;
 
@@ -32,10 +31,6 @@ contract FGenesis is Initializable, OwnableUpgradeable {
     event MaxContributionVirtualAmountUpdated(
         uint256 oldAmount,
         uint256 newAmount
-    );
-    event CreationFeeAddressUpdated(
-        address indexed oldAddress,
-        address indexed newAddress
     );
     event CreationFeeAmountUpdated(uint256 oldAmount, uint256 newAmount);
     event AdminAdded(address indexed admin);
@@ -60,7 +55,6 @@ contract FGenesis is Initializable, OwnableUpgradeable {
         address virtualsFactory_,
         uint256 reserveAmount_,
         uint256 maxContributionVirtualAmount_,
-        address creationFeeAddress_,
         uint256 creationFeeAmount_,
         uint256 duration_
     ) external initializer {
@@ -71,7 +65,6 @@ contract FGenesis is Initializable, OwnableUpgradeable {
         virtualsFactory = virtualsFactory_;
         reserveAmount = reserveAmount_;
         maxContributionVirtualAmount = maxContributionVirtualAmount_;
-        creationFeeAddress = creationFeeAddress_;
         creationFeeAmount = creationFeeAmount_;
         duration = duration_;
 
@@ -107,13 +100,6 @@ contract FGenesis is Initializable, OwnableUpgradeable {
         uint256 oldAmount = maxContributionVirtualAmount;
         maxContributionVirtualAmount = newAmount;
         emit MaxContributionVirtualAmountUpdated(oldAmount, newAmount);
-    }
-
-    function setCreationFeeAddress(address newAddress) external onlyOwner {
-        require(newAddress != address(0), "Invalid address");
-        address oldAddress = creationFeeAddress;
-        creationFeeAddress = newAddress;
-        emit CreationFeeAddressUpdated(oldAddress, newAddress);
     }
 
     function setCreationFeeAmount(uint256 newAmount) external onlyOwner {
@@ -170,15 +156,6 @@ contract FGenesis is Initializable, OwnableUpgradeable {
         string memory _genesisImg,
         string[4] memory _genesisUrls
     ) external returns (GenesisInfo memory) {
-        require(
-            IERC20(virtualTokenAddress).transferFrom(
-                msg.sender,
-                creationFeeAddress,
-                creationFeeAmount
-            ),
-            "Creation fee transfer failed"
-        );
-
         genesisID++;
         Genesis newGenesis = new Genesis(
             genesisID,
@@ -196,6 +173,15 @@ contract FGenesis is Initializable, OwnableUpgradeable {
         mapGenesisIDToGenesisContractAddr[genesisID] = genesisAddr;
 
         emit GenesisCreated(genesisID, genesisAddr);
+        require(
+            IERC20(virtualTokenAddress).transferFrom(
+                msg.sender,
+                genesisAddr,
+                creationFeeAmount
+            ),
+            "Creation fee transfer failed"
+        );
+
         return
             GenesisInfo({genesisID: genesisID, genesisContract: genesisAddr});
     }

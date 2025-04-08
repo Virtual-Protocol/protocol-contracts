@@ -224,6 +224,11 @@
       "address": "0xDF778960D40BCBF6B42B40FF590d0877912BFa90",
       "txHash": "0x7b7cbd7cf806e3de0613362f7bc1c8c0aa9aa92d2c9645b3b869792c0ca3a421",
       "kind": "transparent"
+    },
+    {
+      "address": "0x0921753e8107d38367960B11d9f4f2C95F085323",
+      "txHash": "0x2a833030f67b9db661cab6bdbf45457bbe36d8827e256e27475a7c00a34cebed",
+      "kind": "transparent"
     }
   ],
   "impls": {
@@ -21184,6 +21189,185 @@
             "type": "t_array(t_address)dyn_storage",
             "contract": "FGenesis",
             "src": "contracts/genesis/FGenesis.sol:21"
+          }
+        ],
+        "types": {
+          "t_address": {
+            "label": "address",
+            "numberOfBytes": "20"
+          },
+          "t_bool": {
+            "label": "bool",
+            "numberOfBytes": "1"
+          },
+          "t_struct(InitializableStorage)64_storage": {
+            "label": "struct Initializable.InitializableStorage",
+            "members": [
+              {
+                "label": "_initialized",
+                "type": "t_uint64",
+                "offset": 0,
+                "slot": "0"
+              },
+              {
+                "label": "_initializing",
+                "type": "t_bool",
+                "offset": 8,
+                "slot": "0"
+              }
+            ],
+            "numberOfBytes": "32"
+          },
+          "t_struct(OwnableStorage)14_storage": {
+            "label": "struct OwnableUpgradeable.OwnableStorage",
+            "members": [
+              {
+                "label": "_owner",
+                "type": "t_address",
+                "offset": 0,
+                "slot": "0"
+              }
+            ],
+            "numberOfBytes": "32"
+          },
+          "t_uint64": {
+            "label": "uint64",
+            "numberOfBytes": "8"
+          },
+          "t_array(t_address)dyn_storage": {
+            "label": "address[]",
+            "numberOfBytes": "32"
+          },
+          "t_mapping(t_address,t_bool)": {
+            "label": "mapping(address => bool)",
+            "numberOfBytes": "32"
+          },
+          "t_mapping(t_uint256,t_address)": {
+            "label": "mapping(uint256 => address)",
+            "numberOfBytes": "32"
+          },
+          "t_uint256": {
+            "label": "uint256",
+            "numberOfBytes": "32"
+          }
+        },
+        "namespaces": {
+          "erc7201:openzeppelin.storage.Ownable": [
+            {
+              "contract": "OwnableUpgradeable",
+              "label": "_owner",
+              "type": "t_address",
+              "src": "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol:24",
+              "offset": 0,
+              "slot": "0"
+            }
+          ],
+          "erc7201:openzeppelin.storage.Initializable": [
+            {
+              "contract": "Initializable",
+              "label": "_initialized",
+              "type": "t_uint64",
+              "src": "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol:69",
+              "offset": 0,
+              "slot": "0"
+            },
+            {
+              "contract": "Initializable",
+              "label": "_initializing",
+              "type": "t_bool",
+              "src": "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol:73",
+              "offset": 8,
+              "slot": "0"
+            }
+          ]
+        }
+      }
+    },
+    "b4c2b90c2ea4ba743f2c4d3b38fd498d2889bc90e2d12a84e8e17a74fa9b2c2e": {
+      "address": "0x2E711073384c0F6d87F9238289c9f4Cbd931119c",
+      "txHash": "0x37cd9cb0bc7efde3d44ae91ac441ee3dbe7b33fcc205a79b06991455132db9cb",
+      "layout": {
+        "solcVersion": "0.8.26",
+        "storage": [
+          {
+            "label": "virtualTokenAddress",
+            "offset": 0,
+            "slot": "0",
+            "type": "t_address",
+            "contract": "FGenesis",
+            "src": "contracts/genesis/FGenesis.sol:10"
+          },
+          {
+            "label": "virtualsFactory",
+            "offset": 0,
+            "slot": "1",
+            "type": "t_address",
+            "contract": "FGenesis",
+            "src": "contracts/genesis/FGenesis.sol:11"
+          },
+          {
+            "label": "reserveAmount",
+            "offset": 0,
+            "slot": "2",
+            "type": "t_uint256",
+            "contract": "FGenesis",
+            "src": "contracts/genesis/FGenesis.sol:12"
+          },
+          {
+            "label": "maxContributionVirtualAmount",
+            "offset": 0,
+            "slot": "3",
+            "type": "t_uint256",
+            "contract": "FGenesis",
+            "src": "contracts/genesis/FGenesis.sol:13"
+          },
+          {
+            "label": "creationFeeAmount",
+            "offset": 0,
+            "slot": "4",
+            "type": "t_uint256",
+            "contract": "FGenesis",
+            "src": "contracts/genesis/FGenesis.sol:14"
+          },
+          {
+            "label": "duration",
+            "offset": 0,
+            "slot": "5",
+            "type": "t_uint256",
+            "contract": "FGenesis",
+            "src": "contracts/genesis/FGenesis.sol:15"
+          },
+          {
+            "label": "mapGenesisIDToGenesisContractAddr",
+            "offset": 0,
+            "slot": "6",
+            "type": "t_mapping(t_uint256,t_address)",
+            "contract": "FGenesis",
+            "src": "contracts/genesis/FGenesis.sol:17"
+          },
+          {
+            "label": "genesisID",
+            "offset": 0,
+            "slot": "7",
+            "type": "t_uint256",
+            "contract": "FGenesis",
+            "src": "contracts/genesis/FGenesis.sol:18"
+          },
+          {
+            "label": "isAdmin",
+            "offset": 0,
+            "slot": "8",
+            "type": "t_mapping(t_address,t_bool)",
+            "contract": "FGenesis",
+            "src": "contracts/genesis/FGenesis.sol:19"
+          },
+          {
+            "label": "adminList",
+            "offset": 0,
+            "slot": "9",
+            "type": "t_array(t_address)dyn_storage",
+            "contract": "FGenesis",
+            "src": "contracts/genesis/FGenesis.sol:20"
           }
         ],
         "types": {

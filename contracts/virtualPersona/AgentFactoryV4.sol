@@ -478,6 +478,7 @@ contract AgentFactoryV4 is
         uint256 botProtectionDurationInSeconds,
         address vault
     ) public onlyRole(DEFAULT_ADMIN_ROLE) {
+        require((lpSupply + vaultSupply) <= maxSupply, "Invalid supply");
         _tokenSupplyParams = abi.encode(
             maxSupply,
             lpSupply,
@@ -495,6 +496,12 @@ contract AgentFactoryV4 is
         uint256 taxSwapThresholdBasisPoints,
         address projectTaxRecipient
     ) public onlyRole(DEFAULT_ADMIN_ROLE) {
+        require(
+            projectBuyTaxBasisPoints <= 10000 &&
+                projectSellTaxBasisPoints <= 10000 &&
+                taxSwapThresholdBasisPoints <= 10000,
+            "Invalid tax params"
+        );
         _tokenTaxParams = abi.encode(
             projectBuyTaxBasisPoints,
             projectSellTaxBasisPoints,
@@ -555,6 +562,8 @@ contract AgentFactoryV4 is
         require(_tokenApplication[tokenAddr] == 0, "Token already exists");
 
         require(isCompatibleToken(tokenAddr), "Unsupported token");
+
+        require(tokenAddr != assetToken, "Asset token cannot be used");
 
         require(
             IERC20(assetToken).balanceOf(sender) >= applicationThreshold,
@@ -657,7 +666,6 @@ contract AgentFactoryV4 is
     function _createPair(
         address tokenAddr
     ) internal returns (address uniswapV2Pair_) {
-        
         IUniswapV2Factory factory = IUniswapV2Factory(
             IUniswapV2Router02(_uniswapRouter).factory()
         );

@@ -194,6 +194,19 @@ contract Bonding is
         string[4] memory urls,
         uint256 purchaseAmount
     ) public nonReentrant returns (address, address, uint) {
+        return launchFor(_name, _ticker, cores, desc, img, urls, purchaseAmount, msg.sender);
+    }
+
+    function launchFor(
+        string memory _name,
+        string memory _ticker,
+        uint8[] memory cores,
+        string memory desc,
+        string memory img,
+        string[4] memory urls,
+        uint256 purchaseAmount,
+        address creator
+    ) public nonReentrant returns (address, address, uint) {
         require(
             purchaseAmount > fee,
             "Purchase amount must be greater than fee"
@@ -239,7 +252,7 @@ contract Bonding is
             lastUpdated: block.timestamp
         });
         Token memory tmpToken = Token({
-            creator: msg.sender,
+            creator: creator,
             token: address(token),
             agentToken: address(0),
             pair: _pair,

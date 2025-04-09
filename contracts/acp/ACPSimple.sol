@@ -319,7 +319,8 @@ contract ACPSimple is
         return
             job.phase < PHASE_COMPLETED &&
             ((job.client == account || job.provider == account) ||
-                (job.evaluator == account && job.phase == PHASE_EVALUATION));
+                ((job.evaluator == account || job.evaluator == address(0)) &&
+                    job.phase == PHASE_EVALUATION));
     }
 
     function getAllMemos(

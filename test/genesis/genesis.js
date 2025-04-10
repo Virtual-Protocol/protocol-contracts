@@ -1,191 +1,321 @@
+const { ethers, upgrades } = require("hardhat");
 const { expect } = require("chai");
-const { ethers } = require("hardhat");
 const { time } = require("@nomicfoundation/hardhat-network-helpers");
+const { setupTest } = require("./setup");
 
-describe("Genesis Tests", function () {
+describe("Genesis Business Logic Tests", function () {
   let virtualToken;
+  let agentToken;
   let fGenesis;
   let genesis;
   let owner;
+  let admin;
+  let beOpsWallet;
   let user1;
   let user2;
+  let DEFAULT_ADMIN_ROLE;
+  let ADMIN_ROLE;
+  let FACTORY_ROLE;
+  let params;
+  let agentFactory;
 
   beforeEach(async function () {
-    [owner, user1, user2] = await ethers.getSigners();
-    console.log("\n=== Test Setup ===");
+    const setup = await setupTest();
+    ({
+        virtualToken,
+        agentToken,
+        fGenesis,
+        genesis,
+        owner,
+        admin,
+        beOpsWallet,
+        user1,
+        user2,
+        DEFAULT_ADMIN_ROLE,
+        ADMIN_ROLE,
+        FACTORY_ROLE,
+        params,
+        agentFactory,
+    } = setup);
 
-    // Deploy ERC20Mock
-    console.log("Deploying ERC20Mock...");
-    const VirtualToken = await ethers.getContractFactory("ERC20Mock");
-    virtualToken = await VirtualToken.deploy(
-      "Virtual Token",
-      "VT",
-      owner.address,
-      ethers.parseEther("1000000")
-    );
-    await virtualToken.waitForDeployment();
-    console.log("ERC20Mock deployed to:", virtualToken.target);
+    // Get 5 participant accounts
+    participants = (await ethers.getSigners()).slice(5, 10);
+    
+    // Transfer 100 tokens to each participant and approve
+    for (const participant of participants) {
+      await virtualToken.transfer(
+        participant.address,
+        ethers.parseEther("100")
+      );
+      await virtualToken
+        .connect(participant)
+        .approve(await genesis.getAddress(), ethers.parseEther("100"));
+    }
 
-    // Deploy FGenesis implementation
-    console.log("\nDeploying FGenesis...");
-    const FGenesis = await ethers.getContractFactory("FGenesis");
-    const fGenesisImpl = await FGenesis.deploy();
-    await fGenesisImpl.waitForDeployment();
-    console.log("FGenesis implementation deployed to:", fGenesisImpl.target);
-
-    // Initialize FGenesis
-    const creationFeeAmount = ethers.parseEther("1");
-    const reserveAmount = ethers.parseEther("2");
-
-    const initializeData = fGenesisImpl.interface.encodeFunctionData(
-      "initialize",
-      [
-        virtualToken.target, // virtualToken
-        virtualToken.target, // virtualsFactory
-        reserveAmount, // reserveAmount
-        ethers.parseEther("0.1"), // maxContributionVirtualAmount
-        creationFeeAmount, // creationFeeAmount
-        86400n, // duration
-      ]
-    );
-
-    // Deploy proxy
-    const Proxy = await ethers.getContractFactory(
-      "TransparentUpgradeableProxy"
-    );
-    const proxy = await Proxy.deploy(
-      fGenesisImpl.target,
-      owner.address,
-      initializeData
-    );
-    await proxy.waitForDeployment();
-    console.log("Proxy deployed to:", proxy.target);
-
-    // Get FGenesis instance
-    fGenesis = FGenesis.attach(proxy.target);
-
-    // Approve tokens for creation
-    await virtualToken.approve(fGenesis.target, creationFeeAmount);
-    console.log("Approved tokens for creation");
-
-    // Create Genesis
-    const currentTime = await time.latest();
-    const startTime = currentTime + 3600;
-    const endTime = startTime + 86400;
-
-    console.log("\nCreating Genesis...");
-    const tx = await fGenesis.createGenesis(
-      startTime,
-      endTime,
-      "Test Genesis",
-      "TEST",
-      [1, 2, 3], // non-empty cores array
-      "Test Description",
-      "test.img",
-      ["url1", "url2", "url3", "url4"]
-    );
-    const receipt = await tx.wait();
-
-    // Get Genesis address from event
-    const event = receipt.logs.find(
-      (log) => log.fragment?.name === "GenesisCreated"
-    );
-    const genesisAddress = event.args[1];
-    genesis = await ethers.getContractAt("Genesis", genesisAddress);
-    console.log("Genesis created at:", genesis.target);
+    maxContribution = await genesis.maxContributionVirtualAmount();
   });
 
-  it("Should initialize correctly", async function () {
-    expect(await genesis.START_TIME()).to.be.gt(0n);
-    expect(await genesis.END_TIME()).to.be.gt(await genesis.START_TIME());
+  describe("Genesis Business Logic Tests", function () {
+    it("Should return correct Genesis information", async function () {
+      const genesisInfo = await genesis.getGenesisInfo();
+      expect(genesisInfo.genesisId).to.equal(1);
+      expect(genesisInfo.genesisName).to.equal("Test Genesis");
+      expect(genesisInfo.genesisTicker).to.equal("TEST");
+      expect(genesisInfo.virtualTokenAddress).to.equal(await virtualToken.getAddress());
+    });
+
+    it("Should handle multiple participants with different contribution amounts", async function () {
+      await time.increase(3600); // Ensure Genesis has started
+
+      // edit the contribution amount, ensure it does not exceed the max limit
+      const contributions = [2, 3, 1, 2, 1].map(x => 
+        ethers.parseEther(x.toString())
+      );
+      
+      console.log("\n=== Participation Phase ===");
+      for (let i = 0; i < participants.length; i++) {
+        await genesis
+          .connect(participants[i])
+          .participate(
+            ethers.parseEther("1"),
+            contributions[i],
+            participants[i].address
+          );
+        
+        console.log(`Participant ${i + 1} contributed:`, ethers.formatEther(contributions[i]));
+        
+        // Verify participation record
+        const participated = await genesis.mapAddrToVirtuals(participants[i].address);
+        expect(participated).to.equal(contributions[i]);
+      }
+
+      // Verify participant information
+      const participantCount = await genesis.getParticipantCount();
+      expect(participantCount).to.equal(5);
+
+      const participantsInfo = await genesis.getParticipantsInfo([0, 1, 2, 3, 4]);
+      console.log("\nParticipants Information:");
+      participantsInfo.forEach((info, index) => {
+        console.log(`Participant ${index + 1}:`, {
+          address: info.userAddress,
+          virtuals: ethers.formatEther(info.virtuals)
+        });
+      });
+
+      // Test pagination of participants
+      const pageSize = 2;
+      const page1 = await genesis.getParticipantsPaginated(0, pageSize);
+      expect(page1.length).to.equal(pageSize);
+      expect(page1[0]).to.equal(participants[0].address);
+    });
+
+    it("Should handle Genesis failure with full refunds", async function () {
+      await time.increase(3600);
+
+      // Modify contribution amounts
+      const contributions = [2, 3, 1, 2, 1].map(x => 
+        ethers.parseEther(x.toString())
+      );
+      const initialBalances = await Promise.all(
+        participants.map(p => virtualToken.balanceOf(p.address))
+      );
+      
+      for (let i = 0; i < participants.length; i++) {
+        await genesis
+          .connect(participants[i])
+          .participate(
+            ethers.parseEther("1"),
+            contributions[i],
+            participants[i].address
+          );
+      }
+
+      // Wait for end time
+      const endTime = await genesis.endTime();
+      await time.increaseTo(endTime);
+
+      // Execute failure flow
+      await fGenesis.connect(beOpsWallet).onGenesisFailed(1);
+
+      const finalBalances = await Promise.all(
+        participants.map(p => virtualToken.balanceOf(p.address))
+      );
+
+      console.log("\n=== Genesis Failure Refund Details ===");
+      participants.forEach((p, i) => {
+        console.log(`Participant ${i + 1}:`, {
+          initial: ethers.formatEther(contributions[i]),
+          final: ethers.formatEther(finalBalances[i]),
+          refunded: ethers.formatEther(finalBalances[i] - contributions[i])
+        });
+        // Verify full refund
+        expect(initialBalances[i]).to.equal(finalBalances[i]);
+      });
+
+      // Verify contract state
+      expect(await genesis.isFailed()).to.be.true;
+      expect(await genesis.agentTokenAddress()).to.equal(ethers.ZeroAddress);
+    });
+
+    it("Should enforce contribution limits and timing restrictions", async function () {
+      const amount = ethers.parseEther("10");
+      
+      // Cannot participate before start
+      await expect(
+        genesis
+          .connect(participants[0])
+          .participate(
+            ethers.parseEther("1"),
+            amount,
+            participants[0].address
+          )
+      ).to.be.revertedWith("Genesis has not started yet");
+
+      // Can participate after start
+      await time.increase(3600);
+      await expect(
+        genesis
+          .connect(participants[0])
+          .participate(
+            ethers.parseEther("1"),
+            amount,
+            participants[0].address
+          )
+      ).to.not.be.reverted;
+
+      // Cannot exceed max contribution
+      await expect(
+        genesis
+          .connect(participants[1])
+          .participate(
+            ethers.parseEther("1"),
+            maxContribution + 1n,
+            participants[1].address
+          )
+      ).to.be.revertedWith("Exceeds maximum virtuals per contribution");
+
+      // Cannot participate after end
+      await time.increaseTo(await genesis.endTime());
+      await expect(
+        genesis
+          .connect(participants[2])
+          .participate(
+            ethers.parseEther("1"),
+            amount,
+            participants[2].address
+          )
+      ).to.be.revertedWith("Genesis has ended");
+    });
   });
 
-  // Helper function to setup user participation
-  async function setupUserParticipation(user, amount) {
-    console.log("\n=== Setup User Participation ===");
+  describe("onGenesisSuccess", function () {
+    it("Should revert if Genesis has not ended", async function () {
+      await expect(fGenesis.connect(beOpsWallet).onGenesisSuccess(
+        1,
+        {
+          refundAddresses: [],
+          refundAmounts: [],
+          distributeAddresses: [],
+          distributeAmounts: []
+        }
+      )).to.be.revertedWith("Genesis not ended yet");
+    });
 
-    // Warp to after start time
-    await time.increaseTo((await genesis.START_TIME()) + 1);
+    it("Should revert if insufficient Virtual Token balance", async function () {
+      // Wait for Genesis to end
+      await time.increaseTo(await genesis.endTime());
 
-    // Transfer virtual tokens to user
-    await virtualToken.transfer(user.address, amount);
-    console.log("After transfer to user:");
-    console.log(
-      "- User virtual balance:",
-      await virtualToken.balanceOf(user.address)
-    );
-    console.log(
-      "- Genesis virtual balance:",
-      await virtualToken.balanceOf(genesis.target)
-    );
+      await expect(fGenesis.connect(beOpsWallet).onGenesisSuccess(
+        1,
+        {
+          refundAddresses: [participants[0].address],
+          refundAmounts: [ethers.parseEther("1000")],
+          distributeAddresses: [],
+          distributeAmounts: []
+        }
+      )).to.be.revertedWith("Insufficient Virtual Token committed");
+    });
 
-    // Approve Genesis contract
-    await virtualToken.connect(user).approve(genesis.target, amount);
-    console.log("After approval:");
-    console.log(
-      "- User allowance to Genesis:",
-      await virtualToken.allowance(user.address, genesis.target)
-    );
+    it("Should handle successful Genesis completion with token distribution", async function () {
+      await time.increase(3600);
 
-    // Participate
-    await genesis.connect(user).participate(amount, user.address);
-    console.log("After participate:");
-    console.log(
-      "- User virtual balance:",
-      await virtualToken.balanceOf(user.address)
-    );
-    console.log(
-      "- Genesis virtual balance:",
-      await virtualToken.balanceOf(genesis.target)
-    );
-    console.log(
-      "- User virtuals in Genesis:",
-      await genesis.mapAddrToVirtuals(user.address)
-    );
-  }
+      // edit the contribution amount, ensure it does not exceed the max limit
+      const contributions = [2, 3, 1, 2, 1].map(x => 
+        ethers.parseEther(x.toString())
+      );
+      // Record initial balances
+      let initialBalances = await Promise.all(
+        participants.map(p => virtualToken.balanceOf(p.address))
+      );
+      console.log("Participants Initial Balances:", initialBalances.map(b => ethers.formatEther(b)));
+      
+      for (let i = 0; i < participants.length; i++) {
+        await genesis
+          .connect(participants[i])
+          .participate(
+            1,
+            contributions[i],
+            participants[i].address
+          );
+          const genesisVirtualTokenBalance = await virtualToken.balanceOf(await genesis.getAddress());
+          console.log("After participate idx: " + i + ", Genesis Virtual Token Balance ", ethers.formatEther(genesisVirtualTokenBalance));
+      }
+      initialBalances = await Promise.all(
+        participants.map(p => virtualToken.balanceOf(p.address))
+      );
+      console.log("Participants Balances after participate:", initialBalances.map(b => ethers.formatEther(b)));
 
-  it("Should fail to create Genesis with insufficient fee", async function () {
-    console.log("\n=== Testing Create Genesis With Insufficient Fee ===");
+      // Ensure contract has enough reserve
+      const reserveAmount = (await fGenesis.params()).reserve;
+      await virtualToken.transfer(
+        await genesis.getAddress(),
+        reserveAmount
+      );
 
-    await expect(
-      genesis.participate(ethers.parseEther("1"), owner.address)
-    ).to.be.revertedWith("Genesis has not started yet");
+      // Wait for end time
+      const endTime = await genesis.endTime();
+      await time.increaseTo(endTime);
+
+      console.log("\n=== Genesis Success Scenario ===");
+
+      // Prepare success parameters
+      const successParams = {
+        refundAddresses: participants.map(p => p.address),
+        refundAmounts: contributions.map(c => c / 2n), // Use BigInt division
+        distributeAddresses: participants.map(p => p.address),
+        distributeAmounts: contributions.map(c => c / 2n), // Use BigInt division
+      };
+      console.log("Success Params:", successParams);
+
+      await agentToken.transfer(
+        await genesis.getAddress(),
+        initialBalances.reduce((sum, b) => {
+            const amount = Number(ethers.formatEther(b));
+            return sum + ethers.parseEther((amount / 2).toString());
+        }, 0n)
+      );
+
+      // Get Genesis balance of virtual token
+      const genesisVirtualTokenBalance = await virtualToken.balanceOf(await genesis.getAddress());
+      console.log("Genesis Virtual Token Balance:", ethers.formatEther(genesisVirtualTokenBalance));
+
+      // Execute success flow
+      await fGenesis
+        .connect(beOpsWallet)
+        .onGenesisSuccess(1, successParams);
+
+      // Verify final state
+      const finalBalances = await Promise.all(
+        participants.map(p => virtualToken.balanceOf(p.address))
+      );
+      console.log("Final Balances:", finalBalances.map(b => ethers.formatEther(b)));
+
+      // Verify Genesis state
+      const genesisInfo = await genesis.getGenesisInfo();
+      expect(genesisInfo.agentTokenAddress).to.not.equal(
+        ethers.ZeroAddress,
+        "Agent token should be created"
+      );
+    });
   });
-
-  it("Should allow participation after start time", async function () {
-    // Get maximum contribution limit
-    const maxVirtuals = await genesis.maxContributionVirtualAmount();
-    const amount = maxVirtuals / 2n; // Use half of the maximum limit
-    console.log("\nMax virtuals per contribution:", maxVirtuals.toString());
-    console.log("Participation amount:", amount.toString());
-
-    // Transfer tokens to user1
-    await virtualToken.transfer(user1.address, amount);
-    console.log("Transferred tokens to user1");
-    console.log("User1 balance:", await virtualToken.balanceOf(user1.address));
-
-    // Approve Genesis contract
-    await virtualToken.connect(user1).approve(genesis.target, amount);
-    console.log("Approved Genesis contract");
-
-    // Get start time and ensure time adjustment is correct
-    const startTime = await genesis.START_TIME();
-    console.log("Current time:", await time.latest());
-    console.log("Start time:", startTime);
-
-    // Adjust time to 2 hours after start time
-    await time.increaseTo(startTime + 7200n); // 2 hours after start time
-    console.log("New time:", await time.latest());
-
-    // Participate
-    await genesis.connect(user1).participate(amount, user1.address);
-    console.log("Participation successful");
-
-    // Verify participation
-    const userVirtuals = await genesis.mapAddrToVirtuals(user1.address);
-    console.log("User virtuals:", userVirtuals.toString());
-    expect(userVirtuals).to.equal(amount);
-  });
-
-  // Add more test cases here...
 });

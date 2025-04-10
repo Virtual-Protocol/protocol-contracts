@@ -2,89 +2,103 @@
 pragma solidity ^0.8.26;
 
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
-import "@openzeppelin/contracts/access/Ownable.sol";
+import "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "./FGenesis.sol";
-import "./IVirtuals.sol";
+import "../virtualPersona/IAgentFactoryV3.sol";
+// import "@openzeppelin/contracts/token/ERC20/SafeERC20.sol";
+import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import "./GenesisTypes.sol";
 
-contract Genesis is ReentrancyGuard, Ownable {
+contract Genesis is ReentrancyGuard, AccessControlUpgradeable {
+    using SafeERC20 for IERC20;
+
+    bytes32 public constant FACTORY_ROLE = keccak256("FACTORY_ROLE");
+
     mapping(address => uint256) public mapAddrToVirtuals;
+    mapping(address => uint256) public claimableAgentTokens;
     address[] public participants;
     
-    address public agentTokenAddress;
-    bool public isFailed;
-    FGenesis public immutable factory;
-
-    // Cached factory values
-    address public immutable virtualTokenAddress;
-    address public immutable virtualsFactoryAddress;
-    uint256 public immutable reserveAmount;
-    uint256 public immutable maxContributionVirtualAmount;
+    uint256 public genesisId;
+    FGenesis public factory;
 
     // Genesis-related variables
-    uint256 public immutable START_TIME;
-    uint256 public immutable END_TIME;
+    uint256 public startTime;
+    uint256 public endTime;
     string public genesisName;
     string public genesisTicker;
     uint8[] public genesisCores;
-    string public genesisDesc;
-    string public genesisImg;
-    string[4] public genesisUrls;
 
-    uint256 public immutable GENESIS_ID;
+    // TBA and DAO parameters
+    bytes32 public tbaSalt;
+    address public tbaImplementation;
+    uint32 public daoVotingPeriod;
+    uint256 public daoThreshold;
+    address public agentFactoryAddress;
+    address public virtualTokenAddress;
+    uint256 public reserveAmount;
+    uint256 public maxContributionVirtualAmount;
+    uint256 public agentTokenTotalSupply;
+    uint256 public agentTokenLpSupply;
+
+    address public agentTokenAddress;
+    bool public isFailed;
 
     event GenesisFinalized(uint256 indexed genesisID, bool isSuccess);
-    event Participated(uint256 indexed genesisID, address indexed user, uint256 virtuals);
+    event Participated(uint256 indexed genesisID, address indexed user, uint256 point, uint256 virtuals);
     event RefundClaimed(uint256 indexed genesisID, address indexed user, uint256 amount);
     event AgentTokenClaimed(uint256 indexed genesisID, address indexed user, uint256 amount);
-    event VirtualsWithdrawn(uint256 indexed genesisID, address indexed to, uint256 amount);
-
-    // Add a struct to organize return data
+    event VirtualsWithdrawn(uint256 indexed genesisID, address indexed to, address token, uint256 amount);
+    
     struct ParticipantInfo {
         address userAddress;
         uint256 virtuals;
     }
 
-    // Use factory's admin check
-    modifier onlyAdmin() {
-        require(factory.isAdmin(msg.sender) || factory.owner() == msg.sender, "Not an admin");
-        _;
-    }
+    function initialize(GenesisInitParams calldata params) external initializer {
+        __AccessControl_init();
 
-    constructor(
-        uint256 genesisID_, // todo: will we have issue with this to let ppl use?
-        address factory_,
-        uint256 startTime_,
-        uint256 endTime_,
-        string memory genesisName_,
-        string memory genesisTicker_,
-        uint8[] memory genesisCores_,
-        string memory genesisDesc_,
-        string memory genesisImg_,
-        string[4] memory genesisUrls_
-    ) Ownable(FGenesis(factory_).owner()) {
-        GENESIS_ID = genesisID_;
-        factory = FGenesis(factory_);
+        require(params.genesisID > 0, "Invalid genesis ID");
+        require(params.factory != address(0), "Invalid factory address");
+        require(params.startTime > block.timestamp, "Start time must be in the future");
+        require(params.endTime > params.startTime, "End time must be after start time");
+        require(bytes(params.genesisName).length > 0, "Invalid genesis name");
+        require(bytes(params.genesisTicker).length > 0, "Invalid genesis ticker");
+        require(params.genesisCores.length > 0, "Invalid genesis cores");
+        require(params.tbaImplementation != address(0), "Invalid TBA implementation address");
+        require(params.agentFactoryAddress != address(0), "Invalid agent factory address");
+        require(params.virtualTokenAddress != address(0), "Invalid virtual token address");
+        require(params.reserveAmount > 0, "Reserve amount must be greater than 0");
+        require(params.maxContributionVirtualAmount > 0, "Max contribution must be greater than 0");
+        require(params.agentTokenTotalSupply > 0, "Agent token total supply must be greater than 0");
+        require(params.agentTokenLpSupply > 0, "Agent token lp supply must be greater than 0");
+        require(params.agentTokenTotalSupply >= params.agentTokenLpSupply, "Agent token total supply must be greater than agent token lp supply");
+        
+        genesisId = params.genesisID;
+        factory = FGenesis(params.factory);
+        startTime = params.startTime;
+        endTime = params.endTime;
+        genesisName = params.genesisName;
+        genesisTicker = params.genesisTicker;
+        genesisCores = params.genesisCores;
+        tbaSalt = params.tbaSalt;
+        tbaImplementation = params.tbaImplementation;
+        daoVotingPeriod = params.daoVotingPeriod;
+        daoThreshold = params.daoThreshold;
+        agentFactoryAddress = params.agentFactoryAddress;
+        virtualTokenAddress = params.virtualTokenAddress;
+        reserveAmount = params.reserveAmount;
+        maxContributionVirtualAmount = params.maxContributionVirtualAmount;
+        agentTokenTotalSupply = params.agentTokenTotalSupply;
+        agentTokenLpSupply = params.agentTokenLpSupply;
 
-        // Cache factory values
-        virtualTokenAddress = factory.virtualTokenAddress();
-        virtualsFactoryAddress = factory.virtualsFactory();
-        reserveAmount = factory.reserveAmount();
-        maxContributionVirtualAmount = factory.maxContributionVirtualAmount();
-
-        require(startTime_ > block.timestamp, "Start time must be in the future");
-        require(endTime_ > startTime_, "End time must be after start time");
-        START_TIME = startTime_;
-        END_TIME = endTime_;
-        genesisName = genesisName_;
-        genesisTicker = genesisTicker_;
-        genesisCores = genesisCores_;
-        genesisDesc = genesisDesc_;
-        genesisImg = genesisImg_;
-        genesisUrls = genesisUrls_;
+        _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
+        _grantRole(FACTORY_ROLE, msg.sender);
+        _grantRole(FACTORY_ROLE, params.factory);
     }
 
     function participate(
+        uint256 pointAmt,
         uint256 virtualsAmt,
         address userAddress
     ) external nonReentrant {
@@ -92,7 +106,7 @@ contract Genesis is ReentrancyGuard, Ownable {
         require(!isEnded(), "Genesis has ended");
         require(!isFailed, "Genesis has failed");
 
-        // Add checks for positive values
+        require(pointAmt > 0, "Point amount must be greater than 0");
         require(virtualsAmt > 0, "Virtuals must be greater than 0");
         
         // Check single submission upper limit
@@ -118,9 +132,9 @@ contract Genesis is ReentrancyGuard, Ownable {
         // Update state
         mapAddrToVirtuals[userAddress] += virtualsAmt;
 
-        IERC20(virtualTokenAddress).transferFrom(msg.sender, address(this), virtualsAmt);
+        IERC20(virtualTokenAddress).safeTransferFrom(msg.sender, address(this), virtualsAmt);
         
-        emit Participated(GENESIS_ID, userAddress, virtualsAmt);
+        emit Participated(genesisId, userAddress, pointAmt, virtualsAmt);
     }
 
     function onGenesisSuccess(
@@ -128,7 +142,7 @@ contract Genesis is ReentrancyGuard, Ownable {
         uint256[] calldata refundVirtualsTokenUserAmounts,
         address[] calldata distributeAgentTokenUserAddresses,
         uint256[] calldata distributeAgentTokenUserAmounts
-    ) external onlyAdmin nonReentrant {
+    ) external onlyRole(FACTORY_ROLE) nonReentrant returns (address) {
         require(isEnded(), "Genesis not ended yet");
         require(!isFailed, "Genesis has failed");
         require(
@@ -165,22 +179,32 @@ contract Genesis is ReentrancyGuard, Ownable {
 
         // Only do launch related operations if this is first launch
         if (isFirstLaunch) {
-            // grant allowance to VirtualsFactory for launch
-            IERC20(virtualTokenAddress).approve(virtualsFactoryAddress, reserveAmount);
+            // grant allowance to agentFactoryAddress for launch
+            IERC20(virtualTokenAddress).approve(agentFactoryAddress, reserveAmount);
 
-            // Call launch function on VirtualsFactory
-            (address funToken, , ) = IVirtualsFactory(virtualsFactoryAddress).launch(
-                genesisName,
+            // Call initFromBondingCurve and executeBondingCurveApplication
+            uint256 id = IAgentFactoryV3(agentFactoryAddress).initFromBondingCurve(
+                string.concat(genesisName, " by Virtuals"),
                 genesisTicker,
                 genesisCores,
-                genesisDesc,
-                genesisImg,
-                genesisUrls,
-                reserveAmount
+                tbaSalt,
+                tbaImplementation,
+                daoVotingPeriod,
+                daoThreshold,
+                reserveAmount,
+                msg.sender
             );
 
+            address agentToken = IAgentFactoryV3(agentFactoryAddress)
+                .executeBondingCurveApplication(
+                    id,
+                    agentTokenTotalSupply,
+                    agentTokenLpSupply,
+                    address(this) // vault
+                );
+
             // Store the created agent token address
-            agentTokenAddress = funToken;
+            agentTokenAddress = agentToken;
         }
 
         // Calculate total distribution amount
@@ -199,37 +223,51 @@ contract Genesis is ReentrancyGuard, Ownable {
             // first decrease the virtuals mapping of the user to prevent reentrancy attacks
             mapAddrToVirtuals[refundVirtualsTokenUserAddresses[i]] -= refundVirtualsTokenUserAmounts[i];
             // then transfer the virtuals
-            IERC20(virtualTokenAddress).transfer(
+            IERC20(virtualTokenAddress).safeTransfer(
                 refundVirtualsTokenUserAddresses[i], 
                 refundVirtualsTokenUserAmounts[i]
             );
             emit RefundClaimed(
-                GENESIS_ID, 
+                genesisId, 
                 refundVirtualsTokenUserAddresses[i], 
                 refundVirtualsTokenUserAmounts[i]
             );
         }
 
-        // Directly transfer Agent Tokens
+        // save the amount of agent tokens to claim
         for (uint256 i = 0; i < distributeAgentTokenUserAddresses.length; i++) {
-            IERC20(agentTokenAddress).transfer(
-                distributeAgentTokenUserAddresses[i], 
-                distributeAgentTokenUserAmounts[i]
-            );
-            emit AgentTokenClaimed(
-                GENESIS_ID, 
-                distributeAgentTokenUserAddresses[i], 
-                distributeAgentTokenUserAmounts[i]
-            );
+            claimableAgentTokens[distributeAgentTokenUserAddresses[i]] = distributeAgentTokenUserAmounts[i];
         }
 
-        emit GenesisFinalized(GENESIS_ID, true);
+        emit GenesisFinalized(genesisId, true);
+        return agentTokenAddress;
     }
 
-    function onGenesisFailed() external onlyAdmin nonReentrant {
-        require(!isFailed, "Genesis already failed");
+    function claimAgentToken(address userAddress) external nonReentrant {
         require(isEnded(), "Genesis not ended yet");
-        require(agentTokenAddress == address(0), "Cannot fail after agent token launch");
+        require(!isFailed, "Genesis has failed");
+        require(agentTokenAddress != address(0), "Agent token not launched");
+        
+        uint256 amount = claimableAgentTokens[userAddress];
+        require(amount > 0, "No tokens to claim");
+        
+        // set the amount of claimable agent tokens to 0, to prevent duplicate claims
+        claimableAgentTokens[userAddress] = 0;
+        
+        // transfer the agent token
+        IERC20(agentTokenAddress).safeTransfer(userAddress, amount);
+        
+        emit AgentTokenClaimed(genesisId, userAddress, amount);
+    }
+
+    function getClaimableAgentToken(address userAddress) external view returns (uint256) {
+        return claimableAgentTokens[userAddress];
+    }
+
+    function onGenesisFailed() external onlyRole(FACTORY_ROLE) nonReentrant {
+        require(isEnded(), "Genesis not ended yet");
+        require(!isFailed, "Genesis already failed");
+        require(agentTokenAddress == address(0), "Cannot fail if agent token has been launched");
         isFailed = true;
 
         // Return all virtuals to participants
@@ -240,20 +278,20 @@ contract Genesis is ReentrancyGuard, Ownable {
                 // first clear the virtuals mapping of the user to prevent reentrancy attacks
                 mapAddrToVirtuals[participant] = 0;
                 // then transfer the virtuals
-                IERC20(virtualTokenAddress).transfer(participant, virtualsAmt);
-                emit RefundClaimed(GENESIS_ID, participant, virtualsAmt);
+                IERC20(virtualTokenAddress).safeTransfer(participant, virtualsAmt);
+                emit RefundClaimed(genesisId, participant, virtualsAmt);
             }
         }
 
-        emit GenesisFinalized(GENESIS_ID, false);
+        emit GenesisFinalized(genesisId, false);
     }
 
     function isEnded() public view returns (bool) {
-        return block.timestamp >= END_TIME;
+        return block.timestamp >= endTime;
     }
 
     function isStarted() public view returns (bool) {
-        return block.timestamp >= START_TIME;
+        return block.timestamp >= startTime;
     }
 
     function getParticipantCount() external view returns (uint256) {
@@ -304,47 +342,51 @@ contract Genesis is ReentrancyGuard, Ownable {
 
     struct GenesisInfo {
         uint256 genesisId;
-        address agentTokenAddress;
-        uint256 endTime;
-        bool isFailed;
         address factory;
-
-        address virtualTokenAddress;
-        address virtualsFactoryAddress;
-        uint256 reserveAmount;
-        uint256 maxContributionVirtualAmount;
-
         uint256 startTime;
+        uint256 endTime;
         string genesisName;
         string genesisTicker;
         uint8[] genesisCores;
-        string genesisDesc;
-        string genesisImg;
-        string[4] genesisUrls;
+        bytes32 tbaSalt;
+        address tbaImplementation;
+        uint32 daoVotingPeriod;
+        uint256 daoThreshold;
+        address agentFactoryAddress;
+        address virtualTokenAddress;
+        uint256 reserveAmount;
+        uint256 maxContributionVirtualAmount;
+        uint256 agentTokenTotalSupply;
+        uint256 agentTokenLpSupply;
+        address agentTokenAddress;
+        bool isFailed;
     }
 
     function getGenesisInfo() public view returns (GenesisInfo memory) {
         return GenesisInfo({
-            genesisId: GENESIS_ID,
-            agentTokenAddress: agentTokenAddress,
-            isFailed: isFailed,
+            genesisId: genesisId,
             factory: address(factory),
-            virtualTokenAddress: virtualTokenAddress,
-            virtualsFactoryAddress: virtualsFactoryAddress,
-            reserveAmount: reserveAmount,
-            maxContributionVirtualAmount: maxContributionVirtualAmount,
-            startTime: START_TIME,
-            endTime: END_TIME,
+            startTime: startTime,
+            endTime: endTime,
             genesisName: genesisName,
             genesisTicker: genesisTicker,
             genesisCores: genesisCores,
-            genesisDesc: genesisDesc,
-            genesisImg: genesisImg,
-            genesisUrls: genesisUrls
+            tbaSalt: tbaSalt,
+            tbaImplementation: tbaImplementation,
+            daoVotingPeriod: daoVotingPeriod,
+            daoThreshold: daoThreshold,
+            agentFactoryAddress: agentFactoryAddress,
+            virtualTokenAddress: virtualTokenAddress,
+            reserveAmount: reserveAmount,
+            maxContributionVirtualAmount: maxContributionVirtualAmount,
+            agentTokenTotalSupply: agentTokenTotalSupply,
+            agentTokenLpSupply: agentTokenLpSupply,
+            agentTokenAddress: agentTokenAddress,
+            isFailed: isFailed
         });
     }
 
-    function withdrawLeftVirtualsAfterFinalized(address to) external onlyAdmin nonReentrant {
+    function withdrawLeftVirtualsAfterFinalized(address to, address token) external onlyRole(FACTORY_ROLE) nonReentrant {
         // check if Genesis has ended
         require(isEnded(), "Genesis not ended yet");
         
@@ -353,18 +395,17 @@ contract Genesis is ReentrancyGuard, Ownable {
             isFailed || agentTokenAddress != address(0),
             "Genesis not finalized yet"
         );
+
+        require(token != address(0), "Invalid token address");
         
         // get the remaining virtuals balance of the contract
-        uint256 remainingBalance = IERC20(virtualTokenAddress).balanceOf(address(this));
-        require(remainingBalance > 0, "No virtuals left to withdraw");
+        uint256 remainingBalance = IERC20(token).balanceOf(address(this));
+        require(remainingBalance > 0, "No token left to withdraw");
         
         // transfer all the remaining virtuals
-        require(
-            IERC20(virtualTokenAddress).transfer(to, remainingBalance),
-            "Transfer failed"
-        );
+        IERC20(token).safeTransfer(to, remainingBalance);
         
         // emit an event to record the withdrawal
-        emit VirtualsWithdrawn(GENESIS_ID, to, remainingBalance);
+        emit VirtualsWithdrawn(genesisId, to, token, remainingBalance);
     }
 }

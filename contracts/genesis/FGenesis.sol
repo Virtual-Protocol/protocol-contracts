@@ -1,208 +1,140 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.26;
 
-import "./Genesis.sol";
-import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
+import {Genesis} from "./Genesis.sol";
+import "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
+import "../virtualPersona/AgentFactoryV3.sol";
+import "./GenesisTypes.sol";
+import "./GenesisLib.sol";
+import "../virtualPersona/AgentFactoryV3.sol";
 
-contract FGenesis is Initializable, OwnableUpgradeable {
-    address public virtualTokenAddress;
-    address public virtualsFactory;
-    uint256 public reserveAmount;
-    uint256 public maxContributionVirtualAmount;
-    uint256 public creationFeeAmount;
-    uint256 public duration;
+contract FGenesis is Initializable, AccessControlUpgradeable {
+    using GenesisLib for *;
+    
+    bytes32 public constant ADMIN_ROLE = keccak256("ADMIN_ROLE");
 
-    mapping(uint256 => address) public mapGenesisIDToGenesisContractAddr;
-    uint256 public genesisID;
-    mapping(address => bool) public isAdmin;
-    address[] public adminList;
-
-    event VirtualTokenAddressUpdated(
-        address indexed oldAddress,
-        address indexed newAddress
-    );
-    event VirtualsFactoryUpdated(
-        address indexed oldAddress,
-        address indexed newAddress
-    );
-    event ReserveAmountUpdated(uint256 oldAmount, uint256 newAmount);
-    event MaxContributionVirtualAmountUpdated(
-        uint256 oldAmount,
-        uint256 newAmount
-    );
-    event CreationFeeAmountUpdated(uint256 oldAmount, uint256 newAmount);
-    event AdminAdded(address indexed admin);
-    event AdminRemoved(address indexed admin);
-    event GenesisCreated(
-        uint256 indexed genesisID,
-        address indexed genesisContract
-    );
-
-    modifier onlyAdmin() {
-        require(isAdmin[msg.sender] || owner() == msg.sender, "Not an admin");
-        _;
+    struct Params {
+        address virtualToken;
+        uint256 reserve;
+        uint256 maxContribution;
+        address feeAddr;
+        uint256 feeAmt;
+        uint256 duration;
+        bytes32 tbaSalt;
+        address tbaImpl;
+        uint32 votePeriod;
+        uint256 threshold;
+        address agentFactory;
+        uint256 agentTokenTotalSupply;
+        uint256 agentTokenLpSupply;
     }
+
+    Params public params;
+    mapping(uint256 => address) public genesisContracts;
+    uint256 public genesisID;
+
+    event GenesisCreated(uint256 indexed id, address indexed addr);
 
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() {
         _disableInitializers();
     }
 
-    function initialize(
-        address virtualTokenAddress_,
-        address virtualsFactory_,
-        uint256 reserveAmount_,
-        uint256 maxContributionVirtualAmount_,
-        uint256 creationFeeAmount_,
-        uint256 duration_
-    ) external initializer {
-        __Ownable_init(msg.sender);
-
-        require(duration_ > 0, "Duration must be greater than 0");
-        require(virtualTokenAddress_ != address(0), "Invalid virtual token address");
-        require(virtualsFactory_ != address(0), "Invalid virtuals factory address");
-        require(reserveAmount_ > 0, "Reserve amount must be greater than 0");
-        require(maxContributionVirtualAmount_ > 0, "Max contribution virtual amount must be greater than 0");
-        require(creationFeeAmount_ > 0, "Creation fee amount must be greater than 0");
-        require(reserveAmount_ >= creationFeeAmount_, "Reserve amount must be greater than or equal to creation fee amount");
-        virtualTokenAddress = virtualTokenAddress_;
-        virtualsFactory = virtualsFactory_;
-        reserveAmount = reserveAmount_;
-        maxContributionVirtualAmount = maxContributionVirtualAmount_;
-        creationFeeAmount = creationFeeAmount_;
-        duration = duration_;
-
-        // Set the owner as an admin using setAdmin
-        _setAdmin(msg.sender, true);
+    function initialize(Params memory p) external initializer {
+        __AccessControl_init();
+        _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
+        _grantRole(ADMIN_ROLE, msg.sender);
+        _setParams(p);
     }
 
-    function setVirtualTokenAddress(address newAddress) external onlyOwner {
-        require(newAddress != address(0), "Invalid address");
-        address oldAddress = virtualTokenAddress;
-        virtualTokenAddress = newAddress;
-        emit VirtualTokenAddressUpdated(oldAddress, newAddress);
+    function setParams(Params calldata p) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        _setParams(p);
     }
 
-    function setVirtualsFactory(address newAddress) external onlyOwner {
-        require(newAddress != address(0), "Invalid address");
-        address oldAddress = virtualsFactory;
-        virtualsFactory = newAddress;
-        emit VirtualsFactoryUpdated(oldAddress, newAddress);
+    function _setParams(Params memory p) internal {
+        require(p.virtualToken != address(0) && 
+                p.feeAddr != address(0) && 
+                p.tbaImpl != address(0) && 
+                p.agentFactory != address(0), "Invalid addr");
+
+        require(p.reserve > 0 && 
+                p.maxContribution > 0 && 
+                p.feeAmt > 0 && 
+                p.duration > 0, "Invalid amt");
+
+        require(p.agentTokenTotalSupply > 0 && 
+                p.agentTokenLpSupply > 0 && 
+                p.agentTokenTotalSupply >= p.agentTokenLpSupply, "Invalid amt");
+
+        params = p;
     }
 
-    function setReserveAmount(uint256 newAmount) external onlyOwner {
-        require(newAmount > 0, "Invalid amount");
-        require(newAmount >= creationFeeAmount, "Reserve amount must be greater than or equal to creation fee amount");
-        uint256 oldAmount = reserveAmount;
-        reserveAmount = newAmount;
-        emit ReserveAmountUpdated(oldAmount, newAmount);
-    }
-
-    function setMaxContributionVirtualAmount(
-        uint256 newAmount
-    ) external onlyOwner {
-        require(newAmount > 0, "Invalid amount");
-        uint256 oldAmount = maxContributionVirtualAmount;
-        maxContributionVirtualAmount = newAmount;
-        emit MaxContributionVirtualAmountUpdated(oldAmount, newAmount);
-    }
-
-    function setCreationFeeAmount(uint256 newAmount) external onlyOwner {
-        require(newAmount > 0, "Invalid amount");
-        require(newAmount <= reserveAmount, "Creation fee amount must be less than or equal to reserve amount");
-        uint256 oldAmount = creationFeeAmount;
-        creationFeeAmount = newAmount;
-        emit CreationFeeAmountUpdated(oldAmount, newAmount);
-    }
-
-    function setDuration(uint256 newDuration) external onlyOwner {
-        require(newDuration > 0, "Duration must be greater than 0");
-        duration = newDuration;
-    }
-
-    function setAdmin(address admin, bool status) external onlyOwner {
-        _setAdmin(admin, status);
-    }
-
-    // Internal function for setting admin to avoid code duplication
-    function _setAdmin(address admin, bool status) private {
-        require(admin != address(0), "Invalid admin address");
-        require(isAdmin[admin] != status, "Admin status not changed");
-
-        isAdmin[admin] = status;
-
-        if (status) {
-            adminList.push(admin);
-            emit AdminAdded(admin);
-        } else {
-            // Remove admin from adminList
-            for (uint256 i = 0; i < adminList.length; i++) {
-                if (adminList[i] == admin) {
-                    adminList[i] = adminList[adminList.length - 1];
-                    adminList.pop();
-                    break;
-                }
-            }
-            emit AdminRemoved(admin);
-        }
-    }
-
-    struct GenesisInfo {
-        uint256 genesisID;
-        address genesisContract;
-    }
-
-    function createGenesis(
-        uint256 _startTime,
-        uint256 _endTime,
-        string memory _genesisName,
-        string memory _genesisTicker,
-        uint8[] memory _genesisCores,
-        string memory _genesisDesc,
-        string memory _genesisImg,
-        string[4] memory _genesisUrls
-    ) external returns (GenesisInfo memory) {
-        require(bytes(_genesisName).length > 0, "Name must be greater than 0");
-        require(bytes(_genesisTicker).length > 0, "Ticker must be greater than 0");
-        require(_genesisCores.length > 0, "Cores must be greater than 0");
+    function createGenesis(GenesisCreationParams memory gParams) 
+        external
+        returns (address) 
+    {
+        require(IERC20(params.virtualToken).transferFrom(
+            msg.sender, 
+            params.feeAddr, 
+            params.feeAmt
+        ), "transfer createGenesis fee failed");
+        
+        gParams.endTime = gParams.startTime + params.duration;
         
         genesisID++;
-        Genesis newGenesis = new Genesis(
+        address addr = GenesisLib.validateAndDeploy(
             genesisID,
             address(this),
-            _startTime,
-            _endTime,
-            _genesisName,
-            _genesisTicker,
-            _genesisCores,
-            _genesisDesc,
-            _genesisImg,
-            _genesisUrls
-        );
-        address genesisAddr = address(newGenesis);
-        mapGenesisIDToGenesisContractAddr[genesisID] = genesisAddr;
-
-        emit GenesisCreated(genesisID, genesisAddr);
-        require(
-            IERC20(virtualTokenAddress).transferFrom(
-                msg.sender,
-                genesisAddr,
-                creationFeeAmount
-            ),
-            "Creation fee transfer failed"
+            gParams,
+            params.tbaSalt,
+            params.tbaImpl,
+            params.votePeriod,
+            params.threshold,
+            params.agentFactory,
+            params.virtualToken,
+            params.reserve,
+            params.maxContribution,
+            params.agentTokenTotalSupply,
+            params.agentTokenLpSupply
         );
 
-        return
-            GenesisInfo({genesisID: genesisID, genesisContract: genesisAddr});
+        // Grant BONDING_ROLE of ato the new Genesis contract
+        bytes32 BONDING_ROLE = AgentFactoryV3(params.agentFactory).BONDING_ROLE();
+        AgentFactoryV3(params.agentFactory).grantRole(
+            BONDING_ROLE,
+            address(addr)
+        );
+        
+        genesisContracts[genesisID] = addr;
+        emit GenesisCreated(genesisID, addr);
+        return addr;
     }
 
-    function getGenesisContractByID(
-        uint256 _genesisID
-    ) external view returns (address) {
-        address contractAddr = mapGenesisIDToGenesisContractAddr[_genesisID];
-        require(contractAddr != address(0), "Genesis ID not found");
-        return contractAddr;
+    function _getGenesis(uint256 id) internal view returns (Genesis) {
+        address addr = genesisContracts[id];
+        require(addr != address(0), "Not found");
+        return Genesis(addr);
+    }
+
+    function onGenesisSuccess(
+        uint256 id,
+        SuccessParams calldata p
+    ) external onlyRole(ADMIN_ROLE) {
+        _getGenesis(id).onGenesisSuccess(
+            p.refundAddresses,
+            p.refundAmounts,
+            p.distributeAddresses,
+            p.distributeAmounts
+        );
+    }
+
+    function onGenesisFailed(uint256 id) external onlyRole(ADMIN_ROLE) {
+        _getGenesis(id).onGenesisFailed();
+    }
+
+    function withdrawLeftVirtuals(uint256 id, address to, address token) external onlyRole(ADMIN_ROLE) {
+        _getGenesis(id).withdrawLeftVirtualsAfterFinalized(to, token);
     }
 }

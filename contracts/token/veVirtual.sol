@@ -146,6 +146,7 @@ contract veVirtual is
     function toggleAutoRenew(uint256 index) external nonReentrant {
         require(index < locks[_msgSender()].length, "Invalid index");
         Lock storage lock = locks[_msgSender()][index];
+        require(block.timestamp < lock.end, "Lock is expired");
         lock.autoRenew = !lock.autoRenew;
 
         if (lock.autoRenew) {

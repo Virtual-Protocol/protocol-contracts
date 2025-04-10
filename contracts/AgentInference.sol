@@ -3,7 +3,6 @@ pragma solidity ^0.8.20;
 import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import "@openzeppelin/contracts/utils/math/Math.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
 import "@openzeppelin/contracts/utils/math/Math.sol";
@@ -61,13 +60,14 @@ contract AgentInference is
             "Invalid input"
         );
 
-        for (uint256 i = 0; i < amounts.length; i++) {
+        uint256 len = amounts.length;
+        for (uint256 i = 0; i != len; ++i) {
             total += amounts[i];
         }
 
         require(token.balanceOf(sender) >= total, "Insufficient balance");
 
-        for (uint256 i = 0; i < agentIds.length; i++) {
+        for (uint256 i = 0; i != len; ++i) {
             uint256 agentId = agentIds[i];
             address agentTba = agentNft.virtualInfo(agentId).tba;
             token.safeTransferFrom(sender, agentTba, amounts[i]);
@@ -94,7 +94,7 @@ contract AgentInference is
             "Invalid input"
         );
 
-        for (uint256 i = 0; i < len; i++) {
+        for (uint256 i = 0; i != len; ++i) {
             total += amounts[i];
         }
 
@@ -102,7 +102,7 @@ contract AgentInference is
 
         uint256 prevAgentId = 0;
         address agentTba = address(0);
-        for (uint256 i = 0; i < len; i++) {
+        for (uint256 i = 0; i != len; ++i) {
             uint256 agentId = agentIds[i];
             if (prevAgentId != agentId) {
                 agentTba = agentNft.virtualInfo(agentId).tba;

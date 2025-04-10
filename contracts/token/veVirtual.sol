@@ -16,7 +16,7 @@ contract veVirtual is
         uint256 amount;
         uint256 start;
         uint256 end;
-        uint8 numWeeks;
+        uint8 numWeeks; // Active duration in weeks. Reset to maxWeeks if autoRenew is true.
         uint256 value;
         bool autoRenew;
     }
@@ -38,6 +38,7 @@ contract veVirtual is
         address baseToken_,
         uint8 maxWeeks_
     ) external initializer {
+        require(baseToken_ != address(0), "Invalid token");
         baseToken = baseToken_;
         maxWeeks = maxWeeks_;
 
@@ -56,7 +57,11 @@ contract veVirtual is
     ) public view returns (Lock[] memory) {
         Lock[] memory results = new Lock[](count);
         uint j = 0;
-        for (uint i = start; i < count && i < locks[account].length; i++) {
+        for (
+            uint i = start;
+            i < (start + count) && i < locks[account].length;
+            i++
+        ) {
             results[j] = locks[account][i];
             j++;
         }
@@ -102,10 +107,8 @@ contract veVirtual is
     ) external nonReentrant {
         require(amount > 0, "Amount must be greater than 0");
         require(numWeeks <= maxWeeks, "Num weeks must be less than max weeks");
-        require(
-            IERC20(baseToken).transferFrom(_msgSender(), address(this), amount),
-            "Transfer failed"
-        );
+
+        IERC20(baseToken).safeTransferFrom(_msgSender(), address(this), amount);
 
         if (autoRenew == true) {
             numWeeks = maxWeeks;

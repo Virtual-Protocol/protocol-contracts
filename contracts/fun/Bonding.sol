@@ -270,17 +270,17 @@ contract Bonding is
         tokenInfo[address(token)] = tmpToken;
         tokenInfos.push(address(token));
 
-        bool exists = _checkIfProfileExists(msg.sender);
+        bool exists = _checkIfProfileExists(creator);
 
         if (exists) {
-            Profile storage _profile = profile[msg.sender];
+            Profile storage _profile = profile[creator];
 
             _profile.tokens.push(address(token));
         } else {
-            bool created = _createUserProfile(msg.sender);
+            bool created = _createUserProfile(creator);
 
             if (created) {
-                Profile storage _profile = profile[msg.sender];
+                Profile storage _profile = profile[creator];
 
                 _profile.tokens.push(address(token));
             }

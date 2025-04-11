@@ -2,6 +2,18 @@ const { ethers, upgrades } = require("hardhat");
 const { expect } = require("chai");
 const { time } = require("@nomicfoundation/hardhat-network-helpers");
 const { setupTest } = require("./setup");
+const { 
+    ERR_NOT_STARTED,
+    ERR_ALREADY_STARTED,
+    ERR_NOT_ENDED,
+    ERR_ALREADY_ENDED,
+    ERR_ALREADY_FAILED,
+    ERR_ALREADY_CANCELLED,
+    ERR_START_TIME_FUTURE,
+    ERR_END_AFTER_START,
+    ERR_TOKEN_LAUNCHED,
+    ERR_TOKEN_NOT_LAUNCHED,
+} = require("./const");
 
 describe("Genesis Business Logic Tests", function () {
   let virtualToken;
@@ -45,11 +57,11 @@ describe("Genesis Business Logic Tests", function () {
     for (const participant of participants) {
       await virtualToken.transfer(
         participant.address,
-        ethers.parseEther("100")
+        ethers.parseEther("1000")
       );
       await virtualToken
         .connect(participant)
-        .approve(await genesis.getAddress(), ethers.parseEther("100"));
+        .approve(await genesis.getAddress(), ethers.parseEther("1000"));
     }
 
     maxContribution = await genesis.maxContributionVirtualAmount();
@@ -169,7 +181,7 @@ describe("Genesis Business Logic Tests", function () {
             amount,
             participants[0].address
           )
-      ).to.be.revertedWith("Genesis has not started yet");
+      ).to.be.revertedWith(ERR_NOT_STARTED);
 
       // Can participate after start
       await time.increase(3600);
@@ -204,7 +216,7 @@ describe("Genesis Business Logic Tests", function () {
             amount,
             participants[2].address
           )
-      ).to.be.revertedWith("Genesis has ended");
+      ).to.be.revertedWith(ERR_ALREADY_ENDED);
     });
   });
 
@@ -218,7 +230,7 @@ describe("Genesis Business Logic Tests", function () {
           distributeAddresses: [],
           distributeAmounts: []
         }
-      )).to.be.revertedWith("Genesis not ended yet");
+      )).to.be.revertedWith(ERR_NOT_ENDED);
     });
 
     it("Should revert if insufficient Virtual Token balance", async function () {
@@ -316,6 +328,233 @@ describe("Genesis Business Logic Tests", function () {
         ethers.ZeroAddress,
         "Agent token should be created"
       );
+    });
+
+    it("Should Insufficient Virtual Token balance for refund Virtual Token", async function () {
+      await time.increase(3600);
+
+      // edit the contribution amount, ensure it does not exceed the max limit
+      const contributions = [344, 566].map(x => 
+        ethers.parseEther(x.toString())
+      );
+      // Record initial balances
+      let initialBalances = await Promise.all(
+        participants.map(p => virtualToken.balanceOf(p.address))
+      );
+      console.log("Participants Initial Balances:", initialBalances.map(b => ethers.formatEther(b)));
+      
+      for (let i = 0; i < 2; i++) {
+        await genesis
+          .connect(participants[i])
+          .participate(
+            1,
+            contributions[i],
+            participants[i].address
+          );
+          const genesisVirtualTokenBalance = await virtualToken.balanceOf(await genesis.getAddress());
+          console.log("After participate idx: " + i + ", Genesis Virtual Token Balance ", ethers.formatEther(genesisVirtualTokenBalance));
+      }
+      initialBalances = await Promise.all(
+        participants.map(p => virtualToken.balanceOf(p.address))
+      );
+      console.log("Participants Balances after participate:", initialBalances.map(b => ethers.formatEther(b)));
+
+      // Ensure contract has enough reserve
+      // const reserveAmount = (await fGenesis.params()).reserve;
+      // await virtualToken.transfer(
+      //   await genesis.getAddress(),
+      //   reserveAmount
+      // );
+
+      // Wait for end time
+      const endTime = await genesis.endTime();
+      await time.increaseTo(endTime);
+
+      console.log("\n=== Genesis Success Scenario ===");
+
+      // Prepare success parameters
+      const successParams = {
+        refundAddresses: participants.slice(0, 2).map(p => p.address),
+        refundAmounts: [282.666666666666700000, 202.333333333333340000].map(x => 
+          ethers.parseEther(x.toString())
+        ), // Use BigInt division
+        distributeAddresses: participants.slice(0, 2).map(p => p.address),
+        distributeAmounts: contributions.map(c => c / 2n), // Use BigInt division
+      };
+      console.log("Success Params:", successParams);
+
+      await agentToken.transfer(
+        await genesis.getAddress(),
+        initialBalances.reduce((sum, b) => {
+            const amount = Number(ethers.formatEther(b));
+            return sum + ethers.parseEther((amount / 2).toString());
+        }, 0n)
+      );
+
+      // Get Genesis balance of virtual token
+      let genesisVirtualTokenBalance = await virtualToken.balanceOf(await genesis.getAddress());
+      console.log("Genesis Virtual Token Balance:", ethers.formatEther(genesisVirtualTokenBalance));
+
+      // Execute success flow and expect it to revert
+      await expect(
+        fGenesis
+          .connect(beOpsWallet)
+          .onGenesisSuccess(1, successParams)
+      ).to.be.revertedWith("Insufficient Virtual Token balance");
+
+      // Verify final state
+      const finalBalances = await Promise.all(
+        participants.map(p => virtualToken.balanceOf(p.address))
+      );
+      console.log("Final Balances of participants:", finalBalances.map(b => ethers.formatEther(b)));
+      genesisVirtualTokenBalance = await virtualToken.balanceOf(await genesis.getAddress());
+      console.log("Final Balances of Genesis:", ethers.formatEther(genesisVirtualTokenBalance));
+
+      // Verify Genesis state
+      const genesisInfo = await genesis.getGenesisInfo();
+      expect(genesisInfo.agentTokenAddress).to.equal(
+        ethers.ZeroAddress,
+        "Agent token should not be created"
+      );
+    });
+  });
+
+  describe("Genesis Time Management and Cancellation Tests", function () {
+    it("Should successfully reset time before Genesis starts", async function () {
+      const newStartTime = (await time.latest()) + 7200; // 2 hours from now
+      const newEndTime = newStartTime + 3600; // 1 hour duration
+
+      await fGenesis.connect(beOpsWallet).resetTime(1, newStartTime, newEndTime);
+
+      const genesisInfo = await genesis.getGenesisInfo();
+      expect(genesisInfo.startTime).to.equal(newStartTime);
+      expect(genesisInfo.endTime).to.equal(newEndTime);
+    });
+
+    it("Should revert when resetting time with invalid parameters", async function () {
+      const currentTime = await time.latest();
+      
+      // Test: End time before start time
+      await expect(
+        fGenesis.connect(beOpsWallet).resetTime(
+          1,
+          currentTime + 3600,
+          currentTime + 1800
+        )
+      ).to.be.revertedWith("End time must be after start time");
+
+      // Test: Start time in the past
+      await expect(
+        fGenesis.connect(beOpsWallet).resetTime(
+          1,
+          currentTime - 3600,
+          currentTime + 3600
+        )
+      ).to.be.revertedWith("Start time must be in the future");
+    });
+
+    it("Should revert when resetting time after Genesis has started", async function () {
+      await time.increase(3600); // Move past start time
+
+      const newStartTime = (await time.latest()) + 3600;
+      const newEndTime = newStartTime + 3600;
+
+      await expect(
+        fGenesis.connect(beOpsWallet).resetTime(1, newStartTime, newEndTime)
+      ).to.be.revertedWith(ERR_ALREADY_STARTED);
+    });
+
+    it("Should successfully cancel Genesis before it starts", async function () {
+      await fGenesis.connect(beOpsWallet).cancelGenesis(1);
+
+      const genesisInfo = await genesis.getGenesisInfo();
+      expect(genesisInfo.isCancelled).to.be.true;
+    });
+
+    it("Should revert when trying to participate in cancelled Genesis", async function () {
+      await fGenesis.connect(beOpsWallet).cancelGenesis(1);
+
+      await expect(
+        genesis.connect(participants[0]).participate(
+          ethers.parseEther("1"),
+          ethers.parseEther("10"),
+          participants[0].address
+        )
+      ).to.be.revertedWith(ERR_ALREADY_CANCELLED);
+    });
+
+    it("Should revert when trying to cancel Genesis after it has started", async function () {
+      await time.increase(3600); // Move past start time
+
+      await expect(
+        fGenesis.connect(beOpsWallet).cancelGenesis(1)
+      ).to.be.revertedWith(ERR_ALREADY_STARTED);
+    });
+
+    it("Should revert when trying to cancel already cancelled Genesis", async function () {
+      await fGenesis.connect(beOpsWallet).cancelGenesis(1);
+
+      await expect(
+        fGenesis.connect(beOpsWallet).cancelGenesis(1)
+      ).to.be.revertedWith(ERR_ALREADY_CANCELLED);
+    });
+
+    it("Should allow withdrawal of funds after cancellation", async function () {// Cancel Genesis
+      await fGenesis.connect(beOpsWallet).cancelGenesis(1);
+
+      // Wait for end time
+      const endTime = await genesis.endTime();
+      await time.increaseTo(endTime);
+
+      // Transfer 100 tokens to genesis
+      await virtualToken.transfer(await genesis.getAddress(), ethers.parseEther("100"));
+
+      // Try to withdraw funds
+      const initialBalance = await virtualToken.balanceOf(user1.address);
+      await fGenesis
+        .connect(beOpsWallet)
+        .withdrawLeftVirtuals(1, user1.address, await virtualToken.getAddress());
+
+      const finalBalance = await virtualToken.balanceOf(user1.address);
+      expect(finalBalance).to.be.gt(initialBalance);
+    });
+
+    it("Should handle multiple state changes correctly", async function () {
+      // First reset time
+      const newStartTime = (await time.latest()) + 7200;
+      const newEndTime = newStartTime + 3600;
+      await fGenesis.connect(beOpsWallet).resetTime(1, newStartTime, newEndTime);
+
+      // Then cancel
+      await fGenesis.connect(beOpsWallet).cancelGenesis(1);
+
+      // Verify final state
+      const genesisInfo = await genesis.getGenesisInfo();
+      expect(genesisInfo.startTime).to.equal(newStartTime);
+      expect(genesisInfo.endTime).to.equal(newEndTime);
+      expect(genesisInfo.isCancelled).to.be.true;
+
+      // Verify cannot participate
+      await expect(
+        genesis.connect(participants[0]).participate(
+          ethers.parseEther("1"),
+          ethers.parseEther("10"),
+          participants[0].address
+        )
+      ).to.be.revertedWith(ERR_ALREADY_CANCELLED);
+    });
+
+    it("Should prevent onGenesisSuccess for cancelled Genesis", async function () {
+      await fGenesis.connect(beOpsWallet).cancelGenesis(1);
+
+      await expect(
+        fGenesis.connect(beOpsWallet).onGenesisSuccess(1, {
+          refundAddresses: [],
+          refundAmounts: [],
+          distributeAddresses: [],
+          distributeAmounts: []
+        })
+      ).to.be.revertedWith(ERR_ALREADY_CANCELLED);
     });
   });
 });

@@ -12,7 +12,7 @@ import "../virtualPersona/AgentFactoryV3.sol";
 
 contract FGenesis is Initializable, AccessControlUpgradeable {
     using GenesisLib for *;
-    
+
     bytes32 public constant ADMIN_ROLE = keccak256("ADMIN_ROLE");
 
     struct Params {
@@ -49,40 +49,53 @@ contract FGenesis is Initializable, AccessControlUpgradeable {
         _setParams(p);
     }
 
-    function setParams(Params calldata p) external onlyRole(DEFAULT_ADMIN_ROLE) {
+    function setParams(
+        Params calldata p
+    ) external onlyRole(DEFAULT_ADMIN_ROLE) {
         _setParams(p);
     }
 
     function _setParams(Params memory p) internal {
-        require(p.virtualToken != address(0) && 
-                p.feeAddr != address(0) && 
-                p.tbaImpl != address(0) && 
-                p.agentFactory != address(0), "Invalid addr");
+        require(
+            p.virtualToken != address(0) &&
+                p.feeAddr != address(0) &&
+                p.tbaImpl != address(0) &&
+                p.agentFactory != address(0),
+            "Invalid addr"
+        );
 
-        require(p.reserve > 0 && 
-                p.maxContribution > 0 && 
-                p.feeAmt > 0 && 
-                p.duration > 0, "Invalid amt");
+        require(
+            p.reserve > 0 &&
+                p.maxContribution > 0 &&
+                p.feeAmt > 0 &&
+                p.duration > 0,
+            "Invalid amt"
+        );
 
-        require(p.agentTokenTotalSupply > 0 && 
-                p.agentTokenLpSupply > 0 && 
-                p.agentTokenTotalSupply >= p.agentTokenLpSupply, "Invalid amt");
+        require(
+            p.agentTokenTotalSupply > 0 &&
+                p.agentTokenLpSupply > 0 &&
+                p.agentTokenTotalSupply >= p.agentTokenLpSupply,
+            "Invalid amt"
+        );
 
         params = p;
     }
 
-    function createGenesis(GenesisCreationParams memory gParams) 
-        external
-        returns (address) 
-    {
-        require(IERC20(params.virtualToken).transferFrom(
-            msg.sender, 
-            params.feeAddr, 
-            params.feeAmt
-        ), "transfer createGenesis fee failed");
-        
+    function createGenesis(
+        GenesisCreationParams memory gParams
+    ) external returns (address) {
+        require(
+            IERC20(params.virtualToken).transferFrom(
+                msg.sender,
+                params.feeAddr,
+                params.feeAmt
+            ),
+            "transfer createGenesis fee failed"
+        );
+
         gParams.endTime = gParams.startTime + params.duration;
-        
+
         genesisID++;
         address addr = GenesisLib.validateAndDeploy(
             genesisID,
@@ -101,12 +114,13 @@ contract FGenesis is Initializable, AccessControlUpgradeable {
         );
 
         // Grant BONDING_ROLE of ato the new Genesis contract
-        bytes32 BONDING_ROLE = AgentFactoryV3(params.agentFactory).BONDING_ROLE();
+        bytes32 BONDING_ROLE = AgentFactoryV3(params.agentFactory)
+            .BONDING_ROLE();
         AgentFactoryV3(params.agentFactory).grantRole(
             BONDING_ROLE,
             address(addr)
         );
-        
+
         genesisContracts[genesisID] = addr;
         emit GenesisCreated(genesisID, addr);
         return addr;
@@ -134,7 +148,23 @@ contract FGenesis is Initializable, AccessControlUpgradeable {
         _getGenesis(id).onGenesisFailed();
     }
 
-    function withdrawLeftVirtuals(uint256 id, address to, address token) external onlyRole(ADMIN_ROLE) {
+    function withdrawLeftVirtuals(
+        uint256 id,
+        address to,
+        address token
+    ) external onlyRole(ADMIN_ROLE) {
         _getGenesis(id).withdrawLeftVirtualsAfterFinalized(to, token);
+    }
+
+    function resetTime(
+        uint256 id,
+        uint256 newStartTime,
+        uint256 newEndTime
+    ) external onlyRole(ADMIN_ROLE) {
+        _getGenesis(id).resetTime(newStartTime, newEndTime);
+    }
+
+    function cancelGenesis(uint256 id) external onlyRole(ADMIN_ROLE) {
+        _getGenesis(id).cancelGenesis();
     }
 }

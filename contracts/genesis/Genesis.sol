@@ -18,7 +18,7 @@ contract Genesis is ReentrancyGuard, AccessControlUpgradeable {
     mapping(address => uint256) public mapAddrToVirtuals;
     mapping(address => uint256) public claimableAgentTokens;
     address[] public participants;
-    
+
     uint256 public genesisId;
     FGenesis public factory;
 
@@ -43,37 +43,156 @@ contract Genesis is ReentrancyGuard, AccessControlUpgradeable {
 
     address public agentTokenAddress;
     bool public isFailed;
+    bool public isCancelled;
 
     event GenesisFinalized(uint256 indexed genesisID, bool isSuccess);
-    event Participated(uint256 indexed genesisID, address indexed user, uint256 point, uint256 virtuals);
-    event RefundClaimed(uint256 indexed genesisID, address indexed user, uint256 amount);
-    event AgentTokenClaimed(uint256 indexed genesisID, address indexed user, uint256 amount);
-    event VirtualsWithdrawn(uint256 indexed genesisID, address indexed to, address token, uint256 amount);
-    
-    struct ParticipantInfo {
-        address userAddress;
-        uint256 virtuals;
+    event Participated(
+        uint256 indexed genesisID,
+        address indexed user,
+        uint256 point,
+        uint256 virtuals
+    );
+    event RefundClaimed(
+        uint256 indexed genesisID,
+        address indexed user,
+        uint256 amount
+    );
+    event AgentTokenClaimed(
+        uint256 indexed genesisID,
+        address indexed user,
+        uint256 amount
+    );
+    event VirtualsWithdrawn(
+        uint256 indexed genesisID,
+        address indexed to,
+        address token,
+        uint256 amount
+    );
+
+    string private constant ERR_NOT_STARTED = "Genesis not started yet";
+    string private constant ERR_ALREADY_STARTED = "Genesis already started";
+    string private constant ERR_NOT_ENDED = "Genesis not ended yet";
+    string private constant ERR_ALREADY_ENDED = "Genesis already ended";
+    string private constant ERR_ALREADY_FAILED = "Genesis already failed";
+    string private constant ERR_ALREADY_CANCELLED = "Genesis already cancelled";
+    string private constant ERR_START_TIME_FUTURE =
+        "Start time must be in the future";
+    string private constant ERR_END_AFTER_START =
+        "End time must be after start time";
+    string private constant ERR_TOKEN_LAUNCHED = "Agent token already launched";
+    string private constant ERR_TOKEN_NOT_LAUNCHED = "Agent token not launched";
+
+    // Common validation modifiers
+    modifier whenNotStarted() {
+        require(!isStarted(), ERR_ALREADY_STARTED);
+        _;
     }
 
-    function initialize(GenesisInitParams calldata params) external initializer {
+    modifier whenStarted() {
+        require(isStarted(), ERR_NOT_STARTED);
+        _;
+    }
+
+    modifier whenNotEnded() {
+        require(!isEnded(), ERR_ALREADY_ENDED);
+        _;
+    }
+
+    modifier whenEnded() {
+        require(isEnded(), ERR_NOT_ENDED);
+        _;
+    }
+
+    modifier whenNotFailed() {
+        require(!isFailed, ERR_ALREADY_FAILED);
+        _;
+    }
+
+    modifier whenNotCancelled() {
+        require(!isCancelled, ERR_ALREADY_CANCELLED);
+        _;
+    }
+
+    modifier whenTokenNotLaunched() {
+        require(agentTokenAddress == address(0), ERR_TOKEN_LAUNCHED);
+        _;
+    }
+
+    modifier whenTokenLaunched() {
+        require(agentTokenAddress != address(0), ERR_TOKEN_NOT_LAUNCHED);
+        _;
+    }
+
+    // Combined state checks
+    modifier whenActive() {
+        require(isStarted(), ERR_NOT_STARTED);
+        require(!isEnded(), ERR_ALREADY_ENDED);
+        require(!isFailed, ERR_ALREADY_FAILED);
+        require(!isCancelled, ERR_ALREADY_CANCELLED);
+        _;
+    }
+
+    modifier whenFinalized() {
+        require(isEnded(), ERR_NOT_ENDED);
+        require(
+            isFailed || isCancelled || agentTokenAddress != address(0),
+            "Genesis not finalized yet"
+        );
+        _;
+    }
+
+    function _validateTime(uint256 _startTime, uint256 _endTime) internal view {
+        require(_startTime > block.timestamp, ERR_START_TIME_FUTURE);
+        require(_endTime > _startTime, ERR_END_AFTER_START);
+    }
+
+    function initialize(
+        GenesisInitParams calldata params
+    ) external initializer {
         __AccessControl_init();
 
         require(params.genesisID > 0, "Invalid genesis ID");
         require(params.factory != address(0), "Invalid factory address");
-        require(params.startTime > block.timestamp, "Start time must be in the future");
-        require(params.endTime > params.startTime, "End time must be after start time");
+        _validateTime(params.startTime, params.endTime);
         require(bytes(params.genesisName).length > 0, "Invalid genesis name");
-        require(bytes(params.genesisTicker).length > 0, "Invalid genesis ticker");
+        require(
+            bytes(params.genesisTicker).length > 0,
+            "Invalid genesis ticker"
+        );
         require(params.genesisCores.length > 0, "Invalid genesis cores");
-        require(params.tbaImplementation != address(0), "Invalid TBA implementation address");
-        require(params.agentFactoryAddress != address(0), "Invalid agent factory address");
-        require(params.virtualTokenAddress != address(0), "Invalid virtual token address");
-        require(params.reserveAmount > 0, "Reserve amount must be greater than 0");
-        require(params.maxContributionVirtualAmount > 0, "Max contribution must be greater than 0");
-        require(params.agentTokenTotalSupply > 0, "Agent token total supply must be greater than 0");
-        require(params.agentTokenLpSupply > 0, "Agent token lp supply must be greater than 0");
-        require(params.agentTokenTotalSupply >= params.agentTokenLpSupply, "Agent token total supply must be greater than agent token lp supply");
-        
+        require(
+            params.tbaImplementation != address(0),
+            "Invalid TBA implementation address"
+        );
+        require(
+            params.agentFactoryAddress != address(0),
+            "Invalid agent factory address"
+        );
+        require(
+            params.virtualTokenAddress != address(0),
+            "Invalid virtual token address"
+        );
+        require(
+            params.reserveAmount > 0,
+            "Reserve amount must be greater than 0"
+        );
+        require(
+            params.maxContributionVirtualAmount > 0,
+            "Max contribution must be greater than 0"
+        );
+        require(
+            params.agentTokenTotalSupply > 0,
+            "Agent token total supply must be greater than 0"
+        );
+        require(
+            params.agentTokenLpSupply > 0,
+            "Agent token lp supply must be greater than 0"
+        );
+        require(
+            params.agentTokenTotalSupply >= params.agentTokenLpSupply,
+            "Agent token total supply must be greater than agent token lp supply"
+        );
+
         genesisId = params.genesisID;
         factory = FGenesis(params.factory);
         startTime = params.startTime;
@@ -101,17 +220,22 @@ contract Genesis is ReentrancyGuard, AccessControlUpgradeable {
         uint256 pointAmt,
         uint256 virtualsAmt,
         address userAddress
-    ) external nonReentrant {
-        require(isStarted(), "Genesis has not started yet");
-        require(!isEnded(), "Genesis has ended");
-        require(!isFailed, "Genesis has failed");
-
+    )
+        external
+        nonReentrant
+        whenNotCancelled
+        whenNotFailed
+        whenStarted
+        whenNotEnded
+    {
         require(pointAmt > 0, "Point amount must be greater than 0");
         require(virtualsAmt > 0, "Virtuals must be greater than 0");
-        
+
         // Check single submission upper limit
-        require(virtualsAmt <= maxContributionVirtualAmount, 
-            "Exceeds maximum virtuals per contribution");
+        require(
+            virtualsAmt <= maxContributionVirtualAmount,
+            "Exceeds maximum virtuals per contribution"
+        );
 
         // Add balance check
         require(
@@ -120,20 +244,25 @@ contract Genesis is ReentrancyGuard, AccessControlUpgradeable {
         );
         // Add allowance check
         require(
-            IERC20(virtualTokenAddress).allowance(msg.sender, address(this)) >= virtualsAmt,
+            IERC20(virtualTokenAddress).allowance(msg.sender, address(this)) >=
+                virtualsAmt,
             "Insufficient Virtual Token allowance"
         );
-        
+
         // Update participant list
         if (mapAddrToVirtuals[userAddress] == 0) {
             participants.push(userAddress);
         }
-        
+
         // Update state
         mapAddrToVirtuals[userAddress] += virtualsAmt;
 
-        IERC20(virtualTokenAddress).safeTransferFrom(msg.sender, address(this), virtualsAmt);
-        
+        IERC20(virtualTokenAddress).safeTransferFrom(
+            msg.sender,
+            address(this),
+            virtualsAmt
+        );
+
         emit Participated(genesisId, userAddress, pointAmt, virtualsAmt);
     }
 
@@ -142,15 +271,23 @@ contract Genesis is ReentrancyGuard, AccessControlUpgradeable {
         uint256[] calldata refundVirtualsTokenUserAmounts,
         address[] calldata distributeAgentTokenUserAddresses,
         uint256[] calldata distributeAgentTokenUserAmounts
-    ) external onlyRole(FACTORY_ROLE) nonReentrant returns (address) {
-        require(isEnded(), "Genesis not ended yet");
-        require(!isFailed, "Genesis has failed");
+    )
+        external
+        onlyRole(FACTORY_ROLE)
+        nonReentrant
+        whenNotCancelled
+        whenNotFailed
+        whenEnded
+        returns (address)
+    {
         require(
-            refundVirtualsTokenUserAddresses.length == refundVirtualsTokenUserAmounts.length, 
+            refundVirtualsTokenUserAddresses.length ==
+                refundVirtualsTokenUserAmounts.length,
             "Mismatched refund arrays"
         );
         require(
-            distributeAgentTokenUserAddresses.length == distributeAgentTokenUserAmounts.length, 
+            distributeAgentTokenUserAddresses.length ==
+                distributeAgentTokenUserAmounts.length,
             "Mismatched distribution arrays"
         );
 
@@ -159,7 +296,8 @@ contract Genesis is ReentrancyGuard, AccessControlUpgradeable {
         for (uint256 i = 0; i < refundVirtualsTokenUserAmounts.length; i++) {
             // check if the user has enough virtuals committed
             require(
-                mapAddrToVirtuals[refundVirtualsTokenUserAddresses[i]] >= refundVirtualsTokenUserAmounts[i],
+                mapAddrToVirtuals[refundVirtualsTokenUserAddresses[i]] >=
+                    refundVirtualsTokenUserAmounts[i],
                 "Insufficient Virtual Token committed"
             );
             totalRefundAmount += refundVirtualsTokenUserAmounts[i];
@@ -168,32 +306,37 @@ contract Genesis is ReentrancyGuard, AccessControlUpgradeable {
         // Check if launch has been called before
         bool isFirstLaunch = agentTokenAddress == address(0);
         // Calculate required balance based on whether this is first launch
-        uint256 requiredVirtualsBalance = isFirstLaunch ? 
-            totalRefundAmount + reserveAmount : 
-            totalRefundAmount;
+        uint256 requiredVirtualsBalance = isFirstLaunch
+            ? totalRefundAmount + reserveAmount
+            : totalRefundAmount;
         // Check if contract has enough virtuals balance
         require(
-            IERC20(virtualTokenAddress).balanceOf(address(this)) >= requiredVirtualsBalance,
+            IERC20(virtualTokenAddress).balanceOf(address(this)) >=
+                requiredVirtualsBalance,
             "Insufficient Virtual Token balance"
         );
 
         // Only do launch related operations if this is first launch
         if (isFirstLaunch) {
             // grant allowance to agentFactoryAddress for launch
-            IERC20(virtualTokenAddress).approve(agentFactoryAddress, reserveAmount);
+            IERC20(virtualTokenAddress).approve(
+                agentFactoryAddress,
+                reserveAmount
+            );
 
             // Call initFromBondingCurve and executeBondingCurveApplication
-            uint256 id = IAgentFactoryV3(agentFactoryAddress).initFromBondingCurve(
-                string.concat(genesisName, " by Virtuals"),
-                genesisTicker,
-                genesisCores,
-                tbaSalt,
-                tbaImplementation,
-                daoVotingPeriod,
-                daoThreshold,
-                reserveAmount,
-                msg.sender
-            );
+            uint256 id = IAgentFactoryV3(agentFactoryAddress)
+                .initFromBondingCurve(
+                    string.concat(genesisName, " by Virtuals"),
+                    genesisTicker,
+                    genesisCores,
+                    tbaSalt,
+                    tbaImplementation,
+                    daoVotingPeriod,
+                    daoThreshold,
+                    reserveAmount,
+                    msg.sender
+                );
 
             address agentToken = IAgentFactoryV3(agentFactoryAddress)
                 .executeBondingCurveApplication(
@@ -214,60 +357,77 @@ contract Genesis is ReentrancyGuard, AccessControlUpgradeable {
         }
         // Check if contract has enough agent token balance only after agentTokenAddress be set
         require(
-            IERC20(agentTokenAddress).balanceOf(address(this)) >= totalDistributionAmount,
+            IERC20(agentTokenAddress).balanceOf(address(this)) >=
+                totalDistributionAmount,
             "Insufficient Agent Token balance"
         );
 
         // Directly transfer Virtual Token refunds
         for (uint256 i = 0; i < refundVirtualsTokenUserAddresses.length; i++) {
             // first decrease the virtuals mapping of the user to prevent reentrancy attacks
-            mapAddrToVirtuals[refundVirtualsTokenUserAddresses[i]] -= refundVirtualsTokenUserAmounts[i];
+            mapAddrToVirtuals[
+                refundVirtualsTokenUserAddresses[i]
+            ] -= refundVirtualsTokenUserAmounts[i];
             // then transfer the virtuals
             IERC20(virtualTokenAddress).safeTransfer(
-                refundVirtualsTokenUserAddresses[i], 
+                refundVirtualsTokenUserAddresses[i],
                 refundVirtualsTokenUserAmounts[i]
             );
             emit RefundClaimed(
-                genesisId, 
-                refundVirtualsTokenUserAddresses[i], 
+                genesisId,
+                refundVirtualsTokenUserAddresses[i],
                 refundVirtualsTokenUserAmounts[i]
             );
         }
 
         // save the amount of agent tokens to claim
         for (uint256 i = 0; i < distributeAgentTokenUserAddresses.length; i++) {
-            claimableAgentTokens[distributeAgentTokenUserAddresses[i]] = distributeAgentTokenUserAmounts[i];
+            claimableAgentTokens[
+                distributeAgentTokenUserAddresses[i]
+            ] = distributeAgentTokenUserAmounts[i];
         }
 
         emit GenesisFinalized(genesisId, true);
         return agentTokenAddress;
     }
 
-    function claimAgentToken(address userAddress) external nonReentrant {
-        require(isEnded(), "Genesis not ended yet");
-        require(!isFailed, "Genesis has failed");
-        require(agentTokenAddress != address(0), "Agent token not launched");
-        
+    function claimAgentToken(
+        address userAddress
+    )
+        external
+        nonReentrant
+        whenNotCancelled
+        whenNotFailed
+        whenTokenLaunched
+        whenEnded
+    {
         uint256 amount = claimableAgentTokens[userAddress];
         require(amount > 0, "No tokens to claim");
-        
+
         // set the amount of claimable agent tokens to 0, to prevent duplicate claims
         claimableAgentTokens[userAddress] = 0;
-        
+
         // transfer the agent token
         IERC20(agentTokenAddress).safeTransfer(userAddress, amount);
-        
+
         emit AgentTokenClaimed(genesisId, userAddress, amount);
     }
 
-    function getClaimableAgentToken(address userAddress) external view returns (uint256) {
+    function getClaimableAgentToken(
+        address userAddress
+    ) external view returns (uint256) {
         return claimableAgentTokens[userAddress];
     }
 
-    function onGenesisFailed() external onlyRole(FACTORY_ROLE) nonReentrant {
-        require(isEnded(), "Genesis not ended yet");
-        require(!isFailed, "Genesis already failed");
-        require(agentTokenAddress == address(0), "Cannot fail if agent token has been launched");
+    function onGenesisFailed()
+        external
+        onlyRole(FACTORY_ROLE)
+        nonReentrant
+        whenNotCancelled
+        whenNotFailed
+        whenTokenNotLaunched
+        whenEnded
+    {
         isFailed = true;
 
         // Return all virtuals to participants
@@ -278,7 +438,10 @@ contract Genesis is ReentrancyGuard, AccessControlUpgradeable {
                 // first clear the virtuals mapping of the user to prevent reentrancy attacks
                 mapAddrToVirtuals[participant] = 0;
                 // then transfer the virtuals
-                IERC20(virtualTokenAddress).safeTransfer(participant, virtualsAmt);
+                IERC20(virtualTokenAddress).safeTransfer(
+                    participant,
+                    virtualsAmt
+                );
                 emit RefundClaimed(genesisId, participant, virtualsAmt);
             }
         }
@@ -298,45 +461,50 @@ contract Genesis is ReentrancyGuard, AccessControlUpgradeable {
         return participants.length;
     }
 
-    function getParticipantsPaginated(uint256 startIndex, uint256 pageSize) 
-        external 
-        view 
-        returns (address[] memory) 
-    {
+    function getParticipantsPaginated(
+        uint256 startIndex,
+        uint256 pageSize
+    ) external view returns (address[] memory) {
         require(startIndex < participants.length, "Start index out of bounds");
-        
+
         uint256 actualPageSize = pageSize;
         if (startIndex + pageSize > participants.length) {
             actualPageSize = participants.length - startIndex;
         }
-        
+
         address[] memory page = new address[](actualPageSize);
         for (uint256 i = 0; i < actualPageSize; i++) {
             page[i] = participants[startIndex + i];
         }
-        
+
         return page;
     }
 
-    function getParticipantsInfo(uint256[] calldata participantIndexes) 
-        external 
-        view 
-        returns (ParticipantInfo[] memory) 
-    {
+    struct ParticipantInfo {
+        address userAddress;
+        uint256 virtuals;
+    }
+
+    function getParticipantsInfo(
+        uint256[] calldata participantIndexes
+    ) external view returns (ParticipantInfo[] memory) {
         uint256 length = participantIndexes.length;
         ParticipantInfo[] memory result = new ParticipantInfo[](length);
-        
+
         for (uint256 i = 0; i < length; i++) {
             // check if the index is out of bounds
-            require(participantIndexes[i] < participants.length, "Index out of bounds");
-            
+            require(
+                participantIndexes[i] < participants.length,
+                "Index out of bounds"
+            );
+
             address userAddress = participants[participantIndexes[i]];
             result[i] = ParticipantInfo({
                 userAddress: userAddress,
                 virtuals: mapAddrToVirtuals[userAddress]
             });
         }
-        
+
         return result;
     }
 
@@ -360,52 +528,79 @@ contract Genesis is ReentrancyGuard, AccessControlUpgradeable {
         uint256 agentTokenLpSupply;
         address agentTokenAddress;
         bool isFailed;
+        bool isCancelled;
     }
 
     function getGenesisInfo() public view returns (GenesisInfo memory) {
-        return GenesisInfo({
-            genesisId: genesisId,
-            factory: address(factory),
-            startTime: startTime,
-            endTime: endTime,
-            genesisName: genesisName,
-            genesisTicker: genesisTicker,
-            genesisCores: genesisCores,
-            tbaSalt: tbaSalt,
-            tbaImplementation: tbaImplementation,
-            daoVotingPeriod: daoVotingPeriod,
-            daoThreshold: daoThreshold,
-            agentFactoryAddress: agentFactoryAddress,
-            virtualTokenAddress: virtualTokenAddress,
-            reserveAmount: reserveAmount,
-            maxContributionVirtualAmount: maxContributionVirtualAmount,
-            agentTokenTotalSupply: agentTokenTotalSupply,
-            agentTokenLpSupply: agentTokenLpSupply,
-            agentTokenAddress: agentTokenAddress,
-            isFailed: isFailed
-        });
+        return
+            GenesisInfo({
+                genesisId: genesisId,
+                factory: address(factory),
+                startTime: startTime,
+                endTime: endTime,
+                genesisName: genesisName,
+                genesisTicker: genesisTicker,
+                genesisCores: genesisCores,
+                tbaSalt: tbaSalt,
+                tbaImplementation: tbaImplementation,
+                daoVotingPeriod: daoVotingPeriod,
+                daoThreshold: daoThreshold,
+                agentFactoryAddress: agentFactoryAddress,
+                virtualTokenAddress: virtualTokenAddress,
+                reserveAmount: reserveAmount,
+                maxContributionVirtualAmount: maxContributionVirtualAmount,
+                agentTokenTotalSupply: agentTokenTotalSupply,
+                agentTokenLpSupply: agentTokenLpSupply,
+                agentTokenAddress: agentTokenAddress,
+                isFailed: isFailed,
+                isCancelled: isCancelled
+            });
     }
 
-    function withdrawLeftVirtualsAfterFinalized(address to, address token) external onlyRole(FACTORY_ROLE) nonReentrant {
-        // check if Genesis has ended
-        require(isEnded(), "Genesis not ended yet");
-        
-        // check if Genesis has been finalized (success or failed)
-        require(
-            isFailed || agentTokenAddress != address(0),
-            "Genesis not finalized yet"
-        );
-
+    function withdrawLeftVirtualsAfterFinalized(
+        address to,
+        address token
+    ) external onlyRole(FACTORY_ROLE) nonReentrant whenEnded whenFinalized {
         require(token != address(0), "Invalid token address");
-        
+
         // get the remaining virtuals balance of the contract
         uint256 remainingBalance = IERC20(token).balanceOf(address(this));
         require(remainingBalance > 0, "No token left to withdraw");
-        
+
         // transfer all the remaining virtuals
         IERC20(token).safeTransfer(to, remainingBalance);
-        
+
         // emit an event to record the withdrawal
         emit VirtualsWithdrawn(genesisId, to, token, remainingBalance);
+    }
+
+    function resetTime(
+        uint256 newStartTime,
+        uint256 newEndTime
+    )
+        external
+        onlyRole(FACTORY_ROLE)
+        nonReentrant
+        whenNotCancelled
+        whenNotFailed
+        whenNotStarted
+        whenNotEnded
+    {
+        _validateTime(newStartTime, newEndTime);
+
+        startTime = newStartTime;
+        endTime = newEndTime;
+    }
+
+    function cancelGenesis()
+        external
+        onlyRole(FACTORY_ROLE)
+        nonReentrant
+        whenNotCancelled
+        whenNotFailed
+        whenNotStarted
+        whenNotEnded
+    {
+        isCancelled = true;
     }
 }

@@ -7,24 +7,24 @@ import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
 
-contract MockAgentFactoryV3 is 
+contract MockAgentFactoryV3 is
     IAgentFactoryV3,
     Initializable,
     AccessControlUpgradeable,
-    PausableUpgradeable 
+    PausableUpgradeable
 {
     // Mock variables
     address public mockAgentToken;
     uint256 public mockId;
     bytes32 public constant BONDING_ROLE = keccak256("BONDING_ROLE");
-    
+
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() {
         _disableInitializers();
     }
 
     function initialize(
-      address tokenImplementation_,
+        address tokenImplementation_,
         address veTokenImplementation_,
         address daoImplementation_,
         address tbaRegistry_,

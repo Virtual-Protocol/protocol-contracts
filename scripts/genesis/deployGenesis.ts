@@ -64,7 +64,6 @@ import { ethers, upgrades } from "hardhat";
     );
 
     // Grant DEFAULT_ADMIN_ROLE to FGenesis in AgentFactory
-    console.log("Granting DEFAULT_ADMIN_ROLE of AgentFactory to FGenesis Proxy: ", deployedFGenesisAddress);
     const tx = await agentFactory.grantRole(
       await agentFactory.DEFAULT_ADMIN_ROLE(),
       deployedFGenesisAddress
@@ -73,21 +72,19 @@ import { ethers, upgrades } from "hardhat";
     console.log("Granted DEFAULT_ADMIN_ROLE of AgentFactory to FGenesis Proxy: ", deployedFGenesisAddress);
 
     // Transfer admin rights if needed
-    console.log("Granting DEFAULT_ADMIN_ROLE of fGenesis Proxy to:", process.env.ADMIN);
     const tx1 = await fGenesis.grantRole(
       await fGenesis.DEFAULT_ADMIN_ROLE(),
       process.env.ADMIN
     );
     await tx1.wait();
-    console.log("Granted DEFAULT_ADMIN_ROLE of fGenesis Proxy to:", process.env.ADMIN);
+    console.log("Granted DEFAULT_ADMIN_ROLE of fGenesis Proxy to Admin:", process.env.ADMIN);
 
-    console.log("Granting ADMIN_ROLE of fGenesis Proxy to:", process.env.GENESIS_BE_OPS_WALLET);
     const tx2 = await fGenesis.grantRole(
       await fGenesis.ADMIN_ROLE(),
       process.env.GENESIS_BE_OPS_WALLET
     );
     await tx2.wait();
-    console.log("Granted ADMIN_ROLE of fGenesis Proxy to:", process.env.GENESIS_BE_OPS_WALLET);
+    console.log("Granted ADMIN_ROLE of fGenesis Proxy to BE Ops:", process.env.GENESIS_BE_OPS_WALLET);
     // Print deployed parameters
     const deployedParams = await fGenesis.params();
     console.log("\nDeployed contract parameters:");

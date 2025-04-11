@@ -284,6 +284,21 @@
       "address": "0x9Bfe1f9e91B61BC69D9F07B8B7fbe69fe33cb2c8",
       "txHash": "0xa9bbd83ecd07e5a227bb3db85d3a83fe4ee47531b174db51d42d2b3c80c225c9",
       "kind": "transparent"
+    },
+    {
+      "address": "0x0d7ecE52252F6b0195826ae5FFf9efcF3eC89945",
+      "txHash": "0xb1dd77179bcf006b8e319ae5d271e9ff8b01d596410f4572a1f54fbcc9076be4",
+      "kind": "transparent"
+    },
+    {
+      "address": "0xB3a00821Ec3684D7698ae76c5DE5f935564932b2",
+      "txHash": "0xda8f8381b5e2fa88640295235cb824c0c6112339b35af48f7e9de22ae9fc1a74",
+      "kind": "transparent"
+    },
+    {
+      "address": "0x5220C10e963c0aDeBCC03DB25AF76a9984435a77",
+      "txHash": "0x77156a6bb4a65554edb0ef10e9beaa7198a052f33d1b4f4678219e929a1a3ffa",
+      "kind": "transparent"
     }
   ],
   "impls": {
@@ -23233,6 +23248,239 @@
             "numberOfBytes": "32"
           },
           "t_struct(Params)2754_storage": {
+            "label": "struct FGenesis.Params",
+            "members": [
+              {
+                "label": "virtualToken",
+                "type": "t_address",
+                "offset": 0,
+                "slot": "0"
+              },
+              {
+                "label": "reserve",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "1"
+              },
+              {
+                "label": "maxContribution",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "2"
+              },
+              {
+                "label": "feeAddr",
+                "type": "t_address",
+                "offset": 0,
+                "slot": "3"
+              },
+              {
+                "label": "feeAmt",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "4"
+              },
+              {
+                "label": "duration",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "5"
+              },
+              {
+                "label": "tbaSalt",
+                "type": "t_bytes32",
+                "offset": 0,
+                "slot": "6"
+              },
+              {
+                "label": "tbaImpl",
+                "type": "t_address",
+                "offset": 0,
+                "slot": "7"
+              },
+              {
+                "label": "votePeriod",
+                "type": "t_uint32",
+                "offset": 20,
+                "slot": "7"
+              },
+              {
+                "label": "threshold",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "8"
+              },
+              {
+                "label": "agentFactory",
+                "type": "t_address",
+                "offset": 0,
+                "slot": "9"
+              },
+              {
+                "label": "agentTokenTotalSupply",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "10"
+              },
+              {
+                "label": "agentTokenLpSupply",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "11"
+              }
+            ],
+            "numberOfBytes": "384"
+          },
+          "t_uint256": {
+            "label": "uint256",
+            "numberOfBytes": "32"
+          },
+          "t_uint32": {
+            "label": "uint32",
+            "numberOfBytes": "4"
+          }
+        },
+        "namespaces": {
+          "erc7201:openzeppelin.storage.AccessControl": [
+            {
+              "contract": "AccessControlUpgradeable",
+              "label": "_roles",
+              "type": "t_mapping(t_bytes32,t_struct(RoleData)25_storage)",
+              "src": "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol:61",
+              "offset": 0,
+              "slot": "0"
+            }
+          ],
+          "erc7201:openzeppelin.storage.Initializable": [
+            {
+              "contract": "Initializable",
+              "label": "_initialized",
+              "type": "t_uint64",
+              "src": "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol:69",
+              "offset": 0,
+              "slot": "0"
+            },
+            {
+              "contract": "Initializable",
+              "label": "_initializing",
+              "type": "t_bool",
+              "src": "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol:73",
+              "offset": 8,
+              "slot": "0"
+            }
+          ]
+        }
+      }
+    },
+    "f9133dd64078852e7ff68f9bbb0b27a2ec586e31d071d710d5bdc8aadaaa6aad": {
+      "address": "0x777412f07a4adf7c4996aE513C65b2dbEDac81c2",
+      "txHash": "0x387741a53c69e40496ef6eb955c50fc141e679035b116c73fa59042fccf44f30",
+      "layout": {
+        "solcVersion": "0.8.26",
+        "storage": [
+          {
+            "label": "params",
+            "offset": 0,
+            "slot": "0",
+            "type": "t_struct(Params)3406_storage",
+            "contract": "FGenesis",
+            "src": "contracts/genesis/FGenesis.sol:34"
+          },
+          {
+            "label": "genesisContracts",
+            "offset": 0,
+            "slot": "12",
+            "type": "t_mapping(t_uint256,t_address)",
+            "contract": "FGenesis",
+            "src": "contracts/genesis/FGenesis.sol:35"
+          },
+          {
+            "label": "genesisID",
+            "offset": 0,
+            "slot": "13",
+            "type": "t_uint256",
+            "contract": "FGenesis",
+            "src": "contracts/genesis/FGenesis.sol:36"
+          }
+        ],
+        "types": {
+          "t_address": {
+            "label": "address",
+            "numberOfBytes": "20"
+          },
+          "t_bool": {
+            "label": "bool",
+            "numberOfBytes": "1"
+          },
+          "t_bytes32": {
+            "label": "bytes32",
+            "numberOfBytes": "32"
+          },
+          "t_mapping(t_address,t_bool)": {
+            "label": "mapping(address => bool)",
+            "numberOfBytes": "32"
+          },
+          "t_mapping(t_bytes32,t_struct(RoleData)25_storage)": {
+            "label": "mapping(bytes32 => struct AccessControlUpgradeable.RoleData)",
+            "numberOfBytes": "32"
+          },
+          "t_struct(AccessControlStorage)34_storage": {
+            "label": "struct AccessControlUpgradeable.AccessControlStorage",
+            "members": [
+              {
+                "label": "_roles",
+                "type": "t_mapping(t_bytes32,t_struct(RoleData)25_storage)",
+                "offset": 0,
+                "slot": "0"
+              }
+            ],
+            "numberOfBytes": "32"
+          },
+          "t_struct(InitializableStorage)93_storage": {
+            "label": "struct Initializable.InitializableStorage",
+            "members": [
+              {
+                "label": "_initialized",
+                "type": "t_uint64",
+                "offset": 0,
+                "slot": "0"
+              },
+              {
+                "label": "_initializing",
+                "type": "t_bool",
+                "offset": 8,
+                "slot": "0"
+              }
+            ],
+            "numberOfBytes": "32"
+          },
+          "t_struct(RoleData)25_storage": {
+            "label": "struct AccessControlUpgradeable.RoleData",
+            "members": [
+              {
+                "label": "hasRole",
+                "type": "t_mapping(t_address,t_bool)",
+                "offset": 0,
+                "slot": "0"
+              },
+              {
+                "label": "adminRole",
+                "type": "t_bytes32",
+                "offset": 0,
+                "slot": "1"
+              }
+            ],
+            "numberOfBytes": "64"
+          },
+          "t_uint64": {
+            "label": "uint64",
+            "numberOfBytes": "8"
+          },
+          "t_mapping(t_uint256,t_address)": {
+            "label": "mapping(uint256 => address)",
+            "numberOfBytes": "32"
+          },
+          "t_struct(Params)3406_storage": {
             "label": "struct FGenesis.Params",
             "members": [
               {

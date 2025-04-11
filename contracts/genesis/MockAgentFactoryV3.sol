@@ -24,15 +24,15 @@ contract MockAgentFactoryV3 is
     }
 
     function initialize(
-        address tokenImplementation_,
-        address veTokenImplementation_,
-        address daoImplementation_,
-        address tbaRegistry_,
-        address assetToken_,
-        address nft_,
-        uint256 applicationThreshold_,
-        address vault_,
-        uint256 nextId_
+        address, // tokenImplementation
+        address, // veTokenImplementation
+        address, // daoImplementation
+        address, // tbaRegistry
+        address, // assetToken
+        address, // nft
+        uint256, // applicationThreshold
+        address, // vault
+        uint256 // nextId
     ) public initializer {
         __AccessControl_init();
         __Pausable_init();

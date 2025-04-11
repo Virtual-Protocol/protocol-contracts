@@ -9,12 +9,34 @@ const { ApiBaseUrl } = require("@fireblocks/fireblocks-web3-provider");
 
 module.exports = {
   solidity: {
-    version: "0.8.20",
+    version: "0.8.26",
     settings: {
       viaIR: true,
       optimizer: {
         enabled: true,
         runs: 200,
+      },
+    },
+  },
+  overrides: {
+    "contracts/genesis/FGenesis.sol": {
+      version: "0.8.26",
+      settings: {
+        optimizer: {
+          enabled: true,
+          runs: 200,
+        },
+        viaIR: false,
+      },
+    },
+    "contracts/genesis/Genesis.sol": {
+      version: "0.8.26",
+      settings: {
+        optimizer: {
+          enabled: true,
+          runs: 200,
+        },
+        viaIR: false,
       },
     },
   },

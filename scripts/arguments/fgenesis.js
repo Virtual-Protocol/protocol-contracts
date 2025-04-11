@@ -1,0 +1,15 @@
+module.exports = [
+  process.env.BRIDGED_TOKEN,
+  process.env.GENESIS_RESERVE_AMOUNT,
+  process.env.GENESIS_MAX_CONTRIBUTION_VIRTUAL_AMOUNT,
+  process.env.GENESIS_CREATION_FEE_ADDRESS,
+  process.env.GENESIS_CREATION_FEE_AMOUNT,
+  process.env.GENESIS_DURATION,
+  process.env.GENESIS_TBA_SALT,
+  process.env.TBA_IMPLEMENTATION,
+  process.env.GENESIS_VOTING_PERIOD,
+  process.env.GENESIS_DAO_THRESHOLD,
+  process.env.FACTORY_V3,
+  process.env.GENESIS_AGENT_TOKEN_TOTAL_SUPPLY,
+  process.env.GENESIS_AGENT_TOKEN_LP_SUPPLY,
+];

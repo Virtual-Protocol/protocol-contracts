@@ -71,12 +71,19 @@ contract veVirtual is
         return results;
     }
 
-    function balanceOf(address account) public view returns (uint256) {
+    function balanceOfAt(
+        address account,
+        uint256 timestamp
+    ) public view returns (uint256) {
         uint256 balance = 0;
         for (uint i = 0; i < locks[account].length; i++) {
-            balance += _balanceOfLock(locks[account][i]);
+            balance += _balanceOfLockAt(locks[account][i], timestamp);
         }
         return balance;
+    }
+
+    function balanceOf(address account) public view returns (uint256) {
+        return balanceOfAt(account, block.timestamp);
     }
 
     function balanceOfLock(
@@ -86,21 +93,28 @@ contract veVirtual is
         return _balanceOfLock(locks[account][index]);
     }
 
-    function _balanceOfLock(Lock memory lock) internal view returns (uint256) {
+    function _balanceOfLockAt(
+        Lock memory lock,
+        uint256 timestamp
+    ) internal pure returns (uint256) {
         uint256 value = lock.value;
         if (lock.autoRenew) {
             return value;
         }
 
-        if (block.timestamp >= lock.end) {
+        if (timestamp < lock.start || timestamp >= lock.end) {
             return 0;
         }
 
         uint256 duration = lock.end - lock.start;
-        uint256 elapsed = block.timestamp - lock.start;
+        uint256 elapsed = timestamp - lock.start;
         uint256 decayRate = (value * DENOM) / duration;
 
         return value - (elapsed * decayRate) / DENOM;
+    }
+
+    function _balanceOfLock(Lock memory lock) internal view returns (uint256) {
+        return _balanceOfLockAt(lock, block.timestamp);
     }
 
     function stake(

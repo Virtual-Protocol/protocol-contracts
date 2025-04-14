@@ -22,7 +22,6 @@ contract veVirtual is
     }
 
     uint16 public constant DENOM = 10000;
-    uint256 private constant FAR_FUTURE = type(uint256).max;
 
     bytes32 public constant ADMIN_ROLE = keccak256("ADMIN_ROLE");
 
@@ -114,10 +113,10 @@ contract veVirtual is
             numWeeks = maxWeeks;
         }
 
-        uint multiplier = (numWeeks * DENOM) / maxWeeks;
+        uint multiplier = (uint(numWeeks) * DENOM) / uint(maxWeeks);
         uint256 value = (amount * multiplier) / DENOM;
 
-        uint256 end = block.timestamp + numWeeks * 1 weeks;
+        uint256 end = block.timestamp + uint256(numWeeks) * 1 weeks;
 
         Lock memory lock = Lock({
             amount: amount,
@@ -158,8 +157,26 @@ contract veVirtual is
 
         lock.start = block.timestamp;
         lock.end = block.timestamp + lock.numWeeks * 1 weeks;
-        uint multiplier = (lock.numWeeks * DENOM) / maxWeeks;
+        uint multiplier = (uint(lock.numWeeks) * DENOM) / uint(maxWeeks);
         lock.value = (lock.amount * multiplier) / DENOM;
+    }
+
+    function extend(uint256 index, uint8 numWeeks) external nonReentrant {
+        require(index < locks[_msgSender()].length, "Invalid index");
+        Lock storage lock = locks[_msgSender()][index];
+        require(lock.autoRenew == false, "Lock is auto-renewing");
+        require(block.timestamp < lock.end, "Lock is expired");
+        require(
+            (lock.numWeeks + numWeeks) <= maxWeeks,
+            "Num weeks must be less than max weeks"
+        );
+        uint256 newEnd = lock.end + uint256(numWeeks) * 1 weeks;
+
+        lock.numWeeks += numWeeks;
+        lock.end = newEnd;
+        uint multiplier = ((uint(newEnd) - block.timestamp) * DENOM) /
+            (uint(maxWeeks) * 1 weeks);
+        lock.value += (lock.amount * multiplier) / DENOM;
     }
 
     function setMaxWeeks(uint8 maxWeeks_) external onlyRole(ADMIN_ROLE) {

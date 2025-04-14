@@ -156,7 +156,7 @@ contract veVirtual is
         }
 
         lock.start = block.timestamp;
-        lock.end = block.timestamp + lock.numWeeks * 1 weeks;
+        lock.end = block.timestamp + uint(lock.numWeeks) * 1 weeks;
         uint multiplier = (uint(lock.numWeeks) * DENOM) / uint(maxWeeks);
         lock.value = (lock.amount * multiplier) / DENOM;
     }

@@ -139,4 +139,31 @@ describe("veVIRTUAL", function () {
       parseEther("1000")
     );
   });
+
+  it("should allow toggle auto renew", async function () {
+    await virtual.transfer(staker.address, parseEther("1000"));
+
+    expect(await virtual.balanceOf(staker.address)).to.be.equal(
+      parseEther("1000")
+    );
+
+    await virtual.connect(staker).approve(veVirtual.target, parseEther("1000"));
+    await veVirtual.connect(staker).stake(parseEther("1000"), 52, false);
+    expect(await veVirtual.balanceOf(staker.address)).to.be.equal(
+      parseEther("500")
+    );
+
+    await time.increase(51 * 7 * 24 * 60 * 60);
+    const start = await time.latest()
+    await veVirtual.connect(staker).toggleAutoRenew(0);
+    expect(await veVirtual.balanceOf(staker.address)).to.be.equal(
+      parseEther("1000")
+    );
+    const position2 = (await veVirtual.getPositions(staker.address, 0, 1))[0];
+
+    expect(position2.autoRenew).to.be.equal(true);
+    expect(position2.numWeeks).to.be.equal(104);
+    expect(position2.end).to.be.equal(start + 104 * 7 * 24 * 60 * 60 + 1);
+    
+  });
 });

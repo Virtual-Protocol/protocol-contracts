@@ -228,7 +228,8 @@ describe("Genesis Business Logic Tests", function () {
           refundAddresses: [],
           refundAmounts: [],
           distributeAddresses: [],
-          distributeAmounts: []
+          distributeAmounts: [],
+          creator: owner.address
         }
       )).to.be.revertedWith(ERR_NOT_ENDED);
     });
@@ -243,7 +244,8 @@ describe("Genesis Business Logic Tests", function () {
           refundAddresses: [participants[0].address],
           refundAmounts: [ethers.parseEther("1000")],
           distributeAddresses: [],
-          distributeAmounts: []
+          distributeAmounts: [],
+          creator: owner.address
         }
       )).to.be.revertedWith("Insufficient Virtual Token committed");
     });
@@ -295,7 +297,8 @@ describe("Genesis Business Logic Tests", function () {
         refundAddresses: participants.map(p => p.address),
         refundAmounts: contributions.map(c => c / 2n), // Use BigInt division
         distributeAddresses: participants.map(p => p.address),
-        distributeAmounts: contributions.map(c => c / 2n), // Use BigInt division
+        distributeAmounts: contributions.map(c => c / 2n),
+        creator: owner.address
       };
       console.log("Success Params:", successParams);
 
@@ -379,7 +382,8 @@ describe("Genesis Business Logic Tests", function () {
           ethers.parseEther(x.toString())
         ), // Use BigInt division
         distributeAddresses: participants.slice(0, 2).map(p => p.address),
-        distributeAmounts: contributions.map(c => c / 2n), // Use BigInt division
+        distributeAmounts: contributions.map(c => c / 2n),
+        creator: owner.address
       };
       console.log("Success Params:", successParams);
 
@@ -552,7 +556,8 @@ describe("Genesis Business Logic Tests", function () {
           refundAddresses: [],
           refundAmounts: [],
           distributeAddresses: [],
-          distributeAmounts: []
+          distributeAmounts: [],
+          creator: owner.address
         })
       ).to.be.revertedWith(ERR_ALREADY_CANCELLED);
     });

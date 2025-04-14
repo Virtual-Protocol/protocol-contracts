@@ -270,7 +270,8 @@ contract Genesis is ReentrancyGuard, AccessControlUpgradeable {
         address[] calldata refundVirtualsTokenUserAddresses,
         uint256[] calldata refundVirtualsTokenUserAmounts,
         address[] calldata distributeAgentTokenUserAddresses,
-        uint256[] calldata distributeAgentTokenUserAmounts
+        uint256[] calldata distributeAgentTokenUserAmounts,
+        address creator
     )
         external
         onlyRole(FACTORY_ROLE)
@@ -335,7 +336,7 @@ contract Genesis is ReentrancyGuard, AccessControlUpgradeable {
                     daoVotingPeriod,
                     daoThreshold,
                     reserveAmount,
-                    msg.sender
+                    creator
                 );
 
             address agentToken = IAgentFactoryV3(agentFactoryAddress)

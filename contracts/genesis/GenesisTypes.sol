@@ -14,6 +14,7 @@ struct SuccessParams {
     uint256[] refundAmounts;
     address[] distributeAddresses;
     uint256[] distributeAmounts;
+    address creator;
 }
 
 struct GenesisInitParams {

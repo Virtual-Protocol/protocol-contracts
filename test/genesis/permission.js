@@ -22,20 +22,20 @@ describe("Genesis Permission Tests", function () {
   beforeEach(async function () {
     const setup = await setupTest();
     ({
-        virtualToken,
-        agentToken,
-        fGenesis,
-        genesis,
-        owner,
-        admin,
-        beOpsWallet,
-        user1,
-        user2,
-        DEFAULT_ADMIN_ROLE,
-        ADMIN_ROLE,
-        FACTORY_ROLE,
-        params,
-        agentFactory
+      virtualToken,
+      agentToken,
+      fGenesis,
+      genesis,
+      owner,
+      admin,
+      beOpsWallet,
+      user1,
+      user2,
+      DEFAULT_ADMIN_ROLE,
+      ADMIN_ROLE,
+      FACTORY_ROLE,
+      params,
+      agentFactory,
     } = setup);
   });
 
@@ -101,14 +101,11 @@ describe("Genesis Permission Tests", function () {
 
     it("Should also allow non-ADMIN_ROLE to create Genesis", async function () {
       // First transfer and approve tokens for user1
-      await virtualToken.transfer(
-        user1.address,
-        ethers.parseEther("100")
-      );
+      await virtualToken.transfer(user1.address, ethers.parseEther("100"));
       await virtualToken
         .connect(user1)
         .approve(await fGenesis.getAddress(), ethers.parseEther("100"));
-        const currentTime = await time.latest();
+      const currentTime = await time.latest();
       const newGenesisParams = {
         startTime: currentTime + 3600,
         endTime: currentTime + 86400,
@@ -120,9 +117,8 @@ describe("Genesis Permission Tests", function () {
         genesisUrls: ["url1", "url2", "url3", "url4"],
       };
 
-      await expect(
-        fGenesis.connect(user1).createGenesis(newGenesisParams)
-      ).to.not.be.reverted;
+      await expect(fGenesis.connect(user1).createGenesis(newGenesisParams)).to
+        .not.be.reverted;
     });
   });
 
@@ -231,12 +227,16 @@ describe("Genesis Permission Tests", function () {
           refundAmounts: [refundAmount],
           distributeAddresses: [user1.address],
           distributeAmounts: [ethers.parseEther("1")],
+          creator: owner.address,
         };
 
         console.log("\nSuccess Parameters:");
         console.log(successParams);
 
-        await agentToken.transfer(genesis.getAddress(), ethers.parseEther("1000000000000000000"));
+        await agentToken.transfer(
+          genesis.getAddress(),
+          ethers.parseEther("1000000000000000000")
+        );
 
         // Call onGenesisSuccess
         console.log("\nCalling onGenesisSuccess...");
@@ -304,6 +304,54 @@ describe("Genesis Permission Tests", function () {
         fGenesis.connect(user1).setParams(params)
       ).to.be.revertedWithCustomError(
         fGenesis,
+        "AccessControlUnauthorizedAccount"
+      );
+    });
+  });
+
+  describe("FGenesis Permission Tests", function () {
+    it("Should only allow ADMIN_ROLE to call onGenesisSuccess", async function () {
+      await expect(
+        fGenesis.connect(user1).onGenesisSuccess(1, {
+          refundAddresses: [],
+          refundAmounts: [],
+          distributeAddresses: [],
+          distributeAmounts: [],
+          creator: owner.address,
+        })
+      ).to.be.revertedWithCustomError(
+        fGenesis,
+        "AccessControlUnauthorizedAccount"
+      );
+    });
+
+    it("Should allow ADMIN_ROLE to call onGenesisSuccess", async function () {
+      await time.increaseTo(await genesis.endTime());
+
+      await expect(
+        fGenesis.connect(beOpsWallet).onGenesisSuccess(1, {
+          refundAddresses: [],
+          refundAmounts: [],
+          distributeAddresses: [],
+          distributeAmounts: [],
+          creator: owner.address,
+        })
+      ).to.be.revertedWith("Insufficient Virtual Token balance");
+    });
+  });
+
+  describe("Genesis Permission Tests", function () {
+    it("Should only allow FACTORY_ROLE to call onGenesisSuccess", async function () {
+      await expect(
+        genesis.connect(user1).onGenesisSuccess(
+          [], // refundAddresses
+          [], // refundAmounts
+          [], // distributeAddresses
+          [], // distributeAmounts
+          owner.address // creator
+        )
+      ).to.be.revertedWithCustomError(
+        genesis,
         "AccessControlUnauthorizedAccount"
       );
     });

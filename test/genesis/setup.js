@@ -61,7 +61,10 @@ async function setupTest() {
       "MockERC20 Agent Token deployed at: ",
       await agentToken.getAddress()
     );
-    console.log("Agent Token owner balance: ", await agentToken.balanceOf(owner.address));
+    console.log(
+      "Agent Token owner balance: ",
+      await agentToken.balanceOf(owner.address)
+    );
 
     // Mock IAgentFactory
     console.log("\n--- Deploying MockAgentFactoryV3 ---");
@@ -305,9 +308,7 @@ async function setupTest() {
     console.log("FGenesis has FACTORY_ROLE on Genesis:", hasFactoryRole);
 
     // check Virtual Token balance
-    const genesisVirtualBalance = await virtualToken.balanceOf(
-      genesisAddress
-    );
+    const genesisVirtualBalance = await virtualToken.balanceOf(genesisAddress);
     console.log(
       "Genesis Virtual Token Balance:",
       genesisVirtualBalance.toString()

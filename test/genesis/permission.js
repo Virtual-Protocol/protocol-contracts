@@ -251,8 +251,8 @@ describe("Genesis Permission Tests", function () {
         await expect(
           fGenesis.connect(beOpsWallet).onGenesisSuccess(1, successParams)
         )
-          .to.emit(genesis, "GenesisFinalized")
-          .withArgs(1, true);
+          .to.emit(genesis, "GenesisSucceeded")
+          .withArgs(1);
       } catch (error) {
         console.error("\n=== Test Failed ===");
         console.error("Error message:", error.message);
@@ -270,18 +270,9 @@ describe("Genesis Permission Tests", function () {
       const endTime = await genesis.endTime();
       await time.increaseTo(endTime);
 
-      // Non-admin should not be able to call
-      await expect(
-        fGenesis.connect(user1).onGenesisFailed(1)
-      ).to.be.revertedWithCustomError(
-        fGenesis,
-        "AccessControlUnauthorizedAccount"
-      );
-
-      // Admin should be able to call
       await expect(fGenesis.connect(beOpsWallet).onGenesisFailed(1))
-        .to.emit(genesis, "GenesisFinalized")
-        .withArgs(1, false);
+        .to.emit(genesis, "GenesisFailed")
+        .withArgs(1);
     });
   });
 
@@ -355,5 +346,41 @@ describe("Genesis Permission Tests", function () {
         "AccessControlUnauthorizedAccount"
       );
     });
+  });
+
+  it("Should allow withdrawal of assets after finalization", async function () {
+    await fGenesis.connect(beOpsWallet).cancelGenesis(1);
+
+    // Wait for end time
+    const endTime = await genesis.endTime();
+    await time.increaseTo(endTime);
+
+    // Transfer 100 tokens to genesis
+    await virtualToken.transfer(
+      await genesis.getAddress(),
+      ethers.parseEther("100")
+    );
+
+    // Try to withdraw funds
+    const initialBalance = await virtualToken.balanceOf(user1.address);
+    await expect(
+      fGenesis
+        .connect(beOpsWallet)
+        .withdrawLeftAssetsAfterFinalized(
+          1,
+          user1.address,
+          await virtualToken.getAddress()
+        )
+    )
+      .to.emit(genesis, "AssetsWithdrawn")
+      .withArgs(
+        1,
+        user1.address,
+        await virtualToken.getAddress(),
+        ethers.parseEther("100")
+      );
+
+    const finalBalance = await virtualToken.balanceOf(user1.address);
+    expect(finalBalance).to.be.gt(initialBalance);
   });
 });

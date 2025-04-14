@@ -45,7 +45,24 @@ contract Genesis is ReentrancyGuard, AccessControlUpgradeable {
     bool public isFailed;
     bool public isCancelled;
 
-    event GenesisFinalized(uint256 indexed genesisID, bool isSuccess);
+    event AssetsWithdrawn(
+        uint256 indexed genesisID,
+        address indexed to,
+        address token,
+        uint256 amount
+    );
+
+    event TimeReset(
+        uint256 oldStartTime,
+        uint256 oldEndTime,
+        uint256 newStartTime,
+        uint256 newEndTime
+    );
+
+    event GenesisCancelled(uint256 indexed genesisID);
+    event GenesisSucceeded(uint256 indexed genesisID);
+    event GenesisFailed(uint256 indexed genesisID);
+
     event Participated(
         uint256 indexed genesisID,
         address indexed user,
@@ -388,7 +405,7 @@ contract Genesis is ReentrancyGuard, AccessControlUpgradeable {
             ] = distributeAgentTokenUserAmounts[i];
         }
 
-        emit GenesisFinalized(genesisId, true);
+        emit GenesisSucceeded(genesisId);
         return agentTokenAddress;
     }
 
@@ -447,7 +464,7 @@ contract Genesis is ReentrancyGuard, AccessControlUpgradeable {
             }
         }
 
-        emit GenesisFinalized(genesisId, false);
+        emit GenesisFailed(genesisId);
     }
 
     function isEnded() public view returns (bool) {
@@ -558,7 +575,7 @@ contract Genesis is ReentrancyGuard, AccessControlUpgradeable {
             });
     }
 
-    function withdrawLeftVirtualsAfterFinalized(
+    function withdrawLeftAssetsAfterFinalized(
         address to,
         address token
     ) external onlyRole(FACTORY_ROLE) nonReentrant whenEnded whenFinalized {
@@ -572,7 +589,7 @@ contract Genesis is ReentrancyGuard, AccessControlUpgradeable {
         IERC20(token).safeTransfer(to, remainingBalance);
 
         // emit an event to record the withdrawal
-        emit VirtualsWithdrawn(genesisId, to, token, remainingBalance);
+        emit AssetsWithdrawn(genesisId, to, token, remainingBalance);
     }
 
     function resetTime(
@@ -589,8 +606,13 @@ contract Genesis is ReentrancyGuard, AccessControlUpgradeable {
     {
         _validateTime(newStartTime, newEndTime);
 
+        uint256 oldStartTime = startTime;
+        uint256 oldEndTime = endTime;
+
         startTime = newStartTime;
         endTime = newEndTime;
+
+        emit TimeReset(oldStartTime, oldEndTime, newStartTime, newEndTime);
     }
 
     function cancelGenesis()
@@ -603,5 +625,6 @@ contract Genesis is ReentrancyGuard, AccessControlUpgradeable {
         whenNotEnded
     {
         isCancelled = true;
+        emit GenesisCancelled(genesisId);
     }
 }

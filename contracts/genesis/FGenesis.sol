@@ -149,12 +149,12 @@ contract FGenesis is Initializable, AccessControlUpgradeable {
         _getGenesis(id).onGenesisFailed();
     }
 
-    function withdrawLeftVirtuals(
+    function withdrawLeftAssetsAfterFinalized(
         uint256 id,
         address to,
         address token
     ) external onlyRole(ADMIN_ROLE) {
-        _getGenesis(id).withdrawLeftVirtualsAfterFinalized(to, token);
+        _getGenesis(id).withdrawLeftAssetsAfterFinalized(to, token);
     }
 
     function resetTime(

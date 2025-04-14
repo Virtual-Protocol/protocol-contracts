@@ -147,7 +147,9 @@ describe("Genesis Business Logic Tests", function () {
       await time.increaseTo(endTime);
 
       // Execute failure flow
-      await fGenesis.connect(beOpsWallet).onGenesisFailed(1);
+      await expect(fGenesis.connect(beOpsWallet).onGenesisFailed(1))
+          .to.emit(genesis, "GenesisFailed")
+          .withArgs(1);
 
       const finalBalances = await Promise.all(
         participants.map(p => virtualToken.balanceOf(p.address))
@@ -424,11 +426,39 @@ describe("Genesis Business Logic Tests", function () {
   });
 
   describe("Genesis Time Management and Cancellation Tests", function () {
-    it("Should successfully reset time before Genesis starts", async function () {
-      const newStartTime = (await time.latest()) + 7200; // 2 hours from now
-      const newEndTime = newStartTime + 3600; // 1 hour duration
+    it("Should allow withdrawal of funds after cancellation", async function () {
+      await fGenesis.connect(beOpsWallet).cancelGenesis(1);
 
-      await fGenesis.connect(beOpsWallet).resetTime(1, newStartTime, newEndTime);
+      // Wait for end time
+      const endTime = await genesis.endTime();
+      await time.increaseTo(endTime);
+
+      // Transfer 100 tokens to genesis
+      await virtualToken.transfer(await genesis.getAddress(), ethers.parseEther("100"));
+
+      // Try to withdraw funds
+      const initialBalance = await virtualToken.balanceOf(user1.address);
+      await expect(
+          fGenesis
+              .connect(beOpsWallet)
+              .withdrawLeftAssetsAfterFinalized(1, user1.address, await virtualToken.getAddress())
+      ).to.emit(genesis, "AssetsWithdrawn")
+       .withArgs(1, user1.address, await virtualToken.getAddress(), ethers.parseEther("100"));
+
+      const finalBalance = await virtualToken.balanceOf(user1.address);
+      expect(finalBalance).to.be.gt(initialBalance);
+    });
+
+    it("Should successfully reset time before Genesis starts", async function () {
+      const newStartTime = (await time.latest()) + 7200;
+      const newEndTime = newStartTime + 3600;
+      const oldStartTime = await genesis.startTime();
+      const oldEndTime = await genesis.endTime();
+
+      await expect(
+          fGenesis.connect(beOpsWallet).resetTime(1, newStartTime, newEndTime)
+      ).to.emit(genesis, "TimeReset")
+       .withArgs(oldStartTime, oldEndTime, newStartTime, newEndTime);
 
       const genesisInfo = await genesis.getGenesisInfo();
       expect(genesisInfo.startTime).to.equal(newStartTime);
@@ -469,7 +499,9 @@ describe("Genesis Business Logic Tests", function () {
     });
 
     it("Should successfully cancel Genesis before it starts", async function () {
-      await fGenesis.connect(beOpsWallet).cancelGenesis(1);
+      await expect(fGenesis.connect(beOpsWallet).cancelGenesis(1))
+          .to.emit(genesis, "GenesisCancelled")
+          .withArgs(1);
 
       const genesisInfo = await genesis.getGenesisInfo();
       expect(genesisInfo.isCancelled).to.be.true;
@@ -517,7 +549,7 @@ describe("Genesis Business Logic Tests", function () {
       const initialBalance = await virtualToken.balanceOf(user1.address);
       await fGenesis
         .connect(beOpsWallet)
-        .withdrawLeftVirtuals(1, user1.address, await virtualToken.getAddress());
+        .withdrawLeftAssetsAfterFinalized(1, user1.address, await virtualToken.getAddress());
 
       const finalBalance = await virtualToken.balanceOf(user1.address);
       expect(finalBalance).to.be.gt(initialBalance);

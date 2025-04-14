@@ -135,14 +135,16 @@ contract veVirtual is
         Lock memory lock = locks[_msgSender()][index];
         require(block.timestamp >= lock.end, "Lock is not expired");
 
-        IERC20(baseToken).safeTransfer(_msgSender(), lock.amount);
-        emit Withdraw(_msgSender(), index, lock.amount);
+        uint256 amount = lock.amount;
 
         uint256 lastIndex = locks[_msgSender()].length - 1;
         if (index != lastIndex) {
             locks[_msgSender()][index] = locks[_msgSender()][lastIndex];
         }
         delete locks[_msgSender()][lastIndex];
+
+        IERC20(baseToken).safeTransfer(_msgSender(), amount);
+        emit Withdraw(_msgSender(), index, amount);
     }
 
     function toggleAutoRenew(uint256 index) external nonReentrant {

@@ -25,7 +25,7 @@ abstract contract InteractionLedger {
         TXHASH
     }
 
-    mapping(uint256 => Memo) memos;
+    mapping(uint256 => Memo) public memos;
 
     event NewMemo(
         uint256 indexed jobId,

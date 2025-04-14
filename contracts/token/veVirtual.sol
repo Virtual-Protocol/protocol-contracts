@@ -33,6 +33,10 @@ contract veVirtual is
     event Stake(address indexed user, uint256 amount, uint8 numWeeks);
     event Withdraw(address indexed user, uint256 index, uint256 amount);
 
+    bool public adminUnlocked;
+
+    event AdminUnlocked(bool adminUnlocked);
+
     function initialize(
         address baseToken_,
         uint8 maxWeeks_
@@ -133,7 +137,10 @@ contract veVirtual is
     function withdraw(uint256 index) external nonReentrant {
         require(index < locks[_msgSender()].length, "Invalid index");
         Lock memory lock = locks[_msgSender()][index];
-        require(block.timestamp >= lock.end, "Lock is not expired");
+        require(
+            block.timestamp >= lock.end || adminUnlocked,
+            "Lock is not expired"
+        );
 
         uint256 amount = lock.amount;
 
@@ -207,5 +214,12 @@ contract veVirtual is
 
     function decimals() public pure returns (uint8) {
         return 18;
+    }
+
+    function setAdminUnlocked(
+        bool adminUnlocked_
+    ) external onlyRole(ADMIN_ROLE) {
+        adminUnlocked = adminUnlocked_;
+        emit AdminUnlocked(adminUnlocked);
     }
 }

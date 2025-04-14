@@ -177,4 +177,16 @@ contract veVirtual is
 
         return block.timestamp + maxWeeks * 1 weeks;
     }
+
+    function name() public pure returns (string memory) {
+        return "veVIRTUAL";
+    }
+
+    function symbol() public pure returns (string memory) {
+        return "veVIRTUAL";
+    }
+
+    function decimals() public pure returns (uint8) {
+        return 18;
+    }
 }

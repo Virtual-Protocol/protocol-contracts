@@ -71,6 +71,9 @@ contract veVirtual is
         return results;
     }
 
+    // Query balance at a specific timestamp
+    // If the timestamp is before the lock was created, it will return 0
+    // This does not work on withdrawn locks
     function balanceOfAt(
         address account,
         uint256 timestamp

@@ -421,4 +421,11 @@ contract ACPSimple is
         platformFeeBP = platformFeeBP_;
         platformTreasury = platformTreasury_;
     }
+
+    function getJobPhaseMemoIds(
+        uint256 jobId,
+        uint8 phase
+    ) external view returns (uint256[] memory) {
+        return jobMemoIds[jobId][phase];
+    }
 }

@@ -145,8 +145,11 @@ contract FGenesis is Initializable, AccessControlUpgradeable {
         );
     }
 
-    function onGenesisFailed(uint256 id) external onlyRole(ADMIN_ROLE) {
-        _getGenesis(id).onGenesisFailed();
+    function onGenesisFailed(
+        uint256 id,
+        uint256[] calldata participantIndexes
+    ) external onlyRole(ADMIN_ROLE) {
+        _getGenesis(id).onGenesisFailed(participantIndexes);
     }
 
     function withdrawLeftAssetsAfterFinalized(

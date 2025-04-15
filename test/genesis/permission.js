@@ -267,12 +267,26 @@ describe("Genesis Permission Tests", function () {
     });
 
     it("Should handle Genesis failure correctly", async function () {
+      await genesis
+        .connect(user1)
+        .participate(
+          ethers.parseEther("1"),
+          ethers.parseEther("2"),
+          user1.address
+        );
+
+      // Wait for end time
       const endTime = await genesis.endTime();
       await time.increaseTo(endTime);
 
-      await expect(fGenesis.connect(beOpsWallet).onGenesisFailed(1))
+      await expect(fGenesis.connect(beOpsWallet).onGenesisFailed(1, [0]))
         .to.emit(genesis, "GenesisFailed")
         .withArgs(1);
+
+      // verify the state
+      expect(await genesis.isFailed()).to.be.true;
+      expect(await genesis.refundUserCountForFailed()).to.equal(1);
+      expect(await genesis.mapAddrToVirtuals(user1.address)).to.equal(0);
     });
   });
 

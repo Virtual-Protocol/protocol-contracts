@@ -18,6 +18,7 @@ contract Genesis is ReentrancyGuard, AccessControlUpgradeable {
     mapping(address => uint256) public mapAddrToVirtuals;
     mapping(address => uint256) public claimableAgentTokens;
     address[] public participants;
+    uint256 public refundUserCountForFailed;
 
     uint256 public genesisId;
     FGenesis public factory;
@@ -237,14 +238,7 @@ contract Genesis is ReentrancyGuard, AccessControlUpgradeable {
         uint256 pointAmt,
         uint256 virtualsAmt,
         address userAddress
-    )
-        external
-        nonReentrant
-        whenNotCancelled
-        whenNotFailed
-        whenStarted
-        whenNotEnded
-    {
+    ) external nonReentrant whenActive {
         require(pointAmt > 0, "Point amount must be greater than 0");
         require(virtualsAmt > 0, "Virtuals must be greater than 0");
 
@@ -298,6 +292,10 @@ contract Genesis is ReentrancyGuard, AccessControlUpgradeable {
         whenEnded
         returns (address)
     {
+        require(
+            refundUserCountForFailed == 0,
+            "OnGenesisFailed already called"
+        );
         require(
             refundVirtualsTokenUserAddresses.length ==
                 refundVirtualsTokenUserAmounts.length,
@@ -364,6 +362,8 @@ contract Genesis is ReentrancyGuard, AccessControlUpgradeable {
                     address(this) // vault
                 );
 
+            require(agentToken != address(0), "Agent token creation failed");
+
             // Store the created agent token address
             agentTokenAddress = agentToken;
         }
@@ -409,16 +409,8 @@ contract Genesis is ReentrancyGuard, AccessControlUpgradeable {
         return agentTokenAddress;
     }
 
-    function claimAgentToken(
-        address userAddress
-    )
-        external
-        nonReentrant
-        whenNotCancelled
-        whenNotFailed
-        whenTokenLaunched
-        whenEnded
-    {
+    // can try to claim at any time
+    function claimAgentToken(address userAddress) external nonReentrant {
         uint256 amount = claimableAgentTokens[userAddress];
         require(amount > 0, "No tokens to claim");
 
@@ -437,7 +429,9 @@ contract Genesis is ReentrancyGuard, AccessControlUpgradeable {
         return claimableAgentTokens[userAddress];
     }
 
-    function onGenesisFailed()
+    function onGenesisFailed(
+        uint256[] calldata participantIndexes
+    )
         external
         onlyRole(FACTORY_ROLE)
         nonReentrant
@@ -446,13 +440,16 @@ contract Genesis is ReentrancyGuard, AccessControlUpgradeable {
         whenTokenNotLaunched
         whenEnded
     {
-        isFailed = true;
-
-        // Return all virtuals to participants
-        for (uint256 i = 0; i < participants.length; i++) {
-            address participant = participants[i];
+        for (uint256 i = 0; i < participantIndexes.length; i++) {
+            require(
+                participantIndexes[i] < participants.length,
+                "Index out of bounds"
+            );
+            address participant = participants[participantIndexes[i]];
             uint256 virtualsAmt = mapAddrToVirtuals[participant];
             if (virtualsAmt > 0) {
+                // increase the refund user count for failed, only increase once
+                refundUserCountForFailed++;
                 // first clear the virtuals mapping of the user to prevent reentrancy attacks
                 mapAddrToVirtuals[participant] = 0;
                 // then transfer the virtuals
@@ -464,7 +461,11 @@ contract Genesis is ReentrancyGuard, AccessControlUpgradeable {
             }
         }
 
-        emit GenesisFailed(genesisId);
+        // when all participants have been refunded, set the genesis to failed
+        if (refundUserCountForFailed == participants.length) {
+            isFailed = true;
+            emit GenesisFailed(genesisId);
+        }
     }
 
     function isEnded() public view returns (bool) {

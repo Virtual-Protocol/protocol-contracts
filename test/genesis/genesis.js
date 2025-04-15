@@ -146,29 +146,165 @@ describe("Genesis Business Logic Tests", function () {
       const endTime = await genesis.endTime();
       await time.increaseTo(endTime);
 
-      // Execute failure flow
-      await expect(fGenesis.connect(beOpsWallet).onGenesisFailed(1))
-          .to.emit(genesis, "GenesisFailed")
-          .withArgs(1);
+      // Execute failure flow with participant indexes
+      const participantIndexes = Array.from({length: participants.length}, (_, i) => i);
+      
+      // first call, handle the first 3 participants
+      await fGenesis.connect(beOpsWallet).onGenesisFailed(1, [0, 1, 2]);
+      
+      // verify the refund status of the first 3 participants
+      for (let i = 0; i < 3; i++) {
+        expect(await genesis.mapAddrToVirtuals(participants[i].address)).to.equal(0);
+        expect(await virtualToken.balanceOf(participants[i].address))
+          .to.equal(initialBalances[i]);
+      }
+      
+      // verify the Genesis is not marked as failed
+      expect(await genesis.isFailed()).to.be.false;
+      expect(await genesis.refundUserCountForFailed()).to.equal(3);
 
+      // second call, handle the remaining participants
+      await expect(fGenesis.connect(beOpsWallet).onGenesisFailed(1, [3, 4]))
+        .to.emit(genesis, "GenesisFailed")
+        .withArgs(1);
+
+      // verify the final state of all participants
       const finalBalances = await Promise.all(
         participants.map(p => virtualToken.balanceOf(p.address))
       );
 
       console.log("\n=== Genesis Failure Refund Details ===");
-      participants.forEach((p, i) => {
+      for (let i = 0; i < participants.length; i++) {
+        const p = participants[i];
         console.log(`Participant ${i + 1}:`, {
-          initial: ethers.formatEther(contributions[i]),
+          initial: ethers.formatEther(initialBalances[i]),
           final: ethers.formatEther(finalBalances[i]),
-          refunded: ethers.formatEther(finalBalances[i] - contributions[i])
+          refunded: ethers.formatEther(finalBalances[i] - initialBalances[i])
         });
         // Verify full refund
-        expect(initialBalances[i]).to.equal(finalBalances[i]);
-      });
+        expect(finalBalances[i]).to.equal(initialBalances[i]);
+        expect(await genesis.mapAddrToVirtuals(p.address)).to.equal(0);
+      }
 
-      // Verify contract state
+      // Verify final contract state
+      expect(await genesis.isFailed()).to.be.true;
+      expect(await genesis.refundUserCountForFailed()).to.equal(5);
+      expect(await genesis.agentTokenAddress()).to.equal(ethers.ZeroAddress);
+    });
+
+    it("Should handle Genesis failure with invalid participant indexes", async function () {
+      await time.increase(3600);
+
+      // let some participants participate
+      await genesis
+        .connect(participants[0])
+        .participate(
+          ethers.parseEther("1"),
+          ethers.parseEther("2"),
+          participants[0].address
+        );
+        await genesis
+        .connect(participants[1])
+        .participate(
+          ethers.parseEther("1"),
+          ethers.parseEther("3"),
+          participants[1].address
+        );
+
+      // Wait for end time
+      const endTime = await genesis.endTime();
+      await time.increaseTo(endTime);
+
+      // test invalid participant index, total participants is 2, index 2 is out of bounds`
+      await expect(
+        fGenesis.connect(beOpsWallet).onGenesisFailed(1, [2])
+      ).to.be.revertedWith("Index out of bounds");
+
+      await fGenesis.connect(beOpsWallet).onGenesisFailed(1, [0]);
+      expect(await genesis.refundUserCountForFailed()).to.equal(1);
+      // test repeat handle the same participant
+      await fGenesis.connect(beOpsWallet).onGenesisFailed(1, [0]);
+      // should not increase the refund user count for failed
+      expect(await genesis.refundUserCountForFailed()).to.equal(1);
+
+      await fGenesis.connect(beOpsWallet).onGenesisFailed(1, [1]);
+      expect(await genesis.refundUserCountForFailed()).to.equal(2);
       expect(await genesis.isFailed()).to.be.true;
       expect(await genesis.agentTokenAddress()).to.equal(ethers.ZeroAddress);
+    });
+
+    it("Should handle onGenesisSuccess and withdrawLeftAssetsAfterFinalized well after onGenesisFailed called", async function () {
+      await time.increase(3600);
+
+      // let some participants participate
+      await genesis
+        .connect(participants[0])
+        .participate(
+          ethers.parseEther("1"),
+          ethers.parseEther("2"),
+          participants[0].address
+        );
+        await genesis
+        .connect(participants[1])
+        .participate(
+          ethers.parseEther("1"),
+          ethers.parseEther("3"),
+          participants[1].address
+        );
+
+      // Wait for end time
+      const endTime = await genesis.endTime();
+      await time.increaseTo(endTime);
+
+      // test invalid participant index, total participants is 2, index 2 is out of bounds`
+      await expect(
+        fGenesis.connect(beOpsWallet).onGenesisFailed(1, [2])
+      ).to.be.revertedWith("Index out of bounds");
+
+      await fGenesis.connect(beOpsWallet).onGenesisFailed(1, [0]);
+      expect(await genesis.refundUserCountForFailed()).to.equal(1);
+
+      // test cannot call onGenesisSuccess if onGenesisFailed has been called and refundUserCountForFailed is indeed larger than 0
+      await expect(
+        fGenesis.connect(beOpsWallet).onGenesisSuccess(1, {
+          refundAddresses: [],
+          refundAmounts: [],
+          distributeAddresses: [],
+          distributeAmounts: [],
+          creator: owner.address
+        })
+      ).to.be.revertedWith("OnGenesisFailed already called");
+
+      // test call withdrawLeftAssetsAfterFinalized before onGenesisFailed called
+      await expect(
+        fGenesis
+          .connect(beOpsWallet)
+          .withdrawLeftAssetsAfterFinalized(1, participants[0].address, await virtualToken.getAddress())
+      ).to.be.revertedWith("Genesis not finalized yet");
+
+      // test repeat handle the same participant
+      await fGenesis.connect(beOpsWallet).onGenesisFailed(1, [0]);
+      // should not increase the refund user count for failed
+      expect(await genesis.refundUserCountForFailed()).to.equal(1);
+
+      // test call withdrawLeftAssetsAfterFinalized after onGenesisFailed but not all participants have been refunded
+      await expect(
+        fGenesis
+          .connect(beOpsWallet)
+          .withdrawLeftAssetsAfterFinalized(1, participants[0].address, await virtualToken.getAddress())
+      ).to.be.revertedWith("Genesis not finalized yet");
+
+      await fGenesis.connect(beOpsWallet).onGenesisFailed(1, [1]);
+      expect(await genesis.refundUserCountForFailed()).to.equal(2);
+      expect(await genesis.isFailed()).to.be.true;
+      expect(await genesis.agentTokenAddress()).to.equal(ethers.ZeroAddress);
+
+      // test can call withdrawLeftAssetsAfterFinalized but No token left to withdraw
+      await expect(
+        fGenesis
+          .connect(beOpsWallet)
+          .withdrawLeftAssetsAfterFinalized(1, participants[0].address, await virtualToken.getAddress())
+      ).to.be.revertedWith("No token left to withdraw");
     });
 
     it("Should enforce contribution limits and timing restrictions", async function () {
@@ -510,6 +646,10 @@ describe("Genesis Business Logic Tests", function () {
     it("Should revert when trying to participate in cancelled Genesis", async function () {
       await fGenesis.connect(beOpsWallet).cancelGenesis(1);
 
+      // Wait for start time
+      const startTime = await genesis.startTime();
+      await time.increaseTo(startTime);
+
       await expect(
         genesis.connect(participants[0]).participate(
           ethers.parseEther("1"),
@@ -569,6 +709,10 @@ describe("Genesis Business Logic Tests", function () {
       expect(genesisInfo.startTime).to.equal(newStartTime);
       expect(genesisInfo.endTime).to.equal(newEndTime);
       expect(genesisInfo.isCancelled).to.be.true;
+
+      // Wait for start time
+      const startTime = await genesis.startTime();
+      await time.increaseTo(startTime);
 
       // Verify cannot participate
       await expect(

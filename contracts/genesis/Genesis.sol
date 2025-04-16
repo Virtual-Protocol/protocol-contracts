@@ -212,7 +212,7 @@ contract Genesis is ReentrancyGuard, AccessControlUpgradeable {
         );
 
         genesisId = params.genesisID;
-        factory = FGenesis(params.factory);
+        factory = FGenesis(params.factory); // the FGenesis Proxy
         startTime = params.startTime;
         endTime = params.endTime;
         genesisName = params.genesisName;
@@ -229,15 +229,13 @@ contract Genesis is ReentrancyGuard, AccessControlUpgradeable {
         agentTokenTotalSupply = params.agentTokenTotalSupply;
         agentTokenLpSupply = params.agentTokenLpSupply;
 
-        _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
-        _grantRole(FACTORY_ROLE, msg.sender);
+        _grantRole(DEFAULT_ADMIN_ROLE, params.factory);
         _grantRole(FACTORY_ROLE, params.factory);
     }
 
     function participate(
         uint256 pointAmt,
-        uint256 virtualsAmt,
-        address userAddress
+        uint256 virtualsAmt
     ) external nonReentrant whenActive {
         require(pointAmt > 0, "Point amount must be greater than 0");
         require(virtualsAmt > 0, "Virtuals must be greater than 0");
@@ -261,12 +259,12 @@ contract Genesis is ReentrancyGuard, AccessControlUpgradeable {
         );
 
         // Update participant list
-        if (mapAddrToVirtuals[userAddress] == 0) {
-            participants.push(userAddress);
+        if (mapAddrToVirtuals[msg.sender] == 0) {
+            participants.push(msg.sender);
         }
 
         // Update state
-        mapAddrToVirtuals[userAddress] += virtualsAmt;
+        mapAddrToVirtuals[msg.sender] += virtualsAmt;
 
         IERC20(virtualTokenAddress).safeTransferFrom(
             msg.sender,
@@ -274,7 +272,7 @@ contract Genesis is ReentrancyGuard, AccessControlUpgradeable {
             virtualsAmt
         );
 
-        emit Participated(genesisId, userAddress, pointAmt, virtualsAmt);
+        emit Participated(genesisId, msg.sender, pointAmt, virtualsAmt);
     }
 
     function onGenesisSuccess(
@@ -578,19 +576,25 @@ contract Genesis is ReentrancyGuard, AccessControlUpgradeable {
 
     function withdrawLeftAssetsAfterFinalized(
         address to,
-        address token
-    ) external onlyRole(FACTORY_ROLE) nonReentrant whenEnded whenFinalized {
+        address token,
+        uint256 amount
+    )
+        external
+        onlyRole(DEFAULT_ADMIN_ROLE)
+        nonReentrant
+        whenEnded
+        whenFinalized
+    {
         require(token != address(0), "Invalid token address");
+        require(
+            amount <= IERC20(token).balanceOf(address(this)),
+            "Insufficient balance to withdraw"
+        );
 
-        // get the remaining virtuals balance of the contract
-        uint256 remainingBalance = IERC20(token).balanceOf(address(this));
-        require(remainingBalance > 0, "No token left to withdraw");
-
-        // transfer all the remaining virtuals
-        IERC20(token).safeTransfer(to, remainingBalance);
+        IERC20(token).safeTransfer(to, amount);
 
         // emit an event to record the withdrawal
-        emit AssetsWithdrawn(genesisId, to, token, remainingBalance);
+        emit AssetsWithdrawn(genesisId, to, token, amount);
     }
 
     function resetTime(

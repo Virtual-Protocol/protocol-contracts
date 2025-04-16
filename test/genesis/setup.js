@@ -72,7 +72,6 @@ async function setupTest() {
       "MockAgentFactoryV3"
     );
 
-    // 准备初始化参数
     const initializeParams = [
       ethers.ZeroAddress, // tokenImplementation_
       ethers.ZeroAddress, // veTokenImplementation_
@@ -139,29 +138,38 @@ async function setupTest() {
     console.log("\n--- Setting up Roles ---");
     DEFAULT_ADMIN_ROLE = await fGenesis.DEFAULT_ADMIN_ROLE();
     ADMIN_ROLE = await fGenesis.ADMIN_ROLE();
+    OPERATION_ROLE = ethers.keccak256(ethers.toUtf8Bytes("OPERATION_ROLE"));
     FACTORY_ROLE = ethers.keccak256(ethers.toUtf8Bytes("FACTORY_ROLE"));
     console.log("DEFAULT_ADMIN_ROLE:", DEFAULT_ADMIN_ROLE);
     console.log("ADMIN_ROLE:", ADMIN_ROLE);
+    console.log("OPERATION_ROLE:", OPERATION_ROLE);
     console.log("FACTORY_ROLE:", FACTORY_ROLE);
 
     // Setup roles
-    const grantAdminTx = await fGenesis.grantRole(
+    const grantDefaultAdminTx = await fGenesis.grantRole(
       DEFAULT_ADMIN_ROLE,
       admin.address
     );
-    await grantAdminTx.wait();
+    await grantDefaultAdminTx.wait();
     console.log(
       "Granted fGenesis Proxy DEFAULT_ADMIN_ROLE to admin address: ",
       admin.address
     );
 
+    const grantAdminTx = await fGenesis.grantRole(ADMIN_ROLE, admin.address);
+    await grantAdminTx.wait();
+    console.log(
+      "Granted fGenesis Proxy ADMIN_ROLE to admin address: ",
+      admin.address
+    );
+
     const grantBeOpsTx = await fGenesis.grantRole(
-      ADMIN_ROLE,
+      OPERATION_ROLE,
       beOpsWallet.address
     );
     await grantBeOpsTx.wait();
     console.log(
-      "Granted ADMIN_ROLE to beOpsWallet address: ",
+      "Granted OPERATION_ROLE to beOpsWallet address: ",
       beOpsWallet.address
     );
 
@@ -245,10 +253,10 @@ async function setupTest() {
 
     console.log("\n=== Pre-Creation Checks ===");
 
-    // 1. check beOpsWallet has ADMIN_ROLE
-    let hasAdminRole = await fGenesis.hasRole(ADMIN_ROLE, beOpsWallet.address);
-    console.log("beOpsWallet has ADMIN_ROLE:", hasAdminRole);
-    expect(hasAdminRole).to.be.true;
+    // 1. check beOpsWallet has OPERATION_ROLE
+    let hasOperationRole = await fGenesis.hasRole(OPERATION_ROLE, beOpsWallet.address);
+    console.log("beOpsWallet has OPERATION_ROLE:", hasOperationRole);
+    expect(hasOperationRole).to.be.true;
 
     // 2. check beOpsWallet allowance to fGenesis proxy
     const allowance = await virtualToken.allowance(
@@ -344,6 +352,7 @@ async function setupTest() {
   setup.user2 = user2;
   setup.DEFAULT_ADMIN_ROLE = DEFAULT_ADMIN_ROLE;
   setup.ADMIN_ROLE = ADMIN_ROLE;
+  setup.OPERATION_ROLE = OPERATION_ROLE;
   setup.FACTORY_ROLE = FACTORY_ROLE;
   setup.params = params;
   setup.agentFactory = mockAgentFactory;

@@ -27,6 +27,7 @@ describe("Genesis Business Logic Tests", function () {
   let user2;
   let DEFAULT_ADMIN_ROLE;
   let ADMIN_ROLE;
+  let OPERATION_ROLE;
   let FACTORY_ROLE;
   let params;
   let agentFactory;
@@ -45,6 +46,7 @@ describe("Genesis Business Logic Tests", function () {
         user2,
         DEFAULT_ADMIN_ROLE,
         ADMIN_ROLE,
+        OPERATION_ROLE,
         FACTORY_ROLE,
         params,
         agentFactory,
@@ -90,8 +92,7 @@ describe("Genesis Business Logic Tests", function () {
           .connect(participants[i])
           .participate(
             ethers.parseEther("1"),
-            contributions[i],
-            participants[i].address
+            contributions[i]
           );
         
         console.log(`Participant ${i + 1} contributed:`, ethers.formatEther(contributions[i]));
@@ -137,8 +138,7 @@ describe("Genesis Business Logic Tests", function () {
           .connect(participants[i])
           .participate(
             ethers.parseEther("1"),
-            contributions[i],
-            participants[i].address
+            contributions[i]
           );
       }
 
@@ -200,15 +200,13 @@ describe("Genesis Business Logic Tests", function () {
         .connect(participants[0])
         .participate(
           ethers.parseEther("1"),
-          ethers.parseEther("2"),
-          participants[0].address
+          ethers.parseEther("2")
         );
         await genesis
         .connect(participants[1])
         .participate(
           ethers.parseEther("1"),
-          ethers.parseEther("3"),
-          participants[1].address
+          ethers.parseEther("3")
         );
 
       // Wait for end time
@@ -241,15 +239,13 @@ describe("Genesis Business Logic Tests", function () {
         .connect(participants[0])
         .participate(
           ethers.parseEther("1"),
-          ethers.parseEther("2"),
-          participants[0].address
+          ethers.parseEther("2")
         );
         await genesis
         .connect(participants[1])
         .participate(
           ethers.parseEther("1"),
-          ethers.parseEther("3"),
-          participants[1].address
+          ethers.parseEther("3")
         );
 
       // Wait for end time
@@ -278,8 +274,8 @@ describe("Genesis Business Logic Tests", function () {
       // test call withdrawLeftAssetsAfterFinalized before onGenesisFailed called
       await expect(
         fGenesis
-          .connect(beOpsWallet)
-          .withdrawLeftAssetsAfterFinalized(1, participants[0].address, await virtualToken.getAddress())
+          .connect(admin)
+          .withdrawLeftAssetsAfterFinalized(1, participants[0].address, await virtualToken.getAddress(), ethers.parseEther("100"))
       ).to.be.revertedWith("Genesis not finalized yet");
 
       // test repeat handle the same participant
@@ -290,8 +286,8 @@ describe("Genesis Business Logic Tests", function () {
       // test call withdrawLeftAssetsAfterFinalized after onGenesisFailed but not all participants have been refunded
       await expect(
         fGenesis
-          .connect(beOpsWallet)
-          .withdrawLeftAssetsAfterFinalized(1, participants[0].address, await virtualToken.getAddress())
+          .connect(admin)
+          .withdrawLeftAssetsAfterFinalized(1, participants[0].address, await virtualToken.getAddress(), ethers.parseEther("100"))
       ).to.be.revertedWith("Genesis not finalized yet");
 
       await fGenesis.connect(beOpsWallet).onGenesisFailed(1, [1]);
@@ -299,12 +295,12 @@ describe("Genesis Business Logic Tests", function () {
       expect(await genesis.isFailed()).to.be.true;
       expect(await genesis.agentTokenAddress()).to.equal(ethers.ZeroAddress);
 
-      // test can call withdrawLeftAssetsAfterFinalized but No token left to withdraw
+      // test can call withdrawLeftAssetsAfterFinalized but Insufficient balance to withdraw
       await expect(
         fGenesis
-          .connect(beOpsWallet)
-          .withdrawLeftAssetsAfterFinalized(1, participants[0].address, await virtualToken.getAddress())
-      ).to.be.revertedWith("No token left to withdraw");
+          .connect(admin)
+          .withdrawLeftAssetsAfterFinalized(1, participants[0].address, await virtualToken.getAddress(), ethers.parseEther("100"))
+      ).to.be.revertedWith("Insufficient balance to withdraw");
     });
 
     it("Should enforce contribution limits and timing restrictions", async function () {
@@ -316,8 +312,7 @@ describe("Genesis Business Logic Tests", function () {
           .connect(participants[0])
           .participate(
             ethers.parseEther("1"),
-            amount,
-            participants[0].address
+            amount
           )
       ).to.be.revertedWith(ERR_NOT_STARTED);
 
@@ -328,8 +323,7 @@ describe("Genesis Business Logic Tests", function () {
           .connect(participants[0])
           .participate(
             ethers.parseEther("1"),
-            amount,
-            participants[0].address
+            amount
           )
       ).to.not.be.reverted;
 
@@ -339,8 +333,7 @@ describe("Genesis Business Logic Tests", function () {
           .connect(participants[1])
           .participate(
             ethers.parseEther("1"),
-            maxContribution + 1n,
-            participants[1].address
+            maxContribution + 1n
           )
       ).to.be.revertedWith("Exceeds maximum virtuals per contribution");
 
@@ -351,8 +344,7 @@ describe("Genesis Business Logic Tests", function () {
           .connect(participants[2])
           .participate(
             ethers.parseEther("1"),
-            amount,
-            participants[2].address
+            amount
           )
       ).to.be.revertedWith(ERR_ALREADY_ENDED);
     });
@@ -406,8 +398,7 @@ describe("Genesis Business Logic Tests", function () {
           .connect(participants[i])
           .participate(
             1,
-            contributions[i],
-            participants[i].address
+            contributions[i]
           );
           const genesisVirtualTokenBalance = await virtualToken.balanceOf(await genesis.getAddress());
           console.log("After participate idx: " + i + ", Genesis Virtual Token Balance ", ethers.formatEther(genesisVirtualTokenBalance));
@@ -489,8 +480,7 @@ describe("Genesis Business Logic Tests", function () {
           .connect(participants[i])
           .participate(
             1,
-            contributions[i],
-            participants[i].address
+            contributions[i]
           );
           const genesisVirtualTokenBalance = await virtualToken.balanceOf(await genesis.getAddress());
           console.log("After participate idx: " + i + ", Genesis Virtual Token Balance ", ethers.formatEther(genesisVirtualTokenBalance));
@@ -576,8 +566,8 @@ describe("Genesis Business Logic Tests", function () {
       const initialBalance = await virtualToken.balanceOf(user1.address);
       await expect(
           fGenesis
-              .connect(beOpsWallet)
-              .withdrawLeftAssetsAfterFinalized(1, user1.address, await virtualToken.getAddress())
+              .connect(admin)
+              .withdrawLeftAssetsAfterFinalized(1, user1.address, await virtualToken.getAddress(), ethers.parseEther("100"))
       ).to.emit(genesis, "AssetsWithdrawn")
        .withArgs(1, user1.address, await virtualToken.getAddress(), ethers.parseEther("100"));
 
@@ -653,8 +643,7 @@ describe("Genesis Business Logic Tests", function () {
       await expect(
         genesis.connect(participants[0]).participate(
           ethers.parseEther("1"),
-          ethers.parseEther("10"),
-          participants[0].address
+          ethers.parseEther("10")
         )
       ).to.be.revertedWith(ERR_ALREADY_CANCELLED);
     });
@@ -673,26 +662,6 @@ describe("Genesis Business Logic Tests", function () {
       await expect(
         fGenesis.connect(beOpsWallet).cancelGenesis(1)
       ).to.be.revertedWith(ERR_ALREADY_CANCELLED);
-    });
-
-    it("Should allow withdrawal of funds after cancellation", async function () {// Cancel Genesis
-      await fGenesis.connect(beOpsWallet).cancelGenesis(1);
-
-      // Wait for end time
-      const endTime = await genesis.endTime();
-      await time.increaseTo(endTime);
-
-      // Transfer 100 tokens to genesis
-      await virtualToken.transfer(await genesis.getAddress(), ethers.parseEther("100"));
-
-      // Try to withdraw funds
-      const initialBalance = await virtualToken.balanceOf(user1.address);
-      await fGenesis
-        .connect(beOpsWallet)
-        .withdrawLeftAssetsAfterFinalized(1, user1.address, await virtualToken.getAddress());
-
-      const finalBalance = await virtualToken.balanceOf(user1.address);
-      expect(finalBalance).to.be.gt(initialBalance);
     });
 
     it("Should handle multiple state changes correctly", async function () {
@@ -718,8 +687,7 @@ describe("Genesis Business Logic Tests", function () {
       await expect(
         genesis.connect(participants[0]).participate(
           ethers.parseEther("1"),
-          ethers.parseEther("10"),
-          participants[0].address
+          ethers.parseEther("10")
         )
       ).to.be.revertedWith(ERR_ALREADY_CANCELLED);
     });

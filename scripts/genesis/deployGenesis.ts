@@ -9,6 +9,10 @@ import { ethers, upgrades } from "hardhat";
 (async () => {
   try {
     // Basic check for .env variables
+    const deployer = process.env.DEPLOYER;
+    if (!deployer) {
+      throw new Error("DEPLOYER not set in environment");
+    }
     const beOpsWallet = process.env.GENESIS_BE_OPS_WALLET;
     if (!beOpsWallet) {
       throw new Error("GENESIS_BE_OPS_WALLET not set in environment");
@@ -57,34 +61,60 @@ import { ethers, upgrades } from "hardhat";
     const deployedFGenesisAddress = await fGenesis.getAddress();
     console.log("FGenesis Proxy deployed to:", deployedFGenesisAddress);
 
+    // Reason: because Admin need to have the rights to call setParams for the fgenesis proxy
+    const tx1 = await fGenesis.grantRole(
+      await fGenesis.DEFAULT_ADMIN_ROLE(),
+      process.env.ADMIN
+    );
+    await tx1.wait();
+    console.log("Granted DEFAULT_ADMIN_ROLE of fGenesis Proxy to Admin: ", process.env.ADMIN);
+
+    // Reason: because Admin need to have the rights to call withdrawLeftAssetsAfterFinalized for the fgenesis proxy
+    const tx2 = await fGenesis.grantRole(
+      await fGenesis.ADMIN_ROLE(),
+      process.env.ADMIN
+    );
+    await tx2.wait();
+    console.log("Granted ADMIN_ROLE of fGenesis Proxy to Admin: ", process.env.ADMIN);
+
+    // Reason: because BE Ops need to have the rights to call onGenesisSuccess and onGenesisFailed for the fgenesis proxy
+    const tx3 = await fGenesis.grantRole(
+      await fGenesis.OPERATION_ROLE(),
+      process.env.GENESIS_BE_OPS_WALLET
+    );
+    await tx3.wait();
+    console.log("Granted OPERATION_ROLE of fGenesis Proxy to BE Ops: ", process.env.GENESIS_BE_OPS_WALLET);
+
     // Get the existed AgentFactory contract instance
     const agentFactory = await ethers.getContractAt(
       "AgentFactoryV3",
       params.agentFactory
     );
 
-    // Grant DEFAULT_ADMIN_ROLE to FGenesis in AgentFactory
-    const tx = await agentFactory.grantRole(
+    // Reason: because FGenesis Proxy need to have the rights to grant BONDING_ROLE to the new Genesis contract
+    const tx4 = await agentFactory.grantRole(
       await agentFactory.DEFAULT_ADMIN_ROLE(),
       deployedFGenesisAddress
     );
-    await tx.wait();
+    await tx4.wait();
     console.log("Granted DEFAULT_ADMIN_ROLE of AgentFactory to FGenesis Proxy: ", deployedFGenesisAddress);
 
-    // Transfer admin rights if needed
-    const tx1 = await fGenesis.grantRole(
-      await fGenesis.DEFAULT_ADMIN_ROLE(),
-      process.env.ADMIN
-    );
-    await tx1.wait();
-    console.log("Granted DEFAULT_ADMIN_ROLE of fGenesis Proxy to Admin:", process.env.ADMIN);
-
-    const tx2 = await fGenesis.grantRole(
+    // reason: there is no need for deployer to have ADMIN_ROLE
+    const tx5 = await fGenesis.revokeRole(
       await fGenesis.ADMIN_ROLE(),
-      process.env.GENESIS_BE_OPS_WALLET
+      process.env.DEPLOYER
     );
-    await tx2.wait();
-    console.log("Granted ADMIN_ROLE of fGenesis Proxy to BE Ops:", process.env.GENESIS_BE_OPS_WALLET);
+    await tx5.wait();
+    console.log("Revoked ADMIN_ROLE of fGenesis Proxy from Deployer: ", process.env.DEPLOYER);
+
+    // reason: there is no need for deployer to have DEFAULT_ADMIN_ROLE
+    const tx6 = await fGenesis.revokeRole(
+      await fGenesis.DEFAULT_ADMIN_ROLE(),
+      process.env.DEPLOYER
+    );
+    await tx6.wait();
+    console.log("Revoked DEFAULT_ADMIN_ROLE of fGenesis Proxy from Deployer: ", process.env.DEPLOYER);
+
     // Print deployed parameters
     const deployedParams = await fGenesis.params();
     console.log("\nDeployed contract parameters:");

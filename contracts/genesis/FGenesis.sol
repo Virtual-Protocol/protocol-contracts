@@ -14,6 +14,7 @@ contract FGenesis is Initializable, AccessControlUpgradeable {
     using GenesisLib for *;
 
     bytes32 public constant ADMIN_ROLE = keccak256("ADMIN_ROLE");
+    bytes32 public constant OPERATION_ROLE = keccak256("OPERATION_ROLE");
 
     struct Params {
         address virtualToken;
@@ -135,40 +136,42 @@ contract FGenesis is Initializable, AccessControlUpgradeable {
     function onGenesisSuccess(
         uint256 id,
         SuccessParams calldata p
-    ) external onlyRole(ADMIN_ROLE) {
-        _getGenesis(id).onGenesisSuccess(
-            p.refundAddresses,
-            p.refundAmounts,
-            p.distributeAddresses,
-            p.distributeAmounts,
-            p.creator
-        );
+    ) external onlyRole(OPERATION_ROLE) returns (address) {
+        return
+            _getGenesis(id).onGenesisSuccess(
+                p.refundAddresses,
+                p.refundAmounts,
+                p.distributeAddresses,
+                p.distributeAmounts,
+                p.creator
+            );
     }
 
     function onGenesisFailed(
         uint256 id,
         uint256[] calldata participantIndexes
-    ) external onlyRole(ADMIN_ROLE) {
+    ) external onlyRole(OPERATION_ROLE) {
         _getGenesis(id).onGenesisFailed(participantIndexes);
     }
 
     function withdrawLeftAssetsAfterFinalized(
         uint256 id,
         address to,
-        address token
+        address token,
+        uint256 amount
     ) external onlyRole(ADMIN_ROLE) {
-        _getGenesis(id).withdrawLeftAssetsAfterFinalized(to, token);
+        _getGenesis(id).withdrawLeftAssetsAfterFinalized(to, token, amount);
     }
 
     function resetTime(
         uint256 id,
         uint256 newStartTime,
         uint256 newEndTime
-    ) external onlyRole(ADMIN_ROLE) {
+    ) external onlyRole(OPERATION_ROLE) {
         _getGenesis(id).resetTime(newStartTime, newEndTime);
     }
 
-    function cancelGenesis(uint256 id) external onlyRole(ADMIN_ROLE) {
+    function cancelGenesis(uint256 id) external onlyRole(OPERATION_ROLE) {
         _getGenesis(id).cancelGenesis();
     }
 }

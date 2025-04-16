@@ -15,6 +15,7 @@ describe("Genesis Permission Tests", function () {
   let user2;
   let DEFAULT_ADMIN_ROLE;
   let ADMIN_ROLE;
+  let OPERATION_ROLE;
   let FACTORY_ROLE;
   let params;
   let agentFactory;
@@ -33,6 +34,7 @@ describe("Genesis Permission Tests", function () {
       user2,
       DEFAULT_ADMIN_ROLE,
       ADMIN_ROLE,
+      OPERATION_ROLE,
       FACTORY_ROLE,
       params,
       agentFactory,
@@ -46,7 +48,10 @@ describe("Genesis Permission Tests", function () {
         .true;
       expect(await fGenesis.hasRole(DEFAULT_ADMIN_ROLE, admin.address)).to.be
         .true;
+      expect(await fGenesis.hasRole(ADMIN_ROLE, admin.address)).to.be.true;
       expect(await fGenesis.hasRole(ADMIN_ROLE, beOpsWallet.address)).to.be
+        .false;
+      expect(await fGenesis.hasRole(OPERATION_ROLE, beOpsWallet.address)).to.be
         .true;
     });
 
@@ -138,9 +143,7 @@ describe("Genesis Permission Tests", function () {
 
       // Participate in Genesis
       await time.increase(3600); // Ensure Genesis has started
-      await genesis
-        .connect(user1)
-        .participate(1, ethers.parseEther("50"), user1.address);
+      await genesis.connect(user1).participate(1, ethers.parseEther("50"));
     });
 
     it("Should verify correct Genesis contract roles", async function () {
@@ -269,11 +272,7 @@ describe("Genesis Permission Tests", function () {
     it("Should handle Genesis failure correctly", async function () {
       await genesis
         .connect(user1)
-        .participate(
-          ethers.parseEther("1"),
-          ethers.parseEther("2"),
-          user1.address
-        );
+        .participate(ethers.parseEther("1"), ethers.parseEther("2"));
 
       // Wait for end time
       const endTime = await genesis.endTime();
@@ -379,11 +378,12 @@ describe("Genesis Permission Tests", function () {
     const initialBalance = await virtualToken.balanceOf(user1.address);
     await expect(
       fGenesis
-        .connect(beOpsWallet)
+        .connect(admin)
         .withdrawLeftAssetsAfterFinalized(
           1,
           user1.address,
-          await virtualToken.getAddress()
+          await virtualToken.getAddress(),
+          ethers.parseEther("100")
         )
     )
       .to.emit(genesis, "AssetsWithdrawn")
@@ -396,5 +396,187 @@ describe("Genesis Permission Tests", function () {
 
     const finalBalance = await virtualToken.balanceOf(user1.address);
     expect(finalBalance).to.be.gt(initialBalance);
+  });
+
+  describe("FGenesis Permission Tests", function () {
+    it("Should revert when non-DEFAULT_ADMIN_ROLE calls setParams", async function () {
+      const newParams = {
+        virtualToken: await virtualToken.getAddress(),
+        reserve: ethers.parseEther("100"),
+        maxContribution: ethers.parseEther("10"),
+        feeAddr: await admin.getAddress(),
+        feeAmt: ethers.parseEther("1"),
+        duration: 3600,
+        tbaSalt: ethers.id("SALT"),
+        tbaImpl: await admin.getAddress(),
+        votePeriod: 1000,
+        threshold: ethers.parseEther("1"),
+        agentFactory: await agentFactory.getAddress(),
+        agentTokenTotalSupply: ethers.parseEther("1000"),
+        agentTokenLpSupply: ethers.parseEther("100"),
+      };
+
+      await expect(
+        fGenesis.connect(user1).setParams(newParams)
+      ).to.be.revertedWithCustomError(
+        fGenesis,
+        "AccessControlUnauthorizedAccount"
+      );
+    });
+
+    it("Should revert when non-OPERATION_ROLE calls onGenesisSuccess", async function () {
+      await expect(
+        fGenesis.connect(user1).onGenesisSuccess(1, {
+          refundAddresses: [],
+          refundAmounts: [],
+          distributeAddresses: [],
+          distributeAmounts: [],
+          creator: await owner.getAddress(),
+        })
+      ).to.be.revertedWithCustomError(
+        fGenesis,
+        "AccessControlUnauthorizedAccount"
+      );
+    });
+
+    it("Should revert when non-OPERATION_ROLE calls onGenesisFailed", async function () {
+      await expect(
+        fGenesis.connect(user1).onGenesisFailed(1, [0])
+      ).to.be.revertedWithCustomError(
+        fGenesis,
+        "AccessControlUnauthorizedAccount"
+      );
+    });
+
+    it("Should revert when non-ADMIN_ROLE calls withdrawLeftAssetsAfterFinalized", async function () {
+      await expect(
+        fGenesis
+          .connect(user1)
+          .withdrawLeftAssetsAfterFinalized(
+            1,
+            await user1.getAddress(),
+            await virtualToken.getAddress(),
+            ethers.parseEther("1")
+          )
+      ).to.be.revertedWithCustomError(
+        fGenesis,
+        "AccessControlUnauthorizedAccount"
+      );
+    });
+
+    it("Should revert when non-OPERATION_ROLE calls resetTime", async function () {
+      const newStartTime = (await time.latest()) + 7200;
+      const newEndTime = newStartTime + 3600;
+
+      await expect(
+        fGenesis.connect(user1).resetTime(1, newStartTime, newEndTime)
+      ).to.be.revertedWithCustomError(
+        fGenesis,
+        "AccessControlUnauthorizedAccount"
+      );
+    });
+
+    it("Should revert when non-OPERATION_ROLE calls cancelGenesis", async function () {
+      await expect(
+        fGenesis.connect(user1).cancelGenesis(1)
+      ).to.be.revertedWithCustomError(
+        fGenesis,
+        "AccessControlUnauthorizedAccount"
+      );
+    });
+  });
+
+  describe("Role Management Tests", function () {
+    it("Should allow DEFAULT_ADMIN_ROLE to grant roles", async function () {
+      await fGenesis.connect(admin).grantRole(OPERATION_ROLE, user1.address);
+      expect(await fGenesis.hasRole(OPERATION_ROLE, user1.address)).to.be.true;
+    });
+
+    it("Should allow DEFAULT_ADMIN_ROLE to revoke roles", async function () {
+      await fGenesis.connect(admin).grantRole(OPERATION_ROLE, user1.address);
+      await fGenesis.connect(admin).revokeRole(OPERATION_ROLE, user1.address);
+      expect(await fGenesis.hasRole(OPERATION_ROLE, user1.address)).to.be.false;
+    });
+
+    it("Should revert when non-DEFAULT_ADMIN_ROLE tries to grant roles", async function () {
+      await expect(
+        fGenesis
+          .connect(user1)
+          .grantRole(OPERATION_ROLE, await user2.getAddress())
+      ).to.be.revertedWithCustomError(
+        fGenesis,
+        "AccessControlUnauthorizedAccount"
+      );
+    });
+
+    it("Should revert when non-DEFAULT_ADMIN_ROLE tries to revoke roles", async function () {
+      await expect(
+        fGenesis
+          .connect(user1)
+          .revokeRole(OPERATION_ROLE, await beOpsWallet.getAddress())
+      ).to.be.revertedWithCustomError(
+        fGenesis,
+        "AccessControlUnauthorizedAccount"
+      );
+    });
+  });
+
+  describe("Successful Permission Tests", function () {
+    it("Should allow OPERATION_ROLE to perform operations", async function () {
+      const newStartTime = (await time.latest()) + 7200;
+      const newEndTime = newStartTime + 3600;
+
+      await expect(
+        fGenesis.connect(beOpsWallet).resetTime(1, newStartTime, newEndTime)
+      ).to.not.be.reverted;
+
+      await expect(fGenesis.connect(beOpsWallet).cancelGenesis(1)).to.not.be
+        .reverted;
+    });
+
+    it("Should allow ADMIN_ROLE to withdraw assets after finalization", async function () {
+      // First cancel the Genesis to finalize it
+      await fGenesis.connect(beOpsWallet).cancelGenesis(1);
+      await time.increaseTo(await genesis.endTime());
+
+      // Transfer some tokens to genesis for testing
+      await virtualToken.transfer(
+        await genesis.getAddress(),
+        ethers.parseEther("100")
+      );
+
+      await expect(
+        fGenesis
+          .connect(admin)
+          .withdrawLeftAssetsAfterFinalized(
+            1,
+            admin.address,
+            await virtualToken.getAddress(),
+            ethers.parseEther("100")
+          )
+      ).to.not.be.reverted;
+    });
+
+    it("Should allow DEFAULT_ADMIN_ROLE to set params", async function () {
+      const currentParams = await fGenesis.params();
+      const newParams = {
+        virtualToken: await virtualToken.getAddress(),
+        reserve: currentParams.reserve,
+        maxContribution: currentParams.maxContribution,
+        feeAddr: await admin.getAddress(),
+        feeAmt: currentParams.feeAmt,
+        duration: currentParams.duration,
+        tbaSalt: currentParams.tbaSalt,
+        tbaImpl: currentParams.tbaImpl,
+        votePeriod: currentParams.votePeriod,
+        threshold: currentParams.threshold,
+        agentFactory: await agentFactory.getAddress(),
+        agentTokenTotalSupply: currentParams.agentTokenTotalSupply,
+        agentTokenLpSupply: currentParams.agentTokenLpSupply,
+      };
+
+      await expect(fGenesis.connect(admin).setParams(newParams)).to.not.be
+        .reverted;
+    });
   });
 });

@@ -90,7 +90,7 @@ contract TBABonus is ITBABonus, Initializable, AccessControlUpgradeable {
             bonus = allowance;
         }
 
-        if (bonus > 0) {
+        if (bonus > 0 && assetToken.balanceOf(address(this)) >= bonus) {
             _agentPaidAmounts[agentId] += bonus;
             assetToken.safeTransfer(recipient, bonus);
             emit PaidAgent(agentId, bonus);

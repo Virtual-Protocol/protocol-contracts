@@ -138,7 +138,7 @@ contract AgentTax is Initializable, AccessControlUpgradeable {
         uint16 feeRate_,
         uint16 creatorFeeRate_
     ) public onlyRole(ADMIN_ROLE) {
-        require((feeRate_ + creatorFeeRate_) <= DENOM, "Fees overflow");
+        require((feeRate_ + creatorFeeRate_) == DENOM, "Invalid fee rates");
         address oldRouter = address(router);
         address oldAsset = assetToken;
         uint16 oldFee = feeRate;
@@ -274,12 +274,7 @@ contract AgentTax is Initializable, AccessControlUpgradeable {
             emit SwapExecuted(agentId, amountToSwap, assetReceived);
 
             uint256 feeAmount = (assetReceived * feeRate) / DENOM;
-            uint256 creatorFee = (assetReceived * creatorFeeRate) / DENOM;
-            uint256 tbaFee = assetReceived - feeAmount - creatorFee;
-
-            if (tbaFee > 0) {
-                IERC20(assetToken).safeTransfer(taxRecipient.tba, tbaFee);
-            }
+            uint256 creatorFee = assetReceived - feeAmount;
 
             if (creatorFee > 0) {
                 IERC20(assetToken).safeTransfer(

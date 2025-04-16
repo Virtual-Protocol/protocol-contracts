@@ -8,6 +8,7 @@ import "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol"
 import "@openzeppelin/contracts/utils/math/Math.sol";
 import "../pool/IRouter.sol";
 import "../virtualPersona/IAgentNft.sol";
+import "./ITBABonus.sol";
 
 contract AgentTax is Initializable, AccessControlUpgradeable {
     using SafeERC20 for IERC20;
@@ -80,6 +81,8 @@ contract AgentTax is Initializable, AccessControlUpgradeable {
         address newCreator
     );
 
+    ITBABonus public tbaBonus;
+
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() {
         _disableInitializers();
@@ -135,7 +138,7 @@ contract AgentTax is Initializable, AccessControlUpgradeable {
         uint16 feeRate_,
         uint16 creatorFeeRate_
     ) public onlyRole(ADMIN_ROLE) {
-        require((feeRate_ + creatorFeeRate_) <= DENOM, "Fees overflow");
+        require((feeRate_ + creatorFeeRate_) == DENOM, "Invalid fee rates");
         address oldRouter = address(router);
         address oldAsset = assetToken;
         uint16 oldFee = feeRate;
@@ -212,7 +215,7 @@ contract AgentTax is Initializable, AccessControlUpgradeable {
             emit TaxCollected(txhash, agentId, amounts[i]);
         }
         agentAmounts.amountCollected += totalAmount;
-        _swapForAsset(agentId, minOutput);
+        _swapForAsset(agentId, minOutput, maxSwapThreshold);
     }
 
     function _getTaxRecipient(
@@ -227,16 +230,10 @@ contract AgentTax is Initializable, AccessControlUpgradeable {
         return recipient;
     }
 
-    function swapForAsset(
-        uint256 agentId,
-        uint256 minOutput
-    ) public onlyRole(EXECUTOR_ROLE) returns (bool, uint256) {
-        return _swapForAsset(agentId, minOutput);
-    }
-
     function _swapForAsset(
         uint256 agentId,
-        uint256 minOutput
+        uint256 minOutput,
+        uint256 maxOverride
     ) internal returns (bool, uint256) {
         TaxAmounts storage agentAmounts = agentTaxAmounts[agentId];
         uint256 amountToSwap = agentAmounts.amountCollected -
@@ -253,8 +250,8 @@ contract AgentTax is Initializable, AccessControlUpgradeable {
             return (false, 0);
         }
 
-        if (amountToSwap > maxSwapThreshold) {
-            amountToSwap = maxSwapThreshold;
+        if (amountToSwap > maxOverride) {
+            amountToSwap = maxOverride;
         }
 
         address[] memory path = new address[](2);
@@ -277,18 +274,20 @@ contract AgentTax is Initializable, AccessControlUpgradeable {
             emit SwapExecuted(agentId, amountToSwap, assetReceived);
 
             uint256 feeAmount = (assetReceived * feeRate) / DENOM;
-            uint256 creatorFee = (assetReceived * creatorFeeRate) / DENOM;
-            uint256 tbaFee = assetReceived - feeAmount - creatorFee;
-
-            if (tbaFee > 0) {
-                IERC20(assetToken).safeTransfer(taxRecipient.tba, tbaFee);
-            }
+            uint256 creatorFee = assetReceived - feeAmount;
 
             if (creatorFee > 0) {
                 IERC20(assetToken).safeTransfer(
                     taxRecipient.creator,
                     creatorFee
                 );
+                if (address(tbaBonus) != address(0)) {
+                    tbaBonus.distributeBonus(
+                        agentId,
+                        taxRecipient.creator,
+                        creatorFee
+                    );
+                }
             }
 
             if (feeAmount > 0) {
@@ -319,5 +318,32 @@ contract AgentTax is Initializable, AccessControlUpgradeable {
         );
         recipient.creator = creator;
         emit CreatorUpdated(agentId, oldCreator, creator);
+    }
+
+    function dcaSell(
+        uint256[] memory agentIds,
+        uint256 slippage,
+        uint256 maxOverride
+    ) public onlyRole(EXECUTOR_ROLE) {
+        require(slippage <= DENOM, "Invalid slippage");
+        uint256 agentId;
+        for (uint i = 0; i < agentIds.length; i++) {
+            agentId = agentIds[i];
+
+            TaxAmounts memory agentAmounts = agentTaxAmounts[agentId];
+            uint256 amountToSwap = agentAmounts.amountCollected -
+                agentAmounts.amountSwapped;
+
+            if (amountToSwap > maxOverride) {
+                amountToSwap = maxOverride;
+            }
+
+            uint256 minOutput = ((amountToSwap * (DENOM - slippage)) / DENOM);
+            _swapForAsset(agentId, minOutput, maxOverride);
+        }
+    }
+
+    function updateTbaBonus(address tbaBonus_) public onlyRole(ADMIN_ROLE) {
+        tbaBonus = ITBABonus(tbaBonus_);
     }
 }

@@ -25,7 +25,7 @@ describe("veVIRTUAL", function () {
     veVirtual = await upgrades.deployProxy(Contract, [virtual.target, 104]);
   });
 
-  xit("should allow staking", async function () {
+  it("should allow staking", async function () {
     await virtual.transfer(staker.address, parseEther("1000"));
 
     expect(await virtual.balanceOf(staker.address)).to.be.equal(
@@ -40,7 +40,7 @@ describe("veVIRTUAL", function () {
     );
   });
 
-  xit("should decay balance over time", async function () {
+  it("should decay balance over time", async function () {
     await virtual.transfer(staker.address, parseEther("1000"));
 
     expect(await virtual.balanceOf(staker.address)).to.be.equal(
@@ -55,7 +55,7 @@ describe("veVIRTUAL", function () {
     ).to.be.equal(25);
   });
 
-  xit("should allow withdrawal on maturity only", async function () {
+  it("should allow withdrawal on maturity only", async function () {
     await virtual.transfer(staker.address, parseEther("1000"));
 
     expect(await virtual.balanceOf(staker.address)).to.be.equal(
@@ -74,7 +74,7 @@ describe("veVIRTUAL", function () {
     expect(await veVirtual.connect(staker).withdraw(0)).to.be.not.reverted;
   });
 
-  xit("should allow extension", async function () {
+  it("should allow extension", async function () {
     await virtual.transfer(staker.address, parseEther("1000"));
 
     expect(await virtual.balanceOf(staker.address)).to.be.equal(
@@ -93,7 +93,7 @@ describe("veVIRTUAL", function () {
     );
   });
 
-  xit("should allow over extension", async function () {
+  it("should allow over extension", async function () {
     await virtual.transfer(staker.address, parseEther("1000"));
 
     expect(await virtual.balanceOf(staker.address)).to.be.equal(
@@ -108,7 +108,7 @@ describe("veVIRTUAL", function () {
     );
   });
 
-  xit("should continue decay after extension", async function () {
+  it("should continue decay after extension", async function () {
     await virtual.transfer(staker.address, parseEther("1000"));
 
     expect(await virtual.balanceOf(staker.address)).to.be.equal(
@@ -140,7 +140,7 @@ describe("veVIRTUAL", function () {
     );
   });
 
-  xit("should allow toggle auto renew", async function () {
+  it("should allow toggle auto renew", async function () {
     await virtual.transfer(staker.address, parseEther("1000"));
 
     expect(await virtual.balanceOf(staker.address)).to.be.equal(

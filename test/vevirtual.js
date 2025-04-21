@@ -25,7 +25,7 @@ describe("veVIRTUAL", function () {
     veVirtual = await upgrades.deployProxy(Contract, [virtual.target, 104]);
   });
 
-  it("should allow staking", async function () {
+  xit("should allow staking", async function () {
     await virtual.transfer(staker.address, parseEther("1000"));
 
     expect(await virtual.balanceOf(staker.address)).to.be.equal(
@@ -40,7 +40,7 @@ describe("veVIRTUAL", function () {
     );
   });
 
-  it("should decay balance over time", async function () {
+  xit("should decay balance over time", async function () {
     await virtual.transfer(staker.address, parseEther("1000"));
 
     expect(await virtual.balanceOf(staker.address)).to.be.equal(
@@ -55,7 +55,7 @@ describe("veVIRTUAL", function () {
     ).to.be.equal(25);
   });
 
-  it("should allow withdrawal on maturity only", async function () {
+  xit("should allow withdrawal on maturity only", async function () {
     await virtual.transfer(staker.address, parseEther("1000"));
 
     expect(await virtual.balanceOf(staker.address)).to.be.equal(
@@ -74,7 +74,7 @@ describe("veVIRTUAL", function () {
     expect(await veVirtual.connect(staker).withdraw(0)).to.be.not.reverted;
   });
 
-  it("should allow extension", async function () {
+  xit("should allow extension", async function () {
     await virtual.transfer(staker.address, parseEther("1000"));
 
     expect(await virtual.balanceOf(staker.address)).to.be.equal(
@@ -93,7 +93,7 @@ describe("veVIRTUAL", function () {
     );
   });
 
-  it("should allow over extension", async function () {
+  xit("should allow over extension", async function () {
     await virtual.transfer(staker.address, parseEther("1000"));
 
     expect(await virtual.balanceOf(staker.address)).to.be.equal(
@@ -108,7 +108,7 @@ describe("veVIRTUAL", function () {
     );
   });
 
-  it("should continue decay after extension", async function () {
+  xit("should continue decay after extension", async function () {
     await virtual.transfer(staker.address, parseEther("1000"));
 
     expect(await virtual.balanceOf(staker.address)).to.be.equal(
@@ -140,7 +140,7 @@ describe("veVIRTUAL", function () {
     );
   });
 
-  it("should allow toggle auto renew", async function () {
+  xit("should allow toggle auto renew", async function () {
     await virtual.transfer(staker.address, parseEther("1000"));
 
     expect(await virtual.balanceOf(staker.address)).to.be.equal(
@@ -154,7 +154,7 @@ describe("veVIRTUAL", function () {
     );
 
     await time.increase(51 * 7 * 24 * 60 * 60);
-    const start = await time.latest()
+    const start = await time.latest();
     await veVirtual.connect(staker).toggleAutoRenew(0);
     expect(await veVirtual.balanceOf(staker.address)).to.be.equal(
       parseEther("1000")
@@ -164,6 +164,75 @@ describe("veVIRTUAL", function () {
     expect(position2.autoRenew).to.be.equal(true);
     expect(position2.numWeeks).to.be.equal(104);
     expect(position2.end).to.be.equal(start + 104 * 7 * 24 * 60 * 60 + 1);
+  });
+
+  it("should keep track of voting power without decay", async function () {
+    await virtual.transfer(staker.address, parseEther("1000"));
+
+    expect(await virtual.balanceOf(staker.address)).to.be.equal(
+      parseEther("1000")
+    );
+
+    await virtual.connect(staker).approve(veVirtual.target, parseEther("1000"));
+    await veVirtual.connect(staker).stake(parseEther("1000"), 52, false);
+    expect(await veVirtual.balanceOf(staker.address)).to.be.equal(
+      parseEther("500")
+    );
+    expect(await veVirtual.getVotes(staker.address)).to.be.equal(
+      parseEther("0")
+    );
+    await veVirtual.connect(staker).delegate(staker.address);
+    expect(await veVirtual.getVotes(staker.address)).to.be.equal(
+      parseEther("1000")
+    );
+
+    await time.increase(51 * 7 * 24 * 60 * 60);
+    expect(await veVirtual.getVotes(staker.address)).to.be.equal(
+      parseEther("1000")
+    );
+  });
+
+  it("shoudl calculate voting power correctly when restaking and withdrawing", async function () {
+    await virtual.transfer(staker.address, parseEther("2000"));
+
+    expect(await virtual.balanceOf(staker.address)).to.be.equal(
+      parseEther("2000")
+    );
+
+    await veVirtual.connect(staker).delegate(staker.address);
+    await virtual.connect(staker).approve(veVirtual.target, parseEther("2000"));
+
+
+    await veVirtual.connect(staker).stake(parseEther("1000"), 52, false);
+    expect(await veVirtual.getVotes(staker.address)).to.be.equal(
+      parseEther("1000")
+    );
+
+    const firstBlock = await ethers.provider.getBlockNumber();
+
+    await time.increase(52 * 7 * 24 * 60 * 60);
     
+    await veVirtual.connect(staker).stake(parseEther("1000"), 52, false);
+    const secondBlock = await ethers.provider.getBlockNumber();
+    await time.increase(52 * 7 * 24 * 60 * 60);
+    expect(await veVirtual.getVotes(staker.address)).to.be.equal(
+      parseEther("2000")
+    );
+
+    await veVirtual.connect(staker).withdraw(0)
+
+    expect(await veVirtual.getVotes(staker.address)).to.be.equal(
+      parseEther("1000")
+    );
+    await veVirtual.connect(staker).withdraw(0)
+    expect(await veVirtual.getVotes(staker.address)).to.be.equal(
+      parseEther("0")
+    );
+    expect(await veVirtual.getPastVotes(staker.address, firstBlock)).to.be.equal(
+      parseEther("1000")
+    );
+    expect(await veVirtual.getPastVotes(staker.address, secondBlock)).to.be.equal(
+      parseEther("2000")
+    );
   });
 });

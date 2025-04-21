@@ -5,11 +5,14 @@ import "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol"
 import "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "@openzeppelin/contracts/utils/structs/Checkpoints.sol";
+import "@openzeppelin/contracts-upgradeable/governance/utils/VotesUpgradeable.sol";
 
 contract veVirtual is
     Initializable,
     ReentrancyGuardUpgradeable,
-    AccessControlUpgradeable
+    AccessControlUpgradeable,
+    VotesUpgradeable
 {
     using SafeERC20 for IERC20;
     struct Lock {
@@ -41,6 +44,10 @@ contract veVirtual is
         address baseToken_,
         uint8 maxWeeks_
     ) external initializer {
+        __ReentrancyGuard_init();
+        __AccessControl_init();
+        __Votes_init();
+
         require(baseToken_ != address(0), "Invalid token");
         baseToken = baseToken_;
         maxWeeks = maxWeeks_;
@@ -149,6 +156,7 @@ contract veVirtual is
         });
         locks[_msgSender()].push(lock);
         emit Stake(_msgSender(), amount, numWeeks);
+        _transferVotingUnits(address(0), _msgSender(), amount);
     }
 
     function withdraw(uint256 index) external nonReentrant {
@@ -169,6 +177,7 @@ contract veVirtual is
 
         IERC20(baseToken).safeTransfer(_msgSender(), amount);
         emit Withdraw(_msgSender(), index, amount);
+        _transferVotingUnits(_msgSender(), address(0), amount);
     }
 
     function toggleAutoRenew(uint256 index) external nonReentrant {
@@ -238,5 +247,19 @@ contract veVirtual is
     ) external onlyRole(ADMIN_ROLE) {
         adminUnlocked = adminUnlocked_;
         emit AdminUnlocked(adminUnlocked);
+    }
+
+    function _getVotingUnits(
+        address account
+    ) internal view virtual override returns (uint256) {
+        return stakedAmountOf(account);
+    }
+
+    function stakedAmountOf(address account) public view returns (uint256) {
+        uint256 amount = 0;
+        for (uint i = 0; i < locks[account].length; i++) {
+            amount += locks[account][i].amount;
+        }
+        return amount;
     }
 }

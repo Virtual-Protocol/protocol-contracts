@@ -211,7 +211,7 @@ contract veVirtual is
         lock.end = newEnd;
         uint multiplier = ((uint(newEnd) - block.timestamp) * DENOM) /
             (uint(maxWeeks) * 1 weeks);
-        lock.value += (lock.amount * multiplier) / DENOM;
+        lock.value = (lock.amount * multiplier) / DENOM;
     }
 
     function setMaxWeeks(uint8 maxWeeks_) external onlyRole(ADMIN_ROLE) {

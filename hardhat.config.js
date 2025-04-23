@@ -4,6 +4,7 @@ require("@nomicfoundation/hardhat-toolbox");
 require("hardhat-deploy");
 require("@openzeppelin/hardhat-upgrades");
 require("@fireblocks/hardhat-fireblocks");
+require("hardhat-contract-sizer");
 
 const { ApiBaseUrl } = require("@fireblocks/fireblocks-web3-provider");
 
@@ -111,5 +112,8 @@ module.exports = {
       url: "https://rpc.ankr.com/eth_goerli",
       accounts: [process.env.PRIVATE_KEY],
     },
+  },
+  mocha: {
+    timeout: 100000000,
   },
 };

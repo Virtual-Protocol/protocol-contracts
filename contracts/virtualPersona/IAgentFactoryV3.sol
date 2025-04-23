@@ -37,4 +37,12 @@ interface IAgentFactoryV3 {
         uint256 lpSupply,
         address vault
     ) external returns (address);
+
+    function executeBondingCurveApplicationSalt(
+        uint256 id,
+        uint256 totalSupply,
+        uint256 lpSupply,
+        address vault,
+        bytes32 salt
+    ) external returns (address);
 }

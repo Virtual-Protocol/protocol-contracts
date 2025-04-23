@@ -93,4 +93,14 @@ contract MockAgentFactoryV3 is
     ) public view onlyRole(BONDING_ROLE) returns (address) {
         return address(mockAgentToken);
     }
+
+    function executeBondingCurveApplicationSalt(
+        uint256,
+        uint256,
+        uint256,
+        address,
+        bytes32
+    ) public view onlyRole(BONDING_ROLE) returns (address) {
+        return address(mockAgentToken);
+    }
 }

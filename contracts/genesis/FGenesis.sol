@@ -50,9 +50,7 @@ contract FGenesis is Initializable, AccessControlUpgradeable {
         _setParams(p);
     }
 
-    function setParams(
-        Params calldata p
-    ) external onlyRole(ADMIN_ROLE) {
+    function setParams(Params calldata p) external onlyRole(ADMIN_ROLE) {
         _setParams(p);
     }
 
@@ -137,6 +135,19 @@ contract FGenesis is Initializable, AccessControlUpgradeable {
         uint256 id,
         SuccessParams calldata p
     ) external onlyRole(OPERATION_ROLE) returns (address) {
+        return
+            onGenesisSuccessSalt(
+                id,
+                p,
+                keccak256(abi.encodePacked(msg.sender, block.timestamp))
+            );
+    }
+
+    function onGenesisSuccessSalt(
+        uint256 id,
+        SuccessParams calldata p,
+        bytes32 salt
+    ) public onlyRole(OPERATION_ROLE) returns (address) {
         return
             _getGenesis(id).onGenesisSuccess(
                 p.refundAddresses,

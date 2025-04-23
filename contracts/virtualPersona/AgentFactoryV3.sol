@@ -114,6 +114,8 @@ contract AgentFactoryV3 is
 
     ///////////////////////////////////////////////////////////////
 
+    mapping(address => bool) private _existingAgents;
+
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() {
         _disableInitializers();
@@ -234,7 +236,8 @@ contract AgentFactoryV3 is
     function _executeApplication(
         uint256 id,
         bool canStake,
-        bytes memory tokenSupplyParams_
+        bytes memory tokenSupplyParams_,
+        bytes32 salt
     ) internal {
         require(
             _applications[id].status == ApplicationStatus.Active,
@@ -253,7 +256,8 @@ contract AgentFactoryV3 is
         address token = _createNewAgentToken(
             application.name,
             application.symbol,
-            tokenSupplyParams_
+            tokenSupplyParams_,
+            salt
         );
 
         // C2
@@ -277,7 +281,8 @@ contract AgentFactoryV3 is
                 daoName,
                 IVotes(veToken),
                 application.daoVotingPeriod,
-                application.daoThreshold
+                application.daoThreshold,
+                salt
             )
         );
 
@@ -320,7 +325,11 @@ contract AgentFactoryV3 is
         emit NewPersona(virtualId, token, dao, tbaAddress, veToken, lp);
     }
 
-    function executeApplication(uint256 id, bool canStake) public noReentrant {
+    function executeApplication(
+        uint256 id,
+        bool canStake,
+        bytes32 salt
+    ) public noReentrant {
         // This will bootstrap an Agent with following components:
         // C1: Agent Token
         // C2: LP Pool + Initial liquidity
@@ -338,16 +347,20 @@ contract AgentFactoryV3 is
             "Not proposer"
         );
 
-        _executeApplication(id, canStake, _tokenSupplyParams);
+        _executeApplication(id, canStake, _tokenSupplyParams, salt);
     }
 
     function _createNewDAO(
         string memory name,
         IVotes token,
         uint32 daoVotingPeriod,
-        uint256 daoThreshold
+        uint256 daoThreshold,
+        bytes32 salt
     ) internal returns (address instance) {
-        instance = Clones.clone(daoImplementation);
+        instance = Clones.cloneDeterministic(daoImplementation, salt);
+        if(_existingAgents[instance]) {
+            revert("Agent already exists");
+        }
         IAgentDAO(instance).initialize(
             name,
             token,
@@ -363,9 +376,14 @@ contract AgentFactoryV3 is
     function _createNewAgentToken(
         string memory name,
         string memory symbol,
-        bytes memory tokenSupplyParams_
+        bytes memory tokenSupplyParams_,
+        bytes32 salt
     ) internal returns (address instance) {
-        instance = Clones.clone(tokenImplementation);
+        instance = Clones.cloneDeterministic(tokenImplementation, salt);
+        if(_existingAgents[instance]) {
+            revert("Agent already exists");
+        }
+        _existingAgents[instance] = true;
         IAgentToken(instance).initialize(
             [_tokenAdmin, _uniswapRouter, assetToken],
             abi.encode(name, symbol),
@@ -442,14 +460,18 @@ contract AgentFactoryV3 is
         _tokenAdmin = newTokenAdmin;
     }
 
-    function setTokenSupplyParams(
+    function setTokenParams(
         uint256 maxSupply,
         uint256 lpSupply,
         uint256 vaultSupply,
         uint256 maxTokensPerWallet,
         uint256 maxTokensPerTxn,
         uint256 botProtectionDurationInSeconds,
-        address vault
+        address vault,
+        uint256 projectBuyTaxBasisPoints,
+        uint256 projectSellTaxBasisPoints,
+        uint256 taxSwapThresholdBasisPoints,
+        address projectTaxRecipient
     ) public onlyRole(DEFAULT_ADMIN_ROLE) {
         _tokenSupplyParams = abi.encode(
             maxSupply,
@@ -460,26 +482,12 @@ contract AgentFactoryV3 is
             botProtectionDurationInSeconds,
             vault
         );
-    }
-
-    function setTokenTaxParams(
-        uint256 projectBuyTaxBasisPoints,
-        uint256 projectSellTaxBasisPoints,
-        uint256 taxSwapThresholdBasisPoints,
-        address projectTaxRecipient
-    ) public onlyRole(DEFAULT_ADMIN_ROLE) {
         _tokenTaxParams = abi.encode(
             projectBuyTaxBasisPoints,
             projectSellTaxBasisPoints,
             taxSwapThresholdBasisPoints,
             projectTaxRecipient
         );
-    }
-
-    function setAssetToken(
-        address newToken
-    ) public onlyRole(DEFAULT_ADMIN_ROLE) {
-        assetToken = newToken;
     }
 
     function pause() public onlyRole(DEFAULT_ADMIN_ROLE) {
@@ -566,6 +574,23 @@ contract AgentFactoryV3 is
         uint256 lpSupply,
         address vault
     ) public onlyRole(BONDING_ROLE) noReentrant returns (address) {
+        return
+            executeBondingCurveApplicationSalt(
+                id,
+                totalSupply,
+                lpSupply,
+                vault,
+                keccak256(abi.encodePacked(msg.sender, block.timestamp))
+            );
+    }
+
+    function executeBondingCurveApplicationSalt(
+        uint256 id,
+        uint256 totalSupply,
+        uint256 lpSupply,
+        address vault,
+        bytes32 salt
+    ) public onlyRole(BONDING_ROLE) noReentrant returns (address) {
         bytes memory tokenSupplyParams = abi.encode(
             totalSupply,
             lpSupply,
@@ -576,7 +601,7 @@ contract AgentFactoryV3 is
             vault
         );
 
-        _executeApplication(id, true, tokenSupplyParams);
+        _executeApplication(id, true, tokenSupplyParams, salt);
 
         Application memory application = _applications[id];
 

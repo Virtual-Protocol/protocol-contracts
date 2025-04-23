@@ -194,19 +194,6 @@ contract Bonding is
         string[4] memory urls,
         uint256 purchaseAmount
     ) public nonReentrant returns (address, address, uint) {
-        return launchFor(_name, _ticker, cores, desc, img, urls, purchaseAmount, msg.sender);
-    }
-
-    function launchFor(
-        string memory _name,
-        string memory _ticker,
-        uint8[] memory cores,
-        string memory desc,
-        string memory img,
-        string[4] memory urls,
-        uint256 purchaseAmount,
-        address creator
-    ) public nonReentrant returns (address, address, uint) {
         require(
             purchaseAmount > fee,
             "Purchase amount must be greater than fee"
@@ -224,7 +211,7 @@ contract Bonding is
             initialPurchase
         );
 
-        FERC20 token = new FERC20(string.concat("fun ", _name), _ticker, initialSupply, maxTx);
+        FERC20 token = new FERC20{salt: keccak256(abi.encodePacked(msg.sender, block.timestamp))}(string.concat("fun ", _name), _ticker, initialSupply, maxTx);
         uint256 supply = token.totalSupply();
 
         address _pair = factory.createPair(address(token), assetToken);
@@ -252,7 +239,7 @@ contract Bonding is
             lastUpdated: block.timestamp
         });
         Token memory tmpToken = Token({
-            creator: creator,
+            creator: msg.sender,
             token: address(token),
             agentToken: address(0),
             pair: _pair,
@@ -270,17 +257,17 @@ contract Bonding is
         tokenInfo[address(token)] = tmpToken;
         tokenInfos.push(address(token));
 
-        bool exists = _checkIfProfileExists(creator);
+        bool exists = _checkIfProfileExists(msg.sender);
 
         if (exists) {
-            Profile storage _profile = profile[creator];
+            Profile storage _profile = profile[msg.sender];
 
             _profile.tokens.push(address(token));
         } else {
-            bool created = _createUserProfile(creator);
+            bool created = _createUserProfile(msg.sender);
 
             if (created) {
-                Profile storage _profile = profile[creator];
+                Profile storage _profile = profile[msg.sender];
 
                 _profile.tokens.push(address(token));
             }
@@ -448,11 +435,12 @@ contract Bonding is
         );
 
         address agentToken = IAgentFactoryV3(agentFactory)
-            .executeBondingCurveApplication(
+            .executeBondingCurveApplicationSalt(
                 id,
                 _token.data.supply / (10 ** token_.decimals()),
                 tokenBalance / (10 ** token_.decimals()),
-                pairAddress
+                pairAddress,
+                keccak256(abi.encodePacked(msg.sender, block.timestamp))
             );
         _token.agentToken = agentToken;
 

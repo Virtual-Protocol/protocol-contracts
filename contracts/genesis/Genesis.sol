@@ -275,7 +275,139 @@ contract Genesis is ReentrancyGuard, AccessControlUpgradeable {
         emit Participated(genesisId, msg.sender, pointAmt, virtualsAmt);
     }
 
-    function onGenesisSuccess(
+        function onGenesisSuccess(
+        address[] calldata refundVirtualsTokenUserAddresses,
+        uint256[] calldata refundVirtualsTokenUserAmounts,
+        address[] calldata distributeAgentTokenUserAddresses,
+        uint256[] calldata distributeAgentTokenUserAmounts,
+        address creator
+    )
+        external
+        onlyRole(FACTORY_ROLE)
+        nonReentrant
+        whenNotCancelled
+        whenNotFailed
+        whenEnded
+        returns (address)
+    {
+        require(
+            refundUserCountForFailed == 0,
+            "OnGenesisFailed already called"
+        );
+        require(
+            refundVirtualsTokenUserAddresses.length ==
+                refundVirtualsTokenUserAmounts.length,
+            "Mismatched refund arrays"
+        );
+        require(
+            distributeAgentTokenUserAddresses.length ==
+                distributeAgentTokenUserAmounts.length,
+            "Mismatched distribution arrays"
+        );
+
+        // Calculate total refund amount
+        uint256 totalRefundAmount = 0;
+        for (uint256 i = 0; i < refundVirtualsTokenUserAmounts.length; i++) {
+            // check if the user has enough virtuals committed
+            require(
+                mapAddrToVirtuals[refundVirtualsTokenUserAddresses[i]] >=
+                    refundVirtualsTokenUserAmounts[i],
+                "Insufficient Virtual Token committed"
+            );
+            totalRefundAmount += refundVirtualsTokenUserAmounts[i];
+        }
+
+        // Check if launch has been called before
+        bool isFirstLaunch = agentTokenAddress == address(0);
+        // Calculate required balance based on whether this is first launch
+        uint256 requiredVirtualsBalance = isFirstLaunch
+            ? totalRefundAmount + reserveAmount
+            : totalRefundAmount;
+        // Check if contract has enough virtuals balance
+        require(
+            IERC20(virtualTokenAddress).balanceOf(address(this)) >=
+                requiredVirtualsBalance,
+            "Insufficient Virtual Token balance"
+        );
+
+        // Only do launch related operations if this is first launch
+        if (isFirstLaunch) {
+            // grant allowance to agentFactoryAddress for launch
+            IERC20(virtualTokenAddress).approve(
+                agentFactoryAddress,
+                reserveAmount
+            );
+
+            // Call initFromBondingCurve and executeBondingCurveApplication
+            uint256 id = IAgentFactoryV3(agentFactoryAddress)
+                .initFromBondingCurve(
+                    string.concat(genesisName, " by Virtuals"),
+                    genesisTicker,
+                    genesisCores,
+                    tbaSalt,
+                    tbaImplementation,
+                    daoVotingPeriod,
+                    daoThreshold,
+                    reserveAmount,
+                    creator
+                );
+
+            address agentToken = IAgentFactoryV3(agentFactoryAddress)
+                .executeBondingCurveApplication(
+                    id,
+                    agentTokenTotalSupply,
+                    agentTokenLpSupply,
+                    address(this) // vault
+                );
+
+            require(agentToken != address(0), "Agent token creation failed");
+
+            // Store the created agent token address
+            agentTokenAddress = agentToken;
+        }
+
+        // Calculate total distribution amount
+        uint256 totalDistributionAmount = 0;
+        for (uint256 i = 0; i < distributeAgentTokenUserAmounts.length; i++) {
+            totalDistributionAmount += distributeAgentTokenUserAmounts[i];
+        }
+        // Check if contract has enough agent token balance only after agentTokenAddress be set
+        require(
+            IERC20(agentTokenAddress).balanceOf(address(this)) >=
+                totalDistributionAmount,
+            "Insufficient Agent Token balance"
+        );
+
+        // Directly transfer Virtual Token refunds
+        for (uint256 i = 0; i < refundVirtualsTokenUserAddresses.length; i++) {
+            // first decrease the virtuals mapping of the user to prevent reentrancy attacks
+            mapAddrToVirtuals[
+                refundVirtualsTokenUserAddresses[i]
+            ] -= refundVirtualsTokenUserAmounts[i];
+            // then transfer the virtuals
+            IERC20(virtualTokenAddress).safeTransfer(
+                refundVirtualsTokenUserAddresses[i],
+                refundVirtualsTokenUserAmounts[i]
+            );
+            emit RefundClaimed(
+                genesisId,
+                refundVirtualsTokenUserAddresses[i],
+                refundVirtualsTokenUserAmounts[i]
+            );
+        }
+
+        // save the amount of agent tokens to claim
+        for (uint256 i = 0; i < distributeAgentTokenUserAddresses.length; i++) {
+            claimableAgentTokens[
+                distributeAgentTokenUserAddresses[i]
+            ] = distributeAgentTokenUserAmounts[i];
+        }
+
+        emit GenesisSucceeded(genesisId);
+        return agentTokenAddress;
+    }
+
+    function onGenesisSuccessSalt(
         address[] calldata refundVirtualsTokenUserAddresses,
         uint256[] calldata refundVirtualsTokenUserAmounts,
         address[] calldata distributeAgentTokenUserAddresses,

@@ -136,10 +136,12 @@ contract FGenesis is Initializable, AccessControlUpgradeable {
         SuccessParams calldata p
     ) external onlyRole(OPERATION_ROLE) returns (address) {
         return
-            onGenesisSuccessSalt(
-                id,
-                p,
-                keccak256(abi.encodePacked(msg.sender, block.timestamp))
+            _getGenesis(id).onGenesisSuccess(
+                p.refundAddresses,
+                p.refundAmounts,
+                p.distributeAddresses,
+                p.distributeAmounts,
+                p.creator
             );
     }
 
@@ -149,7 +151,7 @@ contract FGenesis is Initializable, AccessControlUpgradeable {
         bytes32 salt
     ) public onlyRole(OPERATION_ROLE) returns (address) {
         return
-            _getGenesis(id).onGenesisSuccess(
+            _getGenesis(id).onGenesisSuccessSalt(
                 p.refundAddresses,
                 p.refundAmounts,
                 p.distributeAddresses,

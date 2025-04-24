@@ -154,7 +154,8 @@ contract FGenesis is Initializable, AccessControlUpgradeable {
                 p.refundAmounts,
                 p.distributeAddresses,
                 p.distributeAmounts,
-                p.creator
+                p.creator,
+                salt
             );
     }
 

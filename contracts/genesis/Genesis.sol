@@ -280,36 +280,10 @@ contract Genesis is ReentrancyGuard, AccessControlUpgradeable {
         uint256[] calldata refundVirtualsTokenUserAmounts,
         address[] calldata distributeAgentTokenUserAddresses,
         uint256[] calldata distributeAgentTokenUserAmounts,
-        address creator
-    )
-        public
-        onlyRole(FACTORY_ROLE)
-        nonReentrant
-        whenNotCancelled
-        whenNotFailed
-        whenEnded
-        returns (address)
-    {
-        return
-            onGenesisSuccessSalt(
-                refundVirtualsTokenUserAddresses,
-                refundVirtualsTokenUserAmounts,
-                distributeAgentTokenUserAddresses,
-                distributeAgentTokenUserAmounts,
-                creator,
-                keccak256(abi.encodePacked(msg.sender, block.timestamp))
-            );
-    }
-
-    function onGenesisSuccessSalt(
-        address[] calldata refundVirtualsTokenUserAddresses,
-        uint256[] calldata refundVirtualsTokenUserAmounts,
-        address[] calldata distributeAgentTokenUserAddresses,
-        uint256[] calldata distributeAgentTokenUserAmounts,
         address creator,
         bytes32 salt
     )
-        public
+        external
         onlyRole(FACTORY_ROLE)
         nonReentrant
         whenNotCancelled

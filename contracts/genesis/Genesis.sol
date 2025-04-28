@@ -169,7 +169,47 @@ contract Genesis is ReentrancyGuard, AccessControlUpgradeable {
     ) external initializer {
         __AccessControl_init();
 
+        require(params.genesisID > 0, "Invalid genesis ID");
+        require(params.factory != address(0), "Invalid factory address");
         _validateTime(params.startTime, params.endTime);
+        require(bytes(params.genesisName).length > 0, "Invalid genesis name");
+        require(
+            bytes(params.genesisTicker).length > 0,
+            "Invalid genesis ticker"
+        );
+        require(params.genesisCores.length > 0, "Invalid genesis cores");
+        require(
+            params.tbaImplementation != address(0),
+            "Invalid TBA implementation address"
+        );
+        require(
+            params.agentFactoryAddress != address(0),
+            "Invalid agent factory address"
+        );
+        require(
+            params.virtualTokenAddress != address(0),
+            "Invalid virtual token address"
+        );
+        require(
+            params.reserveAmount > 0,
+            "Reserve amount must be greater than 0"
+        );
+        require(
+            params.maxContributionVirtualAmount > 0,
+            "Max contribution must be greater than 0"
+        );
+        require(
+            params.agentTokenTotalSupply > 0,
+            "Agent token total supply must be greater than 0"
+        );
+        require(
+            params.agentTokenLpSupply > 0,
+            "Agent token lp supply must be greater than 0"
+        );
+        require(
+            params.agentTokenTotalSupply >= params.agentTokenLpSupply,
+            "Agent token total supply must be greater than agent token lp supply"
+        );
 
         genesisId = params.genesisID;
         factory = FGenesis(params.factory); // the FGenesis Proxy

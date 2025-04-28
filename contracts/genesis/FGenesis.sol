@@ -13,7 +13,7 @@ contract FGenesis is Initializable, AccessControlUpgradeable {
 
     bytes32 public constant ADMIN_ROLE = keccak256("ADMIN_ROLE");
     bytes32 public constant OPERATION_ROLE = keccak256("OPERATION_ROLE");
-
+    bytes32 public constant BONDING_ROLE = keccak256("BONDING_ROLE");
     struct Params {
         address virtualToken;
         uint256 reserve;
@@ -36,8 +36,6 @@ contract FGenesis is Initializable, AccessControlUpgradeable {
 
     event GenesisCreated(uint256 indexed id, address indexed addr);
 
-    bytes32 BONDING_ROLE = keccak256("BONDING_ROLE");
-
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() {
         _disableInitializers();
@@ -59,23 +57,15 @@ contract FGenesis is Initializable, AccessControlUpgradeable {
             p.virtualToken != address(0) &&
                 p.feeAddr != address(0) &&
                 p.tbaImpl != address(0) &&
-                p.agentFactory != address(0),
-            "Invalid addr"
-        );
-
-        require(
-            p.reserve > 0 &&
+                p.agentFactory != address(0) &&
+                p.reserve > 0 &&
                 p.maxContribution > 0 &&
                 p.feeAmt > 0 &&
-                p.duration > 0,
-            "Invalid amt"
-        );
-
-        require(
-            p.agentTokenTotalSupply > 0 &&
+                p.duration > 0 &&
+                p.agentTokenTotalSupply > 0 &&
                 p.agentTokenLpSupply > 0 &&
                 p.agentTokenTotalSupply >= p.agentTokenLpSupply,
-            "Invalid amt"
+            "Invalid params"
         );
 
         params = p;

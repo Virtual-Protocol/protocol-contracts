@@ -87,18 +87,16 @@ contract Genesis is ReentrancyGuard, AccessControlUpgradeable {
         uint256 amount
     );
 
-    string private constant ERR_NOT_STARTED = "Genesis not started yet";
-    string private constant ERR_ALREADY_STARTED = "Genesis already started";
-    string private constant ERR_NOT_ENDED = "Genesis not ended yet";
-    string private constant ERR_ALREADY_ENDED = "Genesis already ended";
-    string private constant ERR_ALREADY_FAILED = "Genesis already failed";
-    string private constant ERR_ALREADY_CANCELLED = "Genesis already cancelled";
-    string private constant ERR_START_TIME_FUTURE =
-        "Start time must be in the future";
-    string private constant ERR_END_AFTER_START =
-        "End time must be after start time";
-    string private constant ERR_TOKEN_LAUNCHED = "Agent token already launched";
-    string private constant ERR_TOKEN_NOT_LAUNCHED = "Agent token not launched";
+    string private constant ERR_NOT_STARTED = "Not started";
+    string private constant ERR_ALREADY_STARTED = "Already started";
+    string private constant ERR_NOT_ENDED = "Not ended";
+    string private constant ERR_ALREADY_ENDED = "Already ended";
+    string private constant ERR_ALREADY_FAILED = "Already failed";
+    string private constant ERR_ALREADY_CANCELLED = "Already cancelled";
+    string private constant ERR_START_TIME_FUTURE = "StartTime future";
+    string private constant ERR_END_AFTER_START = "End after start";
+    string private constant ERR_TOKEN_LAUNCHED = "Token already launched";
+    string private constant ERR_TOKEN_NOT_LAUNCHED = "Token not launched";
 
     // Common validation modifiers
     modifier whenNotStarted() {
@@ -237,25 +235,13 @@ contract Genesis is ReentrancyGuard, AccessControlUpgradeable {
         uint256 pointAmt,
         uint256 virtualsAmt
     ) external nonReentrant whenActive {
-        require(pointAmt > 0, "Point amount must be greater than 0");
-        require(virtualsAmt > 0, "Virtuals must be greater than 0");
+        require(pointAmt > 0, "invalid pointAmt");
+        require(virtualsAmt > 0, "invalid virtualsAmt");
 
         // Check single submission upper limit
         require(
             virtualsAmt <= maxContributionVirtualAmount,
-            "Exceeds maximum virtuals per contribution"
-        );
-
-        // Add balance check
-        require(
-            IERC20(virtualTokenAddress).balanceOf(msg.sender) >= virtualsAmt,
-            "Insufficient Virtual Token balance"
-        );
-        // Add allowance check
-        require(
-            IERC20(virtualTokenAddress).allowance(msg.sender, address(this)) >=
-                virtualsAmt,
-            "Insufficient Virtual Token allowance"
+            "Exceeds maxContributionVirtualAmount"
         );
 
         // Update participant list

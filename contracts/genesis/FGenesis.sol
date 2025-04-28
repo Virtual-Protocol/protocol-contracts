@@ -5,10 +5,8 @@ import {Genesis} from "./Genesis.sol";
 import "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
-import "../virtualPersona/AgentFactoryV3.sol";
 import "./GenesisTypes.sol";
 import "./GenesisLib.sol";
-import "../virtualPersona/AgentFactoryV3.sol";
 
 contract FGenesis is Initializable, AccessControlUpgradeable {
     using GenesisLib for *;
@@ -37,6 +35,8 @@ contract FGenesis is Initializable, AccessControlUpgradeable {
     uint256 public genesisID;
 
     event GenesisCreated(uint256 indexed id, address indexed addr);
+
+    bytes32 BONDING_ROLE = keccak256("BONDING_ROLE");
 
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() {
@@ -94,7 +94,6 @@ contract FGenesis is Initializable, AccessControlUpgradeable {
         );
 
         gParams.endTime = gParams.startTime + params.duration;
-
         genesisID++;
         address addr = GenesisLib.validateAndDeploy(
             genesisID,
@@ -112,10 +111,7 @@ contract FGenesis is Initializable, AccessControlUpgradeable {
             params.agentTokenLpSupply
         );
 
-        // Grant BONDING_ROLE of ato the new Genesis contract
-        bytes32 BONDING_ROLE = AgentFactoryV3(params.agentFactory)
-            .BONDING_ROLE();
-        AgentFactoryV3(params.agentFactory).grantRole(
+        IAccessControl(params.agentFactory).grantRole(
             BONDING_ROLE,
             address(addr)
         );
@@ -149,7 +145,7 @@ contract FGenesis is Initializable, AccessControlUpgradeable {
         uint256 id,
         SuccessParams calldata p,
         bytes32 salt
-    ) public onlyRole(OPERATION_ROLE) returns (address) {
+    ) external onlyRole(OPERATION_ROLE) returns (address) {
         return
             _getGenesis(id).onGenesisSuccessSalt(
                 p.refundAddresses,

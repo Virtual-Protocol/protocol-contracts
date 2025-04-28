@@ -473,6 +473,7 @@ contract AgentFactoryV3 is
         uint256 taxSwapThresholdBasisPoints,
         address projectTaxRecipient
     ) public onlyRole(DEFAULT_ADMIN_ROLE) {
+        require((lpSupply + vaultSupply) <= maxSupply, "Invalid supply");
         _tokenSupplyParams = abi.encode(
             maxSupply,
             lpSupply,

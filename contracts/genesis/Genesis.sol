@@ -286,12 +286,11 @@ contract Genesis is ReentrancyGuard, AccessControlUpgradeable {
         onlyRole(FACTORY_ROLE)
         nonReentrant
         whenNotCancelled
-        whenNotFailed
         whenEnded
         returns (address)
     {
         return
-            onGenesisSuccessSalt(
+            _onGenesisSuccessSalt(
                 refundVirtualsTokenUserAddresses,
                 refundVirtualsTokenUserAmounts,
                 distributeAgentTokenUserAddresses,
@@ -309,27 +308,34 @@ contract Genesis is ReentrancyGuard, AccessControlUpgradeable {
         address creator,
         bytes32 salt
     )
-        public
+        external
         onlyRole(FACTORY_ROLE)
         nonReentrant
         whenNotCancelled
-        whenNotFailed
         whenEnded
         returns (address)
     {
+        return _onGenesisSuccessSalt(
+            refundVirtualsTokenUserAddresses,
+            refundVirtualsTokenUserAmounts,
+            distributeAgentTokenUserAddresses,
+            distributeAgentTokenUserAmounts,
+            creator,
+            salt
+        );
+    }
+
+    function _onGenesisSuccessSalt(
+        address[] calldata refundVirtualsTokenUserAddresses,
+        uint256[] calldata refundVirtualsTokenUserAmounts,
+        address[] calldata distributeAgentTokenUserAddresses,
+        uint256[] calldata distributeAgentTokenUserAmounts,
+        address creator,
+        bytes32 salt
+    ) internal returns (address) {
         require(
             refundUserCountForFailed == 0,
             "OnGenesisFailed already called"
-        );
-        require(
-            refundVirtualsTokenUserAddresses.length ==
-                refundVirtualsTokenUserAmounts.length,
-            "Mismatched refund arrays"
-        );
-        require(
-            distributeAgentTokenUserAddresses.length ==
-                distributeAgentTokenUserAmounts.length,
-            "Mismatched distribution arrays"
         );
 
         // Calculate total refund amount
@@ -346,16 +352,6 @@ contract Genesis is ReentrancyGuard, AccessControlUpgradeable {
 
         // Check if launch has been called before
         bool isFirstLaunch = agentTokenAddress == address(0);
-        // Calculate required balance based on whether this is first launch
-        uint256 requiredVirtualsBalance = isFirstLaunch
-            ? totalRefundAmount + reserveAmount
-            : totalRefundAmount;
-        // Check if contract has enough virtuals balance
-        require(
-            IERC20(virtualTokenAddress).balanceOf(address(this)) >=
-                requiredVirtualsBalance,
-            "Insufficient Virtual Token balance"
-        );
 
         // Only do launch related operations if this is first launch
         if (isFirstLaunch) {
@@ -399,12 +395,6 @@ contract Genesis is ReentrancyGuard, AccessControlUpgradeable {
         for (uint256 i = 0; i < distributeAgentTokenUserAmounts.length; i++) {
             totalDistributionAmount += distributeAgentTokenUserAmounts[i];
         }
-        // Check if contract has enough agent token balance only after agentTokenAddress be set
-        require(
-            IERC20(agentTokenAddress).balanceOf(address(this)) >=
-                totalDistributionAmount,
-            "Insufficient Agent Token balance"
-        );
 
         // Directly transfer Virtual Token refunds
         for (uint256 i = 0; i < refundVirtualsTokenUserAddresses.length; i++) {

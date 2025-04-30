@@ -246,18 +246,6 @@ contract Genesis is ReentrancyGuard, AccessControlUpgradeable {
             "Exceeds maximum virtuals per contribution"
         );
 
-        // Add balance check
-        require(
-            IERC20(virtualTokenAddress).balanceOf(msg.sender) >= virtualsAmt,
-            "Insufficient Virtual Token balance"
-        );
-        // Add allowance check
-        require(
-            IERC20(virtualTokenAddress).allowance(msg.sender, address(this)) >=
-                virtualsAmt,
-            "Insufficient Virtual Token allowance"
-        );
-
         // Update participant list
         if (mapAddrToVirtuals[msg.sender] == 0) {
             participants.push(msg.sender);

@@ -36,7 +36,7 @@ contract FGenesis is Initializable, AccessControlUpgradeable {
 
     event GenesisCreated(uint256 indexed id, address indexed addr);
 
-    bytes32 BONDING_ROLE = keccak256("BONDING_ROLE");
+    bytes32 public constant BONDING_ROLE = keccak256("BONDING_ROLE");
 
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() {

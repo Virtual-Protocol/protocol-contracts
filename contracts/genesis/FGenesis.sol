@@ -64,15 +64,13 @@ contract FGenesis is Initializable, AccessControlUpgradeable {
         );
 
         require(
-            p.reserve > 0 &&
-                p.maxContribution > 0 &&
-                p.feeAmt > 0 &&
-                p.duration > 0,
+            p.reserve > 0 && p.maxContribution > 0 && p.feeAmt > 0,
             "Invalid amt"
         );
 
         require(
-            p.agentTokenTotalSupply > 0 &&
+            p.duration > 0 &&
+                p.agentTokenTotalSupply > 0 &&
                 p.agentTokenLpSupply > 0 &&
                 p.agentTokenTotalSupply >= p.agentTokenLpSupply,
             "Invalid amt"

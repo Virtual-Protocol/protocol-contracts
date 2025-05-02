@@ -53,6 +53,7 @@ contract ACPSimple is
         uint256 memoCount;
         uint256 expiredAt; // Client can claim back the budget if job is not completed within expiry
         address evaluator;
+        uint256 evaluatorFee;
     }
 
     mapping(uint256 => Job) public jobs;
@@ -141,7 +142,8 @@ contract ACPSimple is
     function createJob(
         address provider,
         address evaluator,
-        uint256 expiredAt
+        uint256 expiredAt,
+        uint256 evaluatorFee
     ) external returns (uint256) {
         require(provider != address(0), "Zero address provider");
         require(expiredAt > (block.timestamp + 5 minutes), "Expiry too short");
@@ -157,7 +159,8 @@ contract ACPSimple is
             phase: 0,
             memoCount: 0,
             expiredAt: expiredAt,
-            evaluator: evaluator
+            evaluator: evaluator,
+            evaluatorFee: evaluatorFee
         });
 
         emit JobCreated(newJobId, _msgSender(), provider, evaluator);
@@ -195,6 +198,7 @@ contract ACPSimple is
             job.phase == PHASE_NEGOTIATION,
             "Budget can only be set in negotiation phase"
         );
+        require(amount > job.evaluatorFee, "Amount must be greater than evaluator fee");
 
         job.budget = amount;
 
@@ -209,31 +213,36 @@ contract ACPSimple is
         Job storage job = jobs[id];
         require(job.budget > job.amountClaimed, "No budget to claim");
 
-        job.amountClaimed = job.budget;
         uint256 claimableAmount = job.budget - job.amountClaimed;
-        uint256 evaluatorFee = (claimableAmount * evaluatorFeeBP) / 10000;
-        uint256 platformFee = (claimableAmount * platformFeeBP) / 10000;
+        job.amountClaimed = job.budget;
 
         if (job.phase == PHASE_COMPLETED) {
+            // only distribute fee if job is completed
+            uint256 evaluatorFee = job.evaluatorFee;
+            uint256 platformFee = (claimableAmount * platformFeeBP) / 10000;
+
+            // transfer platform fee
             if (platformFee > 0) {
                 paymentToken.safeTransferFrom(
                     address(this),
                     platformTreasury,
                     platformFee
                 );
+                claimableAmount = claimableAmount - platformFee;
             }
-            uint256 paidToEvaluators = 0;
-            if (job.evaluator != address(0)) {
+
+            // transfer evaluator fee
+            if (job.evaluator != address(0) && evaluatorFee > 0) {
                 paymentToken.safeTransferFrom(
                     address(this),
                     job.evaluator,
                     evaluatorFee
                 );
                 emit ClaimedEvaluatorFee(id, job.evaluator, evaluatorFee);
+                claimableAmount = claimableAmount - evaluatorFee;
             }
 
-            claimableAmount = claimableAmount - platformFee - paidToEvaluators;
-
+            // transfer the provider fee
             paymentToken.safeTransferFrom(
                 address(this),
                 job.provider,
@@ -243,6 +252,7 @@ contract ACPSimple is
             emit ClaimedProviderFee(id, job.provider, claimableAmount);
         } else {
             // Refund the budget if job is not completed within expiry or rejected
+            // no fee incurred for refund
             require(
                 (job.phase < PHASE_EVALUATION &&
                     block.timestamp > job.expiredAt) ||

@@ -29,7 +29,8 @@ contract ACPSimple is
     uint8 public constant PHASE_EVALUATION = 3;
     uint8 public constant PHASE_COMPLETED = 4;
     uint8 public constant PHASE_REJECTED = 5;
-    uint8 public constant TOTAL_PHASES = 6;
+    uint8 public constant PHASE_EXPIRED = 6;
+    uint8 public constant TOTAL_PHASES = 7;
 
     IERC20 public paymentToken;
 
@@ -133,7 +134,8 @@ contract ACPSimple is
             "TRANSACTION",
             "EVALUATION",
             "COMPLETED",
-            "REJECTED"
+            "REJECTED",
+            "EXPIRED"
         ];
     }
 
@@ -258,7 +260,7 @@ contract ACPSimple is
             emit RefundedBudget(id, job.client, claimableAmount);
 
             if (job.phase != PHASE_REJECTED) {
-                _updateJobPhase(id, PHASE_REJECTED);
+                _updateJobPhase(id, PHASE_EXPIRED);
             }
         }
     }

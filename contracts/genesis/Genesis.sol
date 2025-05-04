@@ -383,6 +383,12 @@ contract Genesis is ReentrancyGuard, AccessControlUpgradeable {
         for (uint256 i = 0; i < distributeAgentTokenUserAmounts.length; i++) {
             totalDistributionAmount += distributeAgentTokenUserAmounts[i];
         }
+        // Check if contract has enough agent token balance only after agentTokenAddress be set
+        require(
+            IERC20(agentTokenAddress).balanceOf(address(this)) >=
+                totalDistributionAmount,
+            "Insufficient Agent Token balance"
+        );
 
         // Directly transfer Virtual Token refunds
         for (uint256 i = 0; i < refundVirtualsTokenUserAddresses.length; i++) {

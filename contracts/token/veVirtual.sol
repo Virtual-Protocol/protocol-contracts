@@ -35,8 +35,15 @@ contract veVirtual is
 
     uint8 public maxWeeks;
 
-    event Stake(address indexed user, uint256 amount, uint8 numWeeks);
-    event Withdraw(address indexed user, uint256 index, uint256 amount);
+    event Stake(
+        address indexed user,
+        uint256 id,
+        uint256 amount,
+        uint8 numWeeks
+    );
+    event Withdraw(address indexed user, uint256 id, uint256 amount);
+    event Extend(address indexed user, uint256 id, uint8 numWeeks);
+    event AutoRenew(address indexed user, uint256 id, bool autoRenew);
 
     event AdminUnlocked(bool adminUnlocked);
     bool public adminUnlocked;
@@ -164,7 +171,7 @@ contract veVirtual is
             id: _nextId++
         });
         locks[_msgSender()].push(lock);
-        emit Stake(_msgSender(), amount, numWeeks);
+        emit Stake(_msgSender(), lock.id, amount, numWeeks);
         _transferVotingUnits(address(0), _msgSender(), amount);
     }
 
@@ -219,6 +226,8 @@ contract veVirtual is
         lock.end = block.timestamp + uint(lock.numWeeks) * 1 weeks;
         uint multiplier = (uint(lock.numWeeks) * DENOM) / uint(maxWeeks);
         lock.value = (lock.amount * multiplier) / DENOM;
+
+        emit AutoRenew(account, id, lock.autoRenew);
     }
 
     function extend(uint256 id, uint8 numWeeks) external nonReentrant {
@@ -238,6 +247,7 @@ contract veVirtual is
         uint multiplier = ((uint(newEnd) - lock.start) * DENOM) /
             (uint(maxWeeks) * 1 weeks);
         lock.value = (lock.amount * multiplier) / DENOM;
+        emit Extend(account, id, numWeeks);
     }
 
     function setMaxWeeks(uint8 maxWeeks_) external onlyRole(ADMIN_ROLE) {

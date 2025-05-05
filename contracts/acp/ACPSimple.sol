@@ -221,7 +221,7 @@ contract ACPSimple is
         require(job.budget > job.amountClaimed, "No budget to claim");
 
         uint256 claimableAmount = job.budget - job.amountClaimed;
-        job.amountClaimed = job.budget;
+        job.amountClaimed = job.budget; // Mark as claimed *before* transfers
 
         if (job.phase == PHASE_COMPLETED) {
             // only distribute fee if job is completed
@@ -329,16 +329,20 @@ contract ACPSimple is
 
     function canSign(
         address account,
-        uint256 jobId
-    ) public view returns (bool) {
-        Job memory job = jobs[jobId];
+        Job memory job
+    ) public pure returns (bool) {
         return
-            job.phase < PHASE_COMPLETED &&
             ((job.client == account || job.provider == account) ||
                 ((job.evaluator == account || job.evaluator == address(0)) &&
                     job.phase == PHASE_EVALUATION));
     }
 
+    function isJobCompleted(
+        Job memory job
+    ) public pure returns (bool) {
+        return job.phase >= PHASE_COMPLETED;
+    }
+    
     function getAllMemos(
         uint256 jobId,
         uint256 offset,
@@ -391,9 +395,10 @@ contract ACPSimple is
         string memory reason
     ) public override nonReentrant {
         Memo storage memo = memos[memoId];
-        require(canSign(_msgSender(), memo.jobId), "Unauthorised");
+        Job memory job = jobs[memo.jobId];
 
-        Job storage job = jobs[memo.jobId];
+        require(!isJobCompleted(job), "Job is already completed");
+        require(canSign(_msgSender(), job), "Unauthorised");
 
         if (signatories[memoId][_msgSender()] > 0) {
             revert("Already signed");

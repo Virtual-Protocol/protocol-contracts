@@ -19,3 +19,4 @@ artifacts/
 deployments
 fireblocks_secret.key
 .cursor/
+contracts/mocks/

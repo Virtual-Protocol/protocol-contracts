@@ -79,7 +79,7 @@ describe("ACPSimple", function () {
 
       // Wait for the transaction and get the memo ID
       const receipt = await tx.wait();
-      const memoId = receipt.logs[0].args[0];
+      const memoId = receipt.logs[0].args[2]; // NewMemo event has memoId as third argument
 
       // Provider signs the memo to approve moving to negotiation
       await acpSimple.connect(provider).signMemo(memoId, true, "Approved");
@@ -121,7 +121,7 @@ describe("ACPSimple", function () {
 
       // Wait for the transaction and get the memo ID
       const receipt = await tx.wait();
-      const memoId = receipt.logs[0].args[0];
+      const memoId = receipt.logs[0].args[2]; // NewMemo event has memoId as third argument
 
       // Provider signs the memo to approve moving to negotiation
       await acpSimple.connect(provider).signMemo(memoId, true, "Approved");
@@ -132,6 +132,75 @@ describe("ACPSimple", function () {
 
       await expect(acpSimple.connect(client).setBudget(1, budget))
         .to.be.revertedWith("Amount must be greater than or equal to evaluator fee plus platform fee");
+    });
+  });
+
+  describe("Job Expiration", function () {
+    it("Should allow client to claim refund after job expires", async function () {
+      // Create a job with 6 minutes expiry
+      const expiredAt = Math.floor(Date.now() / 1000) + 360; // 6 minutes from now
+      const evaluatorFee = ethers.parseEther("1");
+      await acpSimple.connect(client).createJob(
+        provider.address,
+        evaluator.address,
+        expiredAt,
+        evaluatorFee
+      );
+
+      // Move to negotiation phase
+      const tx1 = await acpSimple.connect(client).createMemo(
+        1,
+        "Moving to negotiation",
+        0, // MemoType.REQUEST
+        false,
+        1 // PHASE_NEGOTIATION
+      );
+      const receipt1 = await tx1.wait();
+      const memoId1 = receipt1.logs[0].args[2]; // NewMemo event has memoId as third argument
+      await acpSimple.connect(provider).signMemo(memoId1, true, "Approved");
+
+      // Set budget
+      const budget = ethers.parseEther("10");
+      await mockToken.connect(client).approve(await acpSimple.getAddress(), budget);
+      await acpSimple.connect(client).setBudget(1, budget);
+
+      // Move to transaction phase
+      const tx2 = await acpSimple.connect(client).createMemo(
+        1,
+        "Moving to transaction",
+        0, // MemoType.REQUEST
+        false,
+        2 // PHASE_TRANSACTION
+      );
+      const receipt2 = await tx2.wait();
+      const memoId2 = receipt2.logs[0].args[2]; // NewMemo event has memoId as third argument
+      await acpSimple.connect(provider).signMemo(memoId2, true, "Approved");
+
+      // Fast forward time by 7 minutes
+      await ethers.provider.send("evm_increaseTime", [420]); // 7 minutes
+      await ethers.provider.send("evm_mine");
+
+      // Verify job is in TRANSACTION phase before expiry
+      const jobBeforeExpiry = await acpSimple.jobs(1);
+      expect(jobBeforeExpiry.phase).to.equal(2); // PHASE_TRANSACTION
+
+      // Get initial balances
+      const initialClientBalance = await mockToken.balanceOf(client.address);
+
+      // Claim refund
+      const tx = await acpSimple.connect(client).claimBudget(1);
+      const receipt = await tx.wait();
+      await expect(tx)
+        .to.emit(acpSimple, "RefundedBudget")
+        .withArgs(1, client.address, budget);
+
+      // Verify job is in EXPIRED phase
+      const job = await acpSimple.jobs(1);
+      expect(job.phase).to.equal(6); // PHASE_EXPIRED
+
+      // Verify client received refund
+      const finalClientBalance = await mockToken.balanceOf(client.address);
+      expect(finalClientBalance).to.equal(initialClientBalance + budget);
     });
   });
 }); 

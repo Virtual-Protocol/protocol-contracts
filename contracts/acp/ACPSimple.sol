@@ -200,7 +200,12 @@ contract ACPSimple is
             job.phase == PHASE_NEGOTIATION,
             "Budget can only be set in negotiation phase"
         );
-        require(amount > job.evaluatorFee, "Amount must be greater than evaluator fee");
+
+        uint256 platformFee = (amount * platformFeeBP) / 10000;
+        require(
+            amount >= job.evaluatorFee + platformFee,
+            "Amount must be greater than or equal to evaluator fee plus platform fee"
+        );
 
         job.budget = amount;
 

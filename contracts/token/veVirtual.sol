@@ -134,6 +134,7 @@ contract veVirtual is
     ) external nonReentrant {
         require(amount > 0, "Amount must be greater than 0");
         require(numWeeks <= maxWeeks, "Num weeks must be less than max weeks");
+        require(numWeeks > 0, "Num weeks must be greater than 0");
 
         IERC20(baseToken).safeTransferFrom(_msgSender(), address(this), amount);
 

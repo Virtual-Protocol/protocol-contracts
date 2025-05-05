@@ -22,25 +22,24 @@ contract veVirtual is
         uint8 numWeeks; // Active duration in weeks. Reset to maxWeeks if autoRenew is true.
         uint256 value;
         bool autoRenew;
+        uint256 id;
     }
 
     uint16 public constant DENOM = 10000;
-
     bytes32 public constant ADMIN_ROLE = keccak256("ADMIN_ROLE");
+    uint256 public constant MAX_POSITIONS = 200;
 
     address public baseToken;
     mapping(address => Lock[]) public locks;
+    uint256 private _nextId;
 
     uint8 public maxWeeks;
 
     event Stake(address indexed user, uint256 amount, uint8 numWeeks);
     event Withdraw(address indexed user, uint256 index, uint256 amount);
 
-    bool public adminUnlocked;
-
     event AdminUnlocked(bool adminUnlocked);
-
-    uint256 public constant MAX_POSITIONS = 200;
+    bool public adminUnlocked;
 
     function initialize(
         address baseToken_,
@@ -54,6 +53,7 @@ contract veVirtual is
         require(baseToken_ != address(0), "Invalid token");
         baseToken = baseToken_;
         maxWeeks = maxWeeks_;
+        _nextId = 1;
 
         _grantRole(DEFAULT_ADMIN_ROLE, _msgSender());
         _grantRole(ADMIN_ROLE, _msgSender());
@@ -160,16 +160,30 @@ contract veVirtual is
             end: end,
             numWeeks: numWeeks,
             value: value,
-            autoRenew: autoRenew
+            autoRenew: autoRenew,
+            id: _nextId++
         });
         locks[_msgSender()].push(lock);
         emit Stake(_msgSender(), amount, numWeeks);
         _transferVotingUnits(address(0), _msgSender(), amount);
     }
 
-    function withdraw(uint256 index) external nonReentrant {
-        require(index < locks[_msgSender()].length, "Invalid index");
-        Lock memory lock = locks[_msgSender()][index];
+    function _indexOf(
+        address account,
+        uint256 id
+    ) internal view returns (uint256) {
+        for (uint i = 0; i < locks[account].length; i++) {
+            if (locks[account][i].id == id) {
+                return i;
+            }
+        }
+        revert("Lock not found");
+    }
+
+    function withdraw(uint256 id) external nonReentrant {
+        address account = _msgSender();
+        uint256 index = _indexOf(account, id);
+        Lock memory lock = locks[account][index];
         require(
             block.timestamp >= lock.end || adminUnlocked,
             "Lock is not expired"
@@ -178,20 +192,22 @@ contract veVirtual is
 
         uint256 amount = lock.amount;
 
-        uint256 lastIndex = locks[_msgSender()].length - 1;
+        uint256 lastIndex = locks[account].length - 1;
         if (index != lastIndex) {
-            locks[_msgSender()][index] = locks[_msgSender()][lastIndex];
+            locks[account][index] = locks[account][lastIndex];
         }
-        locks[_msgSender()].pop();
+        locks[account].pop();
 
-        IERC20(baseToken).safeTransfer(_msgSender(), amount);
-        emit Withdraw(_msgSender(), index, amount);
-        _transferVotingUnits(_msgSender(), address(0), amount);
+        IERC20(baseToken).safeTransfer(account, amount);
+        emit Withdraw(account, id, amount);
+        _transferVotingUnits(account, address(0), amount);
     }
 
-    function toggleAutoRenew(uint256 index) external nonReentrant {
-        require(index < locks[_msgSender()].length, "Invalid index");
-        Lock storage lock = locks[_msgSender()][index];
+    function toggleAutoRenew(uint256 id) external nonReentrant {
+        address account = _msgSender();
+        uint256 index = _indexOf(account, id);
+
+        Lock storage lock = locks[account][index];
         require(block.timestamp < lock.end, "Lock is expired");
         lock.autoRenew = !lock.autoRenew;
 
@@ -205,9 +221,10 @@ contract veVirtual is
         lock.value = (lock.amount * multiplier) / DENOM;
     }
 
-    function extend(uint256 index, uint8 numWeeks) external nonReentrant {
-        require(index < locks[_msgSender()].length, "Invalid index");
-        Lock storage lock = locks[_msgSender()][index];
+    function extend(uint256 id, uint8 numWeeks) external nonReentrant {
+        address account = _msgSender();
+        uint256 index = _indexOf(account, id);
+        Lock storage lock = locks[account][index];
         require(lock.autoRenew == false, "Lock is auto-renewing");
         require(block.timestamp < lock.end, "Lock is expired");
         require(

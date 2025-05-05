@@ -176,7 +176,7 @@ contract veVirtual is
         if (index != lastIndex) {
             locks[_msgSender()][index] = locks[_msgSender()][lastIndex];
         }
-        delete locks[_msgSender()][lastIndex];
+        locks[_msgSender()].pop();
 
         IERC20(baseToken).safeTransfer(_msgSender(), amount);
         emit Withdraw(_msgSender(), index, amount);

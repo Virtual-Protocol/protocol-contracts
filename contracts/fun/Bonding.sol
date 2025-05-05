@@ -470,7 +470,7 @@ contract Bonding is
                 _token.data.supply / (10 ** token_.decimals()),
                 tokenBalance / (10 ** token_.decimals()),
                 pairAddress,
-                keccak256(abi.encodePacked(msg.sender, block.timestamp))
+                keccak256(abi.encodePacked(msg.sender, block.timestamp, tokenAddress))
             );
         _token.agentToken = agentToken;
 

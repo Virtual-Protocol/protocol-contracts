@@ -166,6 +166,7 @@ contract veVirtual is
             block.timestamp >= lock.end || adminUnlocked,
             "Lock is not expired"
         );
+        require(lock.autoRenew == false, "Lock is auto-renewing");
 
         uint256 amount = lock.amount;
 

@@ -20,7 +20,6 @@ contract veVirtual is
         uint256 start;
         uint256 end;
         uint8 numWeeks; // Active duration in weeks. Reset to maxWeeks if autoRenew is true.
-        uint256 value;
         bool autoRenew;
         uint256 id;
     }
@@ -116,8 +115,9 @@ contract veVirtual is
     function _balanceOfLockAt(
         Lock memory lock,
         uint256 timestamp
-    ) internal pure returns (uint256) {
-        uint256 value = lock.value;
+    ) internal view returns (uint256) {
+        uint256 value = _calcValue(lock.amount, lock.numWeeks);
+
         if (lock.autoRenew) {
             return value;
         }
@@ -156,9 +156,6 @@ contract veVirtual is
             numWeeks = maxWeeks;
         }
 
-        uint multiplier = (uint(numWeeks) * DENOM) / uint(maxWeeks);
-        uint256 value = (amount * multiplier) / DENOM;
-
         uint256 end = block.timestamp + uint256(numWeeks) * 1 weeks;
 
         Lock memory lock = Lock({
@@ -166,13 +163,23 @@ contract veVirtual is
             start: block.timestamp,
             end: end,
             numWeeks: numWeeks,
-            value: value,
             autoRenew: autoRenew,
             id: _nextId++
         });
         locks[_msgSender()].push(lock);
         emit Stake(_msgSender(), lock.id, amount, numWeeks);
         _transferVotingUnits(address(0), _msgSender(), amount);
+    }
+
+    function _calcValue(
+        uint256 amount,
+        uint8 numWeeks
+    ) internal view returns (uint256) {
+        return
+            (amount *
+                (
+                    numWeeks >= maxWeeks ? DENOM : (uint256(numWeeks) * DENOM) / maxWeeks
+                )) / DENOM;
     }
 
     function _indexOf(
@@ -222,10 +229,10 @@ contract veVirtual is
             lock.numWeeks = maxWeeks;
         }
 
+        lock.numWeeks = lock.numWeeks > maxWeeks ? maxWeeks : lock.numWeeks;
+
         lock.start = block.timestamp;
         lock.end = block.timestamp + uint(lock.numWeeks) * 1 weeks;
-        uint multiplier = (uint(lock.numWeeks) * DENOM) / uint(maxWeeks);
-        lock.value = (lock.amount * multiplier) / DENOM;
 
         emit AutoRenew(account, id, lock.autoRenew);
     }
@@ -244,9 +251,7 @@ contract veVirtual is
 
         lock.numWeeks += numWeeks;
         lock.end = newEnd;
-        uint multiplier = ((uint(newEnd) - lock.start) * DENOM) /
-            (uint(maxWeeks) * 1 weeks);
-        lock.value = (lock.amount * multiplier) / DENOM;
+
         emit Extend(account, id, numWeeks);
     }
 
@@ -256,8 +261,9 @@ contract veVirtual is
 
     function getMaturity(
         address account,
-        uint256 index
+        uint256 id
     ) public view returns (uint256) {
+        uint256 index = _indexOf(account, id);
         Lock memory lock = locks[account][index];
         if (!lock.autoRenew) {
             return locks[account][index].end;

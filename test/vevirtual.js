@@ -64,14 +64,15 @@ describe("veVIRTUAL", function () {
 
     await virtual.connect(staker).approve(veVirtual.target, parseEther("1000"));
     await veVirtual.connect(staker).stake(parseEther("100"), 52, false);
+    const id = (await veVirtual.locks(staker.address, 0)).id;
     await time.increase(26 * 7 * 24 * 60 * 60);
-    await expect(veVirtual.connect(staker).withdraw(0)).to.be.revertedWith(
+    await expect(veVirtual.connect(staker).withdraw(id)).to.be.revertedWith(
       "Lock is not expired"
     );
 
     await time.increase(26 * 7 * 24 * 60 * 60);
     expect(await veVirtual.balanceOf(staker.address)).to.be.equal("0");
-    expect(await veVirtual.connect(staker).withdraw(0)).to.be.not.reverted;
+    expect(await veVirtual.connect(staker).withdraw(id)).to.be.not.reverted;
   });
 
   it("should allow extension", async function () {
@@ -87,7 +88,7 @@ describe("veVIRTUAL", function () {
       parseEther("500")
     );
 
-    await veVirtual.connect(staker).extend(0, 52);
+    await veVirtual.connect(staker).extend(1, 52);
     expect(await veVirtual.balanceOf(staker.address)).to.be.greaterThan(
       parseEther("999")
     );
@@ -103,7 +104,7 @@ describe("veVIRTUAL", function () {
     await virtual.connect(staker).approve(veVirtual.target, parseEther("1000"));
     await veVirtual.connect(staker).stake(parseEther("1000"), 52, false);
 
-    await expect(veVirtual.connect(staker).extend(0, 104)).to.be.revertedWith(
+    await expect(veVirtual.connect(staker).extend(1, 104)).to.be.revertedWith(
       "Num weeks must be less than max weeks"
     );
   });
@@ -123,7 +124,7 @@ describe("veVIRTUAL", function () {
 
     await time.increase(364 * 24 * 60 * 60 - 2);
 
-    await veVirtual.connect(staker).extend(0, 52);
+    await veVirtual.connect(staker).extend(1, 52);
     expect(
       parseInt(formatEther(await veVirtual.balanceOf(staker.address)))
     ).to.be.equal(500);
@@ -134,7 +135,7 @@ describe("veVIRTUAL", function () {
     );
 
     await time.increase(7 * 24 * 60 * 60);
-    await veVirtual.connect(staker).withdraw(0);
+    await veVirtual.connect(staker).withdraw(1);
     expect(await virtual.balanceOf(staker.address)).to.be.equal(
       parseEther("1000")
     );
@@ -155,7 +156,7 @@ describe("veVIRTUAL", function () {
 
     await time.increase(51 * 7 * 24 * 60 * 60);
     const start = await time.latest();
-    await veVirtual.connect(staker).toggleAutoRenew(0);
+    await veVirtual.connect(staker).toggleAutoRenew(1);
     expect(await veVirtual.balanceOf(staker.address)).to.be.equal(
       parseEther("1000")
     );
@@ -202,7 +203,6 @@ describe("veVIRTUAL", function () {
     await veVirtual.connect(staker).delegate(staker.address);
     await virtual.connect(staker).approve(veVirtual.target, parseEther("2000"));
 
-
     await veVirtual.connect(staker).stake(parseEther("1000"), 52, false);
     expect(await veVirtual.getVotes(staker.address)).to.be.equal(
       parseEther("1000")
@@ -211,7 +211,7 @@ describe("veVIRTUAL", function () {
     const firstBlock = await ethers.provider.getBlockNumber();
 
     await time.increase(52 * 7 * 24 * 60 * 60);
-    
+
     await veVirtual.connect(staker).stake(parseEther("1000"), 52, false);
     const secondBlock = await ethers.provider.getBlockNumber();
     await time.increase(52 * 7 * 24 * 60 * 60);
@@ -219,20 +219,20 @@ describe("veVIRTUAL", function () {
       parseEther("2000")
     );
 
-    await veVirtual.connect(staker).withdraw(0)
+    await veVirtual.connect(staker).withdraw(1);
 
     expect(await veVirtual.getVotes(staker.address)).to.be.equal(
       parseEther("1000")
     );
-    await veVirtual.connect(staker).withdraw(0)
+    await veVirtual.connect(staker).withdraw(2);
     expect(await veVirtual.getVotes(staker.address)).to.be.equal(
       parseEther("0")
     );
-    expect(await veVirtual.getPastVotes(staker.address, firstBlock)).to.be.equal(
-      parseEther("1000")
-    );
-    expect(await veVirtual.getPastVotes(staker.address, secondBlock)).to.be.equal(
-      parseEther("2000")
-    );
+    expect(
+      await veVirtual.getPastVotes(staker.address, firstBlock)
+    ).to.be.equal(parseEther("1000"));
+    expect(
+      await veVirtual.getPastVotes(staker.address, secondBlock)
+    ).to.be.equal(parseEther("2000"));
   });
 });

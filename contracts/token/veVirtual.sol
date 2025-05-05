@@ -47,6 +47,7 @@ contract veVirtual is
         __ReentrancyGuard_init();
         __AccessControl_init();
         __Votes_init();
+        __EIP712_init("veVIRTUAL", "1");
 
         require(baseToken_ != address(0), "Invalid token");
         baseToken = baseToken_;

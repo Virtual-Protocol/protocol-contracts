@@ -22,7 +22,8 @@ abstract contract InteractionLedger {
         IMAGE_URL,
         VOICE_URL,
         OBJECT_URL,
-        TXHASH
+        TXHASH,
+        BUDGET
     }
 
     mapping(uint256 => Memo) public memos;

@@ -31,8 +31,6 @@ contract ACPSimple is
     uint8 public constant PHASE_REJECTED = 5;
     uint8 public constant PHASE_EXPIRED = 6;
     uint8 public constant TOTAL_PHASES = 7;
-    uint8 public constant PHASE_EXPIRED = 6;
-    uint8 public constant TOTAL_PHASES = 7;
 
     IERC20 public paymentToken;
 

@@ -12,6 +12,7 @@ import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
 import "./InteractionLedger.sol";
+import "./ACPRegistry.sol";
 
 contract ACPSimple is
     Initializable,
@@ -84,6 +85,8 @@ contract ACPSimple is
 
     event BudgetSet(uint256 indexed jobId, uint256 newBudget);
 
+    ACPRegistry public evaluaorRegistry;
+
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() {
         _disableInitializers();
@@ -141,14 +144,24 @@ contract ACPSimple is
     }
 
     // Job State Machine Functions
-    function createJob(
+    function initiateJob(
         address provider,
         address evaluator,
         uint256 expiredAt,
-        uint256 evaluatorFee
+        uint256 evalId,
+        uint256 evaluatorFee,
+        uint256 jobValue
     ) external returns (uint256) {
         require(provider != address(0), "Zero address provider");
         require(expiredAt > (block.timestamp + 5 minutes), "Expiry too short");
+
+        if (evaluator != address(0)) {
+            require(evaluatorRegistry.isRegisteredEvaluator(evaluator), "Evaluator not registered");
+            (address serviceEvaluator, uint256 price, bool isActive) = evaluatorRegistry.getEvaluationService(evalId);
+            require(isActive, "Evaluation service not active");
+            require(serviceEvaluator == evaluator, "Invalid evaluator for service");
+            require(evaluatorFee == price, "Invalid evaluator fee");
+        }
 
         uint256 newJobId = ++jobCounter;
 
@@ -156,17 +169,26 @@ contract ACPSimple is
             id: newJobId,
             client: _msgSender(),
             provider: provider,
-            budget: 0,
+            budget: jobValue,
             amountClaimed: 0,
             phase: 0,
             memoCount: 0,
             expiredAt: expiredAt,
             evaluator: evaluator,
-            evaluatorFee: evaluatorFee
+            evaluatorFee: evaluatorFee,
         });
 
         emit JobCreated(newJobId, _msgSender(), provider, evaluator);
         return newJobId;
+    }
+
+    function createJob(
+        address provider,
+        address evaluator,
+        uint256 expiredAt,
+        uint256 evaluatorFee
+    ) public pure returns (uint256) {
+        revert("Deprecated");
     }
 
     function _updateJobPhase(uint256 jobId, uint8 phase) internal {
@@ -332,7 +354,8 @@ contract ACPSimple is
         Job memory job = jobs[jobId];
         bool canClientSign = job.evaluator == address(0) &&
             account == job.client;
-        return (account == jobs[jobId].evaluator || canClientSign);
+        return (account == jobs[jobId].evaluator || canClientSign) && 
+               evaluatorRegistry.isRegisteredEvaluator(account);
     }
 
     function canSign(
@@ -479,6 +502,15 @@ contract ACPSimple is
     ) external onlyRole(ADMIN_ROLE) {
         platformFeeBP = platformFeeBP_;
         platformTreasury = platformTreasury_;
+    }
+
+    /**
+     * @notice Initialize the evaluator registry
+     * @param evaluatorRegistryAddress Address of the ACPRegistry contract
+     */
+    function initializeEvaluatorRegistry(address evaluatorRegistryAddress) external onlyRole(ADMIN_ROLE) {
+        require(evaluatorRegistryAddress != address(0), "Zero address registry");
+        evaluatorRegistry = ACPRegistry(evaluatorRegistryAddress);
     }
 
     function getJobPhaseMemoIds(

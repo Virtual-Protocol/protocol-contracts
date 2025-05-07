@@ -35,7 +35,6 @@ contract ACPSimple is
 
     IERC20 public paymentToken;
 
-    uint256 public evaluatorFeeBP; // 10000 = 100%
     uint8 public numEvaluatorsPerJob;
 
     event ClaimedEvaluatorFee(
@@ -101,7 +100,6 @@ contract ACPSimple is
 
     function initialize(
         address paymentTokenAddress,
-        uint256 evaluatorFeeBP_,
         uint256 platformFeeBP_,
         address platformTreasury_,
         address acpRegistryAddress
@@ -118,7 +116,6 @@ contract ACPSimple is
 
         jobCounter = 0;
         memoCounter = 0;
-        evaluatorFeeBP = evaluatorFeeBP_;
 
         // Setup initial admin
         _grantRole(DEFAULT_ADMIN_ROLE, _msgSender());
@@ -135,12 +132,6 @@ contract ACPSimple is
         _;
     }
 
-    function updateEvaluatorFee(
-        uint256 evaluatorFeeBP_
-    ) external onlyRole(ADMIN_ROLE) {
-        evaluatorFeeBP = evaluatorFeeBP_;
-    }
-
     function getPhases() public pure returns (string[TOTAL_PHASES] memory) {
         return [
             "REQUEST",
@@ -153,14 +144,19 @@ contract ACPSimple is
         ];
     }
 
-    // Job State Machine Functions
+    /**
+     * @notice Create a new ACP job
+     * @param provider Address of the service provider
+     * @param expiredAt Timestamp when the job expires
+     * @param evaluator Address of the evaluator (optional, can be zero address)
+     * @param evalId ID of the evaluation service if evaluator is specified
+     * @return The ID of the newly created job
+     */
     function createJob(
         address provider,
         uint256 expiredAt,
         address evaluator,
         uint256 evalId 
-        // todo: what if evaluator change their fee after buyer submit the createJob trx?
-        // buyer should calculate budget based on recorded evaluator fee type&value 
     ) external returns (uint256) {
         require(provider != address(0), "Zero address provider");
         require(expiredAt > (block.timestamp + 5 minutes), "Expiry too short");
@@ -228,6 +224,12 @@ contract ACPSimple is
         }
     }
 
+    /**
+     * @notice Set the budget for a job during negotiation phase
+     * @param jobId The ID of the job
+     * @param jobValue The value to be paid to the provider
+     * @param evaluatorFee The fee amount buyer agreed to pay the evaluator
+     */
     function setBudget(
         uint256 jobId,
         uint256 jobValue,

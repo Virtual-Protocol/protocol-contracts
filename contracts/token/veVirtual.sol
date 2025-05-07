@@ -116,7 +116,10 @@ contract veVirtual is
         Lock memory lock,
         uint256 timestamp
     ) internal view returns (uint256) {
-        uint256 value = _calcValue(lock.amount, lock.numWeeks);
+        uint256 value = _calcValue(
+            lock.amount,
+            lock.autoRenew ? maxWeeks : lock.numWeeks
+        );
 
         if (lock.autoRenew) {
             return value;
@@ -178,7 +181,9 @@ contract veVirtual is
         return
             (amount *
                 (
-                    numWeeks >= maxWeeks ? DENOM : (uint256(numWeeks) * DENOM) / maxWeeks
+                    numWeeks >= maxWeeks
+                        ? DENOM
+                        : (uint256(numWeeks) * DENOM) / maxWeeks
                 )) / DENOM;
     }
 

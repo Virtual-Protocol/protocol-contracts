@@ -247,9 +247,9 @@ describe("Bonding", function () {
     const filter = agentFactory.filters.NewPersona;
     const events = await agentFactory.queryFilter(filter, -1);
     const event = events[0];
-    // const { virtualId, token, veToken, dao, tba, lp } = await event.args;
-    // expect(token).to.not.equal("0x0000000000000000000000000000000000000000");
-    // console.log("Token deployed at", token);
+    const { virtualId, token, veToken, dao, tba, lp } = await event.args;
+    expect(token).to.not.equal("0x0000000000000000000000000000000000000000");
+    console.log("Token deployed at", token);
   });
 
   it("should be able to launch memecoin", async function () {

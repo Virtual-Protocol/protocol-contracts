@@ -2,7 +2,6 @@
 // Modified from https://github.com/sourlodine/Pump.fun-Smart-Contract/blob/main/contracts/PumpFun.sol
 pragma solidity ^0.8.20;
 
-import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
@@ -89,6 +88,10 @@ contract Bonding is
     event Deployed(address indexed token, uint256 amount0, uint256 amount1);
     event Graduated(address indexed token, address agentToken);
 
+    error InvalidTokenStatus();
+    error InvalidInput();
+    error SlippageTooHigh();
+
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() {
         _disableInitializers();
@@ -122,18 +125,6 @@ contract Bonding is
         gradThreshold = gradThreshold_;
     }
 
-    function _createUserProfile(address _user) internal returns (bool) {
-        address[] memory _tokens;
-
-        Profile memory _profile = Profile({user: _user, tokens: _tokens});
-
-        profile[_user] = _profile;
-
-        profiles.push(_user);
-
-        return true;
-    }
-
     function _checkIfProfileExists(address _user) internal view returns (bool) {
         return profile[_user].user == _user;
     }
@@ -148,41 +139,27 @@ contract Bonding is
         return true;
     }
 
-    function setInitialSupply(uint256 newSupply) public onlyOwner {
+    function setTokenParams(
+        uint256 newSupply,
+        uint256 newGradThreshold,
+        uint256 newMaxTx,
+        uint256 newAssetRate,
+        uint256 newFee,
+        address newFeeTo
+    ) public onlyOwner {
+        if (newAssetRate <= 0) {
+            revert InvalidInput();
+        }
         initialSupply = newSupply;
-    }
-
-    function setGradThreshold(uint256 newThreshold) public onlyOwner {
-        gradThreshold = newThreshold;
-    }
-
-    function setFee(uint256 newFee, address newFeeTo) public onlyOwner {
+        gradThreshold = newGradThreshold;
+        maxTx = newMaxTx;
+        assetRate = newAssetRate;
         fee = newFee;
         _feeTo = newFeeTo;
     }
 
-    function setMaxTx(uint256 maxTx_) public onlyOwner {
-        maxTx = maxTx_;
-    }
-
-    function setAssetRate(uint256 newRate) public onlyOwner {
-        require(newRate > 0, "Rate err");
-
-        assetRate = newRate;
-    }
-
     function setDeployParams(DeployParams memory params) public onlyOwner {
         _deployParams = params;
-    }
-
-    function getUserTokens(
-        address account
-    ) public view returns (address[] memory) {
-        require(_checkIfProfileExists(account), "User Profile dose not exist.");
-
-        Profile memory _profile = profile[account];
-
-        return _profile.tokens;
     }
 
     function launch(
@@ -194,18 +171,12 @@ contract Bonding is
         string[4] memory urls,
         uint256 purchaseAmount
     ) public nonReentrant returns (address, address, uint) {
-        require(
-            purchaseAmount > fee,
-            "Purchase amount must be greater than fee"
-        );
-
-        require(cores.length > 0, "Cores must be provided");
+        if (purchaseAmount <= fee || cores.length == 0) {
+            revert InvalidInput();
+        }
 
         address assetToken = router.assetToken();
-        require(
-            IERC20(assetToken).balanceOf(msg.sender) >= purchaseAmount,
-            "Insufficient amount"
-        );
+
         uint256 initialPurchase = (purchaseAmount - fee);
         IERC20(assetToken).safeTransferFrom(msg.sender, _feeTo, fee);
         IERC20(assetToken).safeTransferFrom(
@@ -269,13 +240,10 @@ contract Bonding is
 
             _profile.tokens.push(address(token));
         } else {
-            bool created = _createUserProfile(msg.sender);
+            Profile storage _profile = profile[msg.sender];
+            _profile.user = msg.sender;
 
-            if (created) {
-                Profile storage _profile = profile[msg.sender];
-
-                _profile.tokens.push(address(token));
-            }
+            _profile.tokens.push(address(token));
         }
 
         uint n = tokenInfos.length;
@@ -302,8 +270,12 @@ contract Bonding is
         uint256 amountOutMin,
         uint256 deadline
     ) public returns (bool) {
-        require(tokenInfo[tokenAddress].trading, "Token not trading");
-        require(block.timestamp <= deadline, "Deadline exceeded");
+        if (!tokenInfo[tokenAddress].trading) {
+            revert InvalidTokenStatus();
+        }
+        if (block.timestamp > deadline) {
+            revert InvalidInput();
+        }
 
         address pairAddress = factory.getPair(
             tokenAddress,
@@ -319,7 +291,10 @@ contract Bonding is
             tokenAddress,
             msg.sender
         );
-        require(amount1Out >= amountOutMin, "Slippage too high");
+
+        if (amount1Out < amountOutMin) {
+            revert SlippageTooHigh();
+        }
 
         uint256 newReserveA = reserveA + amount0In;
         uint256 newReserveB = reserveB - amount1Out;
@@ -360,7 +335,9 @@ contract Bonding is
         uint256 amountOutMin,
         uint256 deadline
     ) internal {
-        require(block.timestamp <= deadline, "Deadline exceeded");
+        if (block.timestamp > deadline) {
+            revert InvalidInput();
+        }
         address pairAddress = factory.getPair(
             tokenAddress,
             router.assetToken()
@@ -376,7 +353,9 @@ contract Bonding is
             buyer
         );
 
-        require(amount0Out >= amountOutMin, "Slippage too high");
+        if (amount0Out < amountOutMin) {
+            revert SlippageTooHigh();
+        }
 
         uint256 newReserveA = reserveA - amount0Out;
         uint256 newReserveB = reserveB + amount1In;
@@ -418,7 +397,9 @@ contract Bonding is
         uint256 amountOutMin,
         uint256 deadline
     ) public payable returns (bool) {
-        require(tokenInfo[tokenAddress].trading, "Token not trading");
+        if (!tokenInfo[tokenAddress].trading) {
+            revert InvalidTokenStatus();
+        }
 
         _buy(msg.sender, amountIn, tokenAddress, amountOutMin, deadline);
 
@@ -430,10 +411,9 @@ contract Bonding is
 
         Token storage _token = tokenInfo[tokenAddress];
 
-        require(
-            _token.trading && !_token.tradingOnUniswap,
-            "trading is already open"
-        );
+        if (_token.tradingOnUniswap) {
+            revert InvalidTokenStatus();
+        }
 
         _token.trading = false;
         _token.tradingOnUniswap = true;
@@ -470,7 +450,9 @@ contract Bonding is
                 _token.data.supply / (10 ** token_.decimals()),
                 tokenBalance / (10 ** token_.decimals()),
                 pairAddress,
-                keccak256(abi.encodePacked(msg.sender, block.timestamp, tokenAddress))
+                keccak256(
+                    abi.encodePacked(msg.sender, block.timestamp, tokenAddress)
+                )
             );
         _token.agentToken = agentToken;
 
@@ -491,7 +473,9 @@ contract Bonding is
         address[] memory accounts
     ) public {
         Token memory info = tokenInfo[srcTokenAddress];
-        require(info.tradingOnUniswap, "Token is not graduated yet");
+        if (!info.tradingOnUniswap) {
+            revert InvalidTokenStatus();
+        }
 
         FERC20 token = FERC20(srcTokenAddress);
         IERC20 agentToken = IERC20(info.agentToken);

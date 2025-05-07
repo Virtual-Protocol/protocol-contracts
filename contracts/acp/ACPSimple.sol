@@ -55,6 +55,9 @@ contract ACPSimple is
         uint256 memoCount;
         uint256 expiredAt; // Client can claim back the budget if job is not completed within expiry
         address evaluator;
+        uint256 jobValue;
+        ACPRegistry.EvaluationFeeType evalFeeType;
+        uint256 evalFeeValue;
         uint256 evaluatorFee;
     }
 
@@ -78,14 +81,18 @@ contract ACPSimple is
         uint256 providerFee
     );
 
-    event RefundedBudget(uint256 jobId, address indexed client, uint256 amount);
+    event RefundedBudget(
+        uint256 jobId,
+        address indexed client,
+        uint256 jobValue
+    );
 
     uint256 public platformFeeBP;
     address public platformTreasury;
 
     event BudgetSet(uint256 indexed jobId, uint256 newBudget);
 
-    ACPRegistry public evaluaorRegistry;
+    ACPRegistry public acpRegistry;
 
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() {
@@ -96,13 +103,15 @@ contract ACPSimple is
         address paymentTokenAddress,
         uint256 evaluatorFeeBP_,
         uint256 platformFeeBP_,
-        address platformTreasury_
+        address platformTreasury_,
+        address acpRegistryAddress
     ) public initializer {
         require(
             paymentTokenAddress != address(0),
             "Zero address payment token"
         );
         require(platformTreasury_ != address(0), "Zero address treasury");
+        require(acpRegistryAddress != address(0), "Zero address registry");
 
         __AccessControl_init();
         __ReentrancyGuard_init();
@@ -116,6 +125,7 @@ contract ACPSimple is
         _grantRole(ADMIN_ROLE, _msgSender());
 
         paymentToken = IERC20(paymentTokenAddress);
+        acpRegistry = ACPRegistry(acpRegistryAddress);
         platformFeeBP = platformFeeBP_;
         platformTreasury = platformTreasury_;
     }
@@ -144,23 +154,33 @@ contract ACPSimple is
     }
 
     // Job State Machine Functions
-    function initiateJob(
+    function createJob(
         address provider,
-        address evaluator,
         uint256 expiredAt,
-        uint256 evalId,
-        uint256 evaluatorFee,
-        uint256 jobValue
+        address evaluator,
+        uint256 evalId 
+        // todo: what if evaluator change their fee after buyer submit the createJob trx?
+        // buyer should calculate budget based on recorded evaluator fee type&value 
     ) external returns (uint256) {
         require(provider != address(0), "Zero address provider");
         require(expiredAt > (block.timestamp + 5 minutes), "Expiry too short");
 
+        ACPRegistry.EvaluationFeeType evalFeeType;
+        uint256 evalFeeValue;
         if (evaluator != address(0)) {
-            require(evaluatorRegistry.isRegisteredEvaluator(evaluator), "Evaluator not registered");
-            (address serviceEvaluator, uint256 price, bool isActive) = evaluatorRegistry.getEvaluationService(evalId);
+            address serviceEvaluator;
+            bool isActive;
+            require(
+                acpRegistry.isRegisteredEvaluator(evaluator),
+                "Evaluator not registered"
+            );
+            (serviceEvaluator, evalFeeValue, isActive, evalFeeType) = acpRegistry
+                .getEvaluationService(evalId);
             require(isActive, "Evaluation service not active");
-            require(serviceEvaluator == evaluator, "Invalid evaluator for service");
-            require(evaluatorFee == price, "Invalid evaluator fee");
+            require(
+                serviceEvaluator == evaluator,
+                "Invalid evaluator for service"
+            );
         }
 
         uint256 newJobId = ++jobCounter;
@@ -169,26 +189,20 @@ contract ACPSimple is
             id: newJobId,
             client: _msgSender(),
             provider: provider,
-            budget: jobValue,
+            budget: 0,
             amountClaimed: 0,
             phase: 0,
             memoCount: 0,
             expiredAt: expiredAt,
             evaluator: evaluator,
-            evaluatorFee: evaluatorFee,
+            jobValue: 0,
+            evalFeeType: evalFeeType,
+            evalFeeValue: evalFeeValue,
+            evaluatorFee: 0
         });
 
         emit JobCreated(newJobId, _msgSender(), provider, evaluator);
         return newJobId;
-    }
-
-    function createJob(
-        address provider,
-        address evaluator,
-        uint256 expiredAt,
-        uint256 evaluatorFee
-    ) public pure returns (uint256) {
-        revert("Deprecated");
     }
 
     function _updateJobPhase(uint256 jobId, uint8 phase) internal {
@@ -214,32 +228,41 @@ contract ACPSimple is
         }
     }
 
-    function setBudget(uint256 jobId, uint256 amount) public nonReentrant {
+    function setBudget(
+        uint256 jobId,
+        uint256 jobValue,
+        uint256 evaluatorFee
+    ) public nonReentrant {
         Job storage job = jobs[jobId];
         require(job.client == _msgSender(), "Only client can set budget");
-        require(amount > 0, "Zero amount");
         require(
             job.phase == PHASE_NEGOTIATION,
             "Budget can only be set in negotiation phase"
         );
+        
+        uint256 expectedEvaluatorFee = 0;
+        if (job.evaluator != address(0)) {
+            if (job.evalFeeType == ACPRegistry.EvaluationFeeType.PERCENTAGE) {
+                expectedEvaluatorFee = (jobValue * job.evalFeeValue) / 10000;
+            } else {
+                expectedEvaluatorFee = job.evalFeeValue;
+            }
+        }
+        require(evaluatorFee >= expectedEvaluatorFee, "Evaluator fee is too low");
 
-        uint256 platformFee = (amount * platformFeeBP) / 10000;
-        require(
-            amount >= job.evaluatorFee + platformFee,
-            "Amount must be greater than or equal to evaluator fee plus platform fee"
-        );
-
-        job.budget = amount;
+        job.jobValue = jobValue;
+        job.evaluatorFee = expectedEvaluatorFee;
+        job.budget = jobValue + expectedEvaluatorFee;
 
         createMemo(
             jobId,
-            string(abi.encodePacked(amount)),
+            string(abi.encodePacked(jobValue)),
             MemoType.BUDGET,
             false,
             PHASE_TRANSACTION
         );
 
-        emit BudgetSet(jobId, amount);
+        emit BudgetSet(jobId, jobValue);
     }
 
     function claimBudget(uint256 id) public nonReentrant {
@@ -354,26 +377,20 @@ contract ACPSimple is
         Job memory job = jobs[jobId];
         bool canClientSign = job.evaluator == address(0) &&
             account == job.client;
-        return (account == jobs[jobId].evaluator || canClientSign) && 
-               evaluatorRegistry.isRegisteredEvaluator(account);
+        return
+            (account == jobs[jobId].evaluator || canClientSign) &&
+            acpRegistry.isRegisteredEvaluator(account);
     }
 
     function canSign(
         address account,
         Job memory job
     ) public pure returns (bool) {
-        return
-            ((job.client == account || job.provider == account) ||
-                ((job.evaluator == account || job.evaluator == address(0)) &&
-                    job.phase == PHASE_EVALUATION));
+        return ((job.client == account || job.provider == account) ||
+            ((job.evaluator == account || job.evaluator == address(0)) &&
+                job.phase == PHASE_EVALUATION));
     }
 
-    function isJobCompleted(
-        Job memory job
-    ) public pure returns (bool) {
-        return job.phase >= PHASE_COMPLETED;
-    }
-    
     function getAllMemos(
         uint256 jobId,
         uint256 offset,
@@ -462,7 +479,10 @@ contract ACPSimple is
         } else {
             if (isApproved) {
                 // validate budget if next phase is transaction
-                if (job.phase == PHASE_NEGOTIATION && memo.nextPhase == PHASE_TRANSACTION) {
+                if (
+                    job.phase == PHASE_NEGOTIATION &&
+                    memo.nextPhase == PHASE_TRANSACTION
+                ) {
                     require(
                         isBudgetApproved(memo.jobId),
                         "Budget not approved during negotiation"
@@ -478,9 +498,7 @@ contract ACPSimple is
      * @param jobId The job ID
      * @return true if the budget has been approved, false otherwise
      */
-    function isBudgetApproved(
-        uint256 jobId
-    ) public view returns (bool) {
+    function isBudgetApproved(uint256 jobId) public view returns (bool) {
         Job memory job = jobs[jobId];
         uint256[] memory memoIds = jobMemoIds[jobId][PHASE_NEGOTIATION];
         for (uint256 i = memoIds.length - 1; i >= 0; i--) {
@@ -506,11 +524,13 @@ contract ACPSimple is
 
     /**
      * @notice Initialize the evaluator registry
-     * @param evaluatorRegistryAddress Address of the ACPRegistry contract
+     * @param acpRegistryAddress Address of the ACPRegistry contract
      */
-    function initializeEvaluatorRegistry(address evaluatorRegistryAddress) external onlyRole(ADMIN_ROLE) {
-        require(evaluatorRegistryAddress != address(0), "Zero address registry");
-        evaluatorRegistry = ACPRegistry(evaluatorRegistryAddress);
+    function initializeacpRegistry(
+        address acpRegistryAddress
+    ) external onlyRole(ADMIN_ROLE) {
+        require(acpRegistryAddress != address(0), "Zero address registry");
+        acpRegistry = ACPRegistry(acpRegistryAddress);
     }
 
     function getJobPhaseMemoIds(

@@ -9,10 +9,13 @@ import "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol
 contract ACPRegistry is Initializable, AccessControlUpgradeable, ReentrancyGuardUpgradeable {
     bytes32 public constant ADMIN_ROLE = keccak256("ADMIN_ROLE");
 
+    enum EvaluationFeeType { ABSOLUTE, PERCENTAGE }
+
     struct EvaluationService {
         address evaluator;
-        uint256 price;
+        uint256 value;
         bool isActive;
+        EvaluationFeeType feeType;
     }
 
     mapping(address => bool) public registeredEvaluators;
@@ -21,7 +24,12 @@ contract ACPRegistry is Initializable, AccessControlUpgradeable, ReentrancyGuard
 
     event EvaluatorRegistered(address indexed evaluator);
     event EvaluatorDeregistered(address indexed evaluator);
-    event EvaluationServiceRegistered(uint256 indexed evalId, address indexed evaluator, uint256 price);
+    event EvaluationServiceRegistered(
+        uint256 indexed evalId, 
+        address indexed evaluator, 
+        uint256 value,
+        EvaluationFeeType feeType
+    );
     event EvaluationServiceDeregistered(uint256 indexed evalId);
 
     /// @custom:oz-upgrades-unsafe-allow constructor
@@ -62,24 +70,30 @@ contract ACPRegistry is Initializable, AccessControlUpgradeable, ReentrancyGuard
 
     /**
      * @notice Register a new evaluation service for an evaluator
-     * @param price Price for the evaluation service
+     * @param value Value for the evaluation service fee
+     * @param feeType Type of fee (absolute or percentage in basis point)
      * @return evalId The ID of the newly registered evaluation service
      */
     function registerEvaluationService(
-        uint256 price
+        uint256 value,
+        EvaluationFeeType feeType
     ) external returns (uint256) {
         address evaluator = _msgSender();
         require(registeredEvaluators[evaluator], "Evaluator not registered");
-        require(price > 0, "Price must be greater than 0");
+        require(value > 0, "value must be greater than 0");
+        if (feeType == EvaluationFeeType.PERCENTAGE) {
+            require(value <= 10000, "Percentage cannot exceed 100%");
+        }
 
         uint256 evalId = ++evaluationServiceCounter;
         evaluationServices[evalId] = EvaluationService({
             evaluator: evaluator,
-            price: price,
-            isActive: true
+            value: value,
+            isActive: true,
+            feeType: feeType
         });
 
-        emit EvaluationServiceRegistered(evalId, evaluator, price);
+        emit EvaluationServiceRegistered(evalId, evaluator, value, feeType);
         return evalId;
     }
 
@@ -109,15 +123,17 @@ contract ACPRegistry is Initializable, AccessControlUpgradeable, ReentrancyGuard
      * @notice Get evaluation service details
      * @param evalId ID of the evaluation service
      * @return evaluator Address of the evaluator
-     * @return price Price of the service
+     * @return value value of the service
      * @return isActive Whether the service is active
+     * @return feeType Type of fee (absolute or percentage)
      */
     function getEvaluationService(uint256 evalId) external view returns (
         address evaluator,
-        uint256 price,
-        bool isActive
+        uint256 value,
+        bool isActive,
+        EvaluationFeeType feeType
     ) {
         EvaluationService memory service = evaluationServices[evalId];
-        return (service.evaluator, service.price, service.isActive);
+        return (service.evaluator, service.value, service.isActive, service.feeType);
     }
 } 

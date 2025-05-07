@@ -171,7 +171,7 @@ contract Bonding is
         string[4] memory urls,
         uint256 purchaseAmount
     ) public nonReentrant returns (address, address, uint) {
-        if (purchaseAmount <= fee || cores.length == 0) {
+        if (purchaseAmount <= fee || cores.length <= 0) {
             revert InvalidInput();
         }
 
@@ -360,7 +360,7 @@ contract Bonding is
 
         Token storage _token = tokenInfo[tokenAddress];
 
-        if (_token.tradingOnUniswap) {
+        if (_token.tradingOnUniswap || !_token.trading) {
             revert InvalidTokenStatus();
         }
 

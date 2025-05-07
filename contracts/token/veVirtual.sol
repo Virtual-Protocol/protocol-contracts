@@ -234,7 +234,7 @@ contract veVirtual is
             lock.numWeeks = maxWeeks;
         }
 
-        lock.numWeeks = lock.numWeeks > maxWeeks ? maxWeeks : lock.numWeeks;
+        lock.numWeeks = maxWeeks;
 
         lock.start = block.timestamp;
         lock.end = block.timestamp + uint(lock.numWeeks) * 1 weeks;

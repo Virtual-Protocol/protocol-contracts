@@ -116,6 +116,8 @@ contract AgentFactoryV3 is
 
     mapping(address => bool) private _existingAgents;
 
+    error AgentAlreadyExists();
+
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() {
         _disableInitializers();
@@ -358,8 +360,8 @@ contract AgentFactoryV3 is
         bytes32 salt
     ) internal returns (address instance) {
         instance = Clones.cloneDeterministic(daoImplementation, salt);
-        if(_existingAgents[instance]) {
-            revert("Agent already exists");
+        if (_existingAgents[instance]) {
+            revert AgentAlreadyExists();
         }
         IAgentDAO(instance).initialize(
             name,
@@ -380,8 +382,8 @@ contract AgentFactoryV3 is
         bytes32 salt
     ) internal returns (address instance) {
         instance = Clones.cloneDeterministic(tokenImplementation, salt);
-        if(_existingAgents[instance]) {
-            revert("Agent already exists");
+        if (_existingAgents[instance]) {
+            revert AgentAlreadyExists();
         }
         _existingAgents[instance] = true;
         IAgentToken(instance).initialize(
@@ -442,21 +444,15 @@ contract AgentFactoryV3 is
         veTokenImplementation = veToken;
     }
 
-    function setMaturityDuration(
-        uint256 newDuration
-    ) public onlyRole(DEFAULT_ADMIN_ROLE) {
-        maturityDuration = newDuration;
-    }
-
-    function setUniswapRouter(
-        address router
-    ) public onlyRole(DEFAULT_ADMIN_ROLE) {
-        _uniswapRouter = router;
-    }
-
-    function setTokenAdmin(
+    function setParams(
+        uint256 newMaturityDuration,
+        address newRouter,
+        address newDelegatee,
         address newTokenAdmin
     ) public onlyRole(DEFAULT_ADMIN_ROLE) {
+        maturityDuration = newMaturityDuration;
+        _uniswapRouter = newRouter;
+        defaultDelegatee = newDelegatee;
         _tokenAdmin = newTokenAdmin;
     }
 
@@ -607,11 +603,5 @@ contract AgentFactoryV3 is
         Application memory application = _applications[id];
 
         return IAgentNft(nft).virtualInfo(application.virtualId).token;
-    }
-
-    function setDefaultDelegatee(
-        address newDelegatee
-    ) public onlyRole(DEFAULT_ADMIN_ROLE) {
-        defaultDelegatee = newDelegatee;
     }
 }

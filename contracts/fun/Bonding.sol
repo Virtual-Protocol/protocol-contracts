@@ -277,15 +277,6 @@ contract Bonding is
             revert InvalidInput();
         }
 
-        address pairAddress = factory.getPair(
-            tokenAddress,
-            router.assetToken()
-        );
-
-        IFPair pair = IFPair(pairAddress);
-
-        (uint256 reserveA, uint256 reserveB) = pair.getReserves();
-
         (uint256 amount0In, uint256 amount1Out) = router.sell(
             amountIn,
             tokenAddress,
@@ -296,30 +287,8 @@ contract Bonding is
             revert SlippageTooHigh();
         }
 
-        uint256 newReserveA = reserveA + amount0In;
-        uint256 newReserveB = reserveB - amount1Out;
         uint256 duration = block.timestamp -
             tokenInfo[tokenAddress].data.lastUpdated;
-
-        uint256 liquidity = newReserveB * 2;
-        uint256 mCap = (tokenInfo[tokenAddress].data.supply * newReserveB) /
-            newReserveA;
-        uint256 price = newReserveA / newReserveB;
-        uint256 volume = duration > 86400
-            ? amount1Out
-            : tokenInfo[tokenAddress].data.volume24H + amount1Out;
-        uint256 prevPrice = duration > 86400
-            ? tokenInfo[tokenAddress].data.price
-            : tokenInfo[tokenAddress].data.prevPrice;
-
-        tokenInfo[tokenAddress].data.price = price;
-        tokenInfo[tokenAddress].data.marketCap = mCap;
-        tokenInfo[tokenAddress].data.liquidity = liquidity;
-        tokenInfo[tokenAddress].data.volume =
-            tokenInfo[tokenAddress].data.volume +
-            amount1Out;
-        tokenInfo[tokenAddress].data.volume24H = volume;
-        tokenInfo[tokenAddress].data.prevPrice = prevPrice;
 
         if (duration > 86400) {
             tokenInfo[tokenAddress].data.lastUpdated = block.timestamp;
@@ -358,29 +327,9 @@ contract Bonding is
         }
 
         uint256 newReserveA = reserveA - amount0Out;
-        uint256 newReserveB = reserveB + amount1In;
         uint256 duration = block.timestamp -
             tokenInfo[tokenAddress].data.lastUpdated;
 
-        uint256 liquidity = newReserveB * 2;
-        uint256 mCap = (tokenInfo[tokenAddress].data.supply * newReserveB) /
-            newReserveA;
-        uint256 price = newReserveA / newReserveB;
-        uint256 volume = duration > 86400
-            ? amount1In
-            : tokenInfo[tokenAddress].data.volume24H + amount1In;
-        uint256 _price = duration > 86400
-            ? tokenInfo[tokenAddress].data.price
-            : tokenInfo[tokenAddress].data.prevPrice;
-
-        tokenInfo[tokenAddress].data.price = price;
-        tokenInfo[tokenAddress].data.marketCap = mCap;
-        tokenInfo[tokenAddress].data.liquidity = liquidity;
-        tokenInfo[tokenAddress].data.volume =
-            tokenInfo[tokenAddress].data.volume +
-            amount1In;
-        tokenInfo[tokenAddress].data.volume24H = volume;
-        tokenInfo[tokenAddress].data.prevPrice = _price;
 
         if (duration > 86400) {
             tokenInfo[tokenAddress].data.lastUpdated = block.timestamp;
@@ -447,8 +396,8 @@ contract Bonding is
         address agentToken = IAgentFactoryV3(agentFactory)
             .executeBondingCurveApplicationSalt(
                 id,
-                _token.data.supply / (10 ** token_.decimals()),
-                tokenBalance / (10 ** token_.decimals()),
+                _token.data.supply / 1 ether,
+                tokenBalance / 1 ether,
                 pairAddress,
                 keccak256(
                     abi.encodePacked(msg.sender, block.timestamp, tokenAddress)

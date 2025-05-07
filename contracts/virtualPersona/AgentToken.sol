@@ -286,7 +286,7 @@ contract AgentToken is
         uint256 amountA = balanceOf(address(this));
         uint256 amountB = IERC20(pairToken).balanceOf(address(this));
 
-        transfer(pairAddr, amountA);
+        _transfer(address(this), pairAddr, amountA, false);
         IERC20(pairToken).transfer(pairAddr, amountB);
 
         uint256 lpTokens = IUniswapV2Pair(pairAddr).mint(address(this));
@@ -762,7 +762,6 @@ contract AgentToken is
         }
 
         fromBalance_ = _balances[from_];
-
         if (fromBalance_ < amount_) {
             revert TransferAmountExceedsBalance();
         }

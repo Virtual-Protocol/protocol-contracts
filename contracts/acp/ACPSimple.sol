@@ -199,15 +199,6 @@ contract ACPSimple is
         );
 
         job.budget = amount;
-
-        createMemo(
-            jobId,
-            string(abi.encodePacked(amount)),
-            MemoType.BUDGET,
-            false,
-            PHASE_TRANSACTION
-        );
-
         emit BudgetSet(jobId, amount);
     }
 
@@ -418,39 +409,9 @@ contract ACPSimple is
             }
         } else {
             if (isApproved) {
-                // validate budget if next phase is transaction
-                if (job.phase == PHASE_NEGOTIATION && memo.nextPhase == PHASE_TRANSACTION) {
-                    require(
-                        isBudgetApproved(memo.jobId),
-                        "Budget not approved during negotiation"
-                    );
-                }
                 _updateJobPhase(memo.jobId, memo.nextPhase);
             }
         }
-    }
-
-    /**
-     * @notice Check if the budget has been approved by the counter party
-     * @param jobId The job ID
-     * @return true if the budget has been approved, false otherwise
-     */
-    function isBudgetApproved(
-        uint256 jobId
-    ) public view returns (bool) {
-        Job memory job = jobs[jobId];
-        uint256[] memory memoIds = jobMemoIds[jobId][PHASE_NEGOTIATION];
-        for (uint256 i = memoIds.length - 1; i >= 0; i--) {
-            // iterate in reverse order to get the latest memo first
-            Memo memory memo = memos[memoIds[i]];
-            if (memo.memoType == MemoType.BUDGET) {
-                // Check if counter party approved (signatory value = 1)
-                if (signatories[memoIds[i]][job.provider] == 1) {
-                    return true;
-                }
-            }
-        }
-        return false;
     }
 
     function updatePlatformFee(

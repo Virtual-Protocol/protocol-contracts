@@ -29,7 +29,8 @@ contract ACPSimple is
     uint8 public constant PHASE_EVALUATION = 3;
     uint8 public constant PHASE_COMPLETED = 4;
     uint8 public constant PHASE_REJECTED = 5;
-    uint8 public constant TOTAL_PHASES = 6;
+    uint8 public constant PHASE_EXPIRED = 6;
+    uint8 public constant TOTAL_PHASES = 7;
 
     IERC20 public paymentToken;
 
@@ -133,7 +134,8 @@ contract ACPSimple is
             "TRANSACTION",
             "EVALUATION",
             "COMPLETED",
-            "REJECTED"
+            "REJECTED",
+            "EXPIRED"
         ];
     }
 
@@ -197,7 +199,6 @@ contract ACPSimple is
         );
 
         job.budget = amount;
-
         emit BudgetSet(jobId, amount);
     }
 
@@ -258,7 +259,7 @@ contract ACPSimple is
             emit RefundedBudget(id, job.client, claimableAmount);
 
             if (job.phase != PHASE_REJECTED) {
-                _updateJobPhase(id, PHASE_REJECTED);
+                _updateJobPhase(id, PHASE_EXPIRED);
             }
         }
     }
@@ -313,11 +314,9 @@ contract ACPSimple is
 
     function canSign(
         address account,
-        uint256 jobId
-    ) public view returns (bool) {
-        Job memory job = jobs[jobId];
+        Job memory job
+    ) public pure returns (bool) {
         return
-            job.phase < PHASE_COMPLETED &&
             ((job.client == account || job.provider == account) ||
                 ((job.evaluator == account || job.evaluator == address(0)) &&
                     job.phase == PHASE_EVALUATION));
@@ -375,9 +374,10 @@ contract ACPSimple is
         string memory reason
     ) public override nonReentrant {
         Memo storage memo = memos[memoId];
-        require(canSign(_msgSender(), memo.jobId), "Unauthorised");
+        Job memory job = jobs[memo.jobId];
 
-        Job storage job = jobs[memo.jobId];
+        require(job.phase < PHASE_COMPLETED, "Job is already completed");
+        require(canSign(_msgSender(), job), "Unauthorised memo signer");
 
         if (signatories[memoId][_msgSender()] > 0) {
             revert("Already signed");

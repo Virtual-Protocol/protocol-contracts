@@ -229,13 +229,7 @@ contract veVirtual is
         Lock storage lock = locks[account][index];
         require(block.timestamp < lock.end, "Lock is expired");
         lock.autoRenew = !lock.autoRenew;
-
-        if (lock.autoRenew) {
-            lock.numWeeks = maxWeeks;
-        }
-
         lock.numWeeks = maxWeeks;
-
         lock.start = block.timestamp;
         lock.end = block.timestamp + uint(lock.numWeeks) * 1 weeks;
 

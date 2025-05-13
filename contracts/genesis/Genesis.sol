@@ -169,18 +169,18 @@ contract Genesis is ReentrancyGuard, AccessControlUpgradeable {
     ) external initializer {
         __AccessControl_init();
 
-        require(params.genesisID > 0, "Invalid genesis ID");
+        require(params.genesisID > 0, "Invalid ID");
         require(params.factory != address(0), "Invalid factory address");
         _validateTime(params.startTime, params.endTime);
-        require(bytes(params.genesisName).length > 0, "Invalid genesis name");
+        require(bytes(params.genesisName).length > 0, "Invalid name");
         require(
             bytes(params.genesisTicker).length > 0,
-            "Invalid genesis ticker"
+            "Invalid ticker"
         );
-        require(params.genesisCores.length > 0, "Invalid genesis cores");
+        require(params.genesisCores.length > 0, "Invalid cores");
         require(
             params.tbaImplementation != address(0),
-            "Invalid TBA implementation address"
+            "Invalid TBA address"
         );
         require(
             params.agentFactoryAddress != address(0),
@@ -192,23 +192,23 @@ contract Genesis is ReentrancyGuard, AccessControlUpgradeable {
         );
         require(
             params.reserveAmount > 0,
-            "Reserve amount must be greater than 0"
+            "Reserve amount must be > 0"
         );
         require(
             params.maxContributionVirtualAmount > 0,
-            "Max contribution must be greater than 0"
+            "Max contribution must be > 0"
         );
         require(
             params.agentTokenTotalSupply > 0,
-            "Agent token total supply must be greater than 0"
+            "Agent token total supply must be > 0"
         );
         require(
             params.agentTokenLpSupply > 0,
-            "Agent token lp supply must be greater than 0"
+            "Agent token lp supply must be > 0"
         );
         require(
             params.agentTokenTotalSupply >= params.agentTokenLpSupply,
-            "Agent token total supply must be greater than agent token lp supply"
+            "Agent token total supply must be > agent token lp supply"
         );
 
         genesisId = params.genesisID;
@@ -237,8 +237,8 @@ contract Genesis is ReentrancyGuard, AccessControlUpgradeable {
         uint256 pointAmt,
         uint256 virtualsAmt
     ) external nonReentrant whenActive {
-        require(pointAmt > 0, "Point amount must be greater than 0");
-        require(virtualsAmt > 0, "Virtuals must be greater than 0");
+        require(pointAmt > 0, "Point amount must be > 0");
+        require(virtualsAmt > 0, "Virtuals must be > 0");
 
         // Check single submission upper limit
         require(
@@ -261,31 +261,6 @@ contract Genesis is ReentrancyGuard, AccessControlUpgradeable {
         );
 
         emit Participated(genesisId, msg.sender, pointAmt, virtualsAmt);
-    }
-
-    function onGenesisSuccess(
-        address[] calldata refundVirtualsTokenUserAddresses,
-        uint256[] calldata refundVirtualsTokenUserAmounts,
-        address[] calldata distributeAgentTokenUserAddresses,
-        uint256[] calldata distributeAgentTokenUserAmounts,
-        address creator
-    )
-        external
-        onlyRole(FACTORY_ROLE)
-        nonReentrant
-        whenNotCancelled
-        whenEnded
-        returns (address)
-    {
-        return
-            _onGenesisSuccessSalt(
-                refundVirtualsTokenUserAddresses,
-                refundVirtualsTokenUserAmounts,
-                distributeAgentTokenUserAddresses,
-                distributeAgentTokenUserAmounts,
-                creator,
-                keccak256(abi.encodePacked(msg.sender, block.timestamp))
-            );
     }
 
     function onGenesisSuccessSalt(

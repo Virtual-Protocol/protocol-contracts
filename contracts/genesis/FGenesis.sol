@@ -74,14 +74,11 @@ contract FGenesis is Initializable, AccessControlUpgradeable {
     function createGenesis(
         GenesisCreationParams memory gParams
     ) external returns (address) {
-        require(
             IERC20(params.virtualToken).transferFrom(
                 msg.sender,
                 params.feeAddr,
                 params.feeAmt
-            ),
-            "transfer createGenesis fee failed"
-        );
+            );
 
         gParams.endTime = gParams.startTime + params.duration;
         genesisID++;

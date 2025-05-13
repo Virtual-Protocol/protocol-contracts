@@ -210,8 +210,8 @@ contract ACPSimple is
         Job storage job = jobs[id];
         require(job.budget > job.amountClaimed, "No budget to claim");
 
-        job.amountClaimed = job.budget;
         uint256 claimableAmount = job.budget - job.amountClaimed;
+        job.amountClaimed = job.budget;
 
         if (job.phase == PHASE_COMPLETED) {
             uint256 evaluatorFee = (claimableAmount * evaluatorFeeBP) / 10000;
@@ -251,8 +251,8 @@ contract ACPSimple is
                 "Unable to refund budget"
             );
 
-            if (job.phase == PHASE_TRANSACTION) {
-                // Only for job in transaction phase has the budget transferred to the contract
+            if (job.phase >= PHASE_TRANSACTION) {
+                // Only for job after transaction phase, the budget is transferred to the contract
                 paymentToken.safeTransferFrom(
                     address(this),
                     job.client,

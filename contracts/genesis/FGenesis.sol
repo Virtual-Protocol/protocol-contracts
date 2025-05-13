@@ -28,6 +28,7 @@ contract FGenesis is Initializable, AccessControlUpgradeable {
         address agentFactory;
         uint256 agentTokenTotalSupply;
         uint256 agentTokenLpSupply;
+        uint256 donateAmount;
     }
 
     Params public params;

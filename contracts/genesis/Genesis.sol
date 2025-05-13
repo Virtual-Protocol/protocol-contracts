@@ -99,6 +99,8 @@ contract Genesis is ReentrancyGuard, AccessControlUpgradeable {
         "End time must be after start time";
     string private constant ERR_TOKEN_LAUNCHED = "Agent token already launched";
     string private constant ERR_TOKEN_NOT_LAUNCHED = "Agent token not launched";
+    string private constant ERR_ZERO_ADD = "Address cannot be empty";
+    string private constant ERR_INVALID_PARAM = "Invalid value for parameter";
 
     // Common validation modifiers
     modifier whenNotStarted() {
@@ -175,7 +177,8 @@ contract Genesis is ReentrancyGuard, AccessControlUpgradeable {
         __AccessControl_init();
 
         require(params.genesisID > 0, "Invalid ID");
-        require(params.factory != address(0), "Invalid factory address");
+        require(params.factory != address(0) && params.tbaImplementation != address(0) 
+            && params.agentFactoryAddress != address(0) && params.virtualTokenAddress != address(0), ERR_ZERO_ADD);
         _validateTime(params.startTime, params.endTime);
         require(bytes(params.genesisName).length > 0, "Invalid name");
         require(
@@ -184,32 +187,9 @@ contract Genesis is ReentrancyGuard, AccessControlUpgradeable {
         );
         require(params.genesisCores.length > 0, "Invalid cores");
         require(
-            params.tbaImplementation != address(0),
-            "Invalid TBA address"
-        );
-        require(
-            params.agentFactoryAddress != address(0),
-            "Invalid agent factory address"
-        );
-        require(
-            params.virtualTokenAddress != address(0),
-            "Invalid virtual token address"
-        );
-        require(
-            params.reserveAmount > 0,
-            "Reserve amount must be > 0"
-        );
-        require(
-            params.maxContributionVirtualAmount > 0,
-            "Max contribution must be > 0"
-        );
-        require(
-            params.agentTokenTotalSupply > 0,
-            "Agent token total supply must be > 0"
-        );
-        require(
-            params.agentTokenLpSupply > 0,
-            "Agent token lp supply must be > 0"
+            params.reserveAmount > 0 && params.maxContributionVirtualAmount > 0
+            && params.agentTokenTotalSupply > 0 && params.agentTokenLpSupply > 0,
+           ERR_INVALID_PARAM
         );
         require(
             params.agentTokenTotalSupply >= params.agentTokenLpSupply,
@@ -354,7 +334,7 @@ contract Genesis is ReentrancyGuard, AccessControlUpgradeable {
                     salt
                 );
 
-            require(agentToken != address(0), "Agent token creation failed");
+            require(agentToken != address(0), ERR_ZERO_ADD);
 
             // Store the created agent token address
             agentTokenAddress = agentToken;
@@ -579,7 +559,7 @@ contract Genesis is ReentrancyGuard, AccessControlUpgradeable {
         whenEnded
         whenFinalized
     {
-        require(token != address(0), "Invalid token address");
+        require(token != address(0), ERR_ZERO_ADD);
         require(
             amount <= IERC20(token).balanceOf(address(this)),
             "Insufficient balance to withdraw"

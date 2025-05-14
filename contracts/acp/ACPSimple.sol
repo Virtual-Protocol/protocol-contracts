@@ -184,7 +184,9 @@ contract ACPSimple is
                 address(this),
                 job.budget
             );
-        } else if (oldPhase == PHASE_EVALUATION && phase >= PHASE_COMPLETED) {
+        } else if ((oldPhase >= PHASE_TRANSACTION && oldPhase <= PHASE_EVALUATION) && phase >= PHASE_COMPLETED) {
+            // Trigger refund if job transits from TRANSACTION/EVALUATION to REJECTED
+            // Trigger claim if job transits from TRANSACTION/EVALUATION to COMPLETED
             _claimBudget(jobId);
         }
     }

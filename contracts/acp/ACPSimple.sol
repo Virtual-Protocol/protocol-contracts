@@ -185,8 +185,6 @@ contract ACPSimple is
                 job.budget
             );
         } else if ((oldPhase >= PHASE_TRANSACTION && oldPhase <= PHASE_EVALUATION) && phase >= PHASE_COMPLETED) {
-            // Trigger refund if job transits from TRANSACTION/EVALUATION to REJECTED
-            // Trigger claim if job transits from TRANSACTION/EVALUATION to COMPLETED
             _claimBudget(jobId);
         }
     }
@@ -254,7 +252,6 @@ contract ACPSimple is
             );
 
             if (job.phase >= PHASE_TRANSACTION && claimableAmount > 0) {
-                // Only for job after transaction phase, the budget is transferred to the contract
                 paymentToken.safeTransferFrom(
                     address(this),
                     job.client,

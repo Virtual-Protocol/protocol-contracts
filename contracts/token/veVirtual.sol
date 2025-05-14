@@ -158,11 +158,7 @@ contract stakedToken is
         IERC20(baseToken).safeTransferFrom(_msgSender(), address(this), amount);
 
         bool autoRenew = true;
-        uint8 numWeeks;
-
-        if (autoRenew == true) {
-            numWeeks = maxWeeks;
-        }
+        uint8 numWeeks = maxWeeks;
 
         uint256 end = block.timestamp + uint256(numWeeks) * 1 weeks;
 

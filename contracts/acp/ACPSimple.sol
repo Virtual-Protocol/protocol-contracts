@@ -253,7 +253,7 @@ contract ACPSimple is
                 "Unable to refund budget"
             );
 
-            if (job.phase >= PHASE_TRANSACTION) {
+            if (job.phase >= PHASE_TRANSACTION && claimableAmount > 0) {
                 // Only for job after transaction phase, the budget is transferred to the contract
                 paymentToken.safeTransferFrom(
                     address(this),
@@ -263,7 +263,7 @@ contract ACPSimple is
                 emit RefundedBudget(id, job.client, claimableAmount);
             }
 
-            if (job.phase != PHASE_REJECTED) {
+            if (job.phase != PHASE_REJECTED && job.phase != PHASE_EXPIRED) {
                 _updateJobPhase(id, PHASE_EXPIRED);
             }
         }

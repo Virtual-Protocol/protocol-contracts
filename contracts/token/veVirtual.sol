@@ -8,7 +8,7 @@ import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/utils/structs/Checkpoints.sol";
 import "@openzeppelin/contracts-upgradeable/governance/utils/VotesUpgradeable.sol";
 
-contract veVirtual is
+contract stakedToken is
     Initializable,
     ReentrancyGuardUpgradeable,
     AccessControlUpgradeable,
@@ -46,20 +46,26 @@ contract veVirtual is
 
     event AdminUnlocked(bool adminUnlocked);
     bool public adminUnlocked;
+    string private _name;
+    string private _symbol;
 
     function initialize(
         address baseToken_,
-        uint8 maxWeeks_
+        uint8 maxWeeks_,
+        string memory name_,
+        string memory symbol_
     ) external initializer {
         __ReentrancyGuard_init();
         __AccessControl_init();
         __Votes_init();
-        __EIP712_init("veVIRTUAL", "1");
+        __EIP712_init(name_, "1");
 
         require(baseToken_ != address(0), "Invalid token");
         baseToken = baseToken_;
         maxWeeks = maxWeeks_;
         _nextId = 1;
+        _name = name_;
+        _symbol = symbol_;
 
         _grantRole(DEFAULT_ADMIN_ROLE, _msgSender());
         _grantRole(ADMIN_ROLE, _msgSender());
@@ -141,19 +147,18 @@ contract veVirtual is
     }
 
     function stake(
-        uint256 amount,
-        uint8 numWeeks,
-        bool autoRenew
+        uint256 amount
     ) external nonReentrant {
         require(amount > 0, "Amount must be greater than 0");
-        require(numWeeks <= maxWeeks, "Num weeks must be less than max weeks");
-        require(numWeeks > 0, "Num weeks must be greater than 0");
         require(
             locks[_msgSender()].length < MAX_POSITIONS,
             "Over max positions"
         );
 
         IERC20(baseToken).safeTransferFrom(_msgSender(), address(this), amount);
+
+        bool autoRenew = true;
+        uint8 numWeeks;
 
         if (autoRenew == true) {
             numWeeks = maxWeeks;
@@ -271,12 +276,12 @@ contract veVirtual is
         return block.timestamp + maxWeeks * 1 weeks;
     }
 
-    function name() public pure returns (string memory) {
-        return "veVIRTUAL";
+    function name() public view returns (string memory) {
+        return _name;
     }
 
-    function symbol() public pure returns (string memory) {
-        return "veVIRTUAL";
+    function symbol() public view returns (string memory) {
+        return _symbol;
     }
 
     function decimals() public pure returns (uint8) {

@@ -19,7 +19,8 @@ library GenesisLib {
         uint256 reserve,
         uint256 maxContribution,
         uint256 agentTokenTotalSupply,
-        uint256 agentTokenLpSupply
+        uint256 agentTokenLpSupply,
+        bool shouldStakeLp
     ) internal returns (address) {
         require(
             bytes(params.genesisName).length > 0 &&
@@ -47,7 +48,8 @@ library GenesisLib {
             reserveAmount: reserve,
             maxContributionVirtualAmount: maxContribution,
             agentTokenTotalSupply: agentTokenTotalSupply,
-            agentTokenLpSupply: agentTokenLpSupply
+            agentTokenLpSupply: agentTokenLpSupply,
+            shouldStakeLp: shouldStakeLp
         });
 
         newGenesis.initialize(initParams);

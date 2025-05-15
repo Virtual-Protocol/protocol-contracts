@@ -28,6 +28,7 @@ contract FGenesis is Initializable, AccessControlUpgradeable {
         address agentFactory;
         uint256 agentTokenTotalSupply;
         uint256 agentTokenLpSupply;
+        bool shouldStakeLp;
     }
 
     Params public params;
@@ -95,7 +96,8 @@ contract FGenesis is Initializable, AccessControlUpgradeable {
             params.reserve,
             params.maxContribution,
             params.agentTokenTotalSupply,
-            params.agentTokenLpSupply
+            params.agentTokenLpSupply,
+            params.shouldStakeLp
         );
 
         IAccessControl(params.agentFactory).grantRole(

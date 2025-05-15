@@ -5,7 +5,7 @@ import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "./FGenesis.sol";
-import "../virtualPersona/IAgentFactoryV3.sol";
+import "../virtualPersona/IAgentFactoryV5.sol";
 // import "@openzeppelin/contracts/token/ERC20/SafeERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "./GenesisTypes.sol";
@@ -45,6 +45,7 @@ contract Genesis is ReentrancyGuard, AccessControlUpgradeable {
     address public agentTokenAddress;
     bool public isFailed;
     bool public isCancelled;
+    bool public shouldStakeLp;
 
     event AssetsWithdrawn(
         uint256 indexed genesisID,
@@ -208,6 +209,7 @@ contract Genesis is ReentrancyGuard, AccessControlUpgradeable {
         maxContributionVirtualAmount = params.maxContributionVirtualAmount;
         agentTokenTotalSupply = params.agentTokenTotalSupply;
         agentTokenLpSupply = params.agentTokenLpSupply;
+        shouldStakeLp = params.shouldStakeLp;
 
         _grantRole(DEFAULT_ADMIN_ROLE, params.factory);
         _grantRole(FACTORY_ROLE, params.factory);
@@ -305,7 +307,7 @@ contract Genesis is ReentrancyGuard, AccessControlUpgradeable {
             );
 
             // Call initFromBondingCurve and executeBondingCurveApplication
-            uint256 id = IAgentFactoryV3(agentFactoryAddress)
+            uint256 id = IAgentFactoryV5(agentFactoryAddress)
                 .initFromBondingCurve(
                     string.concat(genesisName, " by Virtuals"),
                     genesisTicker,
@@ -318,13 +320,14 @@ contract Genesis is ReentrancyGuard, AccessControlUpgradeable {
                     creator
                 );
 
-            address agentToken = IAgentFactoryV3(agentFactoryAddress)
+            address agentToken = IAgentFactoryV5(agentFactoryAddress)
                 .executeBondingCurveApplicationSalt(
                     id,
                     agentTokenTotalSupply,
                     agentTokenLpSupply,
                     address(this), // vault
-                    salt
+                    salt,
+                    shouldStakeLp
                 );
 
             require(agentToken != address(0), ERR_ZERO_ADD);

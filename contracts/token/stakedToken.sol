@@ -228,7 +228,6 @@ contract stakedToken is
         uint256 index = _indexOf(account, id);
 
         Lock storage lock = locks[account][index];
-        require(block.timestamp < lock.end, "Lock is expired");
         lock.autoRenew = !lock.autoRenew;
         lock.numWeeks = maxWeeks;
         lock.start = block.timestamp;

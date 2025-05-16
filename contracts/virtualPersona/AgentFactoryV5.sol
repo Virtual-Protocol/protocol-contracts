@@ -240,7 +240,7 @@ contract AgentFactoryV5 is
         bool canStake,
         bytes memory tokenSupplyParams_,
         bytes32 salt,
-        bool shouldStakeLp
+        bool noLpStake
     ) internal {
         require(
             _applications[id].status == ApplicationStatus.Active,
@@ -319,15 +319,15 @@ contract AgentFactoryV5 is
 
         // C7
         IERC20(lp).approve(veToken, type(uint256).max);
-        if (shouldStakeLp) {
+        if (noLpStake) {
+            // If not staking LP, send it to the Genesis contract
+            IERC20(lp).safeTransfer(msg.sender, IERC20(lp).balanceOf(address(this)));
+        } else {
             IAgentVeToken(veToken).stake(
                 IERC20(lp).balanceOf(address(this)),
                 application.proposer,
                 defaultDelegatee
             );
-        } else {
-            // If not staking LP, send it to the Genesis contract
-            IERC20(lp).safeTransfer(msg.sender, IERC20(lp).balanceOf(address(this)));
         }
 
         emit NewPersona(virtualId, token, dao, tbaAddress, veToken, lp);
@@ -337,7 +337,7 @@ contract AgentFactoryV5 is
         uint256 id,
         bool canStake,
         bytes32 salt,
-        bool shouldStakeLp
+        bool noLpStake
     ) public noReentrant {
         // This will bootstrap an Agent with following components:
         // C1: Agent Token
@@ -356,7 +356,7 @@ contract AgentFactoryV5 is
             "Not proposer"
         );
 
-        _executeApplication(id, canStake, _tokenSupplyParams, salt, shouldStakeLp);
+        _executeApplication(id, canStake, _tokenSupplyParams, salt, noLpStake);
     }
 
     function _createNewDAO(
@@ -577,7 +577,7 @@ contract AgentFactoryV5 is
         uint256 totalSupply,
         uint256 lpSupply,
         address vault,
-        bool shouldStakeLp
+        bool noLpStake
     ) public onlyRole(BONDING_ROLE) returns (address) {
         return
             executeBondingCurveApplicationSalt(
@@ -586,7 +586,7 @@ contract AgentFactoryV5 is
                 lpSupply,
                 vault,
                 keccak256(abi.encodePacked(msg.sender, block.timestamp)),
-                shouldStakeLp
+                noLpStake
             );
     }
 
@@ -596,7 +596,7 @@ contract AgentFactoryV5 is
         uint256 lpSupply,
         address vault,
         bytes32 salt,
-        bool shouldStakeLp
+        bool noLpStake
     ) public onlyRole(BONDING_ROLE) noReentrant returns (address) {
         bytes memory tokenSupplyParams = abi.encode(
             totalSupply,
@@ -608,7 +608,7 @@ contract AgentFactoryV5 is
             vault
         );
 
-        _executeApplication(id, true, tokenSupplyParams, salt, shouldStakeLp);
+        _executeApplication(id, true, tokenSupplyParams, salt, noLpStake);
 
         Application memory application = _applications[id];
 

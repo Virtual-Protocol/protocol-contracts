@@ -45,7 +45,7 @@ contract Genesis is ReentrancyGuard, AccessControlUpgradeable {
     address public agentTokenAddress;
     bool public isFailed;
     bool public isCancelled;
-    bool public shouldStakeLp;
+    bool public noLpStake;
 
     event AssetsWithdrawn(
         uint256 indexed genesisID,
@@ -209,7 +209,7 @@ contract Genesis is ReentrancyGuard, AccessControlUpgradeable {
         maxContributionVirtualAmount = params.maxContributionVirtualAmount;
         agentTokenTotalSupply = params.agentTokenTotalSupply;
         agentTokenLpSupply = params.agentTokenLpSupply;
-        shouldStakeLp = params.shouldStakeLp;
+        noLpStake = params.noLpStake;
 
         _grantRole(DEFAULT_ADMIN_ROLE, params.factory);
         _grantRole(FACTORY_ROLE, params.factory);
@@ -327,7 +327,7 @@ contract Genesis is ReentrancyGuard, AccessControlUpgradeable {
                     agentTokenLpSupply,
                     address(this), // vault
                     salt,
-                    shouldStakeLp
+                    noLpStake
                 );
 
             require(agentToken != address(0), ERR_ZERO_ADD);

@@ -36,7 +36,7 @@ interface IAgentFactoryV5 {
         uint256 totalSupply,
         uint256 lpSupply,
         address vault,
-        bool shouldStake
+        bool noLpStake
     ) external returns (address);
 
     function executeBondingCurveApplicationSalt(
@@ -45,6 +45,6 @@ interface IAgentFactoryV5 {
         uint256 lpSupply,
         address vault,
         bytes32 salt,
-        bool shouldStake
+        bool noLpStake
     ) external returns (address);
 }

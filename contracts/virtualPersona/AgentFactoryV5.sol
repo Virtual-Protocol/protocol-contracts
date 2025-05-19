@@ -572,24 +572,6 @@ contract AgentFactoryV5 is
         return id;
     }
 
-    function executeBondingCurveApplication(
-        uint256 id,
-        uint256 totalSupply,
-        uint256 lpSupply,
-        address vault,
-        bool noLpStake
-    ) public onlyRole(BONDING_ROLE) returns (address) {
-        return
-            executeBondingCurveApplicationSalt(
-                id,
-                totalSupply,
-                lpSupply,
-                vault,
-                keccak256(abi.encodePacked(msg.sender, block.timestamp)),
-                noLpStake
-            );
-    }
-
     function executeBondingCurveApplicationSalt(
         uint256 id,
         uint256 totalSupply,

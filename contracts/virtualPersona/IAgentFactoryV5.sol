@@ -31,13 +31,6 @@ interface IAgentFactoryV5 {
         address creator
     ) external returns (uint256);
 
-    function executeBondingCurveApplication(
-        uint256 id,
-        uint256 totalSupply,
-        uint256 lpSupply,
-        address vault,
-        bool noLpStake
-    ) external returns (address);
 
     function executeBondingCurveApplicationSalt(
         uint256 id,

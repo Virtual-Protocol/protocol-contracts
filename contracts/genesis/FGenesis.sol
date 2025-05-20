@@ -28,7 +28,6 @@ contract FGenesis is Initializable, AccessControlUpgradeable {
         address agentFactory;
         uint256 agentTokenTotalSupply;
         uint256 agentTokenLpSupply;
-        bool noLpStake;
     }
 
     Params public params;
@@ -73,7 +72,8 @@ contract FGenesis is Initializable, AccessControlUpgradeable {
     }
 
     function createGenesis(
-        GenesisCreationParams memory gParams
+        GenesisCreationParams memory gParams,
+        bool noLpStake
     ) external returns (address) {
         IERC20(params.virtualToken).transferFrom(
             msg.sender,
@@ -97,7 +97,7 @@ contract FGenesis is Initializable, AccessControlUpgradeable {
             params.maxContribution,
             params.agentTokenTotalSupply,
             params.agentTokenLpSupply,
-            params.noLpStake
+            noLpStake
         );
 
         IAccessControl(params.agentFactory).grantRole(

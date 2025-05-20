@@ -169,8 +169,7 @@ contract Genesis is ReentrancyGuard, AccessControlUpgradeable {
     }
 
     function initialize(
-        GenesisInitParams calldata params,
-        bool noLpStake_
+        GenesisInitParams calldata params
     ) external initializer {
         __AccessControl_init();
 
@@ -211,7 +210,7 @@ contract Genesis is ReentrancyGuard, AccessControlUpgradeable {
         maxContributionVirtualAmount = params.maxContributionVirtualAmount;
         agentTokenTotalSupply = params.agentTokenTotalSupply;
         agentTokenLpSupply = params.agentTokenLpSupply;
-        noLpStake = noLpStake_;
+        noLpStake = params.noLpStake;
 
         _grantRole(DEFAULT_ADMIN_ROLE, params.factory);
         _grantRole(FACTORY_ROLE, params.factory);

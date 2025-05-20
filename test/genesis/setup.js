@@ -285,7 +285,7 @@ async function setupTest() {
     );
 
     console.log("\n=== Creating Genesis ===");
-    const tx = await fGenesis.connect(beOpsWallet).createGenesis(genesisParams);
+    const tx = await fGenesis.connect(beOpsWallet).createGenesis(genesisParams, true);
     console.log("Genesis creation transaction sent");
 
     const receipt = await tx.wait();

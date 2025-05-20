@@ -318,11 +318,11 @@ contract AgentFactoryV5 is
         IAgentNft(nft).setTBA(virtualId, tbaAddress);
 
         // C7
-        IERC20(lp).approve(veToken, type(uint256).max);
         if (noLpStake) {
             // If not staking LP, send it to the Genesis contract
             IERC20(lp).safeTransfer(msg.sender, IERC20(lp).balanceOf(address(this)));
         } else {
+            IERC20(lp).approve(veToken, type(uint256).max);
             IAgentVeToken(veToken).stake(
                 IERC20(lp).balanceOf(address(this)),
                 application.proposer,

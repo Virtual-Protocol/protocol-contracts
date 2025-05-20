@@ -46,6 +46,7 @@ contract Genesis is ReentrancyGuard, AccessControlUpgradeable {
     bool public isFailed;
     bool public isCancelled;
     bool public noLpStake;
+    uint256 public totalClaimableAgentTokensLeft;
 
     event AssetsWithdrawn(
         uint256 indexed genesisID,
@@ -168,7 +169,8 @@ contract Genesis is ReentrancyGuard, AccessControlUpgradeable {
     }
 
     function initialize(
-        GenesisInitParams calldata params
+        GenesisInitParams calldata params,
+        bool noLpStake_
     ) external initializer {
         __AccessControl_init();
 
@@ -209,7 +211,7 @@ contract Genesis is ReentrancyGuard, AccessControlUpgradeable {
         maxContributionVirtualAmount = params.maxContributionVirtualAmount;
         agentTokenTotalSupply = params.agentTokenTotalSupply;
         agentTokenLpSupply = params.agentTokenLpSupply;
-        noLpStake = params.noLpStake;
+        noLpStake = noLpStake_;
 
         _grantRole(DEFAULT_ADMIN_ROLE, params.factory);
         _grantRole(FACTORY_ROLE, params.factory);
@@ -368,9 +370,13 @@ contract Genesis is ReentrancyGuard, AccessControlUpgradeable {
 
         // save the amount of agent tokens to claim
         for (uint256 i = 0; i < distributeAgentTokenUserAddresses.length; i++) {
+            totalClaimableAgentTokensLeft -= claimableAgentTokens[
+                distributeAgentTokenUserAddresses[i]
+            ]; // because here is replace update, so we need to minus the old amount
             claimableAgentTokens[
                 distributeAgentTokenUserAddresses[i]
             ] = distributeAgentTokenUserAmounts[i];
+            totalClaimableAgentTokensLeft += distributeAgentTokenUserAmounts[i];
         }
 
         emit GenesisSucceeded(genesisId);
@@ -383,6 +389,7 @@ contract Genesis is ReentrancyGuard, AccessControlUpgradeable {
         require(amount > 0, "No tokens to claim");
 
         // set the amount of claimable agent tokens to 0, to prevent duplicate claims
+        totalClaimableAgentTokensLeft -= amount;
         claimableAgentTokens[userAddress] = 0;
 
         // transfer the agent token

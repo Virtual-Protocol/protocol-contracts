@@ -1,7 +1,7 @@
 const { expect } = require("chai");
 const { ethers, upgrades } = require("hardhat");
 const { time } = require("@nomicfoundation/hardhat-network-helpers");
-const fgenesis = require("../../scripts/arguments/fgenesis");
+const fgenesis = require("../../scripts/arguments/genesis/fgenesis");
 
 async function setupTest() {
   // Return object to store all setup results

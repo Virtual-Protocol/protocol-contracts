@@ -27,7 +27,7 @@ import { ethers, upgrades } from "hardhat";
     }
 
     // Load arguments from the arguments file
-    const args = require("../arguments/fgenesis");
+    const args = require("../arguments/genesis/fgenesis");
 
     // Create the params struct
     const params = {

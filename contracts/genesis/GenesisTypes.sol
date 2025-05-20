@@ -35,5 +35,4 @@ struct GenesisInitParams {
     uint256 maxContributionVirtualAmount;
     uint256 agentTokenTotalSupply;
     uint256 agentTokenLpSupply;
-    bool noLpStake;
 }

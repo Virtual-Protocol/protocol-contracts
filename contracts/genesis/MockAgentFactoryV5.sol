@@ -85,16 +85,6 @@ contract MockAgentFactoryV5 is
         return mockId;
     }
 
-    function executeBondingCurveApplication(
-        uint256,
-        uint256,
-        uint256,
-        address,
-        bool
-    ) public view onlyRole(BONDING_ROLE) returns (address) {
-        return address(mockAgentToken);
-    }
-
     function executeBondingCurveApplicationSalt(
         uint256,
         uint256,

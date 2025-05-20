@@ -48,11 +48,10 @@ library GenesisLib {
             reserveAmount: reserve,
             maxContributionVirtualAmount: maxContribution,
             agentTokenTotalSupply: agentTokenTotalSupply,
-            agentTokenLpSupply: agentTokenLpSupply,
-            noLpStake: noLpStake
+            agentTokenLpSupply: agentTokenLpSupply
         });
 
-        newGenesis.initialize(initParams);
+        newGenesis.initialize(initParams, noLpStake);
         return address(newGenesis);
     }
 }

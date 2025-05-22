@@ -194,8 +194,8 @@ contract ACPSimple is
         require(job.client == _msgSender(), "Only client can set budget");
         require(amount > 0, "Zero amount");
         require(
-            job.phase == PHASE_NEGOTIATION,
-            "Budget can only be set in negotiation phase"
+            job.phase < PHASE_TRANSACTION,
+            "Budget can only be set before transaction phase"
         );
 
         job.budget = amount;

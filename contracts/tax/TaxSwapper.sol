@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
-import "@openzeppelin/contracts/access/Ownable.sol";
 import "../pool/IUniswapV2Router02.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "@openzeppelin/contracts/access/AccessControl.sol";
 
 contract TaxSwapper is AccessControl {
     address public immutable assetToken;
@@ -87,7 +87,7 @@ contract TaxSwapper is AccessControl {
     }
 
     function withdraw(address token) external onlyRole(DEFAULT_ADMIN_ROLE) {
-        IERC20(token).safeTransfer(
+        IERC20(token).transfer(
             taxRecipient,
             IERC20(token).balanceOf(address(this))
         );

@@ -832,7 +832,7 @@ contract AgentToken is
      */
 
     function _autoSwap(address from_, address to_) internal {
-        if (_tokenHasTax) {
+        if (_tokenHasTax && from_ != address(this)) {
             uint256 contractBalance = balanceOf(address(this));
             uint256 swapBalance = contractBalance;
 

@@ -4,6 +4,7 @@ pragma solidity ^0.8.20;
 import "../pool/IUniswapV2Router02.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/access/AccessControl.sol";
+import "../virtualPersona/IAgentToken.sol";
 
 contract TaxSwapper is AccessControl {
     address public immutable assetToken;
@@ -55,6 +56,7 @@ contract TaxSwapper is AccessControl {
     }
 
     function swapTax(address token) external onlyRole(OPS_ROLE) {
+        IAgentToken(token).distributeTaxTokens();
         uint256 maxAmount = maxAmountByToken[token];
         if (maxAmount == 0) {
             maxAmount = maxSwapAmount;

@@ -5,9 +5,11 @@ import "@openzeppelin/contracts/access/Ownable.sol";
 import "../pool/IUniswapV2Router02.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
-contract TaxSwapper is Ownable {
+contract TaxSwapper is AccessControl {
     address public immutable assetToken;
     address public taxRecipient;
+
+    address public immutable taxManager;
 
     IUniswapV2Router02 internal immutable uniswapRouter;
 
@@ -16,35 +18,43 @@ contract TaxSwapper is Ownable {
 
     event SwapTax(address indexed token, uint256 amount);
 
+    bytes32 public constant OPS_ROLE = keccak256("OPS_ROLE");
+
     constructor(
         address assetToken_,
         address taxRecipient_,
         address router_,
         address initialOwner_,
         uint256 maxSwapAmount_
-    ) Ownable(initialOwner_) {
+    ) {
         assetToken = assetToken_;
         taxRecipient = taxRecipient_;
         uniswapRouter = IUniswapV2Router02(router_);
         maxSwapAmount = maxSwapAmount_;
+        _grantRole(DEFAULT_ADMIN_ROLE, initialOwner_);
+        _grantRole(OPS_ROLE, initialOwner_);
     }
 
-    function setMaxSwapAmount(uint256 maxSwapAmount_) external onlyOwner {
+    function setMaxSwapAmount(
+        uint256 maxSwapAmount_
+    ) external onlyRole(DEFAULT_ADMIN_ROLE) {
         maxSwapAmount = maxSwapAmount_;
     }
 
     function setMaxAmountByToken(
         address token,
         uint256 maxAmount
-    ) external onlyOwner {
+    ) external onlyRole(DEFAULT_ADMIN_ROLE) {
         maxAmountByToken[token] = maxAmount;
     }
 
-    function setTaxRecipient(address taxRecipient_) external onlyOwner {
+    function setTaxRecipient(
+        address taxRecipient_
+    ) external onlyRole(DEFAULT_ADMIN_ROLE) {
         taxRecipient = taxRecipient_;
     }
 
-    function swapTax(address token) external {
+    function swapTax(address token) external onlyRole(OPS_ROLE) {
         uint256 maxAmount = maxAmountByToken[token];
         if (maxAmount == 0) {
             maxAmount = maxSwapAmount;
@@ -74,5 +84,12 @@ contract TaxSwapper is Ownable {
         );
 
         emit SwapTax(token, swapBalance);
+    }
+
+    function withdraw(address token) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        IERC20(token).safeTransfer(
+            taxRecipient,
+            IERC20(token).balanceOf(address(this))
+        );
     }
 }

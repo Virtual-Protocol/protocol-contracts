@@ -5,7 +5,7 @@ import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "./FGenesis.sol";
-import "../virtualPersona/IAgentFactoryV3.sol";
+import "../virtualPersona/IAgentFactoryV5.sol";
 // import "@openzeppelin/contracts/token/ERC20/SafeERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "./GenesisTypes.sol";
@@ -45,6 +45,8 @@ contract Genesis is ReentrancyGuard, AccessControlUpgradeable {
     address public agentTokenAddress;
     bool public isFailed;
     bool public isCancelled;
+    bool public noLpStake;
+    uint256 public totalClaimableAgentTokensLeft;
 
     event AssetsWithdrawn(
         uint256 indexed genesisID,
@@ -99,6 +101,8 @@ contract Genesis is ReentrancyGuard, AccessControlUpgradeable {
         "End time must be after start time";
     string private constant ERR_TOKEN_LAUNCHED = "Agent token already launched";
     string private constant ERR_TOKEN_NOT_LAUNCHED = "Agent token not launched";
+    string private constant ERR_ZERO_ADD = "Address cannot be empty";
+    string private constant ERR_INVALID_PARAM = "Invalid value for parameter";
 
     // Common validation modifiers
     modifier whenNotStarted() {
@@ -169,46 +173,24 @@ contract Genesis is ReentrancyGuard, AccessControlUpgradeable {
     ) external initializer {
         __AccessControl_init();
 
-        require(params.genesisID > 0, "Invalid genesis ID");
-        require(params.factory != address(0), "Invalid factory address");
+        require(params.genesisID > 0, "Invalid ID");
+        require(params.factory != address(0) && params.tbaImplementation != address(0) 
+            && params.agentFactoryAddress != address(0) && params.virtualTokenAddress != address(0), ERR_ZERO_ADD);
         _validateTime(params.startTime, params.endTime);
-        require(bytes(params.genesisName).length > 0, "Invalid genesis name");
+        require(bytes(params.genesisName).length > 0, "Invalid name");
         require(
             bytes(params.genesisTicker).length > 0,
-            "Invalid genesis ticker"
+            "Invalid ticker"
         );
-        require(params.genesisCores.length > 0, "Invalid genesis cores");
+        require(params.genesisCores.length > 0, "Invalid cores");
         require(
-            params.tbaImplementation != address(0),
-            "Invalid TBA implementation address"
-        );
-        require(
-            params.agentFactoryAddress != address(0),
-            "Invalid agent factory address"
-        );
-        require(
-            params.virtualTokenAddress != address(0),
-            "Invalid virtual token address"
-        );
-        require(
-            params.reserveAmount > 0,
-            "Reserve amount must be greater than 0"
-        );
-        require(
-            params.maxContributionVirtualAmount > 0,
-            "Max contribution must be greater than 0"
-        );
-        require(
-            params.agentTokenTotalSupply > 0,
-            "Agent token total supply must be greater than 0"
-        );
-        require(
-            params.agentTokenLpSupply > 0,
-            "Agent token lp supply must be greater than 0"
+            params.reserveAmount > 0 && params.maxContributionVirtualAmount > 0
+            && params.agentTokenTotalSupply > 0 && params.agentTokenLpSupply > 0,
+           ERR_INVALID_PARAM
         );
         require(
             params.agentTokenTotalSupply >= params.agentTokenLpSupply,
-            "Agent token total supply must be greater than agent token lp supply"
+            "Agent token total supply must be > agent token lp supply"
         );
 
         genesisId = params.genesisID;
@@ -228,6 +210,7 @@ contract Genesis is ReentrancyGuard, AccessControlUpgradeable {
         maxContributionVirtualAmount = params.maxContributionVirtualAmount;
         agentTokenTotalSupply = params.agentTokenTotalSupply;
         agentTokenLpSupply = params.agentTokenLpSupply;
+        noLpStake = params.noLpStake;
 
         _grantRole(DEFAULT_ADMIN_ROLE, params.factory);
         _grantRole(FACTORY_ROLE, params.factory);
@@ -237,8 +220,8 @@ contract Genesis is ReentrancyGuard, AccessControlUpgradeable {
         uint256 pointAmt,
         uint256 virtualsAmt
     ) external nonReentrant whenActive {
-        require(pointAmt > 0, "Point amount must be greater than 0");
-        require(virtualsAmt > 0, "Virtuals must be greater than 0");
+        require(pointAmt > 0, "Point amount must be > 0");
+        require(virtualsAmt > 0, "Virtuals must be > 0");
 
         // Check single submission upper limit
         require(
@@ -261,31 +244,6 @@ contract Genesis is ReentrancyGuard, AccessControlUpgradeable {
         );
 
         emit Participated(genesisId, msg.sender, pointAmt, virtualsAmt);
-    }
-
-    function onGenesisSuccess(
-        address[] calldata refundVirtualsTokenUserAddresses,
-        uint256[] calldata refundVirtualsTokenUserAmounts,
-        address[] calldata distributeAgentTokenUserAddresses,
-        uint256[] calldata distributeAgentTokenUserAmounts,
-        address creator
-    )
-        external
-        onlyRole(FACTORY_ROLE)
-        nonReentrant
-        whenNotCancelled
-        whenEnded
-        returns (address)
-    {
-        return
-            _onGenesisSuccessSalt(
-                refundVirtualsTokenUserAddresses,
-                refundVirtualsTokenUserAmounts,
-                distributeAgentTokenUserAddresses,
-                distributeAgentTokenUserAmounts,
-                creator,
-                keccak256(abi.encodePacked(msg.sender, block.timestamp))
-            );
     }
 
     function onGenesisSuccessSalt(
@@ -350,7 +308,7 @@ contract Genesis is ReentrancyGuard, AccessControlUpgradeable {
             );
 
             // Call initFromBondingCurve and executeBondingCurveApplication
-            uint256 id = IAgentFactoryV3(agentFactoryAddress)
+            uint256 id = IAgentFactoryV5(agentFactoryAddress)
                 .initFromBondingCurve(
                     string.concat(genesisName, " by Virtuals"),
                     genesisTicker,
@@ -363,16 +321,17 @@ contract Genesis is ReentrancyGuard, AccessControlUpgradeable {
                     creator
                 );
 
-            address agentToken = IAgentFactoryV3(agentFactoryAddress)
+            address agentToken = IAgentFactoryV5(agentFactoryAddress)
                 .executeBondingCurveApplicationSalt(
                     id,
                     agentTokenTotalSupply,
                     agentTokenLpSupply,
                     address(this), // vault
-                    salt
+                    salt,
+                    noLpStake
                 );
 
-            require(agentToken != address(0), "Agent token creation failed");
+            require(agentToken != address(0), ERR_ZERO_ADD);
 
             // Store the created agent token address
             agentTokenAddress = agentToken;
@@ -410,9 +369,13 @@ contract Genesis is ReentrancyGuard, AccessControlUpgradeable {
 
         // save the amount of agent tokens to claim
         for (uint256 i = 0; i < distributeAgentTokenUserAddresses.length; i++) {
+            totalClaimableAgentTokensLeft -= claimableAgentTokens[
+                distributeAgentTokenUserAddresses[i]
+            ]; // because here is replace update, so we need to minus the old amount
             claimableAgentTokens[
                 distributeAgentTokenUserAddresses[i]
             ] = distributeAgentTokenUserAmounts[i];
+            totalClaimableAgentTokensLeft += distributeAgentTokenUserAmounts[i];
         }
 
         emit GenesisSucceeded(genesisId);
@@ -425,6 +388,7 @@ contract Genesis is ReentrancyGuard, AccessControlUpgradeable {
         require(amount > 0, "No tokens to claim");
 
         // set the amount of claimable agent tokens to 0, to prevent duplicate claims
+        totalClaimableAgentTokensLeft -= amount;
         claimableAgentTokens[userAddress] = 0;
 
         // transfer the agent token
@@ -597,7 +561,7 @@ contract Genesis is ReentrancyGuard, AccessControlUpgradeable {
         whenEnded
         whenFinalized
     {
-        require(token != address(0), "Invalid token address");
+        require(token != address(0), ERR_ZERO_ADD);
         require(
             amount <= IERC20(token).balanceOf(address(this)),
             "Insufficient balance to withdraw"

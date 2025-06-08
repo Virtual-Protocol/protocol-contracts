@@ -406,7 +406,6 @@ contract ACPSimple is
                 _updateJobPhase(memo.jobId, PHASE_COMPLETED);
             } else {
                 _updateJobPhase(memo.jobId, PHASE_REJECTED);
-                claimBudget(memo.jobId);
             }
         } else {
             if (isApproved) {

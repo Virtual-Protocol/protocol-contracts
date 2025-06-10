@@ -6,7 +6,7 @@ import "@openzeppelin/contracts/governance/IGovernor.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
-import "@openzeppelin/contracts/access/AccessControl.sol";
+import "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
 
 import "./IAgentFactoryV3.sol";
@@ -19,7 +19,7 @@ import "../libs/IERC6551Registry.sol";
 contract AgentFactoryV3 is
     IAgentFactoryV3,
     Initializable,
-    AccessControl,
+    AccessControlUpgradeable,
     PausableUpgradeable
 {
     using SafeERC20 for IERC20;

@@ -8,7 +8,7 @@ import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/utils/structs/Checkpoints.sol";
 import "@openzeppelin/contracts-upgradeable/governance/utils/VotesUpgradeable.sol";
 
-contract stakedToken is
+contract StakedToken is
     Initializable,
     ReentrancyGuardUpgradeable,
     AccessControlUpgradeable,

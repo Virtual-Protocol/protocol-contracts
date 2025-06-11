@@ -184,7 +184,7 @@ contract ACPSimple is
                 address(this),
                 job.budget
             );
-        } else if (oldPhase == PHASE_EVALUATION && phase >= PHASE_COMPLETED) {
+        } else if ((oldPhase >= PHASE_TRANSACTION && oldPhase <= PHASE_EVALUATION) && phase >= PHASE_COMPLETED) {
             _claimBudget(jobId);
         }
     }
@@ -210,12 +210,12 @@ contract ACPSimple is
         Job storage job = jobs[id];
         require(job.budget > job.amountClaimed, "No budget to claim");
 
-        job.amountClaimed = job.budget;
         uint256 claimableAmount = job.budget - job.amountClaimed;
-        uint256 evaluatorFee = (claimableAmount * evaluatorFeeBP) / 10000;
-        uint256 platformFee = (claimableAmount * platformFeeBP) / 10000;
+        job.amountClaimed = job.budget;
 
         if (job.phase == PHASE_COMPLETED) {
+            uint256 evaluatorFee = (claimableAmount * evaluatorFeeBP) / 10000;
+            uint256 platformFee = (claimableAmount * platformFeeBP) / 10000;
             if (platformFee > 0) {
                 paymentToken.safeTransferFrom(
                     address(this),
@@ -251,14 +251,16 @@ contract ACPSimple is
                 "Unable to refund budget"
             );
 
-            paymentToken.safeTransferFrom(
-                address(this),
-                job.client,
-                claimableAmount
-            );
-            emit RefundedBudget(id, job.client, claimableAmount);
+            if (job.phase >= PHASE_TRANSACTION && claimableAmount > 0) {
+                paymentToken.safeTransferFrom(
+                    address(this),
+                    job.client,
+                    claimableAmount
+                );
+                emit RefundedBudget(id, job.client, claimableAmount);
+            }
 
-            if (job.phase != PHASE_REJECTED) {
+            if (job.phase != PHASE_REJECTED && job.phase != PHASE_EXPIRED) {
                 _updateJobPhase(id, PHASE_EXPIRED);
             }
         }
@@ -316,10 +318,9 @@ contract ACPSimple is
         address account,
         Job memory job
     ) public pure returns (bool) {
-        return
-            ((job.client == account || job.provider == account) ||
-                ((job.evaluator == account || job.evaluator == address(0)) &&
-                    job.phase == PHASE_EVALUATION));
+        return ((job.client == account || job.provider == account) ||
+            ((job.evaluator == account || job.evaluator == address(0)) &&
+                job.phase == PHASE_EVALUATION));
     }
 
     function getAllMemos(
@@ -405,7 +406,6 @@ contract ACPSimple is
                 _updateJobPhase(memo.jobId, PHASE_COMPLETED);
             } else {
                 _updateJobPhase(memo.jobId, PHASE_REJECTED);
-                claimBudget(memo.jobId);
             }
         } else {
             if (isApproved) {

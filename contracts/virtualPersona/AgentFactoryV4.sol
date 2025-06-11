@@ -343,12 +343,14 @@ contract AgentFactoryV4 is
         IAgentNft(nft).setTBA(virtualId, tbaAddress);
 
         // C7
-        IERC20(lp).approve(veToken, type(uint256).max);
-        IAgentVeToken(veToken).stake(
-            IERC20(lp).balanceOf(address(this)),
-            application.proposer,
-            defaultDelegatee
-        );
+        if (_applicationLP[id] == address(0)) {
+            IERC20(lp).approve(veToken, type(uint256).max);
+            IAgentVeToken(veToken).stake(
+                IERC20(lp).balanceOf(address(this)),
+                application.proposer,
+                defaultDelegatee
+            );
+        }
 
         emit NewPersona(virtualId, token, dao, tbaAddress, veToken, lp);
     }
@@ -600,7 +602,7 @@ contract AgentFactoryV4 is
             );
     }
 
-    function initFromToken(
+    function initFromTokenLP(
         address creator,
         address tokenAddr,
         uint8[] memory cores,

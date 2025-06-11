@@ -13,7 +13,7 @@ contract FGenesis is Initializable, AccessControlUpgradeable {
 
     bytes32 public constant ADMIN_ROLE = keccak256("ADMIN_ROLE");
     bytes32 public constant OPERATION_ROLE = keccak256("OPERATION_ROLE");
-
+    
     struct Params {
         address virtualToken;
         uint256 reserve;

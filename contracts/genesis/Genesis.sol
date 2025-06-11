@@ -595,7 +595,6 @@ contract Genesis is ReentrancyGuard, AccessControlUpgradeable {
         onlyRole(DEFAULT_ADMIN_ROLE)
         nonReentrant
         whenEnded
-        whenFinalized
     {
         require(token != address(0), "Invalid token address");
         require(

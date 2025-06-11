@@ -350,8 +350,7 @@
       "kind": "transparent"
     },
     {
-      "address": "0x3f2314ddFaB2154E5fE3bd8e358f60E6eb87ad6F",
-      "txHash": "0x01f787bbb9d0d34baa52388963a5ef2fc26f9d24dd3c0b5b5280921d4205abb1",
+      "address": "0x56Fefb215714D791e51811EBC8348f9622A347C0",
       "kind": "transparent"
     }
   ],
@@ -28074,211 +28073,71 @@
         }
       }
     },
-    "cf66bbd37c553edaa4a1e1ac6c680c3ffc5f707148f0894d66e829304c6d72b4": {
-      "address": "0x218fF85a122D54155b013B56D31c023C131908E1",
-      "txHash": "0x08b50bb232f88c121031e66b8bdfaac287f2631aa1d8870ff9eb947a28bb1a58",
+    "c23aeae816168bc71ffc485a24d02dec6587e19343f77502ce90294d31dc127f": {
+      "address": "0x089Fd52B09b3aC5FB1d6029B7cf38be49aB58bea",
+      "txHash": "0xb6de45fa850566b8360d81dcf4c85d937c428bd98310989abc23913e1b9da1a1",
       "layout": {
         "solcVersion": "0.8.26",
         "storage": [
           {
-            "label": "_roles",
+            "label": "params",
             "offset": 0,
             "slot": "0",
-            "type": "t_mapping(t_bytes32,t_struct(RoleData)497_storage)",
-            "contract": "AccessControl",
-            "src": "@openzeppelin/contracts/access/AccessControl.sol:55"
+            "type": "t_struct(Params)2045_storage",
+            "contract": "FGenesis",
+            "src": "contracts/genesis/FGenesis.sol:33"
           },
           {
-            "label": "_nextId",
-            "offset": 0,
-            "slot": "1",
-            "type": "t_uint256",
-            "contract": "AgentFactoryV4",
-            "src": "contracts/virtualPersona/AgentFactoryV4.sol:29"
-          },
-          {
-            "label": "tokenImplementation",
-            "offset": 0,
-            "slot": "2",
-            "type": "t_address",
-            "contract": "AgentFactoryV4",
-            "src": "contracts/virtualPersona/AgentFactoryV4.sol:30"
-          },
-          {
-            "label": "daoImplementation",
-            "offset": 0,
-            "slot": "3",
-            "type": "t_address",
-            "contract": "AgentFactoryV4",
-            "src": "contracts/virtualPersona/AgentFactoryV4.sol:31"
-          },
-          {
-            "label": "nft",
-            "offset": 0,
-            "slot": "4",
-            "type": "t_address",
-            "contract": "AgentFactoryV4",
-            "src": "contracts/virtualPersona/AgentFactoryV4.sol:32"
-          },
-          {
-            "label": "tbaRegistry",
-            "offset": 0,
-            "slot": "5",
-            "type": "t_address",
-            "contract": "AgentFactoryV4",
-            "src": "contracts/virtualPersona/AgentFactoryV4.sol:33"
-          },
-          {
-            "label": "applicationThreshold",
-            "offset": 0,
-            "slot": "6",
-            "type": "t_uint256",
-            "contract": "AgentFactoryV4",
-            "src": "contracts/virtualPersona/AgentFactoryV4.sol:34"
-          },
-          {
-            "label": "allTokens",
-            "offset": 0,
-            "slot": "7",
-            "type": "t_array(t_address)dyn_storage",
-            "contract": "AgentFactoryV4",
-            "src": "contracts/virtualPersona/AgentFactoryV4.sol:36"
-          },
-          {
-            "label": "allDAOs",
-            "offset": 0,
-            "slot": "8",
-            "type": "t_array(t_address)dyn_storage",
-            "contract": "AgentFactoryV4",
-            "src": "contracts/virtualPersona/AgentFactoryV4.sol:37"
-          },
-          {
-            "label": "assetToken",
-            "offset": 0,
-            "slot": "9",
-            "type": "t_address",
-            "contract": "AgentFactoryV4",
-            "src": "contracts/virtualPersona/AgentFactoryV4.sol:39"
-          },
-          {
-            "label": "maturityDuration",
-            "offset": 0,
-            "slot": "10",
-            "type": "t_uint256",
-            "contract": "AgentFactoryV4",
-            "src": "contracts/virtualPersona/AgentFactoryV4.sol:40"
-          },
-          {
-            "label": "_applications",
-            "offset": 0,
-            "slot": "11",
-            "type": "t_mapping(t_uint256,t_struct(Application)2849_storage)",
-            "contract": "AgentFactoryV4",
-            "src": "contracts/virtualPersona/AgentFactoryV4.sol:76"
-          },
-          {
-            "label": "_vault",
+            "label": "genesisContracts",
             "offset": 0,
             "slot": "12",
-            "type": "t_address",
-            "contract": "AgentFactoryV4",
-            "src": "contracts/virtualPersona/AgentFactoryV4.sol:82"
+            "type": "t_mapping(t_uint256,t_address)",
+            "contract": "FGenesis",
+            "src": "contracts/genesis/FGenesis.sol:34"
           },
           {
-            "label": "locked",
-            "offset": 20,
-            "slot": "12",
-            "type": "t_bool",
-            "contract": "AgentFactoryV4",
-            "src": "contracts/virtualPersona/AgentFactoryV4.sol:84"
-          },
-          {
-            "label": "allTradingTokens",
+            "label": "genesisID",
             "offset": 0,
             "slot": "13",
-            "type": "t_array(t_address)dyn_storage",
-            "contract": "AgentFactoryV4",
-            "src": "contracts/virtualPersona/AgentFactoryV4.sol:96"
-          },
-          {
-            "label": "_uniswapRouter",
-            "offset": 0,
-            "slot": "14",
-            "type": "t_address",
-            "contract": "AgentFactoryV4",
-            "src": "contracts/virtualPersona/AgentFactoryV4.sol:97"
-          },
-          {
-            "label": "veTokenImplementation",
-            "offset": 0,
-            "slot": "15",
-            "type": "t_address",
-            "contract": "AgentFactoryV4",
-            "src": "contracts/virtualPersona/AgentFactoryV4.sol:98"
-          },
-          {
-            "label": "_tokenAdmin",
-            "offset": 0,
-            "slot": "16",
-            "type": "t_address",
-            "contract": "AgentFactoryV4",
-            "src": "contracts/virtualPersona/AgentFactoryV4.sol:99"
-          },
-          {
-            "label": "defaultDelegatee",
-            "offset": 0,
-            "slot": "17",
-            "type": "t_address",
-            "contract": "AgentFactoryV4",
-            "src": "contracts/virtualPersona/AgentFactoryV4.sol:100"
-          },
-          {
-            "label": "_tokenSupplyParams",
-            "offset": 0,
-            "slot": "18",
-            "type": "t_bytes_storage",
-            "contract": "AgentFactoryV4",
-            "src": "contracts/virtualPersona/AgentFactoryV4.sol:103"
-          },
-          {
-            "label": "_tokenTaxParams",
-            "offset": 0,
-            "slot": "19",
-            "type": "t_bytes_storage",
-            "contract": "AgentFactoryV4",
-            "src": "contracts/virtualPersona/AgentFactoryV4.sol:104"
-          },
-          {
-            "label": "_tokenApplication",
-            "offset": 0,
-            "slot": "20",
-            "type": "t_mapping(t_address,t_uint256)",
-            "contract": "AgentFactoryV4",
-            "src": "contracts/virtualPersona/AgentFactoryV4.sol:110"
-          },
-          {
-            "label": "_applicationToken",
-            "offset": 0,
-            "slot": "21",
-            "type": "t_mapping(t_uint256,t_address)",
-            "contract": "AgentFactoryV4",
-            "src": "contracts/virtualPersona/AgentFactoryV4.sol:111"
-          },
-          {
-            "label": "_applicationLP",
-            "offset": 0,
-            "slot": "22",
-            "type": "t_mapping(t_uint256,t_address)",
-            "contract": "AgentFactoryV4",
-            "src": "contracts/virtualPersona/AgentFactoryV4.sol:112"
+            "type": "t_uint256",
+            "contract": "FGenesis",
+            "src": "contracts/genesis/FGenesis.sol:35"
           }
         ],
         "types": {
+          "t_address": {
+            "label": "address",
+            "numberOfBytes": "20"
+          },
           "t_bool": {
             "label": "bool",
             "numberOfBytes": "1"
           },
-          "t_struct(InitializableStorage)10_storage": {
+          "t_bytes32": {
+            "label": "bytes32",
+            "numberOfBytes": "32"
+          },
+          "t_mapping(t_address,t_bool)": {
+            "label": "mapping(address => bool)",
+            "numberOfBytes": "32"
+          },
+          "t_mapping(t_bytes32,t_struct(RoleData)25_storage)": {
+            "label": "mapping(bytes32 => struct AccessControlUpgradeable.RoleData)",
+            "numberOfBytes": "32"
+          },
+          "t_struct(AccessControlStorage)34_storage": {
+            "label": "struct AccessControlUpgradeable.AccessControlStorage",
+            "members": [
+              {
+                "label": "_roles",
+                "type": "t_mapping(t_bytes32,t_struct(RoleData)25_storage)",
+                "offset": 0,
+                "slot": "0"
+              }
+            ],
+            "numberOfBytes": "32"
+          },
+          "t_struct(InitializableStorage)93_storage": {
             "label": "struct Initializable.InitializableStorage",
             "members": [
               {
@@ -28296,161 +28155,8 @@
             ],
             "numberOfBytes": "32"
           },
-          "t_struct(PausableStorage)82_storage": {
-            "label": "struct PausableUpgradeable.PausableStorage",
-            "members": [
-              {
-                "label": "_paused",
-                "type": "t_bool",
-                "offset": 0,
-                "slot": "0"
-              }
-            ],
-            "numberOfBytes": "32"
-          },
-          "t_uint64": {
-            "label": "uint64",
-            "numberOfBytes": "8"
-          },
-          "t_address": {
-            "label": "address",
-            "numberOfBytes": "20"
-          },
-          "t_array(t_address)dyn_storage": {
-            "label": "address[]",
-            "numberOfBytes": "32"
-          },
-          "t_array(t_uint8)dyn_storage": {
-            "label": "uint8[]",
-            "numberOfBytes": "32"
-          },
-          "t_bytes32": {
-            "label": "bytes32",
-            "numberOfBytes": "32"
-          },
-          "t_bytes_storage": {
-            "label": "bytes",
-            "numberOfBytes": "32"
-          },
-          "t_enum(ApplicationStatus)2820": {
-            "label": "enum AgentFactoryV4.ApplicationStatus",
-            "members": [
-              "Active",
-              "Executed",
-              "Withdrawn"
-            ],
-            "numberOfBytes": "1"
-          },
-          "t_mapping(t_address,t_bool)": {
-            "label": "mapping(address => bool)",
-            "numberOfBytes": "32"
-          },
-          "t_mapping(t_address,t_uint256)": {
-            "label": "mapping(address => uint256)",
-            "numberOfBytes": "32"
-          },
-          "t_mapping(t_bytes32,t_struct(RoleData)497_storage)": {
-            "label": "mapping(bytes32 => struct AccessControl.RoleData)",
-            "numberOfBytes": "32"
-          },
-          "t_mapping(t_uint256,t_address)": {
-            "label": "mapping(uint256 => address)",
-            "numberOfBytes": "32"
-          },
-          "t_mapping(t_uint256,t_struct(Application)2849_storage)": {
-            "label": "mapping(uint256 => struct AgentFactoryV4.Application)",
-            "numberOfBytes": "32"
-          },
-          "t_string_storage": {
-            "label": "string",
-            "numberOfBytes": "32"
-          },
-          "t_struct(Application)2849_storage": {
-            "label": "struct AgentFactoryV4.Application",
-            "members": [
-              {
-                "label": "name",
-                "type": "t_string_storage",
-                "offset": 0,
-                "slot": "0"
-              },
-              {
-                "label": "symbol",
-                "type": "t_string_storage",
-                "offset": 0,
-                "slot": "1"
-              },
-              {
-                "label": "tokenURI",
-                "type": "t_string_storage",
-                "offset": 0,
-                "slot": "2"
-              },
-              {
-                "label": "status",
-                "type": "t_enum(ApplicationStatus)2820",
-                "offset": 0,
-                "slot": "3"
-              },
-              {
-                "label": "withdrawableAmount",
-                "type": "t_uint256",
-                "offset": 0,
-                "slot": "4"
-              },
-              {
-                "label": "proposer",
-                "type": "t_address",
-                "offset": 0,
-                "slot": "5"
-              },
-              {
-                "label": "cores",
-                "type": "t_array(t_uint8)dyn_storage",
-                "offset": 0,
-                "slot": "6"
-              },
-              {
-                "label": "proposalEndBlock",
-                "type": "t_uint256",
-                "offset": 0,
-                "slot": "7"
-              },
-              {
-                "label": "virtualId",
-                "type": "t_uint256",
-                "offset": 0,
-                "slot": "8"
-              },
-              {
-                "label": "tbaSalt",
-                "type": "t_bytes32",
-                "offset": 0,
-                "slot": "9"
-              },
-              {
-                "label": "tbaImplementation",
-                "type": "t_address",
-                "offset": 0,
-                "slot": "10"
-              },
-              {
-                "label": "daoVotingPeriod",
-                "type": "t_uint32",
-                "offset": 20,
-                "slot": "10"
-              },
-              {
-                "label": "daoThreshold",
-                "type": "t_uint256",
-                "offset": 0,
-                "slot": "11"
-              }
-            ],
-            "numberOfBytes": "384"
-          },
-          "t_struct(RoleData)497_storage": {
-            "label": "struct AccessControl.RoleData",
+          "t_struct(RoleData)25_storage": {
+            "label": "struct AccessControlUpgradeable.RoleData",
             "members": [
               {
                 "label": "hasRole",
@@ -28467,6 +28173,98 @@
             ],
             "numberOfBytes": "64"
           },
+          "t_uint64": {
+            "label": "uint64",
+            "numberOfBytes": "8"
+          },
+          "t_mapping(t_uint256,t_address)": {
+            "label": "mapping(uint256 => address)",
+            "numberOfBytes": "32"
+          },
+          "t_struct(Params)2045_storage": {
+            "label": "struct FGenesis.Params",
+            "members": [
+              {
+                "label": "virtualToken",
+                "type": "t_address",
+                "offset": 0,
+                "slot": "0"
+              },
+              {
+                "label": "reserve",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "1"
+              },
+              {
+                "label": "maxContribution",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "2"
+              },
+              {
+                "label": "feeAddr",
+                "type": "t_address",
+                "offset": 0,
+                "slot": "3"
+              },
+              {
+                "label": "feeAmt",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "4"
+              },
+              {
+                "label": "duration",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "5"
+              },
+              {
+                "label": "tbaSalt",
+                "type": "t_bytes32",
+                "offset": 0,
+                "slot": "6"
+              },
+              {
+                "label": "tbaImpl",
+                "type": "t_address",
+                "offset": 0,
+                "slot": "7"
+              },
+              {
+                "label": "votePeriod",
+                "type": "t_uint32",
+                "offset": 20,
+                "slot": "7"
+              },
+              {
+                "label": "threshold",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "8"
+              },
+              {
+                "label": "agentFactory",
+                "type": "t_address",
+                "offset": 0,
+                "slot": "9"
+              },
+              {
+                "label": "agentTokenTotalSupply",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "10"
+              },
+              {
+                "label": "agentTokenLpSupply",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "11"
+              }
+            ],
+            "numberOfBytes": "384"
+          },
           "t_uint256": {
             "label": "uint256",
             "numberOfBytes": "32"
@@ -28474,19 +28272,15 @@
           "t_uint32": {
             "label": "uint32",
             "numberOfBytes": "4"
-          },
-          "t_uint8": {
-            "label": "uint8",
-            "numberOfBytes": "1"
           }
         },
         "namespaces": {
-          "erc7201:openzeppelin.storage.Pausable": [
+          "erc7201:openzeppelin.storage.AccessControl": [
             {
-              "contract": "PausableUpgradeable",
-              "label": "_paused",
-              "type": "t_bool",
-              "src": "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol:21",
+              "contract": "AccessControlUpgradeable",
+              "label": "_roles",
+              "type": "t_mapping(t_bytes32,t_struct(RoleData)25_storage)",
+              "src": "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol:61",
               "offset": 0,
               "slot": "0"
             }
@@ -28512,27 +28306,35 @@
         }
       }
     },
-    "689d5a52bdf710da74072c0c4361aed37002f7f27ff13a2a2666c1790fa03b9d": {
-      "address": "0xa3d04e6a44e04eA29AB821b95ec9764baf594A2A",
-      "txHash": "0x170e9492cf3de01b798289743bdb43f2e95cca2aa778247aac8cefc32d975635",
+    "a8ec8473e682c57f6feee0fefceeb219247225951f9f2c6abb7e2986e285360d": {
+      "address": "0xE725514Fe5315B64cF37a5ef4d40b87Be5b577C2",
+      "txHash": "0xd9d4fc27ce7ddc85ae8ddd8cc0c3c75f7ce90dcd380c44083805997a1ffe1bc9",
       "layout": {
         "solcVersion": "0.8.26",
         "storage": [
           {
-            "label": "_token0",
+            "label": "params",
             "offset": 0,
             "slot": "0",
-            "type": "t_address",
-            "contract": "FakeHook",
-            "src": "contracts/dev/FakeHook.sol:12"
+            "type": "t_struct(Params)2045_storage",
+            "contract": "FGenesis",
+            "src": "contracts/genesis/FGenesis.sol:32"
           },
           {
-            "label": "_token1",
+            "label": "genesisContracts",
             "offset": 0,
-            "slot": "1",
-            "type": "t_address",
-            "contract": "FakeHook",
-            "src": "contracts/dev/FakeHook.sol:13"
+            "slot": "12",
+            "type": "t_mapping(t_uint256,t_address)",
+            "contract": "FGenesis",
+            "src": "contracts/genesis/FGenesis.sol:33"
+          },
+          {
+            "label": "genesisID",
+            "offset": 0,
+            "slot": "13",
+            "type": "t_uint256",
+            "contract": "FGenesis",
+            "src": "contracts/genesis/FGenesis.sol:34"
           }
         ],
         "types": {
@@ -28544,7 +28346,31 @@
             "label": "bool",
             "numberOfBytes": "1"
           },
-          "t_struct(InitializableStorage)64_storage": {
+          "t_bytes32": {
+            "label": "bytes32",
+            "numberOfBytes": "32"
+          },
+          "t_mapping(t_address,t_bool)": {
+            "label": "mapping(address => bool)",
+            "numberOfBytes": "32"
+          },
+          "t_mapping(t_bytes32,t_struct(RoleData)25_storage)": {
+            "label": "mapping(bytes32 => struct AccessControlUpgradeable.RoleData)",
+            "numberOfBytes": "32"
+          },
+          "t_struct(AccessControlStorage)34_storage": {
+            "label": "struct AccessControlUpgradeable.AccessControlStorage",
+            "members": [
+              {
+                "label": "_roles",
+                "type": "t_mapping(t_bytes32,t_struct(RoleData)25_storage)",
+                "offset": 0,
+                "slot": "0"
+              }
+            ],
+            "numberOfBytes": "32"
+          },
+          "t_struct(InitializableStorage)93_storage": {
             "label": "struct Initializable.InitializableStorage",
             "members": [
               {
@@ -28562,30 +28388,132 @@
             ],
             "numberOfBytes": "32"
           },
-          "t_struct(OwnableStorage)14_storage": {
-            "label": "struct OwnableUpgradeable.OwnableStorage",
+          "t_struct(RoleData)25_storage": {
+            "label": "struct AccessControlUpgradeable.RoleData",
             "members": [
               {
-                "label": "_owner",
-                "type": "t_address",
+                "label": "hasRole",
+                "type": "t_mapping(t_address,t_bool)",
                 "offset": 0,
                 "slot": "0"
+              },
+              {
+                "label": "adminRole",
+                "type": "t_bytes32",
+                "offset": 0,
+                "slot": "1"
               }
             ],
-            "numberOfBytes": "32"
+            "numberOfBytes": "64"
           },
           "t_uint64": {
             "label": "uint64",
             "numberOfBytes": "8"
+          },
+          "t_mapping(t_uint256,t_address)": {
+            "label": "mapping(uint256 => address)",
+            "numberOfBytes": "32"
+          },
+          "t_struct(Params)2045_storage": {
+            "label": "struct FGenesis.Params",
+            "members": [
+              {
+                "label": "virtualToken",
+                "type": "t_address",
+                "offset": 0,
+                "slot": "0"
+              },
+              {
+                "label": "reserve",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "1"
+              },
+              {
+                "label": "maxContribution",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "2"
+              },
+              {
+                "label": "feeAddr",
+                "type": "t_address",
+                "offset": 0,
+                "slot": "3"
+              },
+              {
+                "label": "feeAmt",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "4"
+              },
+              {
+                "label": "duration",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "5"
+              },
+              {
+                "label": "tbaSalt",
+                "type": "t_bytes32",
+                "offset": 0,
+                "slot": "6"
+              },
+              {
+                "label": "tbaImpl",
+                "type": "t_address",
+                "offset": 0,
+                "slot": "7"
+              },
+              {
+                "label": "votePeriod",
+                "type": "t_uint32",
+                "offset": 20,
+                "slot": "7"
+              },
+              {
+                "label": "threshold",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "8"
+              },
+              {
+                "label": "agentFactory",
+                "type": "t_address",
+                "offset": 0,
+                "slot": "9"
+              },
+              {
+                "label": "agentTokenTotalSupply",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "10"
+              },
+              {
+                "label": "agentTokenLpSupply",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "11"
+              }
+            ],
+            "numberOfBytes": "384"
+          },
+          "t_uint256": {
+            "label": "uint256",
+            "numberOfBytes": "32"
+          },
+          "t_uint32": {
+            "label": "uint32",
+            "numberOfBytes": "4"
           }
         },
         "namespaces": {
-          "erc7201:openzeppelin.storage.Ownable": [
+          "erc7201:openzeppelin.storage.AccessControl": [
             {
-              "contract": "OwnableUpgradeable",
-              "label": "_owner",
-              "type": "t_address",
-              "src": "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol:24",
+              "contract": "AccessControlUpgradeable",
+              "label": "_roles",
+              "type": "t_mapping(t_bytes32,t_struct(RoleData)25_storage)",
+              "src": "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol:61",
               "offset": 0,
               "slot": "0"
             }
@@ -28611,211 +28539,71 @@
         }
       }
     },
-    "199e7af324e5db0a5a833fa11ed546c881984ed6ceedad13aa0805fa88416c66": {
-      "address": "0x6AB657645803F0979E95ec59265C19B5Afc7C3a3",
-      "txHash": "0x7905acb38802226191688a1b7706e8609ac2a212ab5161c25495ccdd936fc7d9",
+    "810eec7bc604cadf67e52f857b3e2df5fe9d2ce3b3b57db1b1b77a843318f254": {
+      "address": "0x92BBA427A2CF9eA2f47EF948FE89f5783123b4aa",
+      "txHash": "0x7778ba04c724440bcfd8c523c2cadc19521a05389d06886c3c009edf0d24507a",
       "layout": {
         "solcVersion": "0.8.26",
         "storage": [
           {
-            "label": "_roles",
+            "label": "params",
             "offset": 0,
             "slot": "0",
-            "type": "t_mapping(t_bytes32,t_struct(RoleData)497_storage)",
-            "contract": "AccessControl",
-            "src": "@openzeppelin/contracts/access/AccessControl.sol:55"
+            "type": "t_struct(Params)2045_storage",
+            "contract": "FGenesis",
+            "src": "contracts/genesis/FGenesis.sol:32"
           },
           {
-            "label": "_nextId",
-            "offset": 0,
-            "slot": "1",
-            "type": "t_uint256",
-            "contract": "AgentFactoryV4",
-            "src": "contracts/virtualPersona/AgentFactoryV4.sol:29"
-          },
-          {
-            "label": "tokenImplementation",
-            "offset": 0,
-            "slot": "2",
-            "type": "t_address",
-            "contract": "AgentFactoryV4",
-            "src": "contracts/virtualPersona/AgentFactoryV4.sol:30"
-          },
-          {
-            "label": "daoImplementation",
-            "offset": 0,
-            "slot": "3",
-            "type": "t_address",
-            "contract": "AgentFactoryV4",
-            "src": "contracts/virtualPersona/AgentFactoryV4.sol:31"
-          },
-          {
-            "label": "nft",
-            "offset": 0,
-            "slot": "4",
-            "type": "t_address",
-            "contract": "AgentFactoryV4",
-            "src": "contracts/virtualPersona/AgentFactoryV4.sol:32"
-          },
-          {
-            "label": "tbaRegistry",
-            "offset": 0,
-            "slot": "5",
-            "type": "t_address",
-            "contract": "AgentFactoryV4",
-            "src": "contracts/virtualPersona/AgentFactoryV4.sol:33"
-          },
-          {
-            "label": "applicationThreshold",
-            "offset": 0,
-            "slot": "6",
-            "type": "t_uint256",
-            "contract": "AgentFactoryV4",
-            "src": "contracts/virtualPersona/AgentFactoryV4.sol:34"
-          },
-          {
-            "label": "allTokens",
-            "offset": 0,
-            "slot": "7",
-            "type": "t_array(t_address)dyn_storage",
-            "contract": "AgentFactoryV4",
-            "src": "contracts/virtualPersona/AgentFactoryV4.sol:36"
-          },
-          {
-            "label": "allDAOs",
-            "offset": 0,
-            "slot": "8",
-            "type": "t_array(t_address)dyn_storage",
-            "contract": "AgentFactoryV4",
-            "src": "contracts/virtualPersona/AgentFactoryV4.sol:37"
-          },
-          {
-            "label": "assetToken",
-            "offset": 0,
-            "slot": "9",
-            "type": "t_address",
-            "contract": "AgentFactoryV4",
-            "src": "contracts/virtualPersona/AgentFactoryV4.sol:39"
-          },
-          {
-            "label": "maturityDuration",
-            "offset": 0,
-            "slot": "10",
-            "type": "t_uint256",
-            "contract": "AgentFactoryV4",
-            "src": "contracts/virtualPersona/AgentFactoryV4.sol:40"
-          },
-          {
-            "label": "_applications",
-            "offset": 0,
-            "slot": "11",
-            "type": "t_mapping(t_uint256,t_struct(Application)2849_storage)",
-            "contract": "AgentFactoryV4",
-            "src": "contracts/virtualPersona/AgentFactoryV4.sol:76"
-          },
-          {
-            "label": "_vault",
+            "label": "genesisContracts",
             "offset": 0,
             "slot": "12",
-            "type": "t_address",
-            "contract": "AgentFactoryV4",
-            "src": "contracts/virtualPersona/AgentFactoryV4.sol:82"
+            "type": "t_mapping(t_uint256,t_address)",
+            "contract": "FGenesis",
+            "src": "contracts/genesis/FGenesis.sol:33"
           },
           {
-            "label": "locked",
-            "offset": 20,
-            "slot": "12",
-            "type": "t_bool",
-            "contract": "AgentFactoryV4",
-            "src": "contracts/virtualPersona/AgentFactoryV4.sol:84"
-          },
-          {
-            "label": "allTradingTokens",
+            "label": "genesisID",
             "offset": 0,
             "slot": "13",
-            "type": "t_array(t_address)dyn_storage",
-            "contract": "AgentFactoryV4",
-            "src": "contracts/virtualPersona/AgentFactoryV4.sol:96"
-          },
-          {
-            "label": "_uniswapRouter",
-            "offset": 0,
-            "slot": "14",
-            "type": "t_address",
-            "contract": "AgentFactoryV4",
-            "src": "contracts/virtualPersona/AgentFactoryV4.sol:97"
-          },
-          {
-            "label": "veTokenImplementation",
-            "offset": 0,
-            "slot": "15",
-            "type": "t_address",
-            "contract": "AgentFactoryV4",
-            "src": "contracts/virtualPersona/AgentFactoryV4.sol:98"
-          },
-          {
-            "label": "_tokenAdmin",
-            "offset": 0,
-            "slot": "16",
-            "type": "t_address",
-            "contract": "AgentFactoryV4",
-            "src": "contracts/virtualPersona/AgentFactoryV4.sol:99"
-          },
-          {
-            "label": "defaultDelegatee",
-            "offset": 0,
-            "slot": "17",
-            "type": "t_address",
-            "contract": "AgentFactoryV4",
-            "src": "contracts/virtualPersona/AgentFactoryV4.sol:100"
-          },
-          {
-            "label": "_tokenSupplyParams",
-            "offset": 0,
-            "slot": "18",
-            "type": "t_bytes_storage",
-            "contract": "AgentFactoryV4",
-            "src": "contracts/virtualPersona/AgentFactoryV4.sol:103"
-          },
-          {
-            "label": "_tokenTaxParams",
-            "offset": 0,
-            "slot": "19",
-            "type": "t_bytes_storage",
-            "contract": "AgentFactoryV4",
-            "src": "contracts/virtualPersona/AgentFactoryV4.sol:104"
-          },
-          {
-            "label": "_tokenApplication",
-            "offset": 0,
-            "slot": "20",
-            "type": "t_mapping(t_address,t_uint256)",
-            "contract": "AgentFactoryV4",
-            "src": "contracts/virtualPersona/AgentFactoryV4.sol:110"
-          },
-          {
-            "label": "_applicationToken",
-            "offset": 0,
-            "slot": "21",
-            "type": "t_mapping(t_uint256,t_address)",
-            "contract": "AgentFactoryV4",
-            "src": "contracts/virtualPersona/AgentFactoryV4.sol:111"
-          },
-          {
-            "label": "_applicationLP",
-            "offset": 0,
-            "slot": "22",
-            "type": "t_mapping(t_uint256,t_address)",
-            "contract": "AgentFactoryV4",
-            "src": "contracts/virtualPersona/AgentFactoryV4.sol:112"
+            "type": "t_uint256",
+            "contract": "FGenesis",
+            "src": "contracts/genesis/FGenesis.sol:34"
           }
         ],
         "types": {
+          "t_address": {
+            "label": "address",
+            "numberOfBytes": "20"
+          },
           "t_bool": {
             "label": "bool",
             "numberOfBytes": "1"
           },
-          "t_struct(InitializableStorage)10_storage": {
+          "t_bytes32": {
+            "label": "bytes32",
+            "numberOfBytes": "32"
+          },
+          "t_mapping(t_address,t_bool)": {
+            "label": "mapping(address => bool)",
+            "numberOfBytes": "32"
+          },
+          "t_mapping(t_bytes32,t_struct(RoleData)25_storage)": {
+            "label": "mapping(bytes32 => struct AccessControlUpgradeable.RoleData)",
+            "numberOfBytes": "32"
+          },
+          "t_struct(AccessControlStorage)34_storage": {
+            "label": "struct AccessControlUpgradeable.AccessControlStorage",
+            "members": [
+              {
+                "label": "_roles",
+                "type": "t_mapping(t_bytes32,t_struct(RoleData)25_storage)",
+                "offset": 0,
+                "slot": "0"
+              }
+            ],
+            "numberOfBytes": "32"
+          },
+          "t_struct(InitializableStorage)93_storage": {
             "label": "struct Initializable.InitializableStorage",
             "members": [
               {
@@ -28833,161 +28621,8 @@
             ],
             "numberOfBytes": "32"
           },
-          "t_struct(PausableStorage)82_storage": {
-            "label": "struct PausableUpgradeable.PausableStorage",
-            "members": [
-              {
-                "label": "_paused",
-                "type": "t_bool",
-                "offset": 0,
-                "slot": "0"
-              }
-            ],
-            "numberOfBytes": "32"
-          },
-          "t_uint64": {
-            "label": "uint64",
-            "numberOfBytes": "8"
-          },
-          "t_address": {
-            "label": "address",
-            "numberOfBytes": "20"
-          },
-          "t_array(t_address)dyn_storage": {
-            "label": "address[]",
-            "numberOfBytes": "32"
-          },
-          "t_array(t_uint8)dyn_storage": {
-            "label": "uint8[]",
-            "numberOfBytes": "32"
-          },
-          "t_bytes32": {
-            "label": "bytes32",
-            "numberOfBytes": "32"
-          },
-          "t_bytes_storage": {
-            "label": "bytes",
-            "numberOfBytes": "32"
-          },
-          "t_enum(ApplicationStatus)2820": {
-            "label": "enum AgentFactoryV4.ApplicationStatus",
-            "members": [
-              "Active",
-              "Executed",
-              "Withdrawn"
-            ],
-            "numberOfBytes": "1"
-          },
-          "t_mapping(t_address,t_bool)": {
-            "label": "mapping(address => bool)",
-            "numberOfBytes": "32"
-          },
-          "t_mapping(t_address,t_uint256)": {
-            "label": "mapping(address => uint256)",
-            "numberOfBytes": "32"
-          },
-          "t_mapping(t_bytes32,t_struct(RoleData)497_storage)": {
-            "label": "mapping(bytes32 => struct AccessControl.RoleData)",
-            "numberOfBytes": "32"
-          },
-          "t_mapping(t_uint256,t_address)": {
-            "label": "mapping(uint256 => address)",
-            "numberOfBytes": "32"
-          },
-          "t_mapping(t_uint256,t_struct(Application)2849_storage)": {
-            "label": "mapping(uint256 => struct AgentFactoryV4.Application)",
-            "numberOfBytes": "32"
-          },
-          "t_string_storage": {
-            "label": "string",
-            "numberOfBytes": "32"
-          },
-          "t_struct(Application)2849_storage": {
-            "label": "struct AgentFactoryV4.Application",
-            "members": [
-              {
-                "label": "name",
-                "type": "t_string_storage",
-                "offset": 0,
-                "slot": "0"
-              },
-              {
-                "label": "symbol",
-                "type": "t_string_storage",
-                "offset": 0,
-                "slot": "1"
-              },
-              {
-                "label": "tokenURI",
-                "type": "t_string_storage",
-                "offset": 0,
-                "slot": "2"
-              },
-              {
-                "label": "status",
-                "type": "t_enum(ApplicationStatus)2820",
-                "offset": 0,
-                "slot": "3"
-              },
-              {
-                "label": "withdrawableAmount",
-                "type": "t_uint256",
-                "offset": 0,
-                "slot": "4"
-              },
-              {
-                "label": "proposer",
-                "type": "t_address",
-                "offset": 0,
-                "slot": "5"
-              },
-              {
-                "label": "cores",
-                "type": "t_array(t_uint8)dyn_storage",
-                "offset": 0,
-                "slot": "6"
-              },
-              {
-                "label": "proposalEndBlock",
-                "type": "t_uint256",
-                "offset": 0,
-                "slot": "7"
-              },
-              {
-                "label": "virtualId",
-                "type": "t_uint256",
-                "offset": 0,
-                "slot": "8"
-              },
-              {
-                "label": "tbaSalt",
-                "type": "t_bytes32",
-                "offset": 0,
-                "slot": "9"
-              },
-              {
-                "label": "tbaImplementation",
-                "type": "t_address",
-                "offset": 0,
-                "slot": "10"
-              },
-              {
-                "label": "daoVotingPeriod",
-                "type": "t_uint32",
-                "offset": 20,
-                "slot": "10"
-              },
-              {
-                "label": "daoThreshold",
-                "type": "t_uint256",
-                "offset": 0,
-                "slot": "11"
-              }
-            ],
-            "numberOfBytes": "384"
-          },
-          "t_struct(RoleData)497_storage": {
-            "label": "struct AccessControl.RoleData",
+          "t_struct(RoleData)25_storage": {
+            "label": "struct AccessControlUpgradeable.RoleData",
             "members": [
               {
                 "label": "hasRole",
@@ -29004,419 +28639,91 @@
             ],
             "numberOfBytes": "64"
           },
-          "t_uint256": {
-            "label": "uint256",
-            "numberOfBytes": "32"
-          },
-          "t_uint32": {
-            "label": "uint32",
-            "numberOfBytes": "4"
-          },
-          "t_uint8": {
-            "label": "uint8",
-            "numberOfBytes": "1"
-          }
-        },
-        "namespaces": {
-          "erc7201:openzeppelin.storage.Pausable": [
-            {
-              "contract": "PausableUpgradeable",
-              "label": "_paused",
-              "type": "t_bool",
-              "src": "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol:21",
-              "offset": 0,
-              "slot": "0"
-            }
-          ],
-          "erc7201:openzeppelin.storage.Initializable": [
-            {
-              "contract": "Initializable",
-              "label": "_initialized",
-              "type": "t_uint64",
-              "src": "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol:69",
-              "offset": 0,
-              "slot": "0"
-            },
-            {
-              "contract": "Initializable",
-              "label": "_initializing",
-              "type": "t_bool",
-              "src": "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol:73",
-              "offset": 8,
-              "slot": "0"
-            }
-          ]
-        }
-      }
-    },
-    "e5da8a186c280eb66f568d4d8a0e82c6c5c255ddbec044679bb0322ef1251e08": {
-      "address": "0xAA7281cD019F44C08F05626978951fE9Fe9dD54f",
-      "txHash": "0x1303939f5e229be4357e2b30a66402219a905a702e77f68f1149fe59dab9eacb",
-      "layout": {
-        "solcVersion": "0.8.26",
-        "storage": [
-          {
-            "label": "_roles",
-            "offset": 0,
-            "slot": "0",
-            "type": "t_mapping(t_bytes32,t_struct(RoleData)497_storage)",
-            "contract": "AccessControl",
-            "src": "@openzeppelin/contracts/access/AccessControl.sol:55"
-          },
-          {
-            "label": "_nextId",
-            "offset": 0,
-            "slot": "1",
-            "type": "t_uint256",
-            "contract": "AgentFactoryV4",
-            "src": "contracts/virtualPersona/AgentFactoryV4.sol:29"
-          },
-          {
-            "label": "tokenImplementation",
-            "offset": 0,
-            "slot": "2",
-            "type": "t_address",
-            "contract": "AgentFactoryV4",
-            "src": "contracts/virtualPersona/AgentFactoryV4.sol:30"
-          },
-          {
-            "label": "daoImplementation",
-            "offset": 0,
-            "slot": "3",
-            "type": "t_address",
-            "contract": "AgentFactoryV4",
-            "src": "contracts/virtualPersona/AgentFactoryV4.sol:31"
-          },
-          {
-            "label": "nft",
-            "offset": 0,
-            "slot": "4",
-            "type": "t_address",
-            "contract": "AgentFactoryV4",
-            "src": "contracts/virtualPersona/AgentFactoryV4.sol:32"
-          },
-          {
-            "label": "tbaRegistry",
-            "offset": 0,
-            "slot": "5",
-            "type": "t_address",
-            "contract": "AgentFactoryV4",
-            "src": "contracts/virtualPersona/AgentFactoryV4.sol:33"
-          },
-          {
-            "label": "applicationThreshold",
-            "offset": 0,
-            "slot": "6",
-            "type": "t_uint256",
-            "contract": "AgentFactoryV4",
-            "src": "contracts/virtualPersona/AgentFactoryV4.sol:34"
-          },
-          {
-            "label": "allTokens",
-            "offset": 0,
-            "slot": "7",
-            "type": "t_array(t_address)dyn_storage",
-            "contract": "AgentFactoryV4",
-            "src": "contracts/virtualPersona/AgentFactoryV4.sol:36"
-          },
-          {
-            "label": "allDAOs",
-            "offset": 0,
-            "slot": "8",
-            "type": "t_array(t_address)dyn_storage",
-            "contract": "AgentFactoryV4",
-            "src": "contracts/virtualPersona/AgentFactoryV4.sol:37"
-          },
-          {
-            "label": "assetToken",
-            "offset": 0,
-            "slot": "9",
-            "type": "t_address",
-            "contract": "AgentFactoryV4",
-            "src": "contracts/virtualPersona/AgentFactoryV4.sol:39"
-          },
-          {
-            "label": "maturityDuration",
-            "offset": 0,
-            "slot": "10",
-            "type": "t_uint256",
-            "contract": "AgentFactoryV4",
-            "src": "contracts/virtualPersona/AgentFactoryV4.sol:40"
-          },
-          {
-            "label": "_applications",
-            "offset": 0,
-            "slot": "11",
-            "type": "t_mapping(t_uint256,t_struct(Application)2849_storage)",
-            "contract": "AgentFactoryV4",
-            "src": "contracts/virtualPersona/AgentFactoryV4.sol:76"
-          },
-          {
-            "label": "_vault",
-            "offset": 0,
-            "slot": "12",
-            "type": "t_address",
-            "contract": "AgentFactoryV4",
-            "src": "contracts/virtualPersona/AgentFactoryV4.sol:82"
-          },
-          {
-            "label": "locked",
-            "offset": 20,
-            "slot": "12",
-            "type": "t_bool",
-            "contract": "AgentFactoryV4",
-            "src": "contracts/virtualPersona/AgentFactoryV4.sol:84"
-          },
-          {
-            "label": "allTradingTokens",
-            "offset": 0,
-            "slot": "13",
-            "type": "t_array(t_address)dyn_storage",
-            "contract": "AgentFactoryV4",
-            "src": "contracts/virtualPersona/AgentFactoryV4.sol:96"
-          },
-          {
-            "label": "_uniswapRouter",
-            "offset": 0,
-            "slot": "14",
-            "type": "t_address",
-            "contract": "AgentFactoryV4",
-            "src": "contracts/virtualPersona/AgentFactoryV4.sol:97"
-          },
-          {
-            "label": "veTokenImplementation",
-            "offset": 0,
-            "slot": "15",
-            "type": "t_address",
-            "contract": "AgentFactoryV4",
-            "src": "contracts/virtualPersona/AgentFactoryV4.sol:98"
-          },
-          {
-            "label": "_tokenAdmin",
-            "offset": 0,
-            "slot": "16",
-            "type": "t_address",
-            "contract": "AgentFactoryV4",
-            "src": "contracts/virtualPersona/AgentFactoryV4.sol:99"
-          },
-          {
-            "label": "defaultDelegatee",
-            "offset": 0,
-            "slot": "17",
-            "type": "t_address",
-            "contract": "AgentFactoryV4",
-            "src": "contracts/virtualPersona/AgentFactoryV4.sol:100"
-          },
-          {
-            "label": "_tokenSupplyParams",
-            "offset": 0,
-            "slot": "18",
-            "type": "t_bytes_storage",
-            "contract": "AgentFactoryV4",
-            "src": "contracts/virtualPersona/AgentFactoryV4.sol:103"
-          },
-          {
-            "label": "_tokenTaxParams",
-            "offset": 0,
-            "slot": "19",
-            "type": "t_bytes_storage",
-            "contract": "AgentFactoryV4",
-            "src": "contracts/virtualPersona/AgentFactoryV4.sol:104"
-          },
-          {
-            "label": "_tokenApplication",
-            "offset": 0,
-            "slot": "20",
-            "type": "t_mapping(t_address,t_uint256)",
-            "contract": "AgentFactoryV4",
-            "src": "contracts/virtualPersona/AgentFactoryV4.sol:110"
-          },
-          {
-            "label": "_applicationToken",
-            "offset": 0,
-            "slot": "21",
-            "type": "t_mapping(t_uint256,t_address)",
-            "contract": "AgentFactoryV4",
-            "src": "contracts/virtualPersona/AgentFactoryV4.sol:111"
-          },
-          {
-            "label": "_applicationLP",
-            "offset": 0,
-            "slot": "22",
-            "type": "t_mapping(t_uint256,t_address)",
-            "contract": "AgentFactoryV4",
-            "src": "contracts/virtualPersona/AgentFactoryV4.sol:112"
-          }
-        ],
-        "types": {
-          "t_bool": {
-            "label": "bool",
-            "numberOfBytes": "1"
-          },
-          "t_struct(InitializableStorage)10_storage": {
-            "label": "struct Initializable.InitializableStorage",
-            "members": [
-              {
-                "label": "_initialized",
-                "type": "t_uint64",
-                "offset": 0,
-                "slot": "0"
-              },
-              {
-                "label": "_initializing",
-                "type": "t_bool",
-                "offset": 8,
-                "slot": "0"
-              }
-            ],
-            "numberOfBytes": "32"
-          },
-          "t_struct(PausableStorage)82_storage": {
-            "label": "struct PausableUpgradeable.PausableStorage",
-            "members": [
-              {
-                "label": "_paused",
-                "type": "t_bool",
-                "offset": 0,
-                "slot": "0"
-              }
-            ],
-            "numberOfBytes": "32"
-          },
           "t_uint64": {
             "label": "uint64",
             "numberOfBytes": "8"
-          },
-          "t_address": {
-            "label": "address",
-            "numberOfBytes": "20"
-          },
-          "t_array(t_address)dyn_storage": {
-            "label": "address[]",
-            "numberOfBytes": "32"
-          },
-          "t_array(t_uint8)dyn_storage": {
-            "label": "uint8[]",
-            "numberOfBytes": "32"
-          },
-          "t_bytes32": {
-            "label": "bytes32",
-            "numberOfBytes": "32"
-          },
-          "t_bytes_storage": {
-            "label": "bytes",
-            "numberOfBytes": "32"
-          },
-          "t_enum(ApplicationStatus)2820": {
-            "label": "enum AgentFactoryV4.ApplicationStatus",
-            "members": [
-              "Active",
-              "Executed",
-              "Withdrawn"
-            ],
-            "numberOfBytes": "1"
-          },
-          "t_mapping(t_address,t_bool)": {
-            "label": "mapping(address => bool)",
-            "numberOfBytes": "32"
-          },
-          "t_mapping(t_address,t_uint256)": {
-            "label": "mapping(address => uint256)",
-            "numberOfBytes": "32"
-          },
-          "t_mapping(t_bytes32,t_struct(RoleData)497_storage)": {
-            "label": "mapping(bytes32 => struct AccessControl.RoleData)",
-            "numberOfBytes": "32"
           },
           "t_mapping(t_uint256,t_address)": {
             "label": "mapping(uint256 => address)",
             "numberOfBytes": "32"
           },
-          "t_mapping(t_uint256,t_struct(Application)2849_storage)": {
-            "label": "mapping(uint256 => struct AgentFactoryV4.Application)",
-            "numberOfBytes": "32"
-          },
-          "t_string_storage": {
-            "label": "string",
-            "numberOfBytes": "32"
-          },
-          "t_struct(Application)2849_storage": {
-            "label": "struct AgentFactoryV4.Application",
+          "t_struct(Params)2045_storage": {
+            "label": "struct FGenesis.Params",
             "members": [
               {
-                "label": "name",
-                "type": "t_string_storage",
+                "label": "virtualToken",
+                "type": "t_address",
                 "offset": 0,
                 "slot": "0"
               },
               {
-                "label": "symbol",
-                "type": "t_string_storage",
+                "label": "reserve",
+                "type": "t_uint256",
                 "offset": 0,
                 "slot": "1"
               },
               {
-                "label": "tokenURI",
-                "type": "t_string_storage",
+                "label": "maxContribution",
+                "type": "t_uint256",
                 "offset": 0,
                 "slot": "2"
               },
               {
-                "label": "status",
-                "type": "t_enum(ApplicationStatus)2820",
+                "label": "feeAddr",
+                "type": "t_address",
                 "offset": 0,
                 "slot": "3"
               },
               {
-                "label": "withdrawableAmount",
+                "label": "feeAmt",
                 "type": "t_uint256",
                 "offset": 0,
                 "slot": "4"
               },
               {
-                "label": "proposer",
-                "type": "t_address",
+                "label": "duration",
+                "type": "t_uint256",
                 "offset": 0,
                 "slot": "5"
-              },
-              {
-                "label": "cores",
-                "type": "t_array(t_uint8)dyn_storage",
-                "offset": 0,
-                "slot": "6"
-              },
-              {
-                "label": "proposalEndBlock",
-                "type": "t_uint256",
-                "offset": 0,
-                "slot": "7"
-              },
-              {
-                "label": "virtualId",
-                "type": "t_uint256",
-                "offset": 0,
-                "slot": "8"
               },
               {
                 "label": "tbaSalt",
                 "type": "t_bytes32",
                 "offset": 0,
+                "slot": "6"
+              },
+              {
+                "label": "tbaImpl",
+                "type": "t_address",
+                "offset": 0,
+                "slot": "7"
+              },
+              {
+                "label": "votePeriod",
+                "type": "t_uint32",
+                "offset": 20,
+                "slot": "7"
+              },
+              {
+                "label": "threshold",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "8"
+              },
+              {
+                "label": "agentFactory",
+                "type": "t_address",
+                "offset": 0,
                 "slot": "9"
               },
               {
-                "label": "tbaImplementation",
-                "type": "t_address",
+                "label": "agentTokenTotalSupply",
+                "type": "t_uint256",
                 "offset": 0,
                 "slot": "10"
               },
               {
-                "label": "daoVotingPeriod",
-                "type": "t_uint32",
-                "offset": 20,
-                "slot": "10"
-              },
-              {
-                "label": "daoThreshold",
+                "label": "agentTokenLpSupply",
                 "type": "t_uint256",
                 "offset": 0,
                 "slot": "11"
@@ -29424,24 +28731,6 @@
             ],
             "numberOfBytes": "384"
           },
-          "t_struct(RoleData)497_storage": {
-            "label": "struct AccessControl.RoleData",
-            "members": [
-              {
-                "label": "hasRole",
-                "type": "t_mapping(t_address,t_bool)",
-                "offset": 0,
-                "slot": "0"
-              },
-              {
-                "label": "adminRole",
-                "type": "t_bytes32",
-                "offset": 0,
-                "slot": "1"
-              }
-            ],
-            "numberOfBytes": "64"
-          },
           "t_uint256": {
             "label": "uint256",
             "numberOfBytes": "32"
@@ -29449,19 +28738,15 @@
           "t_uint32": {
             "label": "uint32",
             "numberOfBytes": "4"
-          },
-          "t_uint8": {
-            "label": "uint8",
-            "numberOfBytes": "1"
           }
         },
         "namespaces": {
-          "erc7201:openzeppelin.storage.Pausable": [
+          "erc7201:openzeppelin.storage.AccessControl": [
             {
-              "contract": "PausableUpgradeable",
-              "label": "_paused",
-              "type": "t_bool",
-              "src": "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol:21",
+              "contract": "AccessControlUpgradeable",
+              "label": "_roles",
+              "type": "t_mapping(t_bytes32,t_struct(RoleData)25_storage)",
+              "src": "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol:61",
               "offset": 0,
               "slot": "0"
             }

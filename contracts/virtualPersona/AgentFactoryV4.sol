@@ -109,6 +109,9 @@ contract AgentFactoryV4 is
     // The follow 2 variables maps only custom ERC20 to agent applications
     mapping(address => uint256) private _tokenApplication;
     mapping(uint256 => address) private _applicationToken;
+    mapping(uint256 => address) private _applicationLP;
+
+    bytes32 public constant OPS_ROLE = keccak256("OPS_ROLE");
 
     ///////////////////////////////////////////////////////////////
 
@@ -272,20 +275,23 @@ contract AgentFactoryV4 is
             IAgentToken(token).addInitialLiquidity(address(this));
         } else {
             // Custom token
-            lp = _createPair(token);
-            IERC20(token).forceApprove(_uniswapRouter, type(uint256).max);
-            IERC20(assetToken).forceApprove(_uniswapRouter, initialAmount);
-            // Add the liquidity:
-            IUniswapV2Router02(_uniswapRouter).addLiquidity(
-                token,
-                assetToken,
-                IERC20(token).balanceOf(address(this)),
-                initialAmount,
-                0,
-                0,
-                address(this),
-                block.timestamp
-            );
+            lp = _applicationLP[id];
+            if (lp == address(0)) {
+                lp = _createPair(token);
+                IERC20(token).forceApprove(_uniswapRouter, type(uint256).max);
+                IERC20(assetToken).forceApprove(_uniswapRouter, initialAmount);
+                // Add the liquidity:
+                IUniswapV2Router02(_uniswapRouter).addLiquidity(
+                    token,
+                    assetToken,
+                    IERC20(token).balanceOf(address(this)),
+                    initialAmount,
+                    0,
+                    0,
+                    address(this),
+                    block.timestamp
+                );
+            }
         }
 
         // C3
@@ -337,12 +343,14 @@ contract AgentFactoryV4 is
         IAgentNft(nft).setTBA(virtualId, tbaAddress);
 
         // C7
-        IERC20(lp).approve(veToken, type(uint256).max);
-        IAgentVeToken(veToken).stake(
-            IERC20(lp).balanceOf(address(this)),
-            application.proposer,
-            defaultDelegatee
-        );
+        if (_applicationLP[id] == address(0)) {
+            IERC20(lp).approve(veToken, type(uint256).max);
+            IAgentVeToken(veToken).stake(
+                IERC20(lp).balanceOf(address(this)),
+                application.proposer,
+                defaultDelegatee
+            );
+        }
 
         emit NewPersona(virtualId, token, dao, tbaAddress, veToken, lp);
     }
@@ -582,6 +590,66 @@ contract AgentFactoryV4 is
 
         IERC20(tokenAddr).safeTransferFrom(sender, address(this), initialLP);
 
+        return
+            _initFromToken(
+                sender,
+                tokenAddr,
+                cores,
+                tbaSalt,
+                tbaImplementation,
+                daoVotingPeriod,
+                daoThreshold
+            );
+    }
+
+    function initFromTokenLP(
+        address creator,
+        address tokenAddr,
+        uint8[] memory cores,
+        bytes32 tbaSalt,
+        address tbaImplementation,
+        uint32 daoVotingPeriod,
+        uint256 daoThreshold,
+        address lpAddress
+    ) public whenNotPaused onlyRole(OPS_ROLE) returns (uint256) {
+        require(_tokenApplication[tokenAddr] == 0, "Token already exists");
+
+        require(isCompatibleToken(tokenAddr), "Unsupported token");
+
+        require(tokenAddr != assetToken, "Asset token cannot be used");
+
+        require(
+            IERC20(assetToken).allowance(creator, address(this)) >=
+                applicationThreshold,
+            "Insufficient asset token allowance"
+        );
+
+        require(cores.length > 0, "Cores must be provided");
+
+        uint256 id = _initFromToken(
+            creator,
+            tokenAddr,
+            cores,
+            tbaSalt,
+            tbaImplementation,
+            daoVotingPeriod,
+            daoThreshold
+        );
+
+        _applicationLP[id] = lpAddress;
+
+        return id;
+    }
+
+    function _initFromToken(
+        address sender,
+        address tokenAddr,
+        uint8[] memory cores,
+        bytes32 tbaSalt,
+        address tbaImplementation,
+        uint32 daoVotingPeriod,
+        uint256 daoThreshold
+    ) internal returns (uint256) {
         IERC20(assetToken).safeTransferFrom(
             sender,
             address(this),

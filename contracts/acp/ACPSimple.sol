@@ -217,26 +217,22 @@ contract ACPSimple is
             uint256 evaluatorFee = (claimableAmount * evaluatorFeeBP) / 10000;
             uint256 platformFee = (claimableAmount * platformFeeBP) / 10000;
             if (platformFee > 0) {
-                paymentToken.safeTransferFrom(
-                    address(this),
+                paymentToken.safeTransfer(
                     platformTreasury,
                     platformFee
                 );
             }
-            uint256 paidToEvaluators = 0;
-            if (job.evaluator != address(0)) {
-                paymentToken.safeTransferFrom(
-                    address(this),
+            if (job.evaluator != address(0) && evaluatorFee > 0) {
+                paymentToken.safeTransfer(
                     job.evaluator,
                     evaluatorFee
                 );
                 emit ClaimedEvaluatorFee(id, job.evaluator, evaluatorFee);
             }
 
-            claimableAmount = claimableAmount - platformFee - paidToEvaluators;
+            claimableAmount = claimableAmount - platformFee - evaluatorFee;
 
-            paymentToken.safeTransferFrom(
-                address(this),
+            paymentToken.safeTransfer(
                 job.provider,
                 claimableAmount
             );
@@ -252,8 +248,7 @@ contract ACPSimple is
             );
 
             if (job.phase >= PHASE_TRANSACTION && claimableAmount > 0) {
-                paymentToken.safeTransferFrom(
-                    address(this),
+                paymentToken.safeTransfer(
                     job.client,
                     claimableAmount
                 );

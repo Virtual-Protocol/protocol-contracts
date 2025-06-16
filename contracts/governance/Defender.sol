@@ -247,7 +247,7 @@ contract Defender is AccessControlUpgradeable, ReentrancyGuardUpgradeable {
 
     function countVotes(
         uint256 proposalId,
-        address[] memory voters
+        uint256[] calldata voterIndexes
     ) external {
         Proposal memory proposal = proposals[proposalId];
         ProposalVote storage proposalVote = _proposalVotes[proposalId];
@@ -255,8 +255,8 @@ contract Defender is AccessControlUpgradeable, ReentrancyGuardUpgradeable {
             proposal.state == ProposalState.Finalizing,
             "Proposal not finalizing"
         );
-        for (uint256 i = 0; i < voters.length; i++) {
-            address voter = voters[i];
+        for (uint256 i = 0; i < voterIndexes.length; i++) {
+            address voter = proposalVote.voters[voterIndexes[i]];
             if (
                 proposalVote.hasVoted[voter] &&
                 !proposalVote.voteFinalized[voter]
@@ -281,7 +281,7 @@ contract Defender is AccessControlUpgradeable, ReentrancyGuardUpgradeable {
             }
         }
 
-        if (proposalVote.finalizedCount == voters.length) {
+        if (proposalVote.finalizedCount == proposalVote.voters.length) {
             _concludeProposalState(proposalId);
         }
     }

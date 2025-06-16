@@ -180,7 +180,8 @@ contract Defender is AccessControlUpgradeable, ReentrancyGuardUpgradeable {
             uint256 forVotes,
             uint256 initialAgainstVotes,
             uint256 initialForVotes,
-            uint256 totalVEVirtual
+            uint256 totalVEVirtual,
+            uint256 voterCount
         )
     {
         Proposal memory proposal = proposals[proposalId];
@@ -191,7 +192,8 @@ contract Defender is AccessControlUpgradeable, ReentrancyGuardUpgradeable {
             proposalVote.forVotes,
             proposalVote.initialAgainstVotes,
             proposalVote.initialForVotes,
-            proposal.totalVEVirtual
+            proposal.totalVEVirtual,
+            proposalVote.voters.length
         );
     }
 
@@ -316,7 +318,7 @@ contract Defender is AccessControlUpgradeable, ReentrancyGuardUpgradeable {
         return totalVotes >= quorumVotes;
     }
 
-    function voterCount(uint256 proposalId) public view returns (uint256) {
+    function proposalVoterCount(uint256 proposalId) public view returns (uint256) {
         return _proposalVotes[proposalId].voters.length;
     }
 

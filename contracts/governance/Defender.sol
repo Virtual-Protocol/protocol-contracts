@@ -57,7 +57,7 @@ contract Defender is AccessControlUpgradeable, ReentrancyGuardUpgradeable {
         uint256 proposalId
     );
 
-    mapping(address voter => uint8 defendCount) public defendCount;
+    mapping(address voter => uint8 defendedCount) public defendedCount;
 
     uint8 public maxDefendCount;
     uint256 public quorum;
@@ -208,11 +208,11 @@ contract Defender is AccessControlUpgradeable, ReentrancyGuardUpgradeable {
             "Invalid vote"
         );
 
-        if (defendCount[account] >= maxDefendCount) {
-            revert ExceededMaxDefendCount(defendCount[account], maxDefendCount);
+        if (defendedCount[account] >= maxDefendCount) {
+            revert ExceededMaxDefendCount(defendedCount[account], maxDefendCount);
         }
 
-        defendCount[account]++;
+        defendedCount[account]++;
 
         require(!hasVoted(proposalId, account), "Already voted");
 
@@ -277,8 +277,8 @@ contract Defender is AccessControlUpgradeable, ReentrancyGuardUpgradeable {
                 }
 
                 proposalVote.finalizedCount++;
-                if (defendCount[voter] > 0) {
-                    defendCount[voter]--;
+                if (defendedCount[voter] > 0) {
+                    defendedCount[voter]--;
                 }
             }
         }

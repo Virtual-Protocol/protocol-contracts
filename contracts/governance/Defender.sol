@@ -2,13 +2,19 @@
 pragma solidity ^0.8.26;
 
 import "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
+import {Checkpoints} from "@openzeppelin/contracts/utils/structs/Checkpoints.sol";
+import {SafeCast} from "@openzeppelin/contracts/utils/math/SafeCast.sol";
 import {SignatureChecker} from "@openzeppelin/contracts/utils/cryptography/SignatureChecker.sol";
 import "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
 import "../token/IVEVirtual.sol";
 
 contract Defender is AccessControlUpgradeable, ReentrancyGuardUpgradeable {
+    using Checkpoints for Checkpoints.Trace224;
+
     bytes32 public constant OPS_ROLE = keccak256("OPS_ROLE");
     bytes32 public constant ADMIN_ROLE = keccak256("ADMIN_ROLE");
+
+    Checkpoints.Trace224 private _quorumCheckpoints;
 
     error DisabledDeposit();
 
@@ -25,7 +31,6 @@ contract Defender is AccessControlUpgradeable, ReentrancyGuardUpgradeable {
         Against,
         For
     }
-
     struct Proposal {
         uint256 genesisId;
         uint256 totalVEVirtual;
@@ -57,10 +62,11 @@ contract Defender is AccessControlUpgradeable, ReentrancyGuardUpgradeable {
         uint256 proposalId
     );
 
+    event QuorumUpdated(uint224 oldQuorum, uint224 newQuorum);
+
     mapping(address voter => uint8 defendedCount) public defendedCount;
 
     uint8 public maxDefendCount;
-    uint256 public quorum;
 
     uint256 public constant DENOM = 10000;
 
@@ -110,6 +116,7 @@ contract Defender is AccessControlUpgradeable, ReentrancyGuardUpgradeable {
         require(veVirtual_ != address(0), "Invalid veVirtual address");
         maxDefendCount = maxDefendCount_;
         veVirtual = IVEVirtual(veVirtual_);
+        _quorumCheckpoints.push(0, 3000);
     }
 
     receive() external payable virtual {
@@ -122,9 +129,13 @@ contract Defender is AccessControlUpgradeable, ReentrancyGuardUpgradeable {
         maxDefendCount = maxDefendCount_;
     }
 
-    function setQuorum(uint256 quorum_) external onlyRole(ADMIN_ROLE) {
-        require(quorum_ <= DENOM, "Invalid quorum");
-        quorum = quorum_;
+    function updateQuorum(uint224 newQuorum) public onlyRole(ADMIN_ROLE) {
+        uint224 oldQuorum = _quorumCheckpoints.latest();
+        _quorumCheckpoints.push(
+            SafeCast.toUint32(block.timestamp),
+            SafeCast.toUint208(newQuorum)
+        );
+        emit QuorumUpdated(oldQuorum, newQuorum);
     }
 
     function propose(
@@ -209,7 +220,10 @@ contract Defender is AccessControlUpgradeable, ReentrancyGuardUpgradeable {
         );
 
         if (defendedCount[account] >= maxDefendCount) {
-            revert ExceededMaxDefendCount(defendedCount[account], maxDefendCount);
+            revert ExceededMaxDefendCount(
+                defendedCount[account],
+                maxDefendCount
+            );
         }
 
         defendedCount[account]++;
@@ -314,11 +328,14 @@ contract Defender is AccessControlUpgradeable, ReentrancyGuardUpgradeable {
         uint256 forVotes
     ) internal view returns (bool) {
         uint256 totalVotes = againstVotes + forVotes;
-        uint256 quorumVotes = (totalVEVirtual * quorum) / DENOM;
+        uint256 quorumVotes = (totalVEVirtual * quorum(block.timestamp)) /
+            DENOM;
         return totalVotes >= quorumVotes;
     }
 
-    function proposalVoterCount(uint256 proposalId) public view returns (uint256) {
+    function proposalVoterCount(
+        uint256 proposalId
+    ) public view returns (uint256) {
         return _proposalVotes[proposalId].voters.length;
     }
 
@@ -327,5 +344,21 @@ contract Defender is AccessControlUpgradeable, ReentrancyGuardUpgradeable {
         uint256 version
     ) public pure virtual returns (uint256) {
         return uint256(keccak256(abi.encode(genesisId, version)));
+    }
+
+    function quorum(uint256 timestamp) public view returns (uint256) {
+        uint256 length = _quorumCheckpoints.length();
+
+        Checkpoints.Checkpoint224 memory latest = _quorumCheckpoints.at(
+            SafeCast.toUint32(length - 1)
+        );
+        uint48 latestKey = latest._key;
+        uint224 latestValue = latest._value;
+        if (latestKey <= timestamp) {
+            return latestValue;
+        }
+
+        return
+            _quorumCheckpoints.upperLookupRecent(SafeCast.toUint32(timestamp));
     }
 }

@@ -352,6 +352,11 @@
     {
       "address": "0x56Fefb215714D791e51811EBC8348f9622A347C0",
       "kind": "transparent"
+    },
+    {
+      "address": "0x5C4424DE6e94DeF1cd0B43B57Daca269a37Ad474",
+      "txHash": "0xc220be21c920e12c167fde9eb3a788668a4c40855dd52bfb42d3e7022a179ff1",
+      "kind": "transparent"
     }
   ],
   "impls": {
@@ -28741,6 +28746,334 @@
           }
         },
         "namespaces": {
+          "erc7201:openzeppelin.storage.AccessControl": [
+            {
+              "contract": "AccessControlUpgradeable",
+              "label": "_roles",
+              "type": "t_mapping(t_bytes32,t_struct(RoleData)25_storage)",
+              "src": "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol:61",
+              "offset": 0,
+              "slot": "0"
+            }
+          ],
+          "erc7201:openzeppelin.storage.Initializable": [
+            {
+              "contract": "Initializable",
+              "label": "_initialized",
+              "type": "t_uint64",
+              "src": "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol:69",
+              "offset": 0,
+              "slot": "0"
+            },
+            {
+              "contract": "Initializable",
+              "label": "_initializing",
+              "type": "t_bool",
+              "src": "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol:73",
+              "offset": 8,
+              "slot": "0"
+            }
+          ]
+        }
+      }
+    },
+    "b2f8b840a363b5206034a56066c33f42dec5984fd5859d3629fd57b88716cfc9": {
+      "address": "0xF9A9e2Fdd7ef7454020aD0ec35352A9a476776E2",
+      "txHash": "0x6491d085ade22213081002b004937e39b092c0795bf7eff98f3b7e766d9e5a91",
+      "layout": {
+        "solcVersion": "0.8.26",
+        "storage": [
+          {
+            "label": "_proposalVotes",
+            "offset": 0,
+            "slot": "0",
+            "type": "t_mapping(t_uint256,t_struct(ProposalVote)1464_storage)",
+            "contract": "Defender",
+            "src": "contracts/governance/Defender.sol:50"
+          },
+          {
+            "label": "proposals",
+            "offset": 0,
+            "slot": "1",
+            "type": "t_mapping(t_uint256,t_struct(Proposal)1434_storage)",
+            "contract": "Defender",
+            "src": "contracts/governance/Defender.sol:52"
+          },
+          {
+            "label": "defendCount",
+            "offset": 0,
+            "slot": "2",
+            "type": "t_mapping(t_address,t_uint8)",
+            "contract": "Defender",
+            "src": "contracts/governance/Defender.sol:60"
+          },
+          {
+            "label": "maxDefendCount",
+            "offset": 0,
+            "slot": "3",
+            "type": "t_uint8",
+            "contract": "Defender",
+            "src": "contracts/governance/Defender.sol:62"
+          },
+          {
+            "label": "quorum",
+            "offset": 0,
+            "slot": "4",
+            "type": "t_uint256",
+            "contract": "Defender",
+            "src": "contracts/governance/Defender.sol:63"
+          },
+          {
+            "label": "veVirtual",
+            "offset": 0,
+            "slot": "5",
+            "type": "t_contract(IVEVirtual)2261",
+            "contract": "Defender",
+            "src": "contracts/governance/Defender.sol:80"
+          }
+        ],
+        "types": {
+          "t_address": {
+            "label": "address",
+            "numberOfBytes": "20"
+          },
+          "t_bool": {
+            "label": "bool",
+            "numberOfBytes": "1"
+          },
+          "t_bytes32": {
+            "label": "bytes32",
+            "numberOfBytes": "32"
+          },
+          "t_mapping(t_address,t_bool)": {
+            "label": "mapping(address => bool)",
+            "numberOfBytes": "32"
+          },
+          "t_mapping(t_bytes32,t_struct(RoleData)25_storage)": {
+            "label": "mapping(bytes32 => struct AccessControlUpgradeable.RoleData)",
+            "numberOfBytes": "32"
+          },
+          "t_struct(AccessControlStorage)34_storage": {
+            "label": "struct AccessControlUpgradeable.AccessControlStorage",
+            "members": [
+              {
+                "label": "_roles",
+                "type": "t_mapping(t_bytes32,t_struct(RoleData)25_storage)",
+                "offset": 0,
+                "slot": "0"
+              }
+            ],
+            "numberOfBytes": "32"
+          },
+          "t_struct(InitializableStorage)93_storage": {
+            "label": "struct Initializable.InitializableStorage",
+            "members": [
+              {
+                "label": "_initialized",
+                "type": "t_uint64",
+                "offset": 0,
+                "slot": "0"
+              },
+              {
+                "label": "_initializing",
+                "type": "t_bool",
+                "offset": 8,
+                "slot": "0"
+              }
+            ],
+            "numberOfBytes": "32"
+          },
+          "t_struct(ReentrancyGuardStorage)165_storage": {
+            "label": "struct ReentrancyGuardUpgradeable.ReentrancyGuardStorage",
+            "members": [
+              {
+                "label": "_status",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "0"
+              }
+            ],
+            "numberOfBytes": "32"
+          },
+          "t_struct(RoleData)25_storage": {
+            "label": "struct AccessControlUpgradeable.RoleData",
+            "members": [
+              {
+                "label": "hasRole",
+                "type": "t_mapping(t_address,t_bool)",
+                "offset": 0,
+                "slot": "0"
+              },
+              {
+                "label": "adminRole",
+                "type": "t_bytes32",
+                "offset": 0,
+                "slot": "1"
+              }
+            ],
+            "numberOfBytes": "64"
+          },
+          "t_uint256": {
+            "label": "uint256",
+            "numberOfBytes": "32"
+          },
+          "t_uint64": {
+            "label": "uint64",
+            "numberOfBytes": "8"
+          },
+          "t_array(t_address)dyn_storage": {
+            "label": "address[]",
+            "numberOfBytes": "32"
+          },
+          "t_contract(IVEVirtual)2261": {
+            "label": "contract IVEVirtual",
+            "numberOfBytes": "20"
+          },
+          "t_enum(ProposalState)1418": {
+            "label": "enum Defender.ProposalState",
+            "members": [
+              "Pending",
+              "Active",
+              "Finalizing",
+              "Defeated",
+              "Succeeded"
+            ],
+            "numberOfBytes": "1"
+          },
+          "t_mapping(t_address,t_uint256)": {
+            "label": "mapping(address => uint256)",
+            "numberOfBytes": "32"
+          },
+          "t_mapping(t_address,t_uint8)": {
+            "label": "mapping(address => uint8)",
+            "numberOfBytes": "32"
+          },
+          "t_mapping(t_uint256,t_struct(Proposal)1434_storage)": {
+            "label": "mapping(uint256 => struct Defender.Proposal)",
+            "numberOfBytes": "32"
+          },
+          "t_mapping(t_uint256,t_struct(ProposalVote)1464_storage)": {
+            "label": "mapping(uint256 => struct Defender.ProposalVote)",
+            "numberOfBytes": "32"
+          },
+          "t_struct(Proposal)1434_storage": {
+            "label": "struct Defender.Proposal",
+            "members": [
+              {
+                "label": "genesisId",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "0"
+              },
+              {
+                "label": "totalVEVirtual",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "1"
+              },
+              {
+                "label": "finalizedAt",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "2"
+              },
+              {
+                "label": "createdAt",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "3"
+              },
+              {
+                "label": "state",
+                "type": "t_enum(ProposalState)1418",
+                "offset": 0,
+                "slot": "4"
+              }
+            ],
+            "numberOfBytes": "160"
+          },
+          "t_struct(ProposalVote)1464_storage": {
+            "label": "struct Defender.ProposalVote",
+            "members": [
+              {
+                "label": "againstVotes",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "0"
+              },
+              {
+                "label": "forVotes",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "1"
+              },
+              {
+                "label": "initialForVotes",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "2"
+              },
+              {
+                "label": "initialAgainstVotes",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "3"
+              },
+              {
+                "label": "hasVoted",
+                "type": "t_mapping(t_address,t_bool)",
+                "offset": 0,
+                "slot": "4"
+              },
+              {
+                "label": "forVoters",
+                "type": "t_mapping(t_address,t_bool)",
+                "offset": 0,
+                "slot": "5"
+              },
+              {
+                "label": "voteFinalized",
+                "type": "t_mapping(t_address,t_bool)",
+                "offset": 0,
+                "slot": "6"
+              },
+              {
+                "label": "votes",
+                "type": "t_mapping(t_address,t_uint256)",
+                "offset": 0,
+                "slot": "7"
+              },
+              {
+                "label": "voters",
+                "type": "t_array(t_address)dyn_storage",
+                "offset": 0,
+                "slot": "8"
+              },
+              {
+                "label": "finalizedCount",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "9"
+              }
+            ],
+            "numberOfBytes": "320"
+          },
+          "t_uint8": {
+            "label": "uint8",
+            "numberOfBytes": "1"
+          }
+        },
+        "namespaces": {
+          "erc7201:openzeppelin.storage.ReentrancyGuard": [
+            {
+              "contract": "ReentrancyGuardUpgradeable",
+              "label": "_status",
+              "type": "t_uint256",
+              "src": "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol:40",
+              "offset": 0,
+              "slot": "0"
+            }
+          ],
           "erc7201:openzeppelin.storage.AccessControl": [
             {
               "contract": "AccessControlUpgradeable",

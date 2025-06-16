@@ -62,7 +62,7 @@ contract Defender is AccessControlUpgradeable, ReentrancyGuardUpgradeable {
     uint8 public maxDefendCount;
     uint256 public quorum;
 
-    uint256 public DENOM = 10000;
+    uint256 public constant DENOM = 10000;
 
     error ExceededMaxDefendCount(
         uint8 currentDefendCount,

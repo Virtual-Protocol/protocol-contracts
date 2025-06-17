@@ -81,6 +81,14 @@ module.exports = {
         },
       },
     },
+    eth_sepolia: {
+      url: "",
+      accounts: [process.env.PRIVATE_KEY]
+    },
+    eth_mainnet: {
+      url: "",
+      accounts: [process.env.PRIVATE_KEY]
+    },
     base_sepolia_fire: {
       url: "https://sepolia.base.org",
       accounts: [process.env.PRIVATE_KEY],

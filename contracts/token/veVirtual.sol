@@ -148,10 +148,6 @@ contract veVirtual is
         require(amount > 0, "Amount must be greater than 0");
         require(numWeeks <= maxWeeks, "Num weeks must be less than max weeks");
         require(numWeeks > 0, "Num weeks must be greater than 0");
-        require(
-            locks[_msgSender()].length < MAX_POSITIONS,
-            "Over max positions"
-        );
 
         IERC20(baseToken).safeTransferFrom(_msgSender(), address(this), amount);
 
@@ -227,7 +223,6 @@ contract veVirtual is
         uint256 index = _indexOf(account, id);
 
         Lock storage lock = locks[account][index];
-        require(block.timestamp < lock.end, "Lock is expired");
         lock.autoRenew = !lock.autoRenew;
         lock.numWeeks = maxWeeks;
         lock.start = block.timestamp;

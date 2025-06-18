@@ -133,10 +133,10 @@ contract VirtualProtocolDAOV2 is
         _admin = admin;
     }
 
-    function setTotalSupply(uint256 totalSupply) public onlyAdminGov {
+    function setTotalSupply(uint256 totalSupply, uint256 timestamp) public onlyAdminGov {
         uint256 oldTotalSupply = latestTotalSupply();
         _totalSupplyCheckpoints.push(
-            SafeCast.toUint32(block.timestamp),
+            SafeCast.toUint32(timestamp),
             SafeCast.toUint224(totalSupply)
         );
         emit TotalSupplyUpdated(oldTotalSupply, totalSupply);

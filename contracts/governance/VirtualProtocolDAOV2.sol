@@ -236,7 +236,7 @@ contract VirtualProtocolDAOV2 is
         return _token.balanceOfAt(account, timepoint);
     }
 
-    function _validateStateBitmap(uint256 proposalId, bytes32 allowedStates) private view override(Governor) returns (ProposalState) {
+    function _validateStateBitmap2(uint256 proposalId, bytes32 allowedStates) private view returns (ProposalState) {
         ProposalState currentState = state(proposalId);
         if (_encodeStateBitmap(currentState) & allowedStates == bytes32(0)) {
             revert GovernorUnexpectedProposalState(proposalId, currentState, allowedStates);
@@ -251,7 +251,7 @@ contract VirtualProtocolDAOV2 is
         string memory reason,
         bytes memory params
     ) internal override(Governor) returns (uint256) {
-        _validateStateBitmap(proposalId, _encodeStateBitmap(ProposalState.Active));
+        _validateStateBitmap2(proposalId, _encodeStateBitmap(ProposalState.Active));
 
         uint256 weight = _getVotes(account, block.timestamp, params);
         _countVote(proposalId, account, support, weight, params);

@@ -34,6 +34,8 @@ contract veVirtual is
 
     uint8 public maxWeeks;
 
+    mapping(uint256 => Lock) public allLocks;
+
     event Stake(
         address indexed user,
         uint256 id,
@@ -87,6 +89,24 @@ contract veVirtual is
         return results;
     }
 
+    function getPositionIds(
+        address account,
+        uint256 start,
+        uint256 count
+    ) public view returns (uint256[] memory) {
+        uint256[] memory results = new uint256[](count);
+        uint j = 0;
+        for (
+            uint i = start;
+            i < (start + count) && i < locks[account].length;
+            i++
+        ) {
+            results[j] = locks[account][i].id;
+            j++;
+        }
+        return results;
+    }
+
     // Query balance at a specific timestamp
     // If the timestamp is before the lock was created, it will return 0
     // This does not work on withdrawn locks
@@ -110,6 +130,13 @@ contract veVirtual is
         uint256 index
     ) public view returns (uint256) {
         return _balanceOfLock(locks[account][index]);
+    }
+
+    function balanceOfLockAt(
+        uint256 id,
+        uint256 timestamp
+    ) public view returns (uint256) {
+        return _balanceOfLockAt(allLocks[id], timestamp);
     }
 
     function _balanceOfLockAt(
@@ -169,7 +196,10 @@ contract veVirtual is
             autoRenew: autoRenew,
             id: _nextId++
         });
+
         locks[_msgSender()].push(lock);
+        allLocks[lock.id] = lock;
+
         emit Stake(_msgSender(), lock.id, amount, numWeeks);
         _transferVotingUnits(address(0), _msgSender(), amount);
     }
@@ -233,6 +263,8 @@ contract veVirtual is
         lock.start = block.timestamp;
         lock.end = block.timestamp + uint(lock.numWeeks) * 1 weeks;
 
+        _syncLock(lock);
+
         emit AutoRenew(account, id, lock.autoRenew);
     }
 
@@ -251,7 +283,13 @@ contract veVirtual is
         lock.numWeeks += numWeeks;
         lock.end = newEnd;
 
+        _syncLock(lock);
+
         emit Extend(account, id, numWeeks);
+    }
+
+    function _syncLock(Lock memory lock) internal {
+        allLocks[lock.id] = lock;
     }
 
     function setMaxWeeks(uint8 maxWeeks_) external onlyRole(ADMIN_ROLE) {

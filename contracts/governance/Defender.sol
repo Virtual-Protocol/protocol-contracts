@@ -231,7 +231,7 @@ contract Defender is AccessControlUpgradeable, ReentrancyGuardUpgradeable {
         require(!hasVoted(proposalId, account), "Already voted");
 
         ProposalVote storage proposalVote = _proposalVotes[proposalId];
-
+        proposalVote.hasVoted[account] = true;
         proposalVote.voters.push(account);
 
         if (support == VoteType.For) {

@@ -9,14 +9,6 @@ import "@openzeppelin/contracts/governance/extensions/GovernorVotesQuorumFractio
 import "./GovernorCountingVP.sol";
 import "../token/IVEVirtual.sol";
 
-/*
- Governor,
-    GovernorSettings,
-    GovernorStorage,
-    GovernorCountingVP,
-    GovernorVotesQuorumFraction
-    */
-
 contract VirtualProtocolDAOV2 is
     Governor,
     GovernorSettings,

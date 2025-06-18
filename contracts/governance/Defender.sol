@@ -32,7 +32,6 @@ contract Defender is AccessControlUpgradeable, ReentrancyGuardUpgradeable {
         For
     }
     struct Proposal {
-        uint256 genesisId;
         uint256 totalVEVirtual;
         uint256 finalizedAt;
         uint256 createdAt;
@@ -145,7 +144,6 @@ contract Defender is AccessControlUpgradeable, ReentrancyGuardUpgradeable {
         uint256 proposalId = hashProposal(genesisId, version);
 
         proposals[proposalId] = Proposal({
-            genesisId: genesisId,
             totalVEVirtual: 0,
             finalizedAt: 0,
             createdAt: block.timestamp,
@@ -154,7 +152,7 @@ contract Defender is AccessControlUpgradeable, ReentrancyGuardUpgradeable {
 
         emit ProposalCreated(genesisId, version, proposalId);
 
-        return genesisId;
+        return proposalId;
     }
 
     function hasVoted(

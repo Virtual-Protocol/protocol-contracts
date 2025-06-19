@@ -99,6 +99,8 @@ contract Genesis is ReentrancyGuard, AccessControlUpgradeable {
         "End time must be after start time";
     string private constant ERR_TOKEN_LAUNCHED = "Agent token already launched";
     string private constant ERR_TOKEN_NOT_LAUNCHED = "Agent token not launched";
+    string private constant ERR_ZERO_ADD = "Address cannot be empty";
+    string private constant ERR_INVALID_PARAM = "Invalid value for parameter";
 
     // Common validation modifiers
     modifier whenNotStarted() {
@@ -159,6 +161,11 @@ contract Genesis is ReentrancyGuard, AccessControlUpgradeable {
         _;
     }
 
+    uint256 public totalDonateAmt;
+    mapping(address => uint256) public mapAddrToDonateAmt;
+    address[] public donors;
+    event Donate(uint256 indexed genesisID, address indexed user, uint256 amount);
+
     function _validateTime(uint256 _startTime, uint256 _endTime) internal view {
         require(_startTime > block.timestamp, ERR_START_TIME_FUTURE);
         require(_endTime > _startTime, ERR_END_AFTER_START);
@@ -169,46 +176,24 @@ contract Genesis is ReentrancyGuard, AccessControlUpgradeable {
     ) external initializer {
         __AccessControl_init();
 
-        require(params.genesisID > 0, "Invalid genesis ID");
-        require(params.factory != address(0), "Invalid factory address");
+        require(params.genesisID > 0, "Invalid ID");
+        require(params.factory != address(0) && params.tbaImplementation != address(0) 
+            && params.agentFactoryAddress != address(0) && params.virtualTokenAddress != address(0), ERR_ZERO_ADD);
         _validateTime(params.startTime, params.endTime);
-        require(bytes(params.genesisName).length > 0, "Invalid genesis name");
+        require(bytes(params.genesisName).length > 0, "Invalid name");
         require(
             bytes(params.genesisTicker).length > 0,
-            "Invalid genesis ticker"
+            "Invalid ticker"
         );
-        require(params.genesisCores.length > 0, "Invalid genesis cores");
+        require(params.genesisCores.length > 0, "Invalid cores");
         require(
-            params.tbaImplementation != address(0),
-            "Invalid TBA implementation address"
-        );
-        require(
-            params.agentFactoryAddress != address(0),
-            "Invalid agent factory address"
-        );
-        require(
-            params.virtualTokenAddress != address(0),
-            "Invalid virtual token address"
-        );
-        require(
-            params.reserveAmount > 0,
-            "Reserve amount must be greater than 0"
-        );
-        require(
-            params.maxContributionVirtualAmount > 0,
-            "Max contribution must be greater than 0"
-        );
-        require(
-            params.agentTokenTotalSupply > 0,
-            "Agent token total supply must be greater than 0"
-        );
-        require(
-            params.agentTokenLpSupply > 0,
-            "Agent token lp supply must be greater than 0"
+            params.reserveAmount > 0 && params.maxContributionVirtualAmount > 0
+            && params.agentTokenTotalSupply > 0 && params.agentTokenLpSupply > 0,
+           ERR_INVALID_PARAM
         );
         require(
             params.agentTokenTotalSupply >= params.agentTokenLpSupply,
-            "Agent token total supply must be greater than agent token lp supply"
+            "Agent token total supply must be > agent token lp supply"
         );
 
         genesisId = params.genesisID;
@@ -237,8 +222,8 @@ contract Genesis is ReentrancyGuard, AccessControlUpgradeable {
         uint256 pointAmt,
         uint256 virtualsAmt
     ) external nonReentrant whenActive {
-        require(pointAmt > 0, "Point amount must be greater than 0");
-        require(virtualsAmt > 0, "Virtuals must be greater than 0");
+        require(pointAmt > 0, "Point amount must be > 0");
+        require(virtualsAmt > 0, "Virtuals must be > 0");
 
         // Check single submission upper limit
         require(
@@ -261,31 +246,6 @@ contract Genesis is ReentrancyGuard, AccessControlUpgradeable {
         );
 
         emit Participated(genesisId, msg.sender, pointAmt, virtualsAmt);
-    }
-
-    function onGenesisSuccess(
-        address[] calldata refundVirtualsTokenUserAddresses,
-        uint256[] calldata refundVirtualsTokenUserAmounts,
-        address[] calldata distributeAgentTokenUserAddresses,
-        uint256[] calldata distributeAgentTokenUserAmounts,
-        address creator
-    )
-        external
-        onlyRole(FACTORY_ROLE)
-        nonReentrant
-        whenNotCancelled
-        whenEnded
-        returns (address)
-    {
-        return
-            _onGenesisSuccessSalt(
-                refundVirtualsTokenUserAddresses,
-                refundVirtualsTokenUserAmounts,
-                distributeAgentTokenUserAddresses,
-                distributeAgentTokenUserAmounts,
-                creator,
-                keccak256(abi.encodePacked(msg.sender, block.timestamp))
-            );
     }
 
     function onGenesisSuccessSalt(
@@ -346,8 +306,10 @@ contract Genesis is ReentrancyGuard, AccessControlUpgradeable {
             // grant allowance to agentFactoryAddress for launch
             IERC20(virtualTokenAddress).approve(
                 agentFactoryAddress,
-                reserveAmount
+                reserveAmount + totalDonateAmt
             );
+
+            uint256 agentTokenLpSupplyAfterDonate = calAgentTokenLpSupplyAfterDonate(totalDonateAmt);
 
             // Call initFromBondingCurve and executeBondingCurveApplication
             uint256 id = IAgentFactoryV3(agentFactoryAddress)
@@ -359,7 +321,7 @@ contract Genesis is ReentrancyGuard, AccessControlUpgradeable {
                     tbaImplementation,
                     daoVotingPeriod,
                     daoThreshold,
-                    reserveAmount,
+                    reserveAmount + totalDonateAmt,
                     creator
                 );
 
@@ -367,12 +329,12 @@ contract Genesis is ReentrancyGuard, AccessControlUpgradeable {
                 .executeBondingCurveApplicationSalt(
                     id,
                     agentTokenTotalSupply,
-                    agentTokenLpSupply,
+                    agentTokenLpSupplyAfterDonate,
                     address(this), // vault
                     salt
                 );
 
-            require(agentToken != address(0), "Agent token creation failed");
+            require(agentToken != address(0), ERR_ZERO_ADD);
 
             // Store the created agent token address
             agentTokenAddress = agentToken;
@@ -596,7 +558,7 @@ contract Genesis is ReentrancyGuard, AccessControlUpgradeable {
         nonReentrant
         whenEnded
     {
-        require(token != address(0), "Invalid token address");
+        require(token != address(0), ERR_ZERO_ADD);
         require(
             amount <= IERC20(token).balanceOf(address(this)),
             "Insufficient balance to withdraw"
@@ -642,5 +604,59 @@ contract Genesis is ReentrancyGuard, AccessControlUpgradeable {
     {
         isCancelled = true;
         emit GenesisCancelled(genesisId);
+    }
+
+    function donate(uint256 amount)
+        external nonReentrant whenActive
+    {
+        require(amount > 0, "invalid amount");
+        IERC20(virtualTokenAddress).transferFrom(msg.sender, address(this), amount);
+        totalDonateAmt += amount;
+        mapAddrToDonateAmt[msg.sender] += amount;
+        if (mapAddrToDonateAmt[msg.sender] == 0) {
+            donors.push(msg.sender);
+        }
+        emit Donate(genesisId, msg.sender, amount);
+
+        // maybe have a maxCap for the donateAmt
+    }
+
+    function withdrawAgentTokenFromDonate() external onlyRole(FACTORY_ROLE) {
+        if (totalDonateAmt > 0) {
+            uint256 agentTokenLpSupplyAfterDonate = calAgentTokenLpSupplyAfterDonate(totalDonateAmt);
+            uint256 agentTokenFromDonate = agentTokenLpSupply - agentTokenLpSupplyAfterDonate;
+            IERC20(agentTokenAddress).safeTransfer(msg.sender, agentTokenFromDonate);
+        }
+    }
+
+    function calAgentTokenLpSupplyAfterDonate(uint256 donateAmt) public view returns (uint256) {
+        uint256 numerator = 48000 * 125000000 * 1e18;
+        uint256 denominator = (48000 * 1e18 + donateAmt);
+        return numerator / denominator;
+    }
+
+    function refundDonate(
+        uint256[] calldata donorIndexes
+    )
+        external
+        onlyRole(FACTORY_ROLE)
+        nonReentrant
+        whenTokenNotLaunched
+        whenEnded
+    {
+        require(isFailed, "Genesis not failed");
+
+        for (uint256 i = 0; i < donorIndexes.length; i++) {
+            require(
+                donorIndexes[i] < donors.length,
+                "Index out of bounds"
+            );
+            address donor = donors[donorIndexes[i]];
+            uint256 donateAmt = mapAddrToDonateAmt[donor];
+            if (donateAmt > 0) {
+                IERC20(virtualTokenAddress).transfer(donor, donateAmt);
+                mapAddrToDonateAmt[donor] = 0;
+            }
+        }
     }
 }

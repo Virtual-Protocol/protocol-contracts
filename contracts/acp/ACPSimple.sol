@@ -518,6 +518,8 @@ contract ACPSimple is
             } else {
                 _updateJobPhase(memo.jobId, PHASE_REJECTED);
             }
+        } else if (job.phase == PHASE_REQUEST && !isApproved) {
+            _updateJobPhase(memo.jobId, PHASE_REJECTED);
         } else {
             if (isApproved) {
                 _updateJobPhase(memo.jobId, memo.nextPhase);

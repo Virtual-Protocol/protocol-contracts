@@ -9,7 +9,8 @@ abstract contract GovernorCountingVP is Governor {
     enum VoteType {
         Against,
         For,
-        Abstain
+        Abstain,
+        Deliberate
     }
 
     struct ProposalVote {
@@ -69,6 +70,11 @@ abstract contract GovernorCountingVP is Governor {
         uint256 weight,
         bytes memory // params
     ) internal virtual override {
+
+        if(support == uint8(VoteType.Deliberate)) {
+            return;
+        }
+
         ProposalVote storage proposalVote = _proposalVotes[proposalId];
 
         if (proposalVote.hasVoted[account]) {

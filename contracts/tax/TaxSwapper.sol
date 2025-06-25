@@ -57,6 +57,14 @@ contract TaxSwapper is AccessControl {
 
     function swapTax(address token) external onlyRole(OPS_ROLE) {
         IAgentToken(token).distributeTaxTokens();
+        _swapTax(token);
+    }
+
+    function manualSwapTax(address token) external onlyRole(OPS_ROLE) {
+        _swapTax(token);
+    }
+
+    function _swapTax(address token) internal {
         uint256 maxAmount = maxAmountByToken[token];
         if (maxAmount == 0) {
             maxAmount = maxSwapAmount;

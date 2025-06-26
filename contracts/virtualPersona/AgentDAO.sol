@@ -8,7 +8,6 @@ import "@openzeppelin/contracts/utils/structs/Checkpoints.sol";
 import "./IAgentDAO.sol";
 import "./GovernorCountingSimpleUpgradeable.sol";
 import "@openzeppelin/contracts/token/ERC721/IERC721.sol";
-import "@openzeppelin/contracts/utils/Strings.sol";
 import "../contribution/IContributionNft.sol";
 import "./IEloCalculator.sol";
 import "../contribution/IServiceNft.sol";

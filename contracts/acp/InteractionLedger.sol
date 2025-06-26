@@ -22,10 +22,22 @@ abstract contract InteractionLedger {
         IMAGE_URL,
         VOICE_URL,
         OBJECT_URL,
-        TXHASH
+        TXHASH,
+        PAYABLE_TRANSFER,
+        PAYABLE_FEE
+    }
+
+    struct PayableDetails {
+        address token;
+        uint256 amount;
+        address recipient;
+        bool isFee;
+        bool isExecuted;
     }
 
     mapping(uint256 => Memo) public memos;
+    
+    mapping(uint256 memoId => PayableDetails) public payableDetails;
 
     event NewMemo(
         uint256 indexed jobId,
@@ -33,6 +45,22 @@ abstract contract InteractionLedger {
         uint256 memoId
     );
     event MemoSigned(uint256 memoId, bool isApproved, string reason);
+    
+    event PayableTransferExecuted(
+        uint256 indexed jobId,
+        uint256 indexed memoId,
+        address indexed from,
+        address to,
+        address token,
+        uint256 amount
+    );
+
+    event PayableFeeCollected(
+        uint256 indexed jobId,
+        uint256 indexed memoId,
+        address indexed payer,
+        uint256 amount
+    );
 
     function _createMemo(
         uint256 jobId,
@@ -61,4 +89,9 @@ abstract contract InteractionLedger {
         bool isApproved,
         string memory reason
     ) public virtual;
+    
+    function isPayableMemo(uint256 memoId) public view returns (bool) {
+        MemoType mType = memos[memoId].memoType;
+        return mType == MemoType.PAYABLE_TRANSFER || mType == MemoType.PAYABLE_FEE;
+    }
 }

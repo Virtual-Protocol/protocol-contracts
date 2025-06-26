@@ -83,6 +83,14 @@ contract ACPSimple is
 
     event BudgetSet(uint256 indexed jobId, uint256 newBudget);
 
+    mapping(uint256 jobId => uint256) public jobAdditionalFees;
+    
+    event RefundedAdditionalFees(
+        uint256 indexed jobId,
+        address indexed client,
+        uint256 amount
+    );
+
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() {
         _disableInitializers();
@@ -208,38 +216,32 @@ contract ACPSimple is
 
     function _claimBudget(uint256 id) internal {
         Job storage job = jobs[id];
-        require(job.budget > job.amountClaimed, "No budget to claim");
+        uint256 totalFees = jobAdditionalFees[id];
+        uint256 totalAmount = job.budget + totalFees;
+        require(totalAmount > job.amountClaimed, "No budget to claim");
 
-        uint256 claimableAmount = job.budget - job.amountClaimed;
-        job.amountClaimed = job.budget;
+        uint256 claimableAmount = totalAmount - job.amountClaimed;
+        job.amountClaimed = totalAmount;
 
         if (job.phase == PHASE_COMPLETED) {
             uint256 evaluatorFee = (claimableAmount * evaluatorFeeBP) / 10000;
             uint256 platformFee = (claimableAmount * platformFeeBP) / 10000;
+            
             if (platformFee > 0) {
-                paymentToken.safeTransfer(
-                    platformTreasury,
-                    platformFee
-                );
+                paymentToken.safeTransfer(platformTreasury, platformFee);
             }
+            
             if (job.evaluator != address(0) && evaluatorFee > 0) {
-                paymentToken.safeTransfer(
-                    job.evaluator,
-                    evaluatorFee
-                );
+                paymentToken.safeTransfer(job.evaluator, evaluatorFee);
                 emit ClaimedEvaluatorFee(id, job.evaluator, evaluatorFee);
             }
 
-            claimableAmount = claimableAmount - platformFee - evaluatorFee;
-
-            paymentToken.safeTransfer(
-                job.provider,
-                claimableAmount
-            );
-
-            emit ClaimedProviderFee(id, job.provider, claimableAmount);
+            uint256 netAmount = claimableAmount - platformFee - evaluatorFee;
+            
+            paymentToken.safeTransfer(job.provider, netAmount);
+            
+            emit ClaimedProviderFee(id, job.provider, netAmount);
         } else {
-            // Refund the budget if job is not completed within expiry or rejected
             require(
                 (job.phase < PHASE_EVALUATION &&
                     block.timestamp > job.expiredAt) ||
@@ -248,16 +250,107 @@ contract ACPSimple is
             );
 
             if (job.phase >= PHASE_TRANSACTION && claimableAmount > 0) {
-                paymentToken.safeTransfer(
-                    job.client,
-                    claimableAmount
-                );
+                paymentToken.safeTransfer(job.client, claimableAmount);
                 emit RefundedBudget(id, job.client, claimableAmount);
+            }
+            
+            if (totalFees > 0) {
+                paymentToken.safeTransfer(job.client, totalFees);
+                jobAdditionalFees[id] = 0;
+                emit RefundedAdditionalFees(id, job.client, totalFees);
             }
 
             if (job.phase != PHASE_REJECTED && job.phase != PHASE_EXPIRED) {
                 _updateJobPhase(id, PHASE_EXPIRED);
             }
+        }
+    }
+
+    function createPayableMemo(
+        uint256 jobId,
+        string memory content,
+        address token,
+        uint256 amount,
+        address recipient,
+        uint8 nextPhase
+    ) external returns (uint256) {
+        require(amount > 0, "Amount must be greater than 0");
+        require(recipient != address(0), "Invalid recipient");
+        require(token != address(0), "Token address required");
+        require(_isERC20(token), "Token must be ERC20");
+        
+        uint256 memoId = createMemo(jobId, content, MemoType.PAYABLE_TRANSFER, false, nextPhase);
+        
+        payableDetails[memoId] = PayableDetails({
+            token: token,
+            amount: amount,
+            recipient: recipient,
+            isFee: false,
+            isExecuted: false
+        });
+        
+        return memoId;
+    }
+
+    function createPayableFeeMemo(
+        uint256 jobId,
+        string memory content,
+        uint256 amount,
+        uint8 nextPhase
+    ) external returns (uint256) {
+        require(amount > 0, "Fee amount must be greater than 0");
+        
+        uint256 memoId = createMemo(jobId, content, MemoType.PAYABLE_FEE, false, nextPhase);
+        
+        payableDetails[memoId] = PayableDetails({
+            token: address(paymentToken),
+            amount: amount,
+            recipient: address(this),
+            isFee: true,
+            isExecuted: false
+        });
+        
+        return memoId;
+    }
+
+    function _isERC20(address token) internal view returns (bool) {
+        try IERC20(token).totalSupply() returns (uint256) {
+            try IERC20(token).balanceOf(address(0)) returns (uint256) {
+                return true;
+            } catch {
+                return false;
+            }
+        } catch {
+            return false;
+        }
+    }
+
+    function _executePayableMemo(uint256 memoId, Memo storage memo) internal {
+        PayableDetails storage details = payableDetails[memoId];
+        
+        require(!details.isExecuted, "Payable memo already executed");
+        require(details.amount > 0, "Invalid amount");
+
+        details.isExecuted = true;
+
+        if (details.isFee) {
+            IERC20(details.token).safeTransferFrom(
+                _msgSender(),
+                address(this),
+                details.amount
+            );
+            
+            jobAdditionalFees[memo.jobId] += details.amount;
+            
+            emit PayableFeeCollected(memo.jobId, memoId, _msgSender(), details.amount);
+        } else {
+            IERC20(details.token).safeTransferFrom(
+                _msgSender(),
+                details.recipient,
+                details.amount
+            );
+            
+            emit PayableTransferExecuted(memo.jobId, memoId, _msgSender(), details.recipient, details.token, details.amount);
         }
     }
 
@@ -394,6 +487,12 @@ contract ACPSimple is
         }
 
         signatories[memoId][_msgSender()] = isApproved ? 1 : 2;
+        
+        // Execute payable memo if approved and is payable type
+        if (isApproved && isPayableMemo(memoId)) {
+            _executePayableMemo(memoId, memo);
+        }
+
         emit MemoSigned(memoId, isApproved, reason);
 
         if (job.phase == PHASE_EVALUATION) {

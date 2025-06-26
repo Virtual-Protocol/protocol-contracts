@@ -237,12 +237,12 @@ contract ACPSimple is
             }
 
             uint256 netAmount = claimableAmount - platformFee - evaluatorFee;
-            jobAdditionalFees[id] = 0;
 
             if (netAmount > 0) {
                 paymentToken.safeTransfer(job.provider, netAmount);
                 emit ClaimedProviderFee(id, job.provider, netAmount);
             }
+            jobAdditionalFees[id] = 0;
         } else {
             require(
                 (job.phase < PHASE_EVALUATION &&
@@ -259,9 +259,9 @@ contract ACPSimple is
             }
 
             if (totalFees > 0) {
-                jobAdditionalFees[id] = 0;
                 paymentToken.safeTransfer(job.client, totalFees);
                 emit RefundedAdditionalFees(id, job.client, totalFees);
+                jobAdditionalFees[id] = 0;
             }
 
             if (job.phase != PHASE_REJECTED && job.phase != PHASE_EXPIRED) {
@@ -338,8 +338,6 @@ contract ACPSimple is
         address recipient = details.recipient;
         bool isFee = details.isFee;
         
-        details.isExecuted = true;
-
         if (isFee) {
             jobAdditionalFees[memo.jobId] += amount;
             
@@ -359,6 +357,7 @@ contract ACPSimple is
             
             emit PayableTransferExecuted(memo.jobId, memoId, _msgSender(), recipient, token, amount);
         }
+        details.isExecuted = true;
     }
 
     function createMemo(

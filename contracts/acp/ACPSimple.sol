@@ -237,7 +237,8 @@ contract ACPSimple is
             }
 
             uint256 netAmount = claimableAmount - platformFee - evaluatorFee;
-            
+            jobAdditionalFees[id] = 0;
+
             if (netAmount > 0) {
                 paymentToken.safeTransfer(job.provider, netAmount);
                 emit ClaimedProviderFee(id, job.provider, netAmount);
@@ -250,14 +251,16 @@ contract ACPSimple is
                 "Unable to refund budget"
             );
 
-            if (job.phase >= PHASE_TRANSACTION && claimableAmount > 0) {
-                paymentToken.safeTransfer(job.client, claimableAmount);
-                emit RefundedBudget(id, job.client, claimableAmount);
-            }
+            uint256 budgetToRefund = claimableAmount - totalFees;
             
+            if (job.phase >= PHASE_TRANSACTION && budgetToRefund > 0) {
+                paymentToken.safeTransfer(job.client, budgetToRefund);
+                emit RefundedBudget(id, job.client, budgetToRefund);
+            }
+
             if (totalFees > 0) {
-                paymentToken.safeTransfer(job.client, totalFees);
                 jobAdditionalFees[id] = 0;
+                paymentToken.safeTransfer(job.client, totalFees);
                 emit RefundedAdditionalFees(id, job.client, totalFees);
             }
 

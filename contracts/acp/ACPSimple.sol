@@ -339,16 +339,16 @@ contract ACPSimple is
         uint256 amount = details.amount;
         address recipient = details.recipient;
         bool isFee = details.isFee;
+        MemoType memoType = memo.memoType;
         
         if (isFee) {
-            jobAdditionalFees[memo.jobId] += amount;
-            
             IERC20(token).safeTransferFrom(
                 _msgSender(),
                 address(this),
                 amount
             );
             
+            jobAdditionalFees[memo.jobId] += amount;
             emit PayableFeeCollected(memo.jobId, memoId, _msgSender(), amount);
         } else if (memoType == MemoType.PAYABLE_TRANSFER) {
             IERC20(token).safeTransferFrom(

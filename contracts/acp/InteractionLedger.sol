@@ -82,6 +82,7 @@ abstract contract InteractionLedger {
     ) internal returns (uint256) {
         uint256 newMemoId = ++memoCounter;
         memos[newMemoId] = Memo({
+            content: "", // deprecated. content only emitted in event
             memoType: memoType,
             isSecured: isSecured,
             nextPhase: nextPhase,

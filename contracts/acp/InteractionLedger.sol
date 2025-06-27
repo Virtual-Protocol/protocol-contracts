@@ -24,6 +24,7 @@ abstract contract InteractionLedger {
         OBJECT_URL,
         TXHASH,
         PAYABLE_TRANSFER,
+        PAYABLE_REQUEST,
         PAYABLE_FEE
     }
 
@@ -47,6 +48,15 @@ abstract contract InteractionLedger {
     event MemoSigned(uint256 memoId, bool isApproved, string reason);
     
     event PayableTransferExecuted(
+        uint256 indexed jobId,
+        uint256 indexed memoId,
+        address indexed from,
+        address to,
+        address token,
+        uint256 amount
+    );
+
+    event PayableRequestExecuted(
         uint256 indexed jobId,
         uint256 indexed memoId,
         address indexed from,

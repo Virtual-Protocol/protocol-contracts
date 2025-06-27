@@ -276,6 +276,7 @@ contract ACPSimple is
         address token,
         uint256 amount,
         address recipient,
+        uint8 memoType,
         uint8 nextPhase
     ) external returns (uint256) {
         require(jobId > 0 && jobId <= jobCounter, "Job does not exist");
@@ -283,8 +284,9 @@ contract ACPSimple is
         require(recipient != address(0), "Invalid recipient");
         require(token != address(0), "Token address required");
         require(_isERC20(token), "Token must be ERC20");
+        require(memoType == MemoType.PAYABLE_TRANSFER || memoType == MemoType.PAYABLE_REQUEST, "Invalid memo type");
         
-        uint256 memoId = createMemo(jobId, content, MemoType.PAYABLE_TRANSFER, false, nextPhase);
+        uint256 memoId = createMemo(jobId, content, memoType, false, nextPhase);
         
         payableDetails[memoId] = PayableDetails({
             token: token,
@@ -348,7 +350,7 @@ contract ACPSimple is
             );
             
             emit PayableFeeCollected(memo.jobId, memoId, _msgSender(), amount);
-        } else {
+        } else if (memoType == MemoType.PAYABLE_TRANSFER) {
             IERC20(token).safeTransferFrom(
                 _msgSender(),
                 recipient,
@@ -356,6 +358,14 @@ contract ACPSimple is
             );
             
             emit PayableTransferExecuted(memo.jobId, memoId, _msgSender(), recipient, token, amount);
+        } else if (memoType == MemoType.PAYABLE_REQUEST) {
+            IERC20(token).safeTransferFrom(
+                memo.sender,
+                recipient,
+                amount
+            );
+
+            emit PayableRequestExecuted(memo.jobId, memoId, memo.sender, recipient, token, amount);
         }
         details.isExecuted = true;
     }

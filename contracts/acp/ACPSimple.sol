@@ -276,7 +276,7 @@ contract ACPSimple is
         address token,
         uint256 amount,
         address recipient,
-        uint8 memoType,
+        MemoType memoType,
         uint8 nextPhase
     ) external returns (uint256) {
         require(jobId > 0 && jobId <= jobCounter, "Job does not exist");
@@ -284,7 +284,7 @@ contract ACPSimple is
         require(recipient != address(0), "Invalid recipient");
         require(token != address(0), "Token address required");
         require(_isERC20(token), "Token must be ERC20");
-        require(memoType == MemoType.PAYABLE_TRANSFER || memoType == MemoType.PAYABLE_REQUEST, "Invalid memo type");
+        require(memoType == MemoType.PAYABLE_REQUEST || memoType == MemoType.PAYABLE_TRANSFER, "Invalid memo type");
         
         uint256 memoId = createMemo(jobId, content, memoType, false, nextPhase);
         
@@ -350,22 +350,22 @@ contract ACPSimple is
             
             jobAdditionalFees[memo.jobId] += amount;
             emit PayableFeeCollected(memo.jobId, memoId, _msgSender(), amount);
-        } else if (memoType == MemoType.PAYABLE_TRANSFER) {
+        } else if (memoType == MemoType.PAYABLE_REQUEST) {
             IERC20(token).safeTransferFrom(
                 _msgSender(),
                 recipient,
                 amount
             );
             
-            emit PayableTransferExecuted(memo.jobId, memoId, _msgSender(), recipient, token, amount);
-        } else if (memoType == MemoType.PAYABLE_REQUEST) {
+            emit PayableRequestExecuted(memo.jobId, memoId, _msgSender(), recipient, token, amount);
+        } else if (memoType == MemoType.PAYABLE_TRANSFER) {
             IERC20(token).safeTransferFrom(
                 memo.sender,
                 recipient,
                 amount
             );
 
-            emit PayableRequestExecuted(memo.jobId, memoId, memo.sender, recipient, token, amount);
+            emit PayableTransferExecuted(memo.jobId, memoId, memo.sender, recipient, token, amount);
         }
         details.isExecuted = true;
     }

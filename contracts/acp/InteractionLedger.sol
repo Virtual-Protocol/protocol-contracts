@@ -23,8 +23,8 @@ abstract contract InteractionLedger {
         VOICE_URL,
         OBJECT_URL,
         TXHASH,
-        PAYABLE_TRANSFER,
         PAYABLE_REQUEST,
+        PAYABLE_TRANSFER,
         PAYABLE_FEE
     }
 
@@ -47,7 +47,7 @@ abstract contract InteractionLedger {
     );
     event MemoSigned(uint256 memoId, bool isApproved, string reason);
     
-    event PayableTransferExecuted(
+    event PayableRequestExecuted(
         uint256 indexed jobId,
         uint256 indexed memoId,
         address indexed from,
@@ -56,7 +56,7 @@ abstract contract InteractionLedger {
         uint256 amount
     );
 
-    event PayableRequestExecuted(
+    event PayableTransferExecuted(
         uint256 indexed jobId,
         uint256 indexed memoId,
         address indexed from,
@@ -102,6 +102,6 @@ abstract contract InteractionLedger {
     
     function isPayableMemo(uint256 memoId) public view returns (bool) {
         MemoType mType = memos[memoId].memoType;
-        return mType == MemoType.PAYABLE_TRANSFER || mType == MemoType.PAYABLE_FEE;
+        return mType == MemoType.PAYABLE_REQUEST || mType == MemoType.PAYABLE_FEE || mType == MemoType.PAYABLE_TRANSFER;
     }
 }

@@ -4,7 +4,7 @@ pragma solidity ^0.8.20;
 
 abstract contract InteractionLedger {
     struct Memo {
-        string content;
+        string content; // deprecated. content only emitted in event
         MemoType memoType;
         bool isSecured;
         uint8 nextPhase;
@@ -43,7 +43,8 @@ abstract contract InteractionLedger {
     event NewMemo(
         uint256 indexed jobId,
         address indexed sender,
-        uint256 memoId
+        uint256 memoId,
+        string content
     );
     event MemoSigned(uint256 memoId, bool isApproved, string reason);
     
@@ -74,14 +75,13 @@ abstract contract InteractionLedger {
 
     function _createMemo(
         uint256 jobId,
-        string memory content,
+        string calldata content,
         MemoType memoType,
         bool isSecured,
         uint8 nextPhase
     ) internal returns (uint256) {
         uint256 newMemoId = ++memoCounter;
         memos[newMemoId] = Memo({
-            content: content,
             memoType: memoType,
             isSecured: isSecured,
             nextPhase: nextPhase,
@@ -89,7 +89,7 @@ abstract contract InteractionLedger {
             sender: msg.sender
         });
 
-        emit NewMemo(jobId, msg.sender, newMemoId);
+        emit NewMemo(jobId, msg.sender, newMemoId, content);
 
         return newMemoId;
     }
@@ -97,7 +97,7 @@ abstract contract InteractionLedger {
     function signMemo(
         uint256 memoId,
         bool isApproved,
-        string memory reason
+        string calldata reason
     ) public virtual;
     
     function isPayableMemo(uint256 memoId) public view returns (bool) {

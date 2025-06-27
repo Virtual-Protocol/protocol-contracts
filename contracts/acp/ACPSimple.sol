@@ -476,7 +476,7 @@ contract ACPSimple is
     function signMemo(
         uint256 memoId,
         bool isApproved,
-        string memory reason
+        string calldata reason
     ) public override nonReentrant {
         Memo storage memo = memos[memoId];
         Job memory job = jobs[memo.jobId];

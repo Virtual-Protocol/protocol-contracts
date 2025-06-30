@@ -333,7 +333,6 @@ contract ACPSimple is
         PayableDetails storage details = payableDetails[memoId];
         
         require(!details.isExecuted, "Payable memo already executed");
-        require(details.amount > 0, "Invalid amount");
 
         address token = details.token;
         uint256 amount = details.amount;

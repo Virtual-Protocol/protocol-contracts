@@ -91,6 +91,8 @@ contract ACPSimple is
         uint256 amount
     );
 
+    mapping(uint256 memoId => PayableDetails) public payableDetails;
+
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() {
         _disableInitializers();

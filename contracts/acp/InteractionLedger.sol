@@ -38,8 +38,6 @@ abstract contract InteractionLedger {
 
     mapping(uint256 => Memo) public memos;
     
-    mapping(uint256 memoId => PayableDetails) public payableDetails;
-
     event NewMemo(
         uint256 indexed jobId,
         address indexed sender,

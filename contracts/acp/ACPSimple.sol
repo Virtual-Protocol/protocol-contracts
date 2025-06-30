@@ -91,6 +91,9 @@ contract ACPSimple is
         uint256 amount
     );
 
+    // STORAGE LAYOUT FIX: Move payableDetails to end to preserve upgrade compatibility
+    mapping(uint256 memoId => PayableDetails) public payableDetails;
+
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() {
         _disableInitializers();

@@ -272,7 +272,7 @@ contract ACPSimple is
 
     function createPayableMemo(
         uint256 jobId,
-        string memory content,
+        string calldata content,
         address token,
         uint256 amount,
         address recipient,
@@ -301,7 +301,7 @@ contract ACPSimple is
 
     function createPayableFeeMemo(
         uint256 jobId,
-        string memory content,
+        string calldata content,
         uint256 amount,
         uint8 nextPhase
     ) external returns (uint256) {
@@ -372,7 +372,7 @@ contract ACPSimple is
 
     function createMemo(
         uint256 jobId,
-        string memory content,
+        string calldata content,
         MemoType memoType,
         bool isSecured,
         uint8 nextPhase
@@ -476,7 +476,7 @@ contract ACPSimple is
     function signMemo(
         uint256 memoId,
         bool isApproved,
-        string memory reason
+        string calldata reason
     ) public override nonReentrant {
         Memo storage memo = memos[memoId];
         Job memory job = jobs[memo.jobId];

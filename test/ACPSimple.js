@@ -529,8 +529,13 @@ describe("ACPSimple", function () {
 
         // Check memo was created
         const memo = await acp.memos(memoId);
-        expect(memo.content).to.equal("Request 100 VIRTUAL tokens deposit");
+        // Note: content is no longer stored in memo struct, only emitted in NewMemo event
         expect(memo.memoType).to.equal(MEMO_TYPE.PAYABLE_REQUEST);
+        
+        // Verify content was emitted in NewMemo event
+        await expect(memoTx)
+          .to.emit(acp, "NewMemo")
+          .withArgs(jobId, provider.address, memoId, "Request 100 VIRTUAL tokens deposit");
 
         // Check payable details
         const payableDetails = await acp.payableDetails(memoId);
@@ -644,8 +649,13 @@ describe("ACPSimple", function () {
 
         // Check memo was created
         const memo = await acp.memos(memoId);
-        expect(memo.content).to.equal("Transfer 150 VIRTUAL tokens back to client");
+        // Note: content is no longer stored in memo struct, only emitted in NewMemo event
         expect(memo.memoType).to.equal(MEMO_TYPE.PAYABLE_TRANSFER);
+        
+        // Verify content was emitted in NewMemo event
+        await expect(memoTx)
+          .to.emit(acp, "NewMemo")
+          .withArgs(jobId, client.address, memoId, "Transfer 150 VIRTUAL tokens back to client");
 
         // Check payable details
         const payableDetails = await acp.payableDetails(memoId);
@@ -755,8 +765,13 @@ describe("ACPSimple", function () {
 
         // Check memo was created
         const memo = await acp.memos(memoId);
-        expect(memo.content).to.equal("Additional service fee");
+        // Note: content is no longer stored in memo struct, only emitted in NewMemo event
         expect(memo.memoType).to.equal(MEMO_TYPE.PAYABLE_FEE);
+        
+        // Verify content was emitted in NewMemo event
+        await expect(memoTx)
+          .to.emit(acp, "NewMemo")
+          .withArgs(jobId, provider.address, memoId, "Additional service fee");
 
         // Check payable details
         const payableDetails = await acp.payableDetails(memoId);

@@ -28,14 +28,6 @@ abstract contract InteractionLedger {
         PAYABLE_FEE
     }
 
-    struct PayableDetails {
-        address token;
-        uint256 amount;
-        address recipient;
-        bool isFee;
-        bool isExecuted;
-    }
-
     mapping(uint256 => Memo) public memos;
     
     event NewMemo(
@@ -46,31 +38,6 @@ abstract contract InteractionLedger {
     );
     event MemoSigned(uint256 memoId, bool isApproved, string reason);
     
-    event PayableRequestExecuted(
-        uint256 indexed jobId,
-        uint256 indexed memoId,
-        address indexed from,
-        address to,
-        address token,
-        uint256 amount
-    );
-
-    event PayableTransferExecuted(
-        uint256 indexed jobId,
-        uint256 indexed memoId,
-        address indexed from,
-        address to,
-        address token,
-        uint256 amount
-    );
-
-    event PayableFeeCollected(
-        uint256 indexed jobId,
-        uint256 indexed memoId,
-        address indexed payer,
-        uint256 amount
-    );
-
     function _createMemo(
         uint256 jobId,
         string calldata content,

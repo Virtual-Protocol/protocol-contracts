@@ -213,6 +213,7 @@ contract ACPSimple is
     }
 
     function _claimBudget(Job storage job) internal {
+        uint256 id = job.id;
         require(job.budget > job.amountClaimed, "No budget to claim");
 
         uint256 claimableAmount = job.budget - job.amountClaimed;

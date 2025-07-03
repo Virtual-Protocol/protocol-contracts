@@ -232,7 +232,7 @@ contract ACPSimple is
             phase >= PHASE_COMPLETED &&
             phase <= PHASE_REJECTED
         ) {
-            _claimBudget(jobId);
+            _claimBudget(job);
         }
     }
 

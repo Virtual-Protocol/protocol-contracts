@@ -25,7 +25,8 @@ abstract contract InteractionLedger {
         TXHASH,
         PAYABLE_REQUEST,
         PAYABLE_TRANSFER,
-        PAYABLE_FEE
+        PAYABLE_FEE,
+        PAYABLE_FEE_REQUEST
     }
 
     struct PayableDetails {

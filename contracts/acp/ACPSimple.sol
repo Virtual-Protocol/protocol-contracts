@@ -91,6 +91,49 @@ contract ACPSimple is
         uint256 amount
     );
 
+    mapping(uint256 memoId => PayableDetails) public payableDetails;
+
+    struct PayableDetails {
+        address token;
+        uint256 amount;
+        address recipient;
+        bool isFee;
+        bool isExecuted;
+    }
+
+    event PayableRequestExecuted(
+        uint256 indexed jobId,
+        uint256 indexed memoId,
+        address indexed from,
+        address to,
+        address token,
+        uint256 amount
+    );
+
+    event PayableTransferExecuted(
+        uint256 indexed jobId,
+        uint256 indexed memoId,
+        address indexed from,
+        address to,
+        address token,
+        uint256 amount
+    );
+
+    event PayableFeeCollected(
+        uint256 indexed jobId,
+        uint256 indexed memoId,
+        address indexed payer,
+        uint256 amount
+    );
+
+    mapping(uint256 jobId => uint256) public jobAdditionalFees;
+
+    event RefundedAdditionalFees(
+        uint256 indexed jobId,
+        address indexed client,
+        uint256 amount
+    );
+
     // STORAGE LAYOUT FIX: Move payableDetails to end to preserve upgrade compatibility
     mapping(uint256 memoId => PayableDetails) public payableDetails;
 
@@ -199,7 +242,8 @@ contract ACPSimple is
             }
         } else if (
             (oldPhase >= PHASE_TRANSACTION && oldPhase <= PHASE_EVALUATION) &&
-            phase >= PHASE_COMPLETED
+            phase >= PHASE_COMPLETED &&
+            phase <= PHASE_REJECTED
         ) {
             _claimBudget(jobId);
         }

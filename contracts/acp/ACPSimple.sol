@@ -126,16 +126,13 @@ contract ACPSimple is
         uint256 amount
     );
 
-    mapping(uint256 jobId => uint256) public jobAdditionalFees;
-
-    event RefundedAdditionalFees(
+    event PayableFeeRequestExecuted(
         uint256 indexed jobId,
-        address indexed client,
-        uint256 amount
+        uint256 indexed memoId,
+        address indexed payer,
+        address recipient,
+        uint256 netAmount
     );
-
-    // STORAGE LAYOUT FIX: Move payableDetails to end to preserve upgrade compatibility
-    mapping(uint256 memoId => PayableDetails) public payableDetails;
 
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() {
@@ -252,7 +249,6 @@ contract ACPSimple is
     function setBudget(uint256 jobId, uint256 amount) public nonReentrant {
         Job storage job = jobs[jobId];
         require(job.client == _msgSender(), "Only client can set budget");
-        require(amount > 0, "Zero amount");
         require(
             job.phase < PHASE_TRANSACTION,
             "Budget can only be set before transaction phase"
@@ -270,6 +266,7 @@ contract ACPSimple is
         Job storage job = jobs[id];
         uint256 totalFees = jobAdditionalFees[id];
         uint256 totalAmount = job.budget + totalFees;
+        require(totalAmount > 0, "No budget or fees to claim");
         uint256 claimableAmount = totalAmount - job.amountClaimed;
         job.amountClaimed = totalAmount;
 
@@ -296,7 +293,6 @@ contract ACPSimple is
                 paymentToken.safeTransfer(job.provider, netAmount);
                 emit ClaimedProviderFee(id, job.provider, netAmount);
             }
-            jobAdditionalFees[id] = 0;
         } else {
             require(
                 (job.phase < PHASE_EVALUATION &&
@@ -316,7 +312,6 @@ contract ACPSimple is
                 if (totalFees > 0) {
                     paymentToken.safeTransfer(job.client, totalFees);
                     emit RefundedAdditionalFees(id, job.client, totalFees);
-                    jobAdditionalFees[id] = 0;
                 }
             }
 
@@ -376,10 +371,15 @@ contract ACPSimple is
 
         uint256 memoId = createMemo(jobId, content, memoType, false, nextPhase);
 
+        address recipient = address(this);
+        if (memoType == MemoType.PAYABLE_FEE_REQUEST) {
+            recipient = _msgSender();
+        }
+
         payableDetails[memoId] = PayableDetails({
             token: address(paymentToken),
             amount: amount,
-            recipient: address(this),
+            recipient: recipient,
             isFee: true,
             isExecuted: false
         });
@@ -429,13 +429,14 @@ contract ACPSimple is
                     recipient,
                     netAmount
                 );
+                Job storage job = jobs[memo.jobId];
+                job.amountClaimed += amount;
             } else {
                 IERC20(token).safeTransferFrom(
                     _msgSender(),
                     address(this),
                     amount
                 );
-                jobAdditionalFees[memo.jobId] += amount;
                 emit PayableFeeCollected(
                     memo.jobId,
                     memoId,
@@ -443,6 +444,7 @@ contract ACPSimple is
                     amount
                 );
             }
+            jobAdditionalFees[memo.jobId] += amount;
         } else if (memoType == MemoType.PAYABLE_REQUEST) {
             IERC20(token).safeTransferFrom(_msgSender(), recipient, amount);
 

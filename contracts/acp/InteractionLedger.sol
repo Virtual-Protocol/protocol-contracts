@@ -68,6 +68,6 @@ abstract contract InteractionLedger {
     
     function isPayableMemo(uint256 memoId) public view returns (bool) {
         MemoType mType = memos[memoId].memoType;
-        return mType == MemoType.PAYABLE_REQUEST || mType == MemoType.PAYABLE_FEE || mType == MemoType.PAYABLE_TRANSFER;
+        return mType == MemoType.PAYABLE_REQUEST || mType == MemoType.PAYABLE_FEE || mType == MemoType.PAYABLE_TRANSFER || mType == MemoType.PAYABLE_FEE_REQUEST;
     }
 }

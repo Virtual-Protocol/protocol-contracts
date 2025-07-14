@@ -97,7 +97,8 @@ contract ACPSimple is
         address token;
         uint256 amount;
         address recipient;
-        bool isFee;
+        uint256 feeAmount;
+        bool feeToContract;
         bool isExecuted;
     }
 
@@ -327,60 +328,37 @@ contract ACPSimple is
         address token,
         uint256 amount,
         address recipient,
+        uint256 feeAmount,
+        bool feeToContract,
         MemoType memoType,
         uint8 nextPhase
     ) external returns (uint256) {
         require(jobId > 0 && jobId <= jobCounter, "Job does not exist");
-        require(amount > 0, "Amount must be greater than 0");
-        require(recipient != address(0), "Invalid recipient");
-        require(token != address(0), "Token address required");
-        require(_isERC20(token), "Token must be ERC20");
+        require(
+            amount > 0 || feeAmount > 0,
+            "Either amount or fee amount must be greater than 0"
+        );
         require(
             memoType == MemoType.PAYABLE_REQUEST ||
                 memoType == MemoType.PAYABLE_TRANSFER,
             "Invalid memo type"
         );
 
-        uint256 memoId = createMemo(jobId, content, memoType, false, nextPhase);
-
-        payableDetails[memoId] = PayableDetails({
-            token: token,
-            amount: amount,
-            recipient: recipient,
-            isFee: false,
-            isExecuted: false
-        });
-
-        return memoId;
-    }
-
-    function createPayableFeeMemo(
-        uint256 jobId,
-        string calldata content,
-        uint256 amount,
-        MemoType memoType,
-        uint8 nextPhase
-    ) external returns (uint256) {
-        require(amount > 0, "Fee amount must be greater than 0");
-        require(jobId > 0 && jobId <= jobCounter, "Job does not exist");
-        require(
-            memoType == MemoType.PAYABLE_FEE_REQUEST ||
-                memoType == MemoType.PAYABLE_FEE,
-            "Invalid memo type"
-        );
-
-        uint256 memoId = createMemo(jobId, content, memoType, false, nextPhase);
-
-        address recipient = address(this);
-        if (memoType == MemoType.PAYABLE_FEE_REQUEST) {
-            recipient = _msgSender();
+        // If amount > 0, recipient must be valid
+        if (amount > 0) {
+            require(recipient != address(0), "Invalid recipient");
+            require(token != address(0), "Token address required");
+            require(_isERC20(token), "Token must be ERC20");
         }
 
+        uint256 memoId = createMemo(jobId, content, memoType, false, nextPhase);
+
         payableDetails[memoId] = PayableDetails({
-            token: address(paymentToken),
+            token: amount > 0 ? token : address(paymentToken),
             amount: amount,
             recipient: recipient,
-            isFee: true,
+            feeAmount: feeAmount,
+            feeToContract: feeToContract,
             isExecuted: false
         });
 
@@ -403,12 +381,56 @@ contract ACPSimple is
         address token = details.token;
         uint256 amount = details.amount;
         address recipient = details.recipient;
-        bool isFee = details.isFee;
+        uint256 feeAmount = details.feeAmount;
+        bool feeToContract = details.feeToContract;
         MemoType memoType = memo.memoType;
 
-        if (isFee) {
-            if (memoType == MemoType.PAYABLE_FEE_REQUEST) {
-                uint256 platformFee = (amount * platformFeeBP) / 10000;
+        // Handle fund transfer
+        if (amount > 0) {
+            if (memoType == MemoType.PAYABLE_REQUEST) {
+                IERC20(token).safeTransferFrom(_msgSender(), recipient, amount);
+
+                emit PayableRequestExecuted(
+                    memo.jobId,
+                    memoId,
+                    _msgSender(),
+                    recipient,
+                    token,
+                    amount
+                );
+            } else if (memoType == MemoType.PAYABLE_TRANSFER) {
+                IERC20(token).safeTransferFrom(memo.sender, recipient, amount);
+
+                emit PayableTransferExecuted(
+                    memo.jobId,
+                    memoId,
+                    memo.sender,
+                    recipient,
+                    token,
+                    amount
+                );
+            }
+        }
+
+        // Handle fee transfer
+        if (feeAmount > 0) {
+            if (feeToContract) {
+                paymentToken.safeTransferFrom(
+                    _msgSender(),
+                    address(this),
+                    feeAmount
+                );
+                emit PayableFeeCollected(
+                    memo.jobId,
+                    memoId,
+                    _msgSender(),
+                    feeAmount
+                );
+            } else {
+                Job storage job = jobs[memo.jobId];
+                address provider = job.provider;
+                
+                uint256 platformFee = (feeAmount * platformFeeBP) / 10000;
                 if (platformFee > 0) {
                     paymentToken.safeTransferFrom(
                         _msgSender(),
@@ -416,58 +438,24 @@ contract ACPSimple is
                         platformFee
                     );
                 }
-                uint256 netAmount = amount - platformFee;
-                IERC20(token).safeTransferFrom(
+                uint256 netAmount = feeAmount - platformFee;
+                paymentToken.safeTransferFrom(
                     _msgSender(),
-                    recipient,
+                    provider,
                     netAmount
                 );
                 emit PayableFeeRequestExecuted(
                     memo.jobId,
                     memoId,
                     _msgSender(),
-                    recipient,
+                    provider,
                     netAmount
                 );
-                Job storage job = jobs[memo.jobId];
-                job.amountClaimed += amount;
-            } else {
-                IERC20(token).safeTransferFrom(
-                    _msgSender(),
-                    address(this),
-                    amount
-                );
-                emit PayableFeeCollected(
-                    memo.jobId,
-                    memoId,
-                    _msgSender(),
-                    amount
-                );
+                job.amountClaimed += feeAmount;
             }
-            jobAdditionalFees[memo.jobId] += amount;
-        } else if (memoType == MemoType.PAYABLE_REQUEST) {
-            IERC20(token).safeTransferFrom(_msgSender(), recipient, amount);
-
-            emit PayableRequestExecuted(
-                memo.jobId,
-                memoId,
-                _msgSender(),
-                recipient,
-                token,
-                amount
-            );
-        } else if (memoType == MemoType.PAYABLE_TRANSFER) {
-            IERC20(token).safeTransferFrom(memo.sender, recipient, amount);
-
-            emit PayableTransferExecuted(
-                memo.jobId,
-                memoId,
-                memo.sender,
-                recipient,
-                token,
-                amount
-            );
+            jobAdditionalFees[memo.jobId] += feeAmount;
         }
+
         details.isExecuted = true;
     }
 

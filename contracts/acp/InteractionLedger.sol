@@ -24,9 +24,7 @@ abstract contract InteractionLedger {
         OBJECT_URL,
         TXHASH,
         PAYABLE_REQUEST,
-        PAYABLE_TRANSFER,
-        PAYABLE_FEE,
-        PAYABLE_FEE_REQUEST
+        PAYABLE_TRANSFER
     }
 
     mapping(uint256 => Memo) public memos;
@@ -68,6 +66,6 @@ abstract contract InteractionLedger {
     
     function isPayableMemo(uint256 memoId) public view returns (bool) {
         MemoType mType = memos[memoId].memoType;
-        return mType == MemoType.PAYABLE_REQUEST || mType == MemoType.PAYABLE_FEE || mType == MemoType.PAYABLE_TRANSFER || mType == MemoType.PAYABLE_FEE_REQUEST;
+        return mType == MemoType.PAYABLE_REQUEST || mType == MemoType.PAYABLE_TRANSFER;
     }
 }

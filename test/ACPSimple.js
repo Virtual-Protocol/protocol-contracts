@@ -23,17 +23,15 @@ describe("ACPSimple", function () {
     OBJECT_URL: 4,
     TXHASH: 5,
     PAYABLE_REQUEST: 6,
-    PAYABLE_TRANSFER: 7,
-    PAYABLE_FEE: 8,
-    PAYABLE_FEE_REQUEST: 9
+    PAYABLE_TRANSFER: 7
   };
 
   async function deployACPFixture() {
     const [deployer, client, provider, evaluator, platformTreasury, user] = await ethers.getSigners();
 
     // Deploy mock ERC20 token for payments
-    const MockToken = await ethers.getContractFactory("contracts/mocks/MockERC20.sol:MockERC20");
-    const paymentToken = await MockToken.deploy("Mock Token", "MTK", ethers.parseEther("1000000"));
+    const MockToken = await ethers.getContractFactory("contracts/genesis/MockERC20.sol:MockERC20");
+    const paymentToken = await MockToken.deploy("Mock Token", "MTK", deployer.address, ethers.parseEther("1000000"));
     await paymentToken.waitForDeployment();
 
     // Deploy ACPSimple contract
@@ -521,6 +519,8 @@ describe("ACPSimple", function () {
           tokenAddress,
           amount,
           provider.address,
+          0, // feeAmount
+          false, // feeToContract
           MEMO_TYPE.PAYABLE_REQUEST,
           PHASE_TRANSACTION
         );
@@ -543,7 +543,8 @@ describe("ACPSimple", function () {
         expect(payableDetails.token).to.equal(tokenAddress);
         expect(payableDetails.amount).to.equal(amount);
         expect(payableDetails.recipient).to.equal(provider.address);
-        expect(payableDetails.isFee).to.be.false;
+        expect(payableDetails.feeAmount).to.equal(0);
+        expect(payableDetails.feeToContract).to.be.false;
         expect(payableDetails.isExecuted).to.be.false;
       });
 
@@ -560,6 +561,8 @@ describe("ACPSimple", function () {
           tokenAddress,
           amount,
           provider.address,
+          0, // feeAmount
+          false, // feeToContract
           MEMO_TYPE.PAYABLE_REQUEST,
           PHASE_TRANSACTION
         );
@@ -602,6 +605,8 @@ describe("ACPSimple", function () {
           tokenAddress,
           amount,
           provider.address,
+          0, // feeAmount
+          false, // feeToContract
           MEMO_TYPE.PAYABLE_REQUEST,
           PHASE_TRANSACTION
         );
@@ -641,6 +646,8 @@ describe("ACPSimple", function () {
           tokenAddress,
           amount,
           client.address,
+          0, // feeAmount
+          false, // feeToContract
           MEMO_TYPE.PAYABLE_TRANSFER,
           PHASE_TRANSACTION
         );
@@ -663,7 +670,8 @@ describe("ACPSimple", function () {
         expect(payableDetails.token).to.equal(tokenAddress);
         expect(payableDetails.amount).to.equal(amount);
         expect(payableDetails.recipient).to.equal(client.address);
-        expect(payableDetails.isFee).to.be.false;
+        expect(payableDetails.feeAmount).to.equal(0);
+        expect(payableDetails.feeToContract).to.be.false;
         expect(payableDetails.isExecuted).to.be.false;
       });
 
@@ -680,6 +688,8 @@ describe("ACPSimple", function () {
           tokenAddress,
           amount,
           client.address,
+          0, // feeAmount
+          false, // feeToContract
           MEMO_TYPE.PAYABLE_TRANSFER,
           PHASE_TRANSACTION
         );
@@ -722,6 +732,8 @@ describe("ACPSimple", function () {
           tokenAddress,
           amount,
           client.address,
+          0, // feeAmount
+          false, // feeToContract
           MEMO_TYPE.PAYABLE_TRANSFER,
           PHASE_TRANSACTION
         );
@@ -754,11 +766,15 @@ describe("ACPSimple", function () {
 
         const feeAmount = ethers.parseEther("2");
 
-        const memoTx = await acp.connect(provider).createPayableFeeMemo(
+        const memoTx = await acp.connect(provider).createPayableMemo(
           jobId,
           "Additional service fee",
-          feeAmount,
-          MEMO_TYPE.PAYABLE_FEE,
+          ethers.ZeroAddress, // token (not used for fee-only)
+          0, // amount (no fund transfer)
+          ethers.ZeroAddress, // recipient (not used for fee-only)
+          feeAmount, // feeAmount
+          true, // feeToContract
+          MEMO_TYPE.PAYABLE_REQUEST,
           PHASE_TRANSACTION
         );
 
@@ -768,7 +784,7 @@ describe("ACPSimple", function () {
         // Check memo was created
         const memo = await acp.memos(memoId);
         // Note: content is no longer stored in memo struct, only emitted in NewMemo event
-        expect(memo.memoType).to.equal(MEMO_TYPE.PAYABLE_FEE);
+        expect(memo.memoType).to.equal(MEMO_TYPE.PAYABLE_REQUEST);
         
         // Verify content was emitted in NewMemo event
         await expect(memoTx)
@@ -778,9 +794,10 @@ describe("ACPSimple", function () {
         // Check payable details
         const payableDetails = await acp.payableDetails(memoId);
         expect(payableDetails.token).to.equal(await paymentToken.getAddress());
-        expect(payableDetails.amount).to.equal(feeAmount);
-        expect(payableDetails.recipient).to.equal(await acp.getAddress());
-        expect(payableDetails.isFee).to.be.true;
+        expect(payableDetails.amount).to.equal(0);
+        expect(payableDetails.recipient).to.equal(ethers.ZeroAddress);
+        expect(payableDetails.feeAmount).to.equal(feeAmount);
+        expect(payableDetails.feeToContract).to.be.true;
         expect(payableDetails.isExecuted).to.be.false;
       });
 
@@ -790,11 +807,15 @@ describe("ACPSimple", function () {
         const feeAmount = ethers.parseEther("2");
 
         // Create payable fee memo
-        const memoTx = await acp.connect(provider).createPayableFeeMemo(
+        const memoTx = await acp.connect(provider).createPayableMemo(
           jobId,
           "Additional service fee",
-          feeAmount,
-          MEMO_TYPE.PAYABLE_FEE,
+          ethers.ZeroAddress, // token (not used for fee-only)
+          0, // amount (no fund transfer)
+          ethers.ZeroAddress, // recipient (not used for fee-only)
+          feeAmount, // feeAmount
+          true, // feeToContract
+          MEMO_TYPE.PAYABLE_REQUEST,
           PHASE_TRANSACTION
         );
         const receipt = await memoTx.wait();
@@ -833,11 +854,15 @@ describe("ACPSimple", function () {
 
         const feeAmount = ethers.parseEther("5");
 
-        const memoTx = await acp.connect(provider).createPayableFeeMemo(
+        const memoTx = await acp.connect(provider).createPayableMemo(
           jobId,
           "Request payment for premium service",
-          feeAmount,
-          MEMO_TYPE.PAYABLE_FEE_REQUEST,
+          ethers.ZeroAddress, // token (not used for fee-only)
+          0, // amount (no fund transfer)
+          ethers.ZeroAddress, // recipient (not used for fee-only)
+          feeAmount, // feeAmount
+          false, // feeToContract (fee goes to provider)
+          MEMO_TYPE.PAYABLE_REQUEST,
           PHASE_TRANSACTION
         );
 
@@ -846,19 +871,20 @@ describe("ACPSimple", function () {
 
         // Check memo was created
         const memo = await acp.memos(memoId);
-        expect(memo.memoType).to.equal(MEMO_TYPE.PAYABLE_FEE_REQUEST);
+        expect(memo.memoType).to.equal(MEMO_TYPE.PAYABLE_REQUEST);
         
         // Verify content was emitted in NewMemo event
         await expect(memoTx)
           .to.emit(acp, "NewMemo")
           .withArgs(jobId, provider.address, memoId, "Request payment for premium service");
 
-        // Check payable details - recipient should be the memo sender (provider)
+        // Check payable details - fee goes to provider (not contract)
         const payableDetails = await acp.payableDetails(memoId);
         expect(payableDetails.token).to.equal(await paymentToken.getAddress());
-        expect(payableDetails.amount).to.equal(feeAmount);
-        expect(payableDetails.recipient).to.equal(provider.address);
-        expect(payableDetails.isFee).to.be.true;
+        expect(payableDetails.amount).to.equal(0);
+        expect(payableDetails.recipient).to.equal(ethers.ZeroAddress);
+        expect(payableDetails.feeAmount).to.equal(feeAmount);
+        expect(payableDetails.feeToContract).to.be.false;
         expect(payableDetails.isExecuted).to.be.false;
       });
 
@@ -871,11 +897,15 @@ describe("ACPSimple", function () {
         const expectedNetAmount = feeAmount - expectedPlatformFee;
 
         // Create payable fee request memo
-        const memoTx = await acp.connect(provider).createPayableFeeMemo(
+        const memoTx = await acp.connect(provider).createPayableMemo(
           jobId,
           "Request payment for premium service",
-          feeAmount,
-          MEMO_TYPE.PAYABLE_FEE_REQUEST,
+          ethers.ZeroAddress, // token (not used for fee-only)
+          0, // amount (no fund transfer)
+          ethers.ZeroAddress, // recipient (not used for fee-only)
+          feeAmount, // feeAmount
+          false, // feeToContract (fee goes to provider)
+          MEMO_TYPE.PAYABLE_REQUEST,
           PHASE_TRANSACTION
         );
         const receipt = await memoTx.wait();
@@ -916,11 +946,15 @@ describe("ACPSimple", function () {
         const feeAmount = ethers.parseEther("5");
 
         // Create payable fee request memo
-        const memoTx = await acp.connect(provider).createPayableFeeMemo(
+        const memoTx = await acp.connect(provider).createPayableMemo(
           jobId,
           "Request payment for premium service",
-          feeAmount,
-          MEMO_TYPE.PAYABLE_FEE_REQUEST,
+          ethers.ZeroAddress, // token (not used for fee-only)
+          0, // amount (no fund transfer)
+          ethers.ZeroAddress, // recipient (not used for fee-only)
+          feeAmount, // feeAmount
+          false, // feeToContract (fee goes to provider)
+          MEMO_TYPE.PAYABLE_REQUEST,
           PHASE_TRANSACTION
         );
         const receipt = await memoTx.wait();
@@ -954,22 +988,27 @@ describe("ACPSimple", function () {
         const feeAmount = ethers.parseEther("3");
 
         // Client creates payable fee request memo (requesting provider to pay client)
-        const memoTx = await acp.connect(client).createPayableFeeMemo(
+        const memoTx = await acp.connect(client).createPayableMemo(
           jobId,
           "Request reimbursement for expenses",
-          feeAmount,
-          MEMO_TYPE.PAYABLE_FEE_REQUEST,
+          ethers.ZeroAddress, // token (not used for fee-only)
+          0, // amount (no fund transfer)
+          ethers.ZeroAddress, // recipient (not used for fee-only)
+          feeAmount, // feeAmount
+          false, // feeToContract (fee goes to provider)
+          MEMO_TYPE.PAYABLE_REQUEST,
           PHASE_TRANSACTION
         );
 
         const receipt = await memoTx.wait();
         const memoId = receipt.logs[0].args[2];
 
-        // Check payable details - recipient should be the memo sender (client)
+        // Check payable details - fee goes to provider
         const payableDetails = await acp.payableDetails(memoId);
-        expect(payableDetails.recipient).to.equal(client.address);
-        expect(payableDetails.amount).to.equal(feeAmount);
-        expect(payableDetails.isFee).to.be.true;
+        expect(payableDetails.recipient).to.equal(ethers.ZeroAddress);
+        expect(payableDetails.amount).to.equal(0);
+        expect(payableDetails.feeAmount).to.equal(feeAmount);
+        expect(payableDetails.feeToContract).to.be.false;
       });
     });
 
@@ -1074,11 +1113,15 @@ describe("ACPSimple", function () {
 
         // Add additional fee
         const feeAmount = ethers.parseEther("1");
-        const feeMemoTx = await acp.connect(provider).createPayableFeeMemo(
+        const feeMemoTx = await acp.connect(provider).createPayableMemo(
           jobId,
           "Processing fee",
-          feeAmount,
-          MEMO_TYPE.PAYABLE_FEE,
+          ethers.ZeroAddress, // token (not used for fee-only)
+          0, // amount (no fund transfer)
+          ethers.ZeroAddress, // recipient (not used for fee-only)
+          feeAmount, // feeAmount
+          true, // feeToContract
+          MEMO_TYPE.PAYABLE_REQUEST,
           PHASE_TRANSACTION
         );
         const feeReceipt = await feeMemoTx.wait();

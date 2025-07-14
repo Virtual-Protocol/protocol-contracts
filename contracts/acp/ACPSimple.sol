@@ -232,7 +232,7 @@ contract ACPSimple is
             phase >= PHASE_COMPLETED &&
             phase <= PHASE_REJECTED
         ) {
-            _claimBudget(jobId);
+            _claimBudget(job);
         }
     }
 
@@ -250,11 +250,16 @@ contract ACPSimple is
     }
 
     function claimBudget(uint256 id) public nonReentrant {
-        _claimBudget(id);
+        Job storage job = jobs[id];
+        if (job.phase < PHASE_TRANSACTION && block.timestamp > job.expiredAt) {
+            _updateJobPhase(id, PHASE_EXPIRED);
+        } else {
+            _claimBudget(job);
+        }
     }
 
-    function _claimBudget(uint256 id) internal {
-        Job storage job = jobs[id];
+    function _claimBudget(Job storage job) internal {
+        uint256 id = job.id;
         uint256 totalFees = jobAdditionalFees[id];
         uint256 totalAmount = job.budget + totalFees;
         require(totalAmount > job.amountClaimed, "No budget to claim");

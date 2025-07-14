@@ -1013,70 +1013,6 @@ describe("ACPSimple", function () {
     });
 
     describe("Zero Budget Job Completion", function () {
-      it("Should allow creating and completing a job with 0 budget", async function () {
-        const { acp, client, provider, evaluator, paymentToken } = await loadFixture(deployACPFixture);
-
-        // Create job
-        const expiredAt = (await time.latest()) + 86400;
-        const tx = await acp.connect(client).createJob(provider.address, evaluator.address, expiredAt);
-        const receipt = await tx.wait();
-        const jobId = receipt.logs[0].args[0];
-
-        // Set budget to 0 (should be allowed now)
-        await acp.connect(client).setBudget(jobId, 0);
-
-        // Move through phases
-        const memoTx1 = await acp.connect(client).createMemo(
-          jobId,
-          "Request for free consultation",
-          MEMO_TYPE.MESSAGE,
-          false,
-          PHASE_NEGOTIATION
-        );
-        const memoReceipt1 = await memoTx1.wait();
-        const memoId1 = memoReceipt1.logs[0].args[2];
-        await acp.connect(provider).signMemo(memoId1, true, "Approved free consultation");
-
-        const memoTx2 = await acp.connect(provider).createMemo(
-          jobId,
-          "Terms agreed for free work",
-          MEMO_TYPE.MESSAGE,
-          false,
-          PHASE_TRANSACTION
-        );
-        const memoReceipt2 = await memoTx2.wait();
-        const memoId2 = memoReceipt2.logs[0].args[2];
-        await acp.connect(client).signMemo(memoId2, true, "Agreed to free terms");
-
-        // Complete work
-        const memoTx3 = await acp.connect(provider).createMemo(
-          jobId,
-          "Free consultation completed",
-          MEMO_TYPE.MESSAGE,
-          false,
-          PHASE_COMPLETED
-        );
-        const memoReceipt3 = await memoTx3.wait();
-        const memoId3 = memoReceipt3.logs[0].args[2];
-
-        // Job should move to evaluation phase
-        const jobAfterCompletion = await acp.jobs(jobId);
-        expect(jobAfterCompletion.phase).to.equal(PHASE_EVALUATION);
-
-        // Evaluator approves (should complete without payment distribution)
-        await expect(
-          acp.connect(evaluator).signMemo(memoId3, true, "Free work approved")
-        )
-          .to.emit(acp, "JobPhaseUpdated")
-          .withArgs(jobId, PHASE_EVALUATION, PHASE_COMPLETED);
-
-        // Check final job state
-        const finalJob = await acp.jobs(jobId);
-        expect(finalJob.phase).to.equal(PHASE_COMPLETED);
-        expect(finalJob.budget).to.equal(0);
-        expect(finalJob.amountClaimed).to.equal(0);
-      });
-
       it("Should handle 0 budget job with additional fees", async function () {
         const { acp, client, provider, evaluator, paymentToken } = await loadFixture(deployACPFixture);
 
@@ -1175,8 +1111,8 @@ describe("ACPSimple", function () {
         expect(additionalFeesAfter).to.equal(feeAmount);
       });
 
-      it("Should reject 0 budget job and handle refund properly", async function () {
-        const { acp, client, provider, evaluator, paymentToken } = await loadFixture(deployACPFixture);
+      it("Should throw error when completing a job with 0 budget and 0 fees", async function () {
+        const { acp, client, provider, evaluator } = await loadFixture(deployACPFixture);
 
         // Create job with 0 budget
         const expiredAt = (await time.latest()) + 86400;
@@ -1186,7 +1122,7 @@ describe("ACPSimple", function () {
 
         await acp.connect(client).setBudget(jobId, 0);
 
-        // Move to evaluation phase
+        // Move through phases to completion without adding any fees
         const memoTx1 = await acp.connect(client).createMemo(
           jobId,
           "Request",
@@ -1209,6 +1145,7 @@ describe("ACPSimple", function () {
         const memoId2 = memoReceipt2.logs[0].args[2];
         await acp.connect(client).signMemo(memoId2, true, "Agreed");
 
+        // Complete work
         const completionMemoTx = await acp.connect(provider).createMemo(
           jobId,
           "Work completed",
@@ -1219,16 +1156,18 @@ describe("ACPSimple", function () {
         const completionReceipt = await completionMemoTx.wait();
         const completionMemoId = completionReceipt.logs[0].args[2];
 
-        // Evaluator rejects
-        await expect(
-          acp.connect(evaluator).signMemo(completionMemoId, false, "Work rejected")
-        )
-          .to.emit(acp, "JobPhaseUpdated")
-          .withArgs(jobId, PHASE_EVALUATION, PHASE_REJECTED);
+        // Job should move to evaluation phase
+        const jobAfterCompletion = await acp.jobs(jobId);
+        expect(jobAfterCompletion.phase).to.equal(PHASE_EVALUATION);
 
-        // Check final state
+        // Evaluator tries to approve - should fail with "No budget or fees to claim"
+        await expect(
+          acp.connect(evaluator).signMemo(completionMemoId, true, "Work approved")
+        ).to.be.revertedWith("No budget or fees to claim");
+
+        // Job should still be in evaluation phase after failed completion
         const finalJob = await acp.jobs(jobId);
-        expect(finalJob.phase).to.equal(PHASE_REJECTED);
+        expect(finalJob.phase).to.equal(PHASE_EVALUATION);
         expect(finalJob.budget).to.equal(0);
         expect(finalJob.amountClaimed).to.equal(0);
       });

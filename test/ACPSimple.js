@@ -26,6 +26,12 @@ describe("ACPSimple", function () {
     PAYABLE_TRANSFER: 7
   };
 
+  const FEE_TYPE = {
+    NO_FEE: 0,
+    IMMEDIATE_FEE: 1,
+    DEFERRED_FEE: 2
+  };
+
   async function deployACPFixture() {
     const [deployer, client, provider, evaluator, platformTreasury, user] = await ethers.getSigners();
 
@@ -520,7 +526,7 @@ describe("ACPSimple", function () {
           amount,
           provider.address,
           0, // feeAmount
-          false, // feeToContract
+          FEE_TYPE.NO_FEE, // feeType
           MEMO_TYPE.PAYABLE_REQUEST,
           PHASE_TRANSACTION
         );
@@ -544,7 +550,7 @@ describe("ACPSimple", function () {
         expect(payableDetails.amount).to.equal(amount);
         expect(payableDetails.recipient).to.equal(provider.address);
         expect(payableDetails.feeAmount).to.equal(0);
-        expect(payableDetails.feeToContract).to.be.false;
+        expect(payableDetails.feeType).to.equal(FEE_TYPE.NO_FEE);
         expect(payableDetails.isExecuted).to.be.false;
       });
 
@@ -562,7 +568,7 @@ describe("ACPSimple", function () {
           amount,
           provider.address,
           0, // feeAmount
-          false, // feeToContract
+          FEE_TYPE.NO_FEE, // feeType
           MEMO_TYPE.PAYABLE_REQUEST,
           PHASE_TRANSACTION
         );
@@ -606,7 +612,7 @@ describe("ACPSimple", function () {
           amount,
           provider.address,
           0, // feeAmount
-          false, // feeToContract
+          FEE_TYPE.NO_FEE, // feeType
           MEMO_TYPE.PAYABLE_REQUEST,
           PHASE_TRANSACTION
         );
@@ -647,7 +653,7 @@ describe("ACPSimple", function () {
           amount,
           client.address,
           0, // feeAmount
-          false, // feeToContract
+          FEE_TYPE.NO_FEE, // feeType
           MEMO_TYPE.PAYABLE_TRANSFER,
           PHASE_TRANSACTION
         );
@@ -671,7 +677,7 @@ describe("ACPSimple", function () {
         expect(payableDetails.amount).to.equal(amount);
         expect(payableDetails.recipient).to.equal(client.address);
         expect(payableDetails.feeAmount).to.equal(0);
-        expect(payableDetails.feeToContract).to.be.false;
+        expect(payableDetails.feeType).to.equal(FEE_TYPE.NO_FEE);
         expect(payableDetails.isExecuted).to.be.false;
       });
 
@@ -689,7 +695,7 @@ describe("ACPSimple", function () {
           amount,
           client.address,
           0, // feeAmount
-          false, // feeToContract
+          FEE_TYPE.NO_FEE, // feeType
           MEMO_TYPE.PAYABLE_TRANSFER,
           PHASE_TRANSACTION
         );
@@ -733,7 +739,7 @@ describe("ACPSimple", function () {
           amount,
           client.address,
           0, // feeAmount
-          false, // feeToContract
+          FEE_TYPE.NO_FEE, // feeType
           MEMO_TYPE.PAYABLE_TRANSFER,
           PHASE_TRANSACTION
         );
@@ -773,7 +779,7 @@ describe("ACPSimple", function () {
           0, // amount (no fund transfer)
           ethers.ZeroAddress, // recipient (not used for fee-only)
           feeAmount, // feeAmount
-          true, // feeToContract
+          FEE_TYPE.DEFERRED_FEE, // feeType
           MEMO_TYPE.PAYABLE_REQUEST,
           PHASE_TRANSACTION
         );
@@ -797,7 +803,7 @@ describe("ACPSimple", function () {
         expect(payableDetails.amount).to.equal(0);
         expect(payableDetails.recipient).to.equal(ethers.ZeroAddress);
         expect(payableDetails.feeAmount).to.equal(feeAmount);
-        expect(payableDetails.feeToContract).to.be.true;
+        expect(payableDetails.feeType).to.equal(FEE_TYPE.DEFERRED_FEE);
         expect(payableDetails.isExecuted).to.be.false;
       });
 
@@ -814,7 +820,7 @@ describe("ACPSimple", function () {
           0, // amount (no fund transfer)
           ethers.ZeroAddress, // recipient (not used for fee-only)
           feeAmount, // feeAmount
-          true, // feeToContract
+          FEE_TYPE.DEFERRED_FEE, // feeType
           MEMO_TYPE.PAYABLE_REQUEST,
           PHASE_TRANSACTION
         );
@@ -861,7 +867,7 @@ describe("ACPSimple", function () {
           0, // amount (no fund transfer)
           ethers.ZeroAddress, // recipient (not used for fee-only)
           feeAmount, // feeAmount
-          false, // feeToContract (fee goes to provider)
+          FEE_TYPE.IMMEDIATE_FEE, // feeType (fee goes to provider)
           MEMO_TYPE.PAYABLE_REQUEST,
           PHASE_TRANSACTION
         );
@@ -884,7 +890,7 @@ describe("ACPSimple", function () {
         expect(payableDetails.amount).to.equal(0);
         expect(payableDetails.recipient).to.equal(ethers.ZeroAddress);
         expect(payableDetails.feeAmount).to.equal(feeAmount);
-        expect(payableDetails.feeToContract).to.be.false;
+        expect(payableDetails.feeType).to.equal(FEE_TYPE.IMMEDIATE_FEE);
         expect(payableDetails.isExecuted).to.be.false;
       });
 
@@ -904,7 +910,7 @@ describe("ACPSimple", function () {
           0, // amount (no fund transfer)
           ethers.ZeroAddress, // recipient (not used for fee-only)
           feeAmount, // feeAmount
-          false, // feeToContract (fee goes to provider)
+          FEE_TYPE.IMMEDIATE_FEE, // feeType (fee goes to provider)
           MEMO_TYPE.PAYABLE_REQUEST,
           PHASE_TRANSACTION
         );
@@ -953,7 +959,7 @@ describe("ACPSimple", function () {
           0, // amount (no fund transfer)
           ethers.ZeroAddress, // recipient (not used for fee-only)
           feeAmount, // feeAmount
-          false, // feeToContract (fee goes to provider)
+          FEE_TYPE.IMMEDIATE_FEE, // feeType (fee goes to provider)
           MEMO_TYPE.PAYABLE_REQUEST,
           PHASE_TRANSACTION
         );
@@ -995,7 +1001,7 @@ describe("ACPSimple", function () {
           0, // amount (no fund transfer)
           ethers.ZeroAddress, // recipient (not used for fee-only)
           feeAmount, // feeAmount
-          false, // feeToContract (fee goes to provider)
+          FEE_TYPE.IMMEDIATE_FEE, // feeType (fee goes to provider)
           MEMO_TYPE.PAYABLE_REQUEST,
           PHASE_TRANSACTION
         );
@@ -1008,7 +1014,7 @@ describe("ACPSimple", function () {
         expect(payableDetails.recipient).to.equal(ethers.ZeroAddress);
         expect(payableDetails.amount).to.equal(0);
         expect(payableDetails.feeAmount).to.equal(feeAmount);
-        expect(payableDetails.feeToContract).to.be.false;
+        expect(payableDetails.feeType).to.equal(FEE_TYPE.IMMEDIATE_FEE);
       });
     });
 
@@ -1056,7 +1062,7 @@ describe("ACPSimple", function () {
           0, // amount (no fund transfer)
           ethers.ZeroAddress, // recipient (not used for fee-only)
           feeAmount, // feeAmount
-          true, // feeToContract
+          FEE_TYPE.DEFERRED_FEE, // feeType
           MEMO_TYPE.PAYABLE_REQUEST,
           PHASE_TRANSACTION
         );

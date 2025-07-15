@@ -98,8 +98,14 @@ contract ACPSimple is
         uint256 amount;
         address recipient;
         uint256 feeAmount;
-        bool feeToContract;
+        FeeType feeType;
         bool isExecuted;
+    }
+
+    enum FeeType {
+        NO_FEE,
+        IMMEDIATE_FEE,
+        DEFERRED_FEE
     }
 
     event PayableRequestExecuted(
@@ -329,7 +335,7 @@ contract ACPSimple is
         uint256 amount,
         address recipient,
         uint256 feeAmount,
-        bool feeToContract,
+        FeeType feeType,
         MemoType memoType,
         uint8 nextPhase
     ) external returns (uint256) {
@@ -358,7 +364,7 @@ contract ACPSimple is
             amount: amount,
             recipient: recipient,
             feeAmount: feeAmount,
-            feeToContract: feeToContract,
+            feeType: feeType,
             isExecuted: false
         });
 
@@ -382,7 +388,7 @@ contract ACPSimple is
         uint256 amount = details.amount;
         address recipient = details.recipient;
         uint256 feeAmount = details.feeAmount;
-        bool feeToContract = details.feeToContract;
+        FeeType feeType = details.feeType;
         MemoType memoType = memo.memoType;
 
         // Handle fund transfer
@@ -414,7 +420,7 @@ contract ACPSimple is
 
         // Handle fee transfer
         if (feeAmount > 0) {
-            if (feeToContract) {
+            if (feeType == FeeType.DEFERRED_FEE) {
                 paymentToken.safeTransferFrom(
                     _msgSender(),
                     address(this),
@@ -429,7 +435,7 @@ contract ACPSimple is
             } else {
                 Job storage job = jobs[memo.jobId];
                 address provider = job.provider;
-                
+
                 uint256 platformFee = (feeAmount * platformFeeBP) / 10000;
                 if (platformFee > 0) {
                     paymentToken.safeTransferFrom(

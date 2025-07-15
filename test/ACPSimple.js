@@ -793,7 +793,7 @@ describe("ACPSimple", function () {
 
         // Check payable details
         const payableDetails = await acp.payableDetails(memoId);
-        expect(payableDetails.token).to.equal(await paymentToken.getAddress());
+        expect(payableDetails.token).to.equal(ethers.ZeroAddress);
         expect(payableDetails.amount).to.equal(0);
         expect(payableDetails.recipient).to.equal(ethers.ZeroAddress);
         expect(payableDetails.feeAmount).to.equal(feeAmount);
@@ -880,7 +880,7 @@ describe("ACPSimple", function () {
 
         // Check payable details - fee goes to provider (not contract)
         const payableDetails = await acp.payableDetails(memoId);
-        expect(payableDetails.token).to.equal(await paymentToken.getAddress());
+        expect(payableDetails.token).to.equal(ethers.ZeroAddress);
         expect(payableDetails.amount).to.equal(0);
         expect(payableDetails.recipient).to.equal(ethers.ZeroAddress);
         expect(payableDetails.feeAmount).to.equal(feeAmount);

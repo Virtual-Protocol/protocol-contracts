@@ -354,7 +354,7 @@ contract ACPSimple is
         uint256 memoId = createMemo(jobId, content, memoType, false, nextPhase);
 
         payableDetails[memoId] = PayableDetails({
-            token: amount > 0 ? token : address(paymentToken),
+            token: token,
             amount: amount,
             recipient: recipient,
             feeAmount: feeAmount,

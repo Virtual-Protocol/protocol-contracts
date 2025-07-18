@@ -420,16 +420,20 @@ contract ACPSimple is
 
         // Handle fee transfer
         if (feeAmount > 0) {
+            address payer = _msgSender();
+            if (memoType == MemoType.PAYABLE_TRANSFER) {
+                payer = memo.sender;
+            }
             if (feeType == FeeType.DEFERRED_FEE) {
                 paymentToken.safeTransferFrom(
-                    _msgSender(),
+                    payer,
                     address(this),
                     feeAmount
                 );
                 emit PayableFeeCollected(
                     memo.jobId,
                     memoId,
-                    _msgSender(),
+                    payer,
                     feeAmount
                 );
             } else {
@@ -439,21 +443,21 @@ contract ACPSimple is
                 uint256 platformFee = (feeAmount * platformFeeBP) / 10000;
                 if (platformFee > 0) {
                     paymentToken.safeTransferFrom(
-                        _msgSender(),
+                        payer,
                         platformTreasury,
                         platformFee
                     );
                 }
                 uint256 netAmount = feeAmount - platformFee;
                 paymentToken.safeTransferFrom(
-                    _msgSender(),
+                    payer,
                     provider,
                     netAmount
                 );
                 emit PayableFeeRequestExecuted(
                     memo.jobId,
                     memoId,
-                    _msgSender(),
+                    payer,
                     provider,
                     netAmount
                 );

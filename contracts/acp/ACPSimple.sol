@@ -102,6 +102,8 @@ contract ACPSimple is
         bool isExecuted;
     }
 
+    mapping(uint256 memoId => uint256 expiredAt) public memoExpiredAt;
+
     enum FeeType {
         NO_FEE,
         IMMEDIATE_FEE,
@@ -337,7 +339,8 @@ contract ACPSimple is
         uint256 feeAmount,
         FeeType feeType,
         MemoType memoType,
-        uint8 nextPhase
+        uint8 nextPhase,
+        uint256 expiredAt
     ) external returns (uint256) {
         require(jobId > 0 && jobId <= jobCounter, "Job does not exist");
         require(
@@ -349,6 +352,7 @@ contract ACPSimple is
                 memoType == MemoType.PAYABLE_TRANSFER,
             "Invalid memo type"
         );
+        require(expiredAt > block.timestamp + 1 minutes, "Expired at must be in the future");
 
         // If amount > 0, recipient must be valid
         if (amount > 0) {
@@ -367,6 +371,8 @@ contract ACPSimple is
             feeType: feeType,
             isExecuted: false
         });
+
+        memoExpiredAt[memoId] = expiredAt;
 
         return memoId;
     }
@@ -582,6 +588,10 @@ contract ACPSimple is
 
         require(job.phase < PHASE_COMPLETED, "Job is already completed");
         require(canSign(_msgSender(), job), "Unauthorised memo signer");
+
+        if (memoExpiredAt[memoId] > 0 && memoExpiredAt[memoId] < block.timestamp) {
+            revert("Memo expired");
+        }
 
         if (signatories[memoId][_msgSender()] > 0) {
             revert("Already signed");

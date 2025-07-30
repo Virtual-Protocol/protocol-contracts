@@ -352,7 +352,7 @@ contract ACPSimple is
                 memoType == MemoType.PAYABLE_TRANSFER,
             "Invalid memo type"
         );
-        require(expiredAt > block.timestamp + 1 minutes, "Expired at must be in the future");
+        require(expiredAt == 0 || expiredAt > block.timestamp + 1 minutes, "Expired at must be in the future");
 
         // If amount > 0, recipient must be valid
         if (amount > 0) {

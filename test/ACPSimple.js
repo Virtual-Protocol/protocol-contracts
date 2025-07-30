@@ -23,16 +23,21 @@ describe("ACPSimple", function () {
     OBJECT_URL: 4,
     TXHASH: 5,
     PAYABLE_REQUEST: 6,
-    PAYABLE_TRANSFER: 7,
-    PAYABLE_FEE: 8
+    PAYABLE_TRANSFER: 7
+  };
+
+  const FEE_TYPE = {
+    NO_FEE: 0,
+    IMMEDIATE_FEE: 1,
+    DEFERRED_FEE: 2
   };
 
   async function deployACPFixture() {
     const [deployer, client, provider, evaluator, platformTreasury, user] = await ethers.getSigners();
 
     // Deploy mock ERC20 token for payments
-    const MockToken = await ethers.getContractFactory("contracts/mocks/MockERC20.sol:MockERC20");
-    const paymentToken = await MockToken.deploy("Mock Token", "MTK", ethers.parseEther("1000000"));
+    const MockToken = await ethers.getContractFactory("contracts/genesis/MockERC20.sol:MockERC20");
+    const paymentToken = await MockToken.deploy("Mock Token", "MTK", deployer.address, ethers.parseEther("1000000"));
     await paymentToken.waitForDeployment();
 
     // Deploy ACPSimple contract
@@ -520,6 +525,8 @@ describe("ACPSimple", function () {
           tokenAddress,
           amount,
           provider.address,
+          0, // feeAmount
+          FEE_TYPE.NO_FEE, // feeType
           MEMO_TYPE.PAYABLE_REQUEST,
           PHASE_TRANSACTION
         );
@@ -542,7 +549,8 @@ describe("ACPSimple", function () {
         expect(payableDetails.token).to.equal(tokenAddress);
         expect(payableDetails.amount).to.equal(amount);
         expect(payableDetails.recipient).to.equal(provider.address);
-        expect(payableDetails.isFee).to.be.false;
+        expect(payableDetails.feeAmount).to.equal(0);
+        expect(payableDetails.feeType).to.equal(FEE_TYPE.NO_FEE);
         expect(payableDetails.isExecuted).to.be.false;
       });
 
@@ -559,6 +567,8 @@ describe("ACPSimple", function () {
           tokenAddress,
           amount,
           provider.address,
+          0, // feeAmount
+          FEE_TYPE.NO_FEE, // feeType
           MEMO_TYPE.PAYABLE_REQUEST,
           PHASE_TRANSACTION
         );
@@ -601,6 +611,8 @@ describe("ACPSimple", function () {
           tokenAddress,
           amount,
           provider.address,
+          0, // feeAmount
+          FEE_TYPE.NO_FEE, // feeType
           MEMO_TYPE.PAYABLE_REQUEST,
           PHASE_TRANSACTION
         );
@@ -640,6 +652,8 @@ describe("ACPSimple", function () {
           tokenAddress,
           amount,
           client.address,
+          0, // feeAmount
+          FEE_TYPE.NO_FEE, // feeType
           MEMO_TYPE.PAYABLE_TRANSFER,
           PHASE_TRANSACTION
         );
@@ -662,7 +676,8 @@ describe("ACPSimple", function () {
         expect(payableDetails.token).to.equal(tokenAddress);
         expect(payableDetails.amount).to.equal(amount);
         expect(payableDetails.recipient).to.equal(client.address);
-        expect(payableDetails.isFee).to.be.false;
+        expect(payableDetails.feeAmount).to.equal(0);
+        expect(payableDetails.feeType).to.equal(FEE_TYPE.NO_FEE);
         expect(payableDetails.isExecuted).to.be.false;
       });
 
@@ -679,6 +694,8 @@ describe("ACPSimple", function () {
           tokenAddress,
           amount,
           client.address,
+          0, // feeAmount
+          FEE_TYPE.NO_FEE, // feeType
           MEMO_TYPE.PAYABLE_TRANSFER,
           PHASE_TRANSACTION
         );
@@ -721,6 +738,8 @@ describe("ACPSimple", function () {
           tokenAddress,
           amount,
           client.address,
+          0, // feeAmount
+          FEE_TYPE.NO_FEE, // feeType
           MEMO_TYPE.PAYABLE_TRANSFER,
           PHASE_TRANSACTION
         );
@@ -753,10 +772,15 @@ describe("ACPSimple", function () {
 
         const feeAmount = ethers.parseEther("2");
 
-        const memoTx = await acp.connect(provider).createPayableFeeMemo(
+        const memoTx = await acp.connect(provider).createPayableMemo(
           jobId,
           "Additional service fee",
-          feeAmount,
+          ethers.ZeroAddress, // token (not used for fee-only)
+          0, // amount (no fund transfer)
+          ethers.ZeroAddress, // recipient (not used for fee-only)
+          feeAmount, // feeAmount
+          FEE_TYPE.DEFERRED_FEE, // feeType
+          MEMO_TYPE.PAYABLE_REQUEST,
           PHASE_TRANSACTION
         );
 
@@ -766,7 +790,7 @@ describe("ACPSimple", function () {
         // Check memo was created
         const memo = await acp.memos(memoId);
         // Note: content is no longer stored in memo struct, only emitted in NewMemo event
-        expect(memo.memoType).to.equal(MEMO_TYPE.PAYABLE_FEE);
+        expect(memo.memoType).to.equal(MEMO_TYPE.PAYABLE_REQUEST);
         
         // Verify content was emitted in NewMemo event
         await expect(memoTx)
@@ -775,10 +799,11 @@ describe("ACPSimple", function () {
 
         // Check payable details
         const payableDetails = await acp.payableDetails(memoId);
-        expect(payableDetails.token).to.equal(await paymentToken.getAddress());
-        expect(payableDetails.amount).to.equal(feeAmount);
-        expect(payableDetails.recipient).to.equal(await acp.getAddress());
-        expect(payableDetails.isFee).to.be.true;
+        expect(payableDetails.token).to.equal(ethers.ZeroAddress);
+        expect(payableDetails.amount).to.equal(0);
+        expect(payableDetails.recipient).to.equal(ethers.ZeroAddress);
+        expect(payableDetails.feeAmount).to.equal(feeAmount);
+        expect(payableDetails.feeType).to.equal(FEE_TYPE.DEFERRED_FEE);
         expect(payableDetails.isExecuted).to.be.false;
       });
 
@@ -788,10 +813,15 @@ describe("ACPSimple", function () {
         const feeAmount = ethers.parseEther("2");
 
         // Create payable fee memo
-        const memoTx = await acp.connect(provider).createPayableFeeMemo(
+        const memoTx = await acp.connect(provider).createPayableMemo(
           jobId,
           "Additional service fee",
-          feeAmount,
+          ethers.ZeroAddress, // token (not used for fee-only)
+          0, // amount (no fund transfer)
+          ethers.ZeroAddress, // recipient (not used for fee-only)
+          feeAmount, // feeAmount
+          FEE_TYPE.DEFERRED_FEE, // feeType
+          MEMO_TYPE.PAYABLE_REQUEST,
           PHASE_TRANSACTION
         );
         const receipt = await memoTx.wait();
@@ -824,204 +854,491 @@ describe("ACPSimple", function () {
       });
     });
 
-    describe("Complete Hedge Fund Workflow - Updated IRL Example", function () {
-      it("Should execute complete hedge fund workflow with deposits, fees, and withdrawals", async function () {
-        const { acp, client, provider, evaluator, paymentToken, jobId, platformTreasury } = await loadFixture(createJobInTransactionPhase);
+    describe("Payable Fee Request Memos (PAYABLE_FEE_REQUEST)", function () {
+      it("Should create payable fee request memo successfully", async function () {
+        const { acp, provider, paymentToken, jobId } = await loadFixture(createJobInTransactionPhase);
 
-        const depositAmount = ethers.parseEther("100");
-        const feeAmount = ethers.parseEther("2");
-        const withdrawAmount = ethers.parseEther("150");
-        const finalTransferAmount = ethers.parseEther("50"); // Remaining amount to close position
-        const tokenAddress = await paymentToken.getAddress();
+        const feeAmount = ethers.parseEther("5");
 
-        // Record initial balances for all participants
-        const initialBalances = {
-          client: await paymentToken.balanceOf(client.address),
-          provider: await paymentToken.balanceOf(provider.address),
-          evaluator: await paymentToken.balanceOf(evaluator.address),
-          platformTreasury: await paymentToken.balanceOf(platformTreasury.address)
-        };
-
-        // Step 1: Axelrod creates PAYABLE_REQUEST memo for deposit (100 VIRTUAL)
-        // This means Butler (signer) will pay Axelrod (recipient) when signed
-        const depositMemoTx = await acp.connect(provider).createPayableMemo(
+        const memoTx = await acp.connect(provider).createPayableMemo(
           jobId,
-          "Request 100 VIRTUAL tokens deposit",
-          tokenAddress,
-          depositAmount,
-          provider.address,
+          "Request payment for premium service",
+          ethers.ZeroAddress, // token (not used for fee-only)
+          0, // amount (no fund transfer)
+          ethers.ZeroAddress, // recipient (not used for fee-only)
+          feeAmount, // feeAmount
+          FEE_TYPE.IMMEDIATE_FEE, // feeType (fee goes to provider)
           MEMO_TYPE.PAYABLE_REQUEST,
           PHASE_TRANSACTION
         );
-        const depositReceipt = await depositMemoTx.wait();
-        const depositMemoId = depositReceipt.logs[0].args[2];
 
-        // Butler signs deposit memo - Butler pays 100 VIRTUAL to Axelrod
-        await acp.connect(client).signMemo(depositMemoId, true, "Approved deposit");
+        const receipt = await memoTx.wait();
+        const memoId = receipt.logs[0].args[2]; // NewMemo event
 
-        // Step 2: Axelrod creates fee memo (2 VIRTUAL)
-        const feeMemoTx = await acp.connect(provider).createPayableFeeMemo(
+        // Check memo was created
+        const memo = await acp.memos(memoId);
+        expect(memo.memoType).to.equal(MEMO_TYPE.PAYABLE_REQUEST);
+        
+        // Verify content was emitted in NewMemo event
+        await expect(memoTx)
+          .to.emit(acp, "NewMemo")
+          .withArgs(jobId, provider.address, memoId, "Request payment for premium service");
+
+        // Check payable details - fee goes to provider (not contract)
+        const payableDetails = await acp.payableDetails(memoId);
+        expect(payableDetails.token).to.equal(ethers.ZeroAddress);
+        expect(payableDetails.amount).to.equal(0);
+        expect(payableDetails.recipient).to.equal(ethers.ZeroAddress);
+        expect(payableDetails.feeAmount).to.equal(feeAmount);
+        expect(payableDetails.feeType).to.equal(FEE_TYPE.IMMEDIATE_FEE);
+        expect(payableDetails.isExecuted).to.be.false;
+      });
+
+      it("Should execute payable fee request when memo is signed (with platform fee)", async function () {
+        const { acp, client, provider, paymentToken, jobId, platformTreasury } = await loadFixture(createJobInTransactionPhase);
+
+        const feeAmount = ethers.parseEther("10");
+        const platformFeeBP = 500; // 5%
+        const expectedPlatformFee = (feeAmount * BigInt(platformFeeBP)) / BigInt(10000);
+        const expectedNetAmount = feeAmount - expectedPlatformFee;
+
+        // Create payable fee request memo
+        const memoTx = await acp.connect(provider).createPayableMemo(
           jobId,
-          "Additional service fee",
-          feeAmount,
-          PHASE_TRANSACTION
-        );
-        const feeReceipt = await feeMemoTx.wait();
-        const feeMemoId = feeReceipt.logs[0].args[2];
-
-        // Butler signs fee memo - Butler pays 2 VIRTUAL to ACP contract
-        await acp.connect(client).signMemo(feeMemoId, true, "Approved fee");
-
-        // Step 3: Butler creates PAYABLE_REQUEST memo for withdrawal (150 VIRTUAL)
-        // This means Axelrod (signer) will pay Butler (recipient) when signed
-        const withdrawMemoTx = await acp.connect(client).createPayableMemo(
-          jobId,
-          "Request withdrawal of 150 VIRTUAL tokens",
-          tokenAddress,
-          withdrawAmount,
-          client.address,
+          "Request payment for premium service",
+          ethers.ZeroAddress, // token (not used for fee-only)
+          0, // amount (no fund transfer)
+          ethers.ZeroAddress, // recipient (not used for fee-only)
+          feeAmount, // feeAmount
+          FEE_TYPE.IMMEDIATE_FEE, // feeType (fee goes to provider)
           MEMO_TYPE.PAYABLE_REQUEST,
           PHASE_TRANSACTION
         );
-        const withdrawReceipt = await withdrawMemoTx.wait();
-        const withdrawMemoId = withdrawReceipt.logs[0].args[2];
+        const receipt = await memoTx.wait();
+        const memoId = receipt.logs[0].args[2];
 
-        // Axelrod signs withdrawal memo - Axelrod pays 150 VIRTUAL to Butler
-        await acp.connect(provider).signMemo(withdrawMemoId, true, "Approved withdrawal");
+        // Check initial balances
+        const clientBalanceBefore = await paymentToken.balanceOf(client.address);
+        const providerBalanceBefore = await paymentToken.balanceOf(provider.address);
+        const treasuryBalanceBefore = await paymentToken.balanceOf(platformTreasury.address);
 
-        // Step 4: Butler creates memo requesting close position
-        const closeMemoTx = await acp.connect(client).createMemo(
+        // Client signs memo - should execute fee request with platform fee
+        await expect(
+          acp.connect(client).signMemo(memoId, true, "Approved premium service fee")
+        )
+          .to.emit(acp, "PayableFeeRequestExecuted")
+          .withArgs(jobId, memoId, client.address, provider.address, expectedNetAmount);
+
+        // Check balances after transfer
+        const clientBalanceAfter = await paymentToken.balanceOf(client.address);
+        const providerBalanceAfter = await paymentToken.balanceOf(provider.address);
+        const treasuryBalanceAfter = await paymentToken.balanceOf(platformTreasury.address);
+
+        // Client pays the full amount
+        expect(clientBalanceAfter).to.equal(clientBalanceBefore - feeAmount);
+        // Provider receives net amount (after platform fee)
+        expect(providerBalanceAfter).to.equal(providerBalanceBefore + expectedNetAmount);
+        // Platform treasury receives the platform fee
+        expect(treasuryBalanceAfter).to.equal(treasuryBalanceBefore + expectedPlatformFee);
+
+        // Check payable details updated
+        const payableDetails = await acp.payableDetails(memoId);
+        expect(payableDetails.isExecuted).to.be.true;
+      });
+
+      it("Should not execute payable fee request when memo is rejected", async function () {
+        const { acp, client, provider, paymentToken, jobId, platformTreasury } = await loadFixture(createJobInTransactionPhase);
+
+        const feeAmount = ethers.parseEther("5");
+
+        // Create payable fee request memo
+        const memoTx = await acp.connect(provider).createPayableMemo(
           jobId,
-          "Request to close position",
+          "Request payment for premium service",
+          ethers.ZeroAddress, // token (not used for fee-only)
+          0, // amount (no fund transfer)
+          ethers.ZeroAddress, // recipient (not used for fee-only)
+          feeAmount, // feeAmount
+          FEE_TYPE.IMMEDIATE_FEE, // feeType (fee goes to provider)
+          MEMO_TYPE.PAYABLE_REQUEST,
+          PHASE_TRANSACTION
+        );
+        const receipt = await memoTx.wait();
+        const memoId = receipt.logs[0].args[2];
+
+        // Check initial balances
+        const clientBalanceBefore = await paymentToken.balanceOf(client.address);
+        const providerBalanceBefore = await paymentToken.balanceOf(provider.address);
+        const treasuryBalanceBefore = await paymentToken.balanceOf(platformTreasury.address);
+
+        // Client rejects memo - should NOT execute transfer
+        await acp.connect(client).signMemo(memoId, false, "Rejected premium service fee");
+
+        // Check balances unchanged
+        const clientBalanceAfter = await paymentToken.balanceOf(client.address);
+        const providerBalanceAfter = await paymentToken.balanceOf(provider.address);
+        const treasuryBalanceAfter = await paymentToken.balanceOf(platformTreasury.address);
+
+        expect(clientBalanceAfter).to.equal(clientBalanceBefore);
+        expect(providerBalanceAfter).to.equal(providerBalanceBefore);
+        expect(treasuryBalanceAfter).to.equal(treasuryBalanceBefore);
+
+        // Check payable details not executed
+        const payableDetails = await acp.payableDetails(memoId);
+        expect(payableDetails.isExecuted).to.be.false;
+      });
+
+      it("Should allow client to create payable fee request memo", async function () {
+        const { acp, client, provider, paymentToken, jobId } = await loadFixture(createJobInTransactionPhase);
+
+        const feeAmount = ethers.parseEther("3");
+
+        // Client creates payable fee request memo (requesting provider to pay client)
+        const memoTx = await acp.connect(client).createPayableMemo(
+          jobId,
+          "Request reimbursement for expenses",
+          ethers.ZeroAddress, // token (not used for fee-only)
+          0, // amount (no fund transfer)
+          ethers.ZeroAddress, // recipient (not used for fee-only)
+          feeAmount, // feeAmount
+          FEE_TYPE.IMMEDIATE_FEE, // feeType (fee goes to provider)
+          MEMO_TYPE.PAYABLE_REQUEST,
+          PHASE_TRANSACTION
+        );
+
+        const receipt = await memoTx.wait();
+        const memoId = receipt.logs[0].args[2];
+
+        // Check payable details - fee goes to provider
+        const payableDetails = await acp.payableDetails(memoId);
+        expect(payableDetails.recipient).to.equal(ethers.ZeroAddress);
+        expect(payableDetails.amount).to.equal(0);
+        expect(payableDetails.feeAmount).to.equal(feeAmount);
+        expect(payableDetails.feeType).to.equal(FEE_TYPE.IMMEDIATE_FEE);
+      });
+    });
+
+    describe("Combined Fund and Fee Transfer Tests", function () {
+      describe("PAYABLE_REQUEST with both fund and fee (signer pays both)", function () {
+        it("Should execute both fund and deferred fee transfers from signer", async function () {
+          const { acp, client, provider, paymentToken, jobId } = await loadFixture(createJobInTransactionPhase);
+
+          const fundAmount = ethers.parseEther("100");
+          const feeAmount = ethers.parseEther("5");
+          const tokenAddress = await paymentToken.getAddress();
+
+          // Provider requests client to pay both fund and fee
+          const memoTx = await acp.connect(provider).createPayableMemo(
+            jobId,
+            "Request fund deposit with processing fee",
+            tokenAddress,
+            fundAmount,
+            provider.address, // fund recipient
+            feeAmount, // feeAmount
+            FEE_TYPE.DEFERRED_FEE, // fee goes to contract
+            MEMO_TYPE.PAYABLE_REQUEST,
+            PHASE_TRANSACTION
+          );
+          const receipt = await memoTx.wait();
+          const memoId = receipt.logs[0].args[2];
+
+          // Check initial balances
+          const clientBalanceBefore = await paymentToken.balanceOf(client.address);
+          const providerBalanceBefore = await paymentToken.balanceOf(provider.address);
+          const acpBalanceBefore = await paymentToken.balanceOf(await acp.getAddress());
+
+          // Client signs memo - should transfer both fund and fee from client
+          await expect(
+            acp.connect(client).signMemo(memoId, true, "Approved fund and fee")
+          )
+            .to.emit(acp, "PayableRequestExecuted")
+            .withArgs(jobId, memoId, client.address, provider.address, tokenAddress, fundAmount)
+            .and.to.emit(acp, "PayableFeeCollected")
+            .withArgs(jobId, memoId, client.address, feeAmount);
+
+          // Check balances after transfer
+          const clientBalanceAfter = await paymentToken.balanceOf(client.address);
+          const providerBalanceAfter = await paymentToken.balanceOf(provider.address);
+          const acpBalanceAfter = await paymentToken.balanceOf(await acp.getAddress());
+
+          // Client pays both fund and fee
+          expect(clientBalanceAfter).to.equal(clientBalanceBefore - fundAmount - feeAmount);
+          // Provider receives the fund
+          expect(providerBalanceAfter).to.equal(providerBalanceBefore + fundAmount);
+          // ACP contract receives the fee
+          expect(acpBalanceAfter).to.equal(acpBalanceBefore + feeAmount);
+
+          // Check payable details updated
+          const payableDetails = await acp.payableDetails(memoId);
+          expect(payableDetails.isExecuted).to.be.true;
+        });
+
+        it("Should execute both fund and immediate fee transfers from signer", async function () {
+          const { acp, client, provider, paymentToken, jobId, platformTreasury } = await loadFixture(createJobInTransactionPhase);
+
+          const fundAmount = ethers.parseEther("50");
+          const feeAmount = ethers.parseEther("10");
+          const tokenAddress = await paymentToken.getAddress();
+          const platformFeeBP = 500; // 5%
+          const expectedPlatformFee = (feeAmount * BigInt(platformFeeBP)) / BigInt(10000);
+          const expectedNetAmount = feeAmount - expectedPlatformFee;
+
+          // Provider requests client to pay both fund and immediate fee
+          const memoTx = await acp.connect(provider).createPayableMemo(
+            jobId,
+            "Request fund with immediate service fee",
+            tokenAddress,
+            fundAmount,
+            provider.address, // fund recipient
+            feeAmount, // feeAmount
+            FEE_TYPE.IMMEDIATE_FEE, // fee goes to provider (after platform fee)
+            MEMO_TYPE.PAYABLE_REQUEST,
+            PHASE_TRANSACTION
+          );
+          const receipt = await memoTx.wait();
+          const memoId = receipt.logs[0].args[2];
+
+          // Check initial balances
+          const clientBalanceBefore = await paymentToken.balanceOf(client.address);
+          const providerBalanceBefore = await paymentToken.balanceOf(provider.address);
+          const treasuryBalanceBefore = await paymentToken.balanceOf(platformTreasury.address);
+
+          // Client signs memo - should transfer both fund and fee from client
+          await expect(
+            acp.connect(client).signMemo(memoId, true, "Approved fund and immediate fee")
+          )
+            .to.emit(acp, "PayableRequestExecuted")
+            .withArgs(jobId, memoId, client.address, provider.address, tokenAddress, fundAmount)
+            .and.to.emit(acp, "PayableFeeRequestExecuted")
+            .withArgs(jobId, memoId, client.address, provider.address, expectedNetAmount);
+
+          // Check balances after transfer
+          const clientBalanceAfter = await paymentToken.balanceOf(client.address);
+          const providerBalanceAfter = await paymentToken.balanceOf(provider.address);
+          const treasuryBalanceAfter = await paymentToken.balanceOf(platformTreasury.address);
+
+          // Client pays both fund and fee
+          expect(clientBalanceAfter).to.equal(clientBalanceBefore - fundAmount - feeAmount);
+          // Provider receives fund + net fee amount
+          expect(providerBalanceAfter).to.equal(providerBalanceBefore + fundAmount + expectedNetAmount);
+          // Platform treasury receives the platform fee
+          expect(treasuryBalanceAfter).to.equal(treasuryBalanceBefore + expectedPlatformFee);
+
+          // Check payable details updated
+          const payableDetails = await acp.payableDetails(memoId);
+          expect(payableDetails.isExecuted).to.be.true;
+        });
+      });
+
+      describe("PAYABLE_TRANSFER with both fund and fee (creator pays both)", function () {
+        it("Should execute both fund and deferred fee transfers from creator", async function () {
+          const { acp, client, provider, paymentToken, jobId } = await loadFixture(createJobInTransactionPhase);
+
+          const fundAmount = ethers.parseEther("75");
+          const feeAmount = ethers.parseEther("3");
+          const tokenAddress = await paymentToken.getAddress();
+
+          // Client creates transfer memo to send both fund and fee
+          const memoTx = await acp.connect(client).createPayableMemo(
+            jobId,
+            "Transfer fund with processing fee",
+            tokenAddress,
+            fundAmount,
+            provider.address, // fund recipient
+            feeAmount, // feeAmount
+            FEE_TYPE.DEFERRED_FEE, // fee goes to contract
+            MEMO_TYPE.PAYABLE_TRANSFER,
+            PHASE_TRANSACTION
+          );
+          const receipt = await memoTx.wait();
+          const memoId = receipt.logs[0].args[2];
+
+          // Check initial balances
+          const clientBalanceBefore = await paymentToken.balanceOf(client.address);
+          const providerBalanceBefore = await paymentToken.balanceOf(provider.address);
+          const acpBalanceBefore = await paymentToken.balanceOf(await acp.getAddress());
+
+          // Provider signs memo - should transfer both fund and fee from client (memo creator)
+          await expect(
+            acp.connect(provider).signMemo(memoId, true, "Approved transfer and fee")
+          )
+            .to.emit(acp, "PayableTransferExecuted")
+            .withArgs(jobId, memoId, client.address, provider.address, tokenAddress, fundAmount)
+            .and.to.emit(acp, "PayableFeeCollected")
+            .withArgs(jobId, memoId, client.address, feeAmount);
+
+          // Check balances after transfer
+          const clientBalanceAfter = await paymentToken.balanceOf(client.address);
+          const providerBalanceAfter = await paymentToken.balanceOf(provider.address);
+          const acpBalanceAfter = await paymentToken.balanceOf(await acp.getAddress());
+
+          // Client (memo creator) pays both fund and fee
+          expect(clientBalanceAfter).to.equal(clientBalanceBefore - fundAmount - feeAmount);
+          // Provider receives the fund
+          expect(providerBalanceAfter).to.equal(providerBalanceBefore + fundAmount);
+          // ACP contract receives the fee
+          expect(acpBalanceAfter).to.equal(acpBalanceBefore + feeAmount);
+
+          // Check payable details updated
+          const payableDetails = await acp.payableDetails(memoId);
+          expect(payableDetails.isExecuted).to.be.true;
+        });
+
+        it("Should execute both fund and immediate fee transfers from creator", async function () {
+          const { acp, client, provider, paymentToken, jobId, platformTreasury } = await loadFixture(createJobInTransactionPhase);
+
+          const fundAmount = ethers.parseEther("25");
+          const feeAmount = ethers.parseEther("7");
+          const tokenAddress = await paymentToken.getAddress();
+          const platformFeeBP = 500; // 5%
+          const expectedPlatformFee = (feeAmount * BigInt(platformFeeBP)) / BigInt(10000);
+          const expectedNetAmount = feeAmount - expectedPlatformFee;
+
+          // Client creates transfer memo with immediate fee
+          const memoTx = await acp.connect(client).createPayableMemo(
+            jobId,
+            "Transfer fund with immediate service fee",
+            tokenAddress,
+            fundAmount,
+            provider.address, // fund recipient
+            feeAmount, // feeAmount
+            FEE_TYPE.IMMEDIATE_FEE, // fee goes to provider (after platform fee)
+            MEMO_TYPE.PAYABLE_TRANSFER,
+            PHASE_TRANSACTION
+          );
+          const receipt = await memoTx.wait();
+          const memoId = receipt.logs[0].args[2];
+
+          // Check initial balances
+          const clientBalanceBefore = await paymentToken.balanceOf(client.address);
+          const providerBalanceBefore = await paymentToken.balanceOf(provider.address);
+          const treasuryBalanceBefore = await paymentToken.balanceOf(platformTreasury.address);
+
+          // Provider signs memo - should transfer both fund and fee from client (memo creator)
+          await expect(
+            acp.connect(provider).signMemo(memoId, true, "Approved transfer and immediate fee")
+          )
+            .to.emit(acp, "PayableTransferExecuted")
+            .withArgs(jobId, memoId, client.address, provider.address, tokenAddress, fundAmount)
+            .and.to.emit(acp, "PayableFeeRequestExecuted")
+            .withArgs(jobId, memoId, client.address, provider.address, expectedNetAmount);
+
+          // Check balances after transfer
+          const clientBalanceAfter = await paymentToken.balanceOf(client.address);
+          const providerBalanceAfter = await paymentToken.balanceOf(provider.address);
+          const treasuryBalanceAfter = await paymentToken.balanceOf(platformTreasury.address);
+
+          // Client (memo creator) pays both fund and fee
+          expect(clientBalanceAfter).to.equal(clientBalanceBefore - fundAmount - feeAmount);
+          // Provider receives fund + net fee amount
+          expect(providerBalanceAfter).to.equal(providerBalanceBefore + fundAmount + expectedNetAmount);
+          // Platform treasury receives the platform fee
+          expect(treasuryBalanceAfter).to.equal(treasuryBalanceBefore + expectedPlatformFee);
+
+          // Check payable details updated
+          const payableDetails = await acp.payableDetails(memoId);
+          expect(payableDetails.isExecuted).to.be.true;
+        });
+
+        it("Should not execute transfers when PAYABLE_TRANSFER memo is rejected", async function () {
+          const { acp, client, provider, paymentToken, jobId } = await loadFixture(createJobInTransactionPhase);
+
+          const fundAmount = ethers.parseEther("30");
+          const feeAmount = ethers.parseEther("2");
+          const tokenAddress = await paymentToken.getAddress();
+
+          // Client creates transfer memo with both fund and fee
+          const memoTx = await acp.connect(client).createPayableMemo(
+            jobId,
+            "Transfer fund with fee",
+            tokenAddress,
+            fundAmount,
+            provider.address,
+            feeAmount,
+            FEE_TYPE.DEFERRED_FEE,
+            MEMO_TYPE.PAYABLE_TRANSFER,
+            PHASE_TRANSACTION
+          );
+          const receipt = await memoTx.wait();
+          const memoId = receipt.logs[0].args[2];
+
+          // Check initial balances
+          const clientBalanceBefore = await paymentToken.balanceOf(client.address);
+          const providerBalanceBefore = await paymentToken.balanceOf(provider.address);
+          const acpBalanceBefore = await paymentToken.balanceOf(await acp.getAddress());
+
+          // Provider rejects memo - should NOT execute any transfers
+          await acp.connect(provider).signMemo(memoId, false, "Rejected transfer");
+
+          // Check balances unchanged
+          const clientBalanceAfter = await paymentToken.balanceOf(client.address);
+          const providerBalanceAfter = await paymentToken.balanceOf(provider.address);
+          const acpBalanceAfter = await paymentToken.balanceOf(await acp.getAddress());
+
+          expect(clientBalanceAfter).to.equal(clientBalanceBefore);
+          expect(providerBalanceAfter).to.equal(providerBalanceBefore);
+          expect(acpBalanceAfter).to.equal(acpBalanceBefore);
+
+          // Check payable details not executed
+          const payableDetails = await acp.payableDetails(memoId);
+          expect(payableDetails.isExecuted).to.be.false;
+        });
+      });
+    });
+
+    describe("Zero Budget Job Completion", function () {
+      it("Should handle 0 budget job with additional fees", async function () {
+        const { acp, client, provider, evaluator, paymentToken } = await loadFixture(deployACPFixture);
+
+        // Create job with 0 budget
+        const expiredAt = (await time.latest()) + 86400;
+        const tx = await acp.connect(client).createJob(provider.address, evaluator.address, expiredAt);
+        const receipt = await tx.wait();
+        const jobId = receipt.logs[0].args[0];
+
+        await acp.connect(client).setBudget(jobId, 0);
+
+        // Move to transaction phase
+        const memoTx1 = await acp.connect(client).createMemo(
+          jobId,
+          "Request",
+          MEMO_TYPE.MESSAGE,
+          false,
+          PHASE_NEGOTIATION
+        );
+        const memoReceipt1 = await memoTx1.wait();
+        const memoId1 = memoReceipt1.logs[0].args[2];
+        await acp.connect(provider).signMemo(memoId1, true, "Approved");
+
+        const memoTx2 = await acp.connect(provider).createMemo(
+          jobId,
+          "Terms",
           MEMO_TYPE.MESSAGE,
           false,
           PHASE_TRANSACTION
         );
-        const closeReceipt = await closeMemoTx.wait();
-        const closeMemoId = closeReceipt.logs[0].args[2];
+        const memoReceipt2 = await memoTx2.wait();
+        const memoId2 = memoReceipt2.logs[0].args[2];
+        await acp.connect(client).signMemo(memoId2, true, "Agreed");
 
-        // Axelrod signs close memo
-        await acp.connect(provider).signMemo(closeMemoId, true, "Position close approved");
-
-        // Step 5: Axelrod creates PAYABLE_TRANSFER memo for final transfer (50 VIRTUAL) with nextPhase = COMPLETED
-        // This will automatically move the job to EVALUATION phase
-        const finalTransferMemoTx = await acp.connect(provider).createPayableMemo(
+        // Add additional fee
+        const feeAmount = ethers.parseEther("1");
+        const feeMemoTx = await acp.connect(provider).createPayableMemo(
           jobId,
-          "Final transfer of 50 VIRTUAL tokens",
-          tokenAddress,
-          finalTransferAmount,
-          client.address,
-          MEMO_TYPE.PAYABLE_TRANSFER,
-          PHASE_COMPLETED  // This triggers automatic transition to EVALUATION
-        );
-        const finalTransferReceipt = await finalTransferMemoTx.wait();
-        const finalTransferMemoId = finalTransferReceipt.logs[0].args[2];
-
-        // Check job automatically moved to evaluation phase after creating the memo
-        const jobAfterTransfer = await acp.jobs(jobId);
-        expect(jobAfterTransfer.phase).to.equal(PHASE_EVALUATION);
-
-        // Check additional fees accumulated
-        const additionalFees = await acp.jobAdditionalFees(jobId);
-        expect(additionalFees).to.equal(feeAmount);
-
-        // Step 7: Set up contract to have tokens for payment distribution
-        const budget = ethers.parseEther("100"); // Original job budget was 100
-        const acpAddress = await acp.getAddress();
-        const totalForDistribution = budget + feeAmount; // 102 VIRTUAL total
-
-        await paymentToken.mint(acpAddress, totalForDistribution);
-        await network.provider.request({
-          method: "hardhat_impersonateAccount",
-          params: [acpAddress],
-        });
-        await network.provider.send("hardhat_setBalance", [
-          acpAddress,
-          "0x1000000000000000000",
-        ]);
-        const contractSigner = await ethers.getSigner(acpAddress);
-        await paymentToken.connect(contractSigner).approve(acpAddress, ethers.parseEther("1000"));
-        await network.provider.request({
-          method: "hardhat_stopImpersonatingAccount",
-          params: [acpAddress],
-        });
-
-        // Step 8: Evaluator signs the final transfer memo to execute transfer and complete the job
-        await expect(
-          acp.connect(evaluator).signMemo(finalTransferMemoId, true, "Work completed successfully")
-        )
-          .to.emit(acp, "PayableTransferExecuted")
-          .withArgs(jobId, finalTransferMemoId, provider.address, client.address, tokenAddress, finalTransferAmount)
-          .and.to.emit(acp, "JobPhaseUpdated")
-          .withArgs(jobId, PHASE_EVALUATION, PHASE_COMPLETED);
-
-        // Check final balances and net changes for all participants
-        const finalBalances = {
-          client: await paymentToken.balanceOf(client.address),
-          provider: await paymentToken.balanceOf(provider.address),
-          evaluator: await paymentToken.balanceOf(evaluator.address),
-          platformTreasury: await paymentToken.balanceOf(platformTreasury.address)
-        };
-
-        // Calculate net changes
-        const netChanges = {
-          client: finalBalances.client - initialBalances.client,
-          provider: finalBalances.provider - initialBalances.provider,
-          evaluator: finalBalances.evaluator - initialBalances.evaluator,
-          platformTreasury: finalBalances.platformTreasury - initialBalances.platformTreasury
-        };
-
-
-
-        // Expected net changes based on the complete workflow:
-        // Note: Initial balances are recorded AFTER job budget was already transferred to ACP in TRANSACTION phase
-        
-        // Client: -100 (deposit) -2 (fee) +150 (withdrawal) +50 (final transfer) = +98 VIRTUAL
-        const expectedClientNetChange = -depositAmount - feeAmount + withdrawAmount + finalTransferAmount;
-        expect(netChanges.client).to.equal(expectedClientNetChange);
-
-        // Provider: +100 (deposit) -150 (withdrawal) -50 (final transfer) +86.7 (job payment after fees) = -13.3 VIRTUAL
-        const expectedEvaluatorFee = totalForDistribution * BigInt(1000) / BigInt(10000); // 10.2 VIRTUAL
-        const expectedPlatformFee = totalForDistribution * BigInt(500) / BigInt(10000);   // 5.1 VIRTUAL
-        const expectedJobPayment = totalForDistribution - expectedEvaluatorFee - expectedPlatformFee; // 86.7 VIRTUAL
-        const expectedProviderNetChange = depositAmount - withdrawAmount - finalTransferAmount + expectedJobPayment;
-        expect(netChanges.provider).to.equal(expectedProviderNetChange);
-
-        // Evaluator: +10.2 VIRTUAL (10% of total distribution)
-        expect(netChanges.evaluator).to.equal(expectedEvaluatorFee);
-
-        // Platform Treasury: +5.1 VIRTUAL (5% of total distribution)
-        expect(netChanges.platformTreasury).to.equal(expectedPlatformFee);
-
-        // Verify the math: total net change should equal the job budget
-        // The additional fees were paid by client but redistributed, so they net out
-        // Only the job budget (100 VIRTUAL) represents new money minted to ACP contract
-        const jobBudget = ethers.parseEther("100");
-        const totalNetChange = netChanges.client + netChanges.provider + netChanges.evaluator + netChanges.platformTreasury;
-        expect(totalNetChange).to.equal(jobBudget);
-
-        // Check additional fees reset
-        const additionalFeesAfter = await acp.jobAdditionalFees(jobId);
-        expect(additionalFeesAfter).to.equal(0);
-      });
-
-      it("Should handle refund of additional fees when job is rejected", async function () {
-        const { acp, client, provider, evaluator, paymentToken, jobId } = await loadFixture(createJobInTransactionPhase);
-
-        const feeAmount = ethers.parseEther("2");
-
-        // Create and approve fee memo
-        const feeMemoTx = await acp.connect(provider).createPayableFeeMemo(
-          jobId,
-          "Additional service fee",
-          feeAmount,
+          "Processing fee",
+          ethers.ZeroAddress, // token (not used for fee-only)
+          0, // amount (no fund transfer)
+          ethers.ZeroAddress, // recipient (not used for fee-only)
+          feeAmount, // feeAmount
+          FEE_TYPE.DEFERRED_FEE, // feeType
+          MEMO_TYPE.PAYABLE_REQUEST,
           PHASE_TRANSACTION
         );
         const feeReceipt = await feeMemoTx.wait();
         const feeMemoId = feeReceipt.logs[0].args[2];
         await acp.connect(client).signMemo(feeMemoId, true, "Approved fee");
 
-        // Create completion memo and move to evaluation
+        // Complete work
         const completionMemoTx = await acp.connect(provider).createMemo(
           jobId,
           "Work completed",
@@ -1032,10 +1349,9 @@ describe("ACPSimple", function () {
         const completionReceipt = await completionMemoTx.wait();
         const completionMemoId = completionReceipt.logs[0].args[2];
 
-        // Set up contract for refund
-        const budget = ethers.parseEther("100");
+        // Set up contract for fee distribution
         const acpAddress = await acp.getAddress();
-        await paymentToken.mint(acpAddress, budget + feeAmount);
+        await paymentToken.mint(acpAddress, feeAmount);
         await network.provider.request({
           method: "hardhat_impersonateAccount",
           params: [acpAddress],
@@ -1051,168 +1367,83 @@ describe("ACPSimple", function () {
           params: [acpAddress],
         });
 
-        const clientBalanceBefore = await paymentToken.balanceOf(client.address);
-
-        // Evaluator rejects - should refund additional fees to client
+        // Evaluator approves - should distribute the fee amount
         await expect(
-          acp.connect(evaluator).signMemo(completionMemoId, false, "Work rejected")
+          acp.connect(evaluator).signMemo(completionMemoId, true, "Work approved")
         )
-          .to.emit(acp, "RefundedAdditionalFees")
-          .withArgs(jobId, client.address, feeAmount)
-          .and.to.emit(acp, "RefundedBudget")
-          .withArgs(jobId, client.address, budget);
+          .to.emit(acp, "JobPhaseUpdated")
+          .withArgs(jobId, PHASE_EVALUATION, PHASE_COMPLETED);
 
-        const clientBalanceAfter = await paymentToken.balanceOf(client.address);
-        // In rejection, client gets back budget (which was transferred when entering transaction phase)
-        // plus the additional fees (which were transferred as escrow)
-        expect(clientBalanceAfter - clientBalanceBefore).to.equal(budget + feeAmount);
+        // Check that fees were distributed properly
+        const finalJob = await acp.jobs(jobId);
+        expect(finalJob.phase).to.equal(PHASE_COMPLETED);
+        expect(finalJob.budget).to.equal(0);
+        expect(finalJob.amountClaimed).to.equal(feeAmount);
 
-        // Check additional fees reset
+        // Additional fees should remain tracked (not reset)
         const additionalFeesAfter = await acp.jobAdditionalFees(jobId);
-        expect(additionalFeesAfter).to.equal(0);
-      });
-    });
-
-    describe("Validation and Error Cases", function () {
-      it("Should revert when creating payable memo with invalid parameters", async function () {
-        const { acp, provider, paymentToken, jobId } = await loadFixture(createJobInTransactionPhase);
-
-        const tokenAddress = await paymentToken.getAddress();
-
-        // Invalid amount (zero)
-        await expect(
-          acp.connect(provider).createPayableMemo(
-            jobId,
-            "Invalid amount",
-            tokenAddress,
-            0,
-            provider.address,
-            MEMO_TYPE.PAYABLE_REQUEST,
-            PHASE_TRANSACTION
-          )
-        ).to.be.revertedWith("Amount must be greater than 0");
-
-        // Invalid recipient (zero address)
-        await expect(
-          acp.connect(provider).createPayableMemo(
-            jobId,
-            "Invalid recipient",
-            tokenAddress,
-            ethers.parseEther("100"),
-            ethers.ZeroAddress,
-            MEMO_TYPE.PAYABLE_REQUEST,
-            PHASE_TRANSACTION
-          )
-        ).to.be.revertedWith("Invalid recipient");
-
-        // Invalid token (zero address)
-        await expect(
-          acp.connect(provider).createPayableMemo(
-            jobId,
-            "Invalid token",
-            ethers.ZeroAddress,
-            ethers.parseEther("100"),
-            provider.address,
-            MEMO_TYPE.PAYABLE_REQUEST,
-            PHASE_TRANSACTION
-          )
-        ).to.be.revertedWith("Token address required");
-
-        // Invalid job ID
-        await expect(
-          acp.connect(provider).createPayableMemo(
-            999,
-            "Invalid job",
-            tokenAddress,
-            ethers.parseEther("100"),
-            provider.address,
-            MEMO_TYPE.PAYABLE_REQUEST,
-            PHASE_TRANSACTION
-          )
-        ).to.be.revertedWith("Job does not exist");
+        expect(additionalFeesAfter).to.equal(feeAmount);
       });
 
-      it("Should revert when creating payable fee memo with invalid parameters", async function () {
-        const { acp, provider, jobId } = await loadFixture(createJobInTransactionPhase);
+      it("Should throw error when completing a job with 0 budget and 0 fees", async function () {
+        const { acp, client, provider, evaluator } = await loadFixture(deployACPFixture);
 
-        // Invalid amount (zero)
-        await expect(
-          acp.connect(provider).createPayableFeeMemo(
-            jobId,
-            "Invalid fee amount",
-            0,
-            PHASE_TRANSACTION
-          )
-        ).to.be.revertedWith("Fee amount must be greater than 0");
+        // Create job with 0 budget
+        const expiredAt = (await time.latest()) + 86400;
+        const tx = await acp.connect(client).createJob(provider.address, evaluator.address, expiredAt);
+        const receipt = await tx.wait();
+        const jobId = receipt.logs[0].args[0];
 
-        // Invalid job ID
-        await expect(
-          acp.connect(provider).createPayableFeeMemo(
-            999,
-            "Invalid job",
-            ethers.parseEther("2"),
-            PHASE_TRANSACTION
-          )
-        ).to.be.revertedWith("Job does not exist");
-      });
+        await acp.connect(client).setBudget(jobId, 0);
 
-      it("Should prevent double execution of payable memo", async function () {
-        const { acp, client, provider, paymentToken, jobId } = await loadFixture(createJobInTransactionPhase);
-
-        const amount = ethers.parseEther("100");
-        const tokenAddress = await paymentToken.getAddress();
-
-        // Create payable memo
-        const memoTx = await acp.connect(provider).createPayableMemo(
+        // Move through phases to completion without adding any fees
+        const memoTx1 = await acp.connect(client).createMemo(
           jobId,
-          "Deposit tokens",
-          tokenAddress,
-          amount,
-          provider.address,
-          MEMO_TYPE.PAYABLE_REQUEST,
+          "Request",
+          MEMO_TYPE.MESSAGE,
+          false,
+          PHASE_NEGOTIATION
+        );
+        const memoReceipt1 = await memoTx1.wait();
+        const memoId1 = memoReceipt1.logs[0].args[2];
+        await acp.connect(provider).signMemo(memoId1, true, "Approved");
+
+        const memoTx2 = await acp.connect(provider).createMemo(
+          jobId,
+          "Terms",
+          MEMO_TYPE.MESSAGE,
+          false,
           PHASE_TRANSACTION
         );
-        const receipt = await memoTx.wait();
-        const memoId = receipt.logs[0].args[2];
+        const memoReceipt2 = await memoTx2.wait();
+        const memoId2 = memoReceipt2.logs[0].args[2];
+        await acp.connect(client).signMemo(memoId2, true, "Agreed");
 
-        // First signature executes successfully
-        await acp.connect(client).signMemo(memoId, true, "First approval");
+        // Complete work
+        const completionMemoTx = await acp.connect(provider).createMemo(
+          jobId,
+          "Work completed",
+          MEMO_TYPE.MESSAGE,
+          false,
+          PHASE_COMPLETED
+        );
+        const completionReceipt = await completionMemoTx.wait();
+        const completionMemoId = completionReceipt.logs[0].args[2];
 
-        // Verify it's marked as executed
-        const payableDetails = await acp.payableDetails(memoId);
-        expect(payableDetails.isExecuted).to.be.true;
+        // Job should move to evaluation phase
+        const jobAfterCompletion = await acp.jobs(jobId);
+        expect(jobAfterCompletion.phase).to.equal(PHASE_EVALUATION);
 
-        // Try to execute again by manipulating internal state (this should be prevented by the contract)
-        // In a real scenario, this would only happen through a bug, but we test the protection
-        // Since we can't sign the same memo twice, we test the execution protection indirectly
-        // by verifying the isExecuted flag prevents re-execution
-      });
-
-      it("Should only allow job participants to create payable memos", async function () {
-        const { acp, user, paymentToken, jobId } = await loadFixture(createJobInTransactionPhase);
-
-        const tokenAddress = await paymentToken.getAddress();
-
+        // Evaluator tries to approve - should fail with "No budget or fees to claim"
         await expect(
-          acp.connect(user).createPayableMemo(
-            jobId,
-            "Unauthorized memo",
-            tokenAddress,
-            ethers.parseEther("100"),
-            user.address,
-            MEMO_TYPE.PAYABLE_REQUEST,
-            PHASE_TRANSACTION
-          )
-        ).to.be.revertedWith("Only client or provider can create memo");
+          acp.connect(evaluator).signMemo(completionMemoId, true, "Work approved")
+        ).to.be.revertedWith("No budget or fees to claim");
 
-        await expect(
-          acp.connect(user).createPayableFeeMemo(
-            jobId,
-            "Unauthorized fee memo",
-            ethers.parseEther("2"),
-            PHASE_TRANSACTION
-          )
-        ).to.be.revertedWith("Only client or provider can create memo");
+        // Job should still be in evaluation phase after failed completion
+        const finalJob = await acp.jobs(jobId);
+        expect(finalJob.phase).to.equal(PHASE_EVALUATION);
+        expect(finalJob.budget).to.equal(0);
+        expect(finalJob.amountClaimed).to.equal(0);
       });
     });
   });

@@ -143,6 +143,16 @@ contract ACPSimple is
         uint256 netAmount
     );
 
+    event PayableFundsEscrowed(
+        uint256 indexed jobId,
+        uint256 indexed memoId,
+        address indexed sender,
+        address token,
+        uint256 amount,
+        uint256 feeAmount
+    );
+
+
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() {
         _disableInitializers();
@@ -379,6 +389,19 @@ contract ACPSimple is
 
         memoExpiredAt[memoId] = expiredAt;
 
+        // Escrow funds if this is a PAYABLE_TRANSFER with amount > 0
+        if (memoType == MemoType.PAYABLE_TRANSFER && amount > 0) {
+            IERC20(token).safeTransferFrom(_msgSender(), address(this), amount);
+        }
+
+        if (memoType == MemoType.PAYABLE_TRANSFER && feeAmount > 0) {
+            IERC20(token).safeTransferFrom(_msgSender(), address(this), feeAmount);
+        }
+
+        if (amount > 0 || feeAmount > 0) {
+            emit PayableFundsEscrowed(jobId, memoId, _msgSender(), token, amount, feeAmount);
+        }
+
         return memoId;
     }
 
@@ -416,7 +439,8 @@ contract ACPSimple is
                     amount
                 );
             } else if (memoType == MemoType.PAYABLE_TRANSFER) {
-                IERC20(token).safeTransferFrom(memo.sender, recipient, amount);
+                // Transfer from escrowed funds
+                IERC20(token).safeTransfer(recipient, amount);
 
                 emit PayableTransferExecuted(
                     memo.jobId,
@@ -433,7 +457,8 @@ contract ACPSimple is
         if (feeAmount > 0) {
             address payer = _msgSender();
             if (memoType == MemoType.PAYABLE_TRANSFER) {
-                payer = memo.sender;
+                payer = address(this); // fee is already escrowed
+                paymentToken.approve(address(this), feeAmount);
             }
             if (feeType == FeeType.DEFERRED_FEE) {
                 paymentToken.safeTransferFrom(
@@ -652,5 +677,45 @@ contract ACPSimple is
         uint8 phase
     ) external view returns (uint256[] memory) {
         return jobMemoIds[jobId][phase];
+    }
+
+
+
+    function withdrawEscrowedFunds(uint256 memoId) external nonReentrant {
+        Memo storage memo = memos[memoId];
+        PayableDetails storage details = payableDetails[memoId];
+        
+        require(memo.memoType == MemoType.PAYABLE_TRANSFER, "Not a payable transfer memo");
+        require(!details.isExecuted, "Memo already executed");
+        
+        // Check if memo is expired or job is in a state where funds can be withdrawn
+        Job storage job = jobs[memo.jobId];
+        bool canWithdraw = false;
+        
+        // Allow withdrawal if memo is expired
+        if (memoExpiredAt[memoId] > 0 && memoExpiredAt[memoId] < block.timestamp) {
+            canWithdraw = true;
+        }
+        
+        // Allow withdrawal if job is rejected or expired
+        if (job.phase == PHASE_REJECTED || job.phase == PHASE_EXPIRED) {
+            canWithdraw = true;
+        }
+        
+        require(canWithdraw, "Cannot withdraw funds yet");
+        require(_msgSender() == memo.sender, "Only memo sender can withdraw");
+        
+        // Withdraw escrowed amount
+        if (details.amount > 0) {
+            IERC20(details.token).safeTransfer(_msgSender(), details.amount);
+        }
+        
+        // Withdraw escrowed fee
+        if (details.feeAmount > 0) {
+            paymentToken.safeTransfer(_msgSender(), details.feeAmount);
+        }
+        
+        // Mark as executed to prevent double withdrawal
+        details.isExecuted = true;
     }
 }

@@ -12,7 +12,6 @@ import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
 import "./InteractionLedger.sol";
-import "hardhat/console.sol";
 
 contract ACPSimple is
     Initializable,
@@ -429,7 +428,6 @@ contract ACPSimple is
 
         // Handle fund transfer
         if (amount > 0) {
-            console.log("entered function");
 
             if (memoType == MemoType.PAYABLE_REQUEST) {
                 IERC20(token).safeTransferFrom(_msgSender(), recipient, amount);
@@ -456,7 +454,6 @@ contract ACPSimple is
             } else if (memoType == MemoType.PAYABLE_TRANSFER_ESCROW) {
                 // Transfer from escrowed funds
                 IERC20(token).safeTransfer(recipient, amount);
-                console.log("emit event hereeeee");
                 emit PayableTransferExecuted(
                     memo.jobId,
                     memoId,

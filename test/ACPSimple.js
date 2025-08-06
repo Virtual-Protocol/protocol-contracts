@@ -23,7 +23,8 @@ describe("ACPSimple", function () {
     OBJECT_URL: 4,
     TXHASH: 5,
     PAYABLE_REQUEST: 6,
-    PAYABLE_TRANSFER: 7
+    PAYABLE_TRANSFER: 7,
+    PAYABLE_TRANSFER_ESCROW: 8
   };
 
   const FEE_TYPE = {
@@ -691,10 +692,6 @@ describe("ACPSimple", function () {
         const amount = ethers.parseEther("150");
         const tokenAddress = await paymentToken.getAddress();
 
-        // Check initial balances
-        const clientBalanceBefore = await paymentToken.balanceOf(client.address);
-        const providerBalanceBefore = await paymentToken.balanceOf(provider.address);
-
         // Create payable transfer memo - client creates memo to transfer from client to client
         const memoTx = await acp.connect(client).createPayableMemo(
           jobId,
@@ -711,7 +708,11 @@ describe("ACPSimple", function () {
         const receipt = await memoTx.wait();
         const memoId = receipt.logs[0].args[2];
 
+        // Check initial balances
+        const clientBalanceBefore = await paymentToken.balanceOf(client.address);
+        const providerBalanceBefore = await paymentToken.balanceOf(provider.address);
 
+        // Provider signs memo - client (sender) pays client (recipient)
         await expect(
           acp.connect(provider).signMemo(memoId, true, "Approved withdrawal")
         )
@@ -1151,13 +1152,6 @@ describe("ACPSimple", function () {
           const fundAmount = ethers.parseEther("75");
           const feeAmount = ethers.parseEther("3");
           const tokenAddress = await paymentToken.getAddress();
-          const acpAddress = await acp.getAddress();
-          // Check initial balances
-          const clientBalanceBefore = await paymentToken.balanceOf(client.address);
-          const providerBalanceBefore = await paymentToken.balanceOf(provider.address);
-          const acpBalanceBefore = await paymentToken.balanceOf(await acp.getAddress());
-     
-          // await paymentToken.connect(client).approve(acpAddress, fundAmount + feeAmount);
 
           // Client creates transfer memo to send both fund and fee
           const memoTx = await acp.connect(client).createPayableMemo(
@@ -1175,6 +1169,10 @@ describe("ACPSimple", function () {
           const receipt = await memoTx.wait();
           const memoId = receipt.logs[0].args[2];
 
+          // Check initial balances
+          const clientBalanceBefore = await paymentToken.balanceOf(client.address);
+          const providerBalanceBefore = await paymentToken.balanceOf(provider.address);
+          const acpBalanceBefore = await paymentToken.balanceOf(await acp.getAddress());
 
           // Provider signs memo - should transfer both fund and fee from client (memo creator)
           await expect(
@@ -1212,11 +1210,6 @@ describe("ACPSimple", function () {
           const expectedPlatformFee = (feeAmount * BigInt(platformFeeBP)) / BigInt(10000);
           const expectedNetAmount = feeAmount - expectedPlatformFee;
 
-          // Check initial balances
-          const clientBalanceBefore = await paymentToken.balanceOf(client.address);
-          const providerBalanceBefore = await paymentToken.balanceOf(provider.address);
-          const treasuryBalanceBefore = await paymentToken.balanceOf(platformTreasury.address)
-
           // Client creates transfer memo with immediate fee
           const memoTx = await acp.connect(client).createPayableMemo(
             jobId,
@@ -1232,6 +1225,11 @@ describe("ACPSimple", function () {
           );
           const receipt = await memoTx.wait();
           const memoId = receipt.logs[0].args[2];
+
+          // Check initial balances
+          const clientBalanceBefore = await paymentToken.balanceOf(client.address);
+          const providerBalanceBefore = await paymentToken.balanceOf(provider.address);
+          const treasuryBalanceBefore = await paymentToken.balanceOf(platformTreasury.address);
 
           // Provider signs memo - should transfer both fund and fee from client (memo creator)
           await expect(
@@ -1489,7 +1487,7 @@ describe("ACPSimple", function () {
           client.address,
           0, // feeAmount
           FEE_TYPE.NO_FEE,
-          MEMO_TYPE.PAYABLE_TRANSFER,
+          MEMO_TYPE.PAYABLE_TRANSFER_ESCROW,
           PHASE_TRANSACTION,
           0
         );
@@ -1529,7 +1527,7 @@ describe("ACPSimple", function () {
           client.address,
           feeAmount,
           FEE_TYPE.IMMEDIATE_FEE,
-          MEMO_TYPE.PAYABLE_TRANSFER,
+          MEMO_TYPE.PAYABLE_TRANSFER_ESCROW,
           PHASE_TRANSACTION,
           0
         );
@@ -1566,7 +1564,7 @@ describe("ACPSimple", function () {
             client.address,
             0,
             FEE_TYPE.NO_FEE,
-            MEMO_TYPE.PAYABLE_TRANSFER,
+            MEMO_TYPE.PAYABLE_TRANSFER_ESCROW,
             PHASE_TRANSACTION,
             0
           )
@@ -1591,7 +1589,7 @@ describe("ACPSimple", function () {
             client.address,
             0,
             FEE_TYPE.NO_FEE,
-            MEMO_TYPE.PAYABLE_TRANSFER,
+            MEMO_TYPE.PAYABLE_TRANSFER_ESCROW,
             PHASE_TRANSACTION,
             0
           )
@@ -1615,7 +1613,7 @@ describe("ACPSimple", function () {
           provider.address,
           0,
           FEE_TYPE.NO_FEE,
-          MEMO_TYPE.PAYABLE_TRANSFER,
+          MEMO_TYPE.PAYABLE_TRANSFER_ESCROW,
           PHASE_TRANSACTION,
           0
         );
@@ -1661,7 +1659,7 @@ describe("ACPSimple", function () {
           provider.address,
           feeAmount,
           FEE_TYPE.IMMEDIATE_FEE,
-          MEMO_TYPE.PAYABLE_TRANSFER,
+          MEMO_TYPE.PAYABLE_TRANSFER_ESCROW,
           PHASE_TRANSACTION,
           0
         );
@@ -1716,7 +1714,7 @@ describe("ACPSimple", function () {
           client.address,
           0,
           FEE_TYPE.NO_FEE,
-          MEMO_TYPE.PAYABLE_TRANSFER,
+          MEMO_TYPE.PAYABLE_TRANSFER_ESCROW,
           PHASE_TRANSACTION,
           expiredAt
         );
@@ -1763,7 +1761,7 @@ describe("ACPSimple", function () {
           client.address,
           0,
           FEE_TYPE.NO_FEE,
-          MEMO_TYPE.PAYABLE_TRANSFER,
+          MEMO_TYPE.PAYABLE_TRANSFER_ESCROW,
           PHASE_TRANSACTION,
           0
         );
@@ -1792,7 +1790,7 @@ describe("ACPSimple", function () {
           client.address,
           0,
           FEE_TYPE.NO_FEE,
-          MEMO_TYPE.PAYABLE_TRANSFER,
+          MEMO_TYPE.PAYABLE_TRANSFER_ESCROW,
           PHASE_TRANSACTION,
           expiredAt
         );
@@ -1823,7 +1821,7 @@ describe("ACPSimple", function () {
           provider.address,
           0,
           FEE_TYPE.NO_FEE,
-          MEMO_TYPE.PAYABLE_TRANSFER,
+          MEMO_TYPE.PAYABLE_TRANSFER_ESCROW,
           PHASE_TRANSACTION,
           0
         );
@@ -1884,7 +1882,7 @@ describe("ACPSimple", function () {
           provider.address,
           0,
           FEE_TYPE.NO_FEE,
-          MEMO_TYPE.PAYABLE_TRANSFER,
+          MEMO_TYPE.PAYABLE_TRANSFER_ESCROW,
           PHASE_TRANSACTION,
           0
         );
@@ -1926,7 +1924,7 @@ describe("ACPSimple", function () {
           provider.address,
           0,
           FEE_TYPE.NO_FEE,
-          MEMO_TYPE.PAYABLE_TRANSFER,
+          MEMO_TYPE.PAYABLE_TRANSFER_ESCROW,
           PHASE_TRANSACTION,
           0
         );
@@ -1942,7 +1940,7 @@ describe("ACPSimple", function () {
           provider.address,
           0,
           FEE_TYPE.NO_FEE,
-          MEMO_TYPE.PAYABLE_TRANSFER,
+          MEMO_TYPE.PAYABLE_TRANSFER_ESCROW,
           PHASE_TRANSACTION,
           0
         );
@@ -1979,7 +1977,7 @@ describe("ACPSimple", function () {
           client.address,
           0,
           FEE_TYPE.NO_FEE,
-          MEMO_TYPE.PAYABLE_TRANSFER,
+          MEMO_TYPE.PAYABLE_TRANSFER_ESCROW,
           PHASE_TRANSACTION,
           0
         )).to.be.revertedWith("Either amount or fee amount must be greater than 0");

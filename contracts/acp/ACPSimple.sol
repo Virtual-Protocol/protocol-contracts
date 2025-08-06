@@ -12,6 +12,7 @@ import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
 import "./InteractionLedger.sol";
+import "hardhat/console.sol";
 
 contract ACPSimple is
     Initializable,
@@ -103,7 +104,6 @@ contract ACPSimple is
     }
 
     mapping(uint256 memoId => uint256 expiredAt) public memoExpiredAt;
-    mapping(uint256 jobId => address paymentToken) public jobPayment;
 
     enum FeeType {
         NO_FEE,
@@ -247,8 +247,6 @@ contract ACPSimple is
         job.phase = phase;
         emit JobPhaseUpdated(jobId, oldPhase, phase);
 
-        
-
         // Handle transition logic
         if (oldPhase == PHASE_NEGOTIATION && phase == PHASE_TRANSACTION) {
             // Transfer the budget to current contract
@@ -367,7 +365,8 @@ contract ACPSimple is
         );
         require(
             memoType == MemoType.PAYABLE_REQUEST ||
-                memoType == MemoType.PAYABLE_TRANSFER,
+                memoType == MemoType.PAYABLE_TRANSFER ||
+                memoType == MemoType.PAYABLE_TRANSFER_ESCROW,
             "Invalid memo type"
         );
         require(expiredAt == 0 || expiredAt > block.timestamp + 1 minutes, "Expired at must be in the future");
@@ -393,11 +392,11 @@ contract ACPSimple is
         memoExpiredAt[memoId] = expiredAt;
 
         // Escrow funds if this is a PAYABLE_TRANSFER with amount > 0
-        if (memoType == MemoType.PAYABLE_TRANSFER && amount > 0) {
+        if (memoType == MemoType.PAYABLE_TRANSFER_ESCROW && amount > 0) {
             IERC20(token).safeTransferFrom(_msgSender(), address(this), amount);
         }
 
-        if (memoType == MemoType.PAYABLE_TRANSFER && feeAmount > 0) {
+        if (memoType == MemoType.PAYABLE_TRANSFER_ESCROW && feeAmount > 0) {
             IERC20(token).safeTransferFrom(_msgSender(), address(this), feeAmount);
         }
 
@@ -430,6 +429,8 @@ contract ACPSimple is
 
         // Handle fund transfer
         if (amount > 0) {
+            console.log("entered function");
+
             if (memoType == MemoType.PAYABLE_REQUEST) {
                 IERC20(token).safeTransferFrom(_msgSender(), recipient, amount);
 
@@ -442,9 +443,20 @@ contract ACPSimple is
                     amount
                 );
             } else if (memoType == MemoType.PAYABLE_TRANSFER) {
+                IERC20(token).safeTransferFrom(memo.sender, recipient, amount);
+
+                emit PayableTransferExecuted(
+                    memo.jobId,
+                    memoId,
+                    memo.sender,
+                    recipient,
+                    token,
+                    amount
+                );
+            } else if (memoType == MemoType.PAYABLE_TRANSFER_ESCROW) {
                 // Transfer from escrowed funds
                 IERC20(token).safeTransfer(recipient, amount);
-
+                console.log("emit event hereeeee");
                 emit PayableTransferExecuted(
                     memo.jobId,
                     memoId,
@@ -461,6 +473,9 @@ contract ACPSimple is
             address payer = _msgSender();
             address eventPayer = _msgSender(); // For event emission
             if (memoType == MemoType.PAYABLE_TRANSFER) {
+                payer = memo.sender;
+                eventPayer = memo.sender;
+            } else if (memoType == MemoType.PAYABLE_TRANSFER_ESCROW) {
                 payer = address(this); // fee is already escrowed
                 eventPayer = memo.sender; // Use memo creator for event
                 paymentToken.approve(address(this), feeAmount);
@@ -690,7 +705,7 @@ contract ACPSimple is
         Memo storage memo = memos[memoId];
         PayableDetails storage details = payableDetails[memoId];
         
-        require(memo.memoType == MemoType.PAYABLE_TRANSFER, "Not a payable transfer memo");
+        require(memo.memoType == MemoType.PAYABLE_TRANSFER_ESCROW, "Not a payable transfer memo");
         require(!details.isExecuted, "Memo already executed");
         
         // Check if memo is expired or job is in a state where funds can be withdrawn

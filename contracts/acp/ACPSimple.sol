@@ -103,6 +103,7 @@ contract ACPSimple is
     }
 
     mapping(uint256 memoId => uint256 expiredAt) public memoExpiredAt;
+    mapping(uint256 jobId => address paymentToken) public jobPayment;
 
     enum FeeType {
         NO_FEE,
@@ -245,6 +246,8 @@ contract ACPSimple is
         uint8 oldPhase = job.phase;
         job.phase = phase;
         emit JobPhaseUpdated(jobId, oldPhase, phase);
+
+        
 
         // Handle transition logic
         if (oldPhase == PHASE_NEGOTIATION && phase == PHASE_TRANSACTION) {
@@ -456,8 +459,10 @@ contract ACPSimple is
         // Handle fee transfer
         if (feeAmount > 0) {
             address payer = _msgSender();
+            address eventPayer = _msgSender(); // For event emission
             if (memoType == MemoType.PAYABLE_TRANSFER) {
                 payer = address(this); // fee is already escrowed
+                eventPayer = memo.sender; // Use memo creator for event
                 paymentToken.approve(address(this), feeAmount);
             }
             if (feeType == FeeType.DEFERRED_FEE) {
@@ -469,7 +474,7 @@ contract ACPSimple is
                 emit PayableFeeCollected(
                     memo.jobId,
                     memoId,
-                    payer,
+                    eventPayer,
                     feeAmount
                 );
             } else {
@@ -493,7 +498,7 @@ contract ACPSimple is
                 emit PayableFeeRequestExecuted(
                     memo.jobId,
                     memoId,
-                    payer,
+                    eventPayer,
                     provider,
                     netAmount
                 );

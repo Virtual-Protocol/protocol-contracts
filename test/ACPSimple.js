@@ -1774,7 +1774,7 @@ describe("ACPSimple", function () {
         ).to.be.revertedWith("Cannot withdraw funds yet");
       });
 
-      it("Should fail to withdraw if not the memo sender", async function () {
+      it("Should be able to withdraw if not the memo sender", async function () {
         const { acp, client, provider, paymentToken, jobId } = await loadFixture(createJobInTransactionPhase);
 
         const amount = ethers.parseEther("100");
@@ -1800,10 +1800,24 @@ describe("ACPSimple", function () {
         // Wait for expiry
         await time.increase(120);
 
-        // Try to withdraw with different account - should fail
-        await expect(
-          acp.connect(provider).withdrawEscrowedFunds(memoId)
-        ).to.be.revertedWith("Only memo sender can withdraw");
+        // Check initial balances
+        const clientBalanceBefore = await paymentToken.balanceOf(client.address);
+        const contractBalanceBefore = await paymentToken.balanceOf(await acp.getAddress());
+
+        // Try to withdraw with different account - should succeed
+        await acp.connect(provider).withdrawEscrowedFunds(memoId);
+
+        // Check balances after withdrawal
+        const clientBalanceAfter = await paymentToken.balanceOf(client.address);
+        const contractBalanceAfter = await paymentToken.balanceOf(await acp.getAddress());
+
+        expect(clientBalanceAfter).to.equal(clientBalanceBefore + amount);
+        expect(contractBalanceAfter).to.equal(contractBalanceBefore - amount);
+
+        // Check payable details marked as executed
+        const payableDetails = await acp.payableDetails(memoId);
+        expect(payableDetails.isExecuted).to.be.true;
+
       });
 
       it("Should fail to withdraw if memo is already executed", async function () {

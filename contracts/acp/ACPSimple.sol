@@ -720,16 +720,15 @@ contract ACPSimple is
         }
         
         require(canWithdraw, "Cannot withdraw funds yet");
-        require(_msgSender() == memo.sender, "Only memo sender can withdraw");
         
         // Withdraw escrowed amount
         if (details.amount > 0) {
-            IERC20(details.token).safeTransfer(_msgSender(), details.amount);
+            IERC20(details.token).safeTransfer(memo.sender, details.amount);
         }
         
         // Withdraw escrowed fee
         if (details.feeAmount > 0) {
-            paymentToken.safeTransfer(_msgSender(), details.feeAmount);
+            paymentToken.safeTransfer(memo.sender, details.feeAmount);
         }
         
         // Mark as executed to prevent double withdrawal

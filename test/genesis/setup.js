@@ -1,7 +1,7 @@
 const { expect } = require("chai");
 const { ethers, upgrades } = require("hardhat");
 const { time } = require("@nomicfoundation/hardhat-network-helpers");
-const fgenesis = require("../../scripts/arguments/fgenesis");
+const fgenesis = require("../../scripts/arguments/genesis/fgenesis");
 
 async function setupTest() {
   // Return object to store all setup results
@@ -285,7 +285,7 @@ async function setupTest() {
     );
 
     console.log("\n=== Creating Genesis ===");
-    const tx = await fGenesis.connect(beOpsWallet).createGenesis(genesisParams);
+    const tx = await fGenesis.connect(beOpsWallet).createGenesis(genesisParams, true);
     console.log("Genesis creation transaction sent");
 
     const receipt = await tx.wait();

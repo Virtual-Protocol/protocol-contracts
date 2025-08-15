@@ -254,7 +254,10 @@ async function setupTest() {
     console.log("\n=== Pre-Creation Checks ===");
 
     // 1. check beOpsWallet has OPERATION_ROLE
-    let hasOperationRole = await fGenesis.hasRole(OPERATION_ROLE, beOpsWallet.address);
+    let hasOperationRole = await fGenesis.hasRole(
+      OPERATION_ROLE,
+      beOpsWallet.address
+    );
     console.log("beOpsWallet has OPERATION_ROLE:", hasOperationRole);
     expect(hasOperationRole).to.be.true;
 

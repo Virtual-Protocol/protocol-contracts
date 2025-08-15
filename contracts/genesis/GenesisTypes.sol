@@ -36,3 +36,8 @@ struct GenesisInitParams {
     uint256 agentTokenTotalSupply;
     uint256 agentTokenLpSupply;
 }
+
+struct GenesisParamsUpdate {
+    uint256 reserveAmount;
+    uint256 agentTokenLpSupply;
+}

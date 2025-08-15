@@ -13,7 +13,7 @@ contract FGenesis is Initializable, AccessControlUpgradeable {
 
     bytes32 public constant ADMIN_ROLE = keccak256("ADMIN_ROLE");
     bytes32 public constant OPERATION_ROLE = keccak256("OPERATION_ROLE");
-    
+
     struct Params {
         address virtualToken;
         uint256 reserve;
@@ -125,20 +125,6 @@ contract FGenesis is Initializable, AccessControlUpgradeable {
         return Genesis(addr);
     }
 
-    function onGenesisSuccess(
-        uint256 id,
-        SuccessParams calldata p
-    ) external onlyRole(OPERATION_ROLE) returns (address) {
-        return
-            _getGenesis(id).onGenesisSuccess(
-                p.refundAddresses,
-                p.refundAmounts,
-                p.distributeAddresses,
-                p.distributeAmounts,
-                p.creator
-            );
-    }
-
     function onGenesisSuccessSalt(
         uint256 id,
         SuccessParams calldata p,
@@ -177,6 +163,13 @@ contract FGenesis is Initializable, AccessControlUpgradeable {
         uint256 newEndTime
     ) external onlyRole(OPERATION_ROLE) {
         _getGenesis(id).resetTime(newStartTime, newEndTime);
+    }
+
+    function setParamsForGenesis(
+        uint256 id,
+        GenesisParamsUpdate calldata newGenesisParams
+    ) external onlyRole(OPERATION_ROLE) {
+        _getGenesis(id).setParams(newGenesisParams);
     }
 
     function cancelGenesis(uint256 id) external onlyRole(OPERATION_ROLE) {

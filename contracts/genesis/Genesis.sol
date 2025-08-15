@@ -60,6 +60,13 @@ contract Genesis is ReentrancyGuard, AccessControlUpgradeable {
         uint256 newEndTime
     );
 
+    event ParamsUpdated(
+        uint256 oldReserveAmount,
+        uint256 newReserveAmount,
+        uint256 oldAgentTokenLpSupply,
+        uint256 newAgentTokenLpSupply
+    );
+
     event GenesisCancelled(uint256 indexed genesisID);
     event GenesisSucceeded(uint256 indexed genesisID);
     event GenesisFailed(uint256 indexed genesisID);
@@ -263,31 +270,6 @@ contract Genesis is ReentrancyGuard, AccessControlUpgradeable {
         emit Participated(genesisId, msg.sender, pointAmt, virtualsAmt);
     }
 
-    function onGenesisSuccess(
-        address[] calldata refundVirtualsTokenUserAddresses,
-        uint256[] calldata refundVirtualsTokenUserAmounts,
-        address[] calldata distributeAgentTokenUserAddresses,
-        uint256[] calldata distributeAgentTokenUserAmounts,
-        address creator
-    )
-        external
-        onlyRole(FACTORY_ROLE)
-        nonReentrant
-        whenNotCancelled
-        whenEnded
-        returns (address)
-    {
-        return
-            _onGenesisSuccessSalt(
-                refundVirtualsTokenUserAddresses,
-                refundVirtualsTokenUserAmounts,
-                distributeAgentTokenUserAddresses,
-                distributeAgentTokenUserAmounts,
-                creator,
-                keccak256(abi.encodePacked(msg.sender, block.timestamp))
-            );
-    }
-
     function onGenesisSuccessSalt(
         address[] calldata refundVirtualsTokenUserAddresses,
         uint256[] calldata refundVirtualsTokenUserAmounts,
@@ -303,14 +285,15 @@ contract Genesis is ReentrancyGuard, AccessControlUpgradeable {
         whenEnded
         returns (address)
     {
-        return _onGenesisSuccessSalt(
-            refundVirtualsTokenUserAddresses,
-            refundVirtualsTokenUserAmounts,
-            distributeAgentTokenUserAddresses,
-            distributeAgentTokenUserAmounts,
-            creator,
-            salt
-        );
+        return
+            _onGenesisSuccessSalt(
+                refundVirtualsTokenUserAddresses,
+                refundVirtualsTokenUserAmounts,
+                distributeAgentTokenUserAddresses,
+                distributeAgentTokenUserAmounts,
+                creator,
+                salt
+            );
     }
 
     function _onGenesisSuccessSalt(
@@ -590,12 +573,7 @@ contract Genesis is ReentrancyGuard, AccessControlUpgradeable {
         address to,
         address token,
         uint256 amount
-    )
-        external
-        onlyRole(DEFAULT_ADMIN_ROLE)
-        nonReentrant
-        whenEnded
-    {
+    ) external onlyRole(DEFAULT_ADMIN_ROLE) nonReentrant whenEnded {
         require(token != address(0), "Invalid token address");
         require(
             amount <= IERC20(token).balanceOf(address(this)),
@@ -629,6 +607,43 @@ contract Genesis is ReentrancyGuard, AccessControlUpgradeable {
         endTime = newEndTime;
 
         emit TimeReset(oldStartTime, oldEndTime, newStartTime, newEndTime);
+    }
+
+    function setParams(
+        GenesisParamsUpdate calldata params
+    )
+        external
+        onlyRole(FACTORY_ROLE)
+        nonReentrant
+        whenNotCancelled
+        whenNotFailed
+        whenTokenNotLaunched
+    {
+        require(
+            params.reserveAmount > 0,
+            "Reserve amount must be greater than 0"
+        );
+        require(
+            params.agentTokenLpSupply > 0,
+            "Agent token lp supply must be greater than 0"
+        );
+        require(
+            agentTokenTotalSupply >= params.agentTokenLpSupply,
+            "Agent token total supply must be greater than agent token lp supply"
+        );
+
+        uint256 oldReserveAmount = reserveAmount;
+        uint256 oldAgentTokenLpSupply = agentTokenLpSupply;
+
+        reserveAmount = params.reserveAmount;
+        agentTokenLpSupply = params.agentTokenLpSupply;
+
+        emit ParamsUpdated(
+            oldReserveAmount,
+            params.reserveAmount,
+            oldAgentTokenLpSupply,
+            params.agentTokenLpSupply
+        );
     }
 
     function cancelGenesis()

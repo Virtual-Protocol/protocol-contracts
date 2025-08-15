@@ -56,23 +56,15 @@ contract FGenesis is Initializable, AccessControlUpgradeable {
 
     function _setParams(Params memory p) internal {
         require(
-            p.virtualToken != address(0) &&
-                p.feeAddr != address(0) &&
-                p.tbaImpl != address(0) &&
-                p.agentFactory != address(0),
-            "Invalid addr"
+            p.virtualToken != address(0) && p.feeAddr != address(0) && 
+            p.tbaImpl != address(0) && p.agentFactory != address(0),
+            "Zero addr"
         );
 
         require(
-            p.reserve > 0 && p.maxContribution > 0 && p.feeAmt > 0,
-            "Invalid amt"
-        );
-
-        require(
-            p.duration > 0 &&
-                p.agentTokenTotalSupply > 0 &&
-                p.agentTokenLpSupply > 0 &&
-                p.agentTokenTotalSupply >= p.agentTokenLpSupply,
+            p.reserve > 0 && p.maxContribution > 0 && p.feeAmt > 0 &&
+            p.duration > 0 && p.agentTokenTotalSupply > 0 && 
+            p.agentTokenLpSupply > 0 && p.agentTokenTotalSupply >= p.agentTokenLpSupply,
             "Invalid amt"
         );
 
@@ -82,14 +74,11 @@ contract FGenesis is Initializable, AccessControlUpgradeable {
     function createGenesis(
         GenesisCreationParams memory gParams
     ) external returns (address) {
-        require(
             IERC20(params.virtualToken).transferFrom(
                 msg.sender,
                 params.feeAddr,
                 params.feeAmt
-            ),
-            "transfer createGenesis fee failed"
-        );
+            );
 
         gParams.endTime = gParams.startTime + params.duration;
         genesisID++;
@@ -125,19 +114,6 @@ contract FGenesis is Initializable, AccessControlUpgradeable {
         return Genesis(addr);
     }
 
-    function onGenesisSuccess(
-        uint256 id,
-        SuccessParams calldata p
-    ) external onlyRole(OPERATION_ROLE) returns (address) {
-        return
-            _getGenesis(id).onGenesisSuccess(
-                p.refundAddresses,
-                p.refundAmounts,
-                p.distributeAddresses,
-                p.distributeAmounts,
-                p.creator
-            );
-    }
 
     function onGenesisSuccessSalt(
         uint256 id,

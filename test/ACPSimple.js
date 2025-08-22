@@ -1310,7 +1310,7 @@ describe("ACPSimple", function () {
 
         // Create job with 0 budget
         const expiredAt = (await time.latest()) + 86400;
-        const tx = await acp.connect(client).createJob(provider.address, evaluator.address, expiredAt);
+        const tx = await acp.connect(client).createJob(provider.address, evaluator.address, expiredAt, paymentToken);
         const receipt = await tx.wait();
         const jobId = receipt.logs[0].args[0];
 
@@ -1996,6 +1996,187 @@ describe("ACPSimple", function () {
           0
         )).to.be.revertedWith("Either amount or fee amount must be greater than 0");
       });
+    });
+  });
+
+  describe("setBudget", function () {
+    it("Should allow client to set budget", async function () {
+      const { acp, client, provider, evaluator } = await loadFixture(deployACPFixture);
+
+      // Create a job
+      const expiredAt = (await time.latest()) + 86400;
+      const tx = await acp.connect(client).createJob(provider.address, evaluator.address, expiredAt);
+      const receipt = await tx.wait();
+      const jobId = receipt.logs[0].args[0];
+
+      // Set budget
+      const budget = ethers.parseEther("100");
+      await expect(acp.connect(client).setBudget(jobId, budget))
+        .to.emit(acp, "BudgetSet")
+        .withArgs(jobId, budget);
+
+      // Check job budget
+      const job = await acp.jobs(jobId);
+      expect(job.budget).to.equal(budget);
+    });
+
+    it("Should allow client to set budget with custom payment token", async function () {
+      const { acp, client, provider, evaluator, paymentToken } = await loadFixture(deployACPFixture);
+
+      // Create a job
+      const expiredAt = (await time.latest()) + 86400;
+      const tx = await acp.connect(client).createJob(provider.address, evaluator.address, expiredAt);
+      const receipt = await tx.wait();
+      const jobId = receipt.logs[0].args[0];
+
+      // Set budget with custom payment token
+      const budget = ethers.parseEther("100");
+      await expect(acp.connect(client).setBudgetWithPaymentToken(jobId, budget, paymentToken))
+        .to.emit(acp, "BudgetSet")
+        .withArgs(jobId, budget)
+        .and.to.emit(acp, "JobPaymentTokenSet")
+        .withArgs(jobId, await paymentToken.getAddress(), budget);
+
+      // Check job budget and payment token
+      const job = await acp.jobs(jobId);
+      expect(job.budget).to.equal(budget);
+      expect(job.jobPaymentToken).to.equal(await paymentToken.getAddress());
+    });
+
+    it("Should not allow non-client to set budget", async function () {
+      const { acp, client, provider, evaluator } = await loadFixture(deployACPFixture);
+
+      // Create a job
+      const expiredAt = (await time.latest()) + 86400;
+      const tx = await acp.connect(client).createJob(provider.address, evaluator.address, expiredAt);
+      const receipt = await tx.wait();
+      const jobId = receipt.logs[0].args[0];
+
+      // Provider tries to set budget
+      const budget = ethers.parseEther("100");
+      await expect(acp.connect(provider).setBudget(jobId, budget)).to.be.revertedWith("Only client can set budget");
+    });
+
+    it("Should not allow setting budget after transaction phase", async function () {
+      const { acp, client, provider, jobId } = await loadFixture(createJobInTransactionPhase);
+
+      // Try to set budget in transaction phase
+      const budget = ethers.parseEther("100");
+      await expect(acp.connect(client).setBudget(jobId, budget)).to.be.revertedWith("Budget can only be set before transaction phase");
+    });
+
+    it("Should default to global paymentToken when jobPaymentToken is address(0)", async function () {
+      const { acp, client, provider, evaluator, paymentToken } = await loadFixture(deployACPFixture);
+
+      // Create a job
+      const expiredAt = (await time.latest()) + 86400;
+      const tx = await acp.connect(client).createJob(provider.address, evaluator.address, expiredAt);
+      const receipt = await tx.wait();
+      const jobId = receipt.logs[0].args[0];
+
+      // Set budget without custom payment token (should default to global paymentToken)
+      const budget = ethers.parseEther("100");
+      await acp.connect(client).setBudget(jobId, budget);
+
+      // Check that jobPaymentToken is set to global paymentToken
+      const job = await acp.jobs(jobId);
+      expect(job.jobPaymentToken).to.equal(await paymentToken.getAddress());
+
+      // Move to transaction phase to test payment logic
+      const memoTx = await acp.connect(client).createMemo(
+        jobId,
+        "Initial request memo",
+        MEMO_TYPE.MESSAGE,
+        false,
+        PHASE_NEGOTIATION
+      );
+      const memoReceipt = await memoTx.wait();
+      const memoId = memoReceipt.logs[0].args[2];
+      await acp.connect(provider).signMemo(memoId, true, "Approved");
+
+      const memoTx2 = await acp.connect(provider).createMemo(
+        jobId,
+        "Negotiation memo",
+        MEMO_TYPE.MESSAGE,
+        false,
+        PHASE_TRANSACTION
+      );
+      const memoReceipt2 = await memoTx2.wait();
+      const memoId2 = memoReceipt2.logs[0].args[2];
+      await acp.connect(client).signMemo(memoId2, true, "Agreed to terms");
+
+      // Complete the job
+      const completionMemoTx = await acp.connect(provider).createMemo(
+        jobId,
+        "Work completed",
+        MEMO_TYPE.MESSAGE,
+        false,
+        PHASE_COMPLETED
+      );
+      const completionReceipt = await completionMemoTx.wait();
+      const completionMemoId = completionReceipt.logs[0].args[2];
+      await acp.connect(evaluator).signMemo(completionMemoId, true, "Work approved");
+
+      // Verify the job was completed successfully using the default payment token
+      const finalJob = await acp.jobs(jobId);
+      expect(finalJob.phase).to.equal(PHASE_COMPLETED);
+    });
+
+    it("Should handle custom payment tokens correctly", async function () {
+      const { acp, client, provider, evaluator, paymentToken } = await loadFixture(deployACPFixture);
+
+      // Create a job
+      const expiredAt = (await time.latest()) + 86400;
+      const tx = await acp.connect(client).createJob(provider.address, evaluator.address, expiredAt);
+      const receipt = await tx.wait();
+      const jobId = receipt.logs[0].args[0];
+
+      // Set budget with custom payment token
+      const budget = ethers.parseEther("100");
+      await acp.connect(client).setBudgetWithPaymentToken(jobId, budget, paymentToken);
+
+      // Check that jobPaymentToken is set to custom payment token
+      const job = await acp.jobs(jobId);
+      expect(job.jobPaymentToken).to.equal(await paymentToken.getAddress());
+
+      // Move to transaction phase to test payment logic with custom token
+      const memoTx = await acp.connect(client).createMemo(
+        jobId,
+        "Initial request memo",
+        MEMO_TYPE.MESSAGE,
+        false,
+        PHASE_NEGOTIATION
+      );
+      const memoReceipt = await memoTx.wait();
+      const memoId = memoReceipt.logs[0].args[2];
+      await acp.connect(provider).signMemo(memoId, true, "Approved");
+
+      const memoTx2 = await acp.connect(provider).createMemo(
+        jobId,
+        "Negotiation memo",
+        MEMO_TYPE.MESSAGE,
+        false,
+        PHASE_TRANSACTION
+      );
+      const memoReceipt2 = await memoTx2.wait();
+      const memoId2 = memoReceipt2.logs[0].args[2];
+      await acp.connect(client).signMemo(memoId2, true, "Agreed to terms");
+
+      // Complete the job
+      const completionMemoTx = await acp.connect(provider).createMemo(
+        jobId,
+        "Work completed",
+        MEMO_TYPE.MESSAGE,
+        false,
+        PHASE_COMPLETED
+      );
+      const completionReceipt = await completionMemoTx.wait();
+      const completionMemoId = completionReceipt.logs[0].args[2];
+      await acp.connect(evaluator).signMemo(completionMemoId, true, "Work approved");
+
+      // Verify the job was completed successfully using the custom payment token
+      const finalJob = await acp.jobs(jobId);
+      expect(finalJob.phase).to.equal(PHASE_COMPLETED);
     });
   });
 });

@@ -2,7 +2,7 @@
 // This is sample implementation of ACP
 // - all phases requires counter party approval except for evaluation phase
 // - evaluation phase requires evaluators to sign
-// - payment token is fixed
+// - payment token defaults to global paymentToken but can be set per job in setBudget
 
 pragma solidity ^0.8.20;
 
@@ -54,6 +54,7 @@ contract ACPSimple is
         uint256 memoCount;
         uint256 expiredAt; // Client can claim back the budget if job is not completed within expiry
         address evaluator;
+        IERC20 jobPaymentToken;
     }
 
     mapping(uint256 => Job) public jobs;
@@ -82,6 +83,8 @@ contract ACPSimple is
     address public platformTreasury;
 
     event BudgetSet(uint256 indexed jobId, uint256 newBudget);
+
+    event JobPaymentTokenSet(uint256 indexed jobId, address indexed paymentToken, uint256 newBudget);
 
     mapping(uint256 jobId => uint256) public jobAdditionalFees;
 
@@ -191,6 +194,11 @@ contract ACPSimple is
         _;
     }
 
+    function _getJobPaymentToken(uint256 jobId) internal view returns (IERC20) {
+        Job storage job = jobs[jobId];
+        return address(job.jobPaymentToken) == address(0) ? paymentToken : job.jobPaymentToken;
+    }
+
     function updateEvaluatorFee(
         uint256 evaluatorFeeBP_
     ) external onlyRole(ADMIN_ROLE) {
@@ -229,7 +237,8 @@ contract ACPSimple is
             phase: 0,
             memoCount: 0,
             expiredAt: expiredAt,
-            evaluator: evaluator
+            evaluator: evaluator,
+            jobPaymentToken: paymentToken
         });
 
         emit JobCreated(newJobId, _msgSender(), provider, evaluator);
@@ -250,7 +259,7 @@ contract ACPSimple is
         if (oldPhase == PHASE_NEGOTIATION && phase == PHASE_TRANSACTION) {
             // Transfer the budget to current contract
             if (job.budget > 0) {
-                paymentToken.safeTransferFrom(
+                _getJobPaymentToken(jobId).safeTransferFrom(
                     job.client,
                     address(this),
                     job.budget
@@ -261,20 +270,36 @@ contract ACPSimple is
             phase >= PHASE_COMPLETED &&
             phase <= PHASE_REJECTED
         ) {
-            _claimBudget(job);
+            _claimBudget(jobId);
         }
     }
 
-    function setBudget(uint256 jobId, uint256 amount) public nonReentrant {
+    function setBudgetWithPaymentToken(uint256 jobId, uint256 amount, IERC20 jobPaymentToken_) public nonReentrant {
         Job storage job = jobs[jobId];
         require(job.client == _msgSender(), "Only client can set budget");
         require(
             job.phase < PHASE_TRANSACTION,
             "Budget can only be set before transaction phase"
         );
+        
+        IERC20 jobPaymentToken = jobPaymentToken_;
+
+        if (address(jobPaymentToken_) == address(0)) {
+            jobPaymentToken = paymentToken;
+        }
+
+        require(_isERC20(address(jobPaymentToken)), "Token must be ERC20");
 
         job.budget = amount;
         emit BudgetSet(jobId, amount);
+
+        // Set payment token if provided
+        job.jobPaymentToken = jobPaymentToken_;
+        emit JobPaymentTokenSet(jobId, address(jobPaymentToken_), amount);
+    }
+
+    function setBudget(uint256 jobId, uint256 amount) public {
+        setBudgetWithPaymentToken(jobId, amount, IERC20(address(paymentToken)));
     }
 
     function claimBudget(uint256 id) public nonReentrant {
@@ -282,13 +307,14 @@ contract ACPSimple is
         if (job.phase < PHASE_TRANSACTION && block.timestamp > job.expiredAt) {
             _updateJobPhase(id, PHASE_EXPIRED);
         } else {
-            _claimBudget(job);
+            _claimBudget(id);
         }
     }
 
-    function _claimBudget(Job storage job) internal {
-        uint256 id = job.id;
-        uint256 totalFees = jobAdditionalFees[id];
+    function _claimBudget(uint256 jobId) internal {
+        Job storage job = jobs[jobId];
+        IERC20 jobPaymentToken = _getJobPaymentToken(jobId);
+        uint256 totalFees = jobAdditionalFees[jobId];
         uint256 totalAmount = job.budget + totalFees;
         require(totalAmount > 0, "No budget or fees to claim");
         uint256 claimableAmount = totalAmount - job.amountClaimed;
@@ -303,19 +329,19 @@ contract ACPSimple is
             uint256 platformFee = (claimableAmount * platformFeeBP) / 10000;
 
             if (platformFee > 0) {
-                paymentToken.safeTransfer(platformTreasury, platformFee);
+                jobPaymentToken.safeTransfer(platformTreasury, platformFee);
             }
 
             if (job.evaluator != address(0) && evaluatorFee > 0) {
-                paymentToken.safeTransfer(job.evaluator, evaluatorFee);
-                emit ClaimedEvaluatorFee(id, job.evaluator, evaluatorFee);
+                jobPaymentToken.safeTransfer(job.evaluator, evaluatorFee);
+                emit ClaimedEvaluatorFee(jobId, job.evaluator, evaluatorFee);
             }
 
             uint256 netAmount = claimableAmount - platformFee - evaluatorFee;
 
             if (netAmount > 0) {
-                paymentToken.safeTransfer(job.provider, netAmount);
-                emit ClaimedProviderFee(id, job.provider, netAmount);
+                jobPaymentToken.safeTransfer(job.provider, netAmount);
+                emit ClaimedProviderFee(jobId, job.provider, netAmount);
             }
         } else {
             require(
@@ -329,18 +355,18 @@ contract ACPSimple is
                 uint256 budgetToRefund = claimableAmount - totalFees;
 
                 if (job.phase >= PHASE_TRANSACTION && budgetToRefund > 0) {
-                    paymentToken.safeTransfer(job.client, budgetToRefund);
-                    emit RefundedBudget(id, job.client, budgetToRefund);
+                    jobPaymentToken.safeTransfer(job.client, budgetToRefund);
+                    emit RefundedBudget(jobId, job.client, budgetToRefund);
                 }
 
                 if (totalFees > 0) {
-                    paymentToken.safeTransfer(job.client, totalFees);
-                    emit RefundedAdditionalFees(id, job.client, totalFees);
+                    jobPaymentToken.safeTransfer(job.client, totalFees);
+                    emit RefundedAdditionalFees(jobId, job.client, totalFees);
                 }
             }
 
             if (job.phase != PHASE_REJECTED && job.phase != PHASE_EXPIRED) {
-                _updateJobPhase(id, PHASE_EXPIRED);
+                _updateJobPhase(jobId, PHASE_EXPIRED);
             }
         }
     }
@@ -370,6 +396,8 @@ contract ACPSimple is
         );
         require(expiredAt == 0 || expiredAt > block.timestamp + 1 minutes, "Expired at must be in the future");
 
+        IERC20 jobPaymentToken = _getJobPaymentToken(jobId);
+
         // If amount > 0, recipient must be valid
         if (amount > 0) {
             require(recipient != address(0), "Invalid recipient");
@@ -396,7 +424,7 @@ contract ACPSimple is
         }
 
         if (memoType == MemoType.PAYABLE_TRANSFER_ESCROW && feeAmount > 0) {
-            IERC20(token).safeTransferFrom(_msgSender(), address(this), feeAmount);
+            jobPaymentToken.safeTransferFrom(_msgSender(), address(this), feeAmount);
         }
 
         if (amount > 0 || feeAmount > 0) {
@@ -469,16 +497,18 @@ contract ACPSimple is
         if (feeAmount > 0) {
             address payer = _msgSender();
             address eventPayer = _msgSender(); // For event emission
+            IERC20 jobPaymentToken = _getJobPaymentToken(memo.jobId);
+            
             if (memoType == MemoType.PAYABLE_TRANSFER) {
                 payer = memo.sender;
                 eventPayer = memo.sender;
             } else if (memoType == MemoType.PAYABLE_TRANSFER_ESCROW) {
                 payer = address(this); // fee is already escrowed
                 eventPayer = memo.sender; // Use memo creator for event
-                paymentToken.approve(address(this), feeAmount);
+                jobPaymentToken.forceApprove(address(this), feeAmount);
             }
             if (feeType == FeeType.DEFERRED_FEE) {
-                paymentToken.safeTransferFrom(
+                jobPaymentToken.safeTransferFrom(
                     payer,
                     address(this),
                     feeAmount
@@ -495,14 +525,14 @@ contract ACPSimple is
 
                 uint256 platformFee = (feeAmount * platformFeeBP) / 10000;
                 if (platformFee > 0) {
-                    paymentToken.safeTransferFrom(
+                    jobPaymentToken.safeTransferFrom(
                         payer,
                         platformTreasury,
                         platformFee
                     );
                 }
                 uint256 netAmount = feeAmount - platformFee;
-                paymentToken.safeTransferFrom(
+                jobPaymentToken.safeTransferFrom(
                     payer,
                     provider,
                     netAmount
@@ -728,7 +758,7 @@ contract ACPSimple is
         
         // Withdraw escrowed fee
         if (details.feeAmount > 0) {
-            paymentToken.safeTransfer(memo.sender, details.feeAmount);
+            _getJobPaymentToken(memo.jobId).safeTransfer(_msgSender(), details.feeAmount);
         }
         
         // Mark as executed to prevent double withdrawal

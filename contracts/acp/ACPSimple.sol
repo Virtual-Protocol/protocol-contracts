@@ -745,7 +745,7 @@ contract ACPSimple is
     }
 
 
-    function _refundEscrowedFunds(uint256 memoId, Memo storage memo) internal nonReentrant { 
+    function _refundEscrowedFunds(uint256 memoId, Memo storage memo) internal { 
         PayableDetails storage details = payableDetails[memoId];
         
         require(memo.memoType == MemoType.PAYABLE_TRANSFER_ESCROW, "Not a payable transfer memo");

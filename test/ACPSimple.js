@@ -1826,7 +1826,8 @@ describe("ACPSimple", function () {
         const amount = ethers.parseEther("100");
         const tokenAddress = await paymentToken.getAddress();
 
-        // Create memo
+        // Create memo with expiry to allow withdrawal conditions to be met
+        const expiredAt = (await time.latest()) + 120; // 2 minutes from now
         const memoTx = await acp.connect(client).createPayableMemo(
           jobId,
           "Transfer",
@@ -1837,7 +1838,7 @@ describe("ACPSimple", function () {
           FEE_TYPE.NO_FEE,
           MEMO_TYPE.PAYABLE_TRANSFER_ESCROW,
           PHASE_TRANSACTION,
-          0
+          expiredAt
         );
         const receipt = await memoTx.wait();
         const memoId = receipt.logs[0].args[2];
@@ -1845,7 +1846,10 @@ describe("ACPSimple", function () {
         // Execute the memo
         await acp.connect(provider).signMemo(memoId, true, "Approved");
 
-        // Try to withdraw - should fail
+        // Wait for memo to expire so withdrawal conditions are met
+        await time.increase(120);
+
+        // Try to withdraw - should fail with "Memo already executed" since memo was executed by signing
         await expect(
           acp.connect(client).withdrawEscrowedFunds(memoId)
         ).to.be.revertedWith("Memo already executed");
@@ -1857,7 +1861,8 @@ describe("ACPSimple", function () {
         const amount = ethers.parseEther("100");
         const tokenAddress = await paymentToken.getAddress();
 
-        // Create PAYABLE_REQUEST memo
+        // Create PAYABLE_REQUEST memo with expiry to meet withdrawal conditions
+        const expiredAt = (await time.latest()) + 120; // 2 minutes from now
         const memoTx = await acp.connect(provider).createPayableMemo(
           jobId,
           "Request",
@@ -1868,12 +1873,15 @@ describe("ACPSimple", function () {
           FEE_TYPE.NO_FEE,
           MEMO_TYPE.PAYABLE_REQUEST,
           PHASE_TRANSACTION,
-          0
+          expiredAt
         );
         const receipt = await memoTx.wait();
         const memoId = receipt.logs[0].args[2];
 
-        // Try to withdraw - should fail
+        // Wait for memo to expire so withdrawal conditions are met
+        await time.increase(120);
+
+        // Try to withdraw - should fail with "Not a payable transfer memo" since it's PAYABLE_REQUEST
         await expect(
           acp.connect(provider).withdrawEscrowedFunds(memoId)
         ).to.be.revertedWith("Not a payable transfer memo");
@@ -2004,7 +2012,7 @@ describe("ACPSimple", function () {
         const feeAmount = ethers.parseEther("10");
         const tokenAddress = await paymentToken.getAddress();
 
-        // Check initial balances
+        // Check initial balances (after budget is set)
         const clientBalanceBefore = await paymentToken.balanceOf(client.address);
         const contractBalanceBefore = await paymentToken.balanceOf(await acp.getAddress());
 
@@ -2031,12 +2039,16 @@ describe("ACPSimple", function () {
         expect(clientBalanceAfterEscrow).to.equal(clientBalanceBefore - amount - feeAmount);
         expect(contractBalanceAfterEscrow).to.equal(contractBalanceBefore + amount + feeAmount);
 
-        // Provider rejects memo
+        // Provider rejects memo - should trigger refund
         await expect(
           acp.connect(provider).signMemo(memoId, false, "Rejected transfer")
         )
           .to.emit(acp, "MemoSigned")
-          .withArgs(memoId, false, "Rejected transfer");
+          .withArgs(memoId, false, "Rejected transfer")
+          .and.to.emit(acp, "PayableFundsRefunded")
+          .withArgs(jobId, memoId, client.address, tokenAddress, amount)
+          .and.to.emit(acp, "PayableFeeRefunded")
+          .withArgs(jobId, memoId, client.address, tokenAddress, feeAmount);
 
         // Check balances after rejection - should be refunded to original state
         const clientBalanceAfterReject = await paymentToken.balanceOf(client.address);

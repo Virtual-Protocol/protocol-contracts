@@ -155,6 +155,22 @@ contract ACPSimple is
         uint256 feeAmount
     );
 
+    event PayableFundsRefunded(
+        uint256 indexed jobId,
+        uint256 indexed memoId,
+        address indexed sender,
+        address token,
+        uint256 amount
+    );
+
+    event PayableFeeRefunded(
+        uint256 indexed jobId,
+        uint256 indexed memoId,
+        address indexed sender,
+        address token,
+        uint256 amount
+    );
+
 
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() {
@@ -692,6 +708,8 @@ contract ACPSimple is
 
         if (isApproved && isPayableMemo(memoId)) {
             _executePayableMemo(memoId, memo);
+        } else if(!isApproved && memo.memoType == MemoType.PAYABLE_TRANSFER_ESCROW) {
+            _refundEscrowedFunds(memoId, memo);
         }
 
         emit MemoSigned(memoId, isApproved, reason);
@@ -727,15 +745,44 @@ contract ACPSimple is
     }
 
 
-
-    function withdrawEscrowedFunds(uint256 memoId) external nonReentrant {
-        Memo storage memo = memos[memoId];
+    function _refundEscrowedFunds(uint256 memoId, Memo storage memo) internal { 
         PayableDetails storage details = payableDetails[memoId];
         
         require(memo.memoType == MemoType.PAYABLE_TRANSFER_ESCROW, "Not a payable transfer memo");
         require(!details.isExecuted, "Memo already executed");
+
+        // Withdraw escrowed amount
+        if (details.amount > 0) {
+            IERC20(details.token).safeTransfer(memo.sender, details.amount);
+            emit PayableFundsRefunded(
+                memo.jobId,
+                memoId,
+                memo.sender,
+                details.token,
+                details.amount
+            );
+        }
         
+        // Withdraw escrowed fee
+        if (details.feeAmount > 0) {
+            IERC20 jobPaymentToken = _getJobPaymentToken(memo.jobId);
+            jobPaymentToken.safeTransfer(memo.sender, details.feeAmount);
+            emit PayableFeeRefunded(
+                memo.jobId,
+                memoId,
+                memo.sender,
+                address(jobPaymentToken),
+                details.feeAmount
+            );
+        }
+        
+        // Mark as executed to prevent double withdrawal
+        details.isExecuted = true;
+    }
+
+    function withdrawEscrowedFunds(uint256 memoId) external nonReentrant {
         // Check if memo is expired or job is in a state where funds can be withdrawn
+        Memo storage memo = memos[memoId];
         Job storage job = jobs[memo.jobId];
         bool canWithdraw = false;
         
@@ -750,18 +797,7 @@ contract ACPSimple is
         }
         
         require(canWithdraw, "Cannot withdraw funds yet");
-        
-        // Withdraw escrowed amount
-        if (details.amount > 0) {
-            IERC20(details.token).safeTransfer(memo.sender, details.amount);
-        }
-        
-        // Withdraw escrowed fee
-        if (details.feeAmount > 0) {
-            _getJobPaymentToken(memo.jobId).safeTransfer(_msgSender(), details.feeAmount);
-        }
-        
-        // Mark as executed to prevent double withdrawal
-        details.isExecuted = true;
+
+        _refundEscrowedFunds(memoId, memo);
     }
 }

@@ -29424,6 +29424,482 @@
         "0xd64857CA662352E1D49a10A9337869A016A6693e",
         "0x236576B85b9d34bd4B3cD85fd62AA9c588341972"
       ]
+    },
+    "22c231c2d7ed8130a5bc74e5127ddc97022eeb0e5c2150673a2320310c58d59a": {
+      "address": "0x79C29b668269811747Fd83945Ad535eBD34B5653",
+      "layout": {
+        "solcVersion": "0.8.26",
+        "storage": [
+          {
+            "label": "memoCounter",
+            "offset": 0,
+            "slot": "0",
+            "type": "t_uint256",
+            "contract": "InteractionLedger",
+            "src": "contracts/acp/InteractionLedger.sol:14"
+          },
+          {
+            "label": "signatories",
+            "offset": 0,
+            "slot": "1",
+            "type": "t_mapping(t_uint256,t_mapping(t_address,t_uint8))",
+            "contract": "InteractionLedger",
+            "src": "contracts/acp/InteractionLedger.sol:16"
+          },
+          {
+            "label": "memos",
+            "offset": 0,
+            "slot": "2",
+            "type": "t_mapping(t_uint256,t_struct(Memo)3989_storage)",
+            "contract": "InteractionLedger",
+            "src": "contracts/acp/InteractionLedger.sol:31"
+          },
+          {
+            "label": "paymentToken",
+            "offset": 0,
+            "slot": "3",
+            "type": "t_contract(IERC20)992",
+            "contract": "ACPSimple",
+            "src": "contracts/acp/ACPSimple.sol:35"
+          },
+          {
+            "label": "evaluatorFeeBP",
+            "offset": 0,
+            "slot": "4",
+            "type": "t_uint256",
+            "contract": "ACPSimple",
+            "src": "contracts/acp/ACPSimple.sol:37"
+          },
+          {
+            "label": "numEvaluatorsPerJob",
+            "offset": 0,
+            "slot": "5",
+            "type": "t_uint8",
+            "contract": "ACPSimple",
+            "src": "contracts/acp/ACPSimple.sol:38"
+          },
+          {
+            "label": "jobs",
+            "offset": 0,
+            "slot": "6",
+            "type": "t_mapping(t_uint256,t_struct(Job)1669_storage)",
+            "contract": "ACPSimple",
+            "src": "contracts/acp/ACPSimple.sol:60"
+          },
+          {
+            "label": "jobCounter",
+            "offset": 0,
+            "slot": "7",
+            "type": "t_uint256",
+            "contract": "ACPSimple",
+            "src": "contracts/acp/ACPSimple.sol:61"
+          },
+          {
+            "label": "jobMemoIds",
+            "offset": 0,
+            "slot": "8",
+            "type": "t_mapping(t_uint256,t_mapping(t_uint8,t_array(t_uint256)dyn_storage))",
+            "contract": "ACPSimple",
+            "src": "contracts/acp/ACPSimple.sol:71"
+          },
+          {
+            "label": "platformFeeBP",
+            "offset": 0,
+            "slot": "9",
+            "type": "t_uint256",
+            "contract": "ACPSimple",
+            "src": "contracts/acp/ACPSimple.sol:82"
+          },
+          {
+            "label": "platformTreasury",
+            "offset": 0,
+            "slot": "10",
+            "type": "t_address",
+            "contract": "ACPSimple",
+            "src": "contracts/acp/ACPSimple.sol:83"
+          },
+          {
+            "label": "jobAdditionalFees",
+            "offset": 0,
+            "slot": "11",
+            "type": "t_mapping(t_uint256,t_uint256)",
+            "contract": "ACPSimple",
+            "src": "contracts/acp/ACPSimple.sol:89"
+          },
+          {
+            "label": "payableDetails",
+            "offset": 0,
+            "slot": "12",
+            "type": "t_mapping(t_uint256,t_struct(PayableDetails)1766_storage)",
+            "contract": "ACPSimple",
+            "src": "contracts/acp/ACPSimple.sol:97"
+          },
+          {
+            "label": "memoExpiredAt",
+            "offset": 0,
+            "slot": "13",
+            "type": "t_mapping(t_uint256,t_uint256)",
+            "contract": "ACPSimple",
+            "src": "contracts/acp/ACPSimple.sol:108"
+          }
+        ],
+        "types": {
+          "t_address": {
+            "label": "address",
+            "numberOfBytes": "20"
+          },
+          "t_bool": {
+            "label": "bool",
+            "numberOfBytes": "1"
+          },
+          "t_bytes32": {
+            "label": "bytes32",
+            "numberOfBytes": "32"
+          },
+          "t_mapping(t_address,t_bool)": {
+            "label": "mapping(address => bool)",
+            "numberOfBytes": "32"
+          },
+          "t_mapping(t_bytes32,t_struct(RoleData)25_storage)": {
+            "label": "mapping(bytes32 => struct AccessControlUpgradeable.RoleData)",
+            "numberOfBytes": "32"
+          },
+          "t_struct(AccessControlStorage)34_storage": {
+            "label": "struct AccessControlUpgradeable.AccessControlStorage",
+            "members": [
+              {
+                "label": "_roles",
+                "type": "t_mapping(t_bytes32,t_struct(RoleData)25_storage)",
+                "offset": 0,
+                "slot": "0"
+              }
+            ],
+            "numberOfBytes": "32"
+          },
+          "t_struct(InitializableStorage)93_storage": {
+            "label": "struct Initializable.InitializableStorage",
+            "members": [
+              {
+                "label": "_initialized",
+                "type": "t_uint64",
+                "offset": 0,
+                "slot": "0"
+              },
+              {
+                "label": "_initializing",
+                "type": "t_bool",
+                "offset": 8,
+                "slot": "0"
+              }
+            ],
+            "numberOfBytes": "32"
+          },
+          "t_struct(ReentrancyGuardStorage)165_storage": {
+            "label": "struct ReentrancyGuardUpgradeable.ReentrancyGuardStorage",
+            "members": [
+              {
+                "label": "_status",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "0"
+              }
+            ],
+            "numberOfBytes": "32"
+          },
+          "t_struct(RoleData)25_storage": {
+            "label": "struct AccessControlUpgradeable.RoleData",
+            "members": [
+              {
+                "label": "hasRole",
+                "type": "t_mapping(t_address,t_bool)",
+                "offset": 0,
+                "slot": "0"
+              },
+              {
+                "label": "adminRole",
+                "type": "t_bytes32",
+                "offset": 0,
+                "slot": "1"
+              }
+            ],
+            "numberOfBytes": "64"
+          },
+          "t_uint256": {
+            "label": "uint256",
+            "numberOfBytes": "32"
+          },
+          "t_uint64": {
+            "label": "uint64",
+            "numberOfBytes": "8"
+          },
+          "t_array(t_uint256)dyn_storage": {
+            "label": "uint256[]",
+            "numberOfBytes": "32"
+          },
+          "t_contract(IERC20)992": {
+            "label": "contract IERC20",
+            "numberOfBytes": "20"
+          },
+          "t_enum(FeeType)1774": {
+            "label": "enum ACPSimple.FeeType",
+            "members": [
+              "NO_FEE",
+              "IMMEDIATE_FEE",
+              "DEFERRED_FEE"
+            ],
+            "numberOfBytes": "1"
+          },
+          "t_enum(MemoType)4007": {
+            "label": "enum InteractionLedger.MemoType",
+            "members": [
+              "MESSAGE",
+              "CONTEXT_URL",
+              "IMAGE_URL",
+              "VOICE_URL",
+              "OBJECT_URL",
+              "TXHASH",
+              "PAYABLE_REQUEST",
+              "PAYABLE_TRANSFER",
+              "PAYABLE_TRANSFER_ESCROW"
+            ],
+            "numberOfBytes": "1"
+          },
+          "t_mapping(t_address,t_uint8)": {
+            "label": "mapping(address => uint8)",
+            "numberOfBytes": "32"
+          },
+          "t_mapping(t_uint256,t_mapping(t_address,t_uint8))": {
+            "label": "mapping(uint256 => mapping(address => uint8))",
+            "numberOfBytes": "32"
+          },
+          "t_mapping(t_uint256,t_mapping(t_uint8,t_array(t_uint256)dyn_storage))": {
+            "label": "mapping(uint256 => mapping(uint8 => uint256[]))",
+            "numberOfBytes": "32"
+          },
+          "t_mapping(t_uint256,t_struct(Job)1669_storage)": {
+            "label": "mapping(uint256 => struct ACPSimple.Job)",
+            "numberOfBytes": "32"
+          },
+          "t_mapping(t_uint256,t_struct(Memo)3989_storage)": {
+            "label": "mapping(uint256 => struct InteractionLedger.Memo)",
+            "numberOfBytes": "32"
+          },
+          "t_mapping(t_uint256,t_struct(PayableDetails)1766_storage)": {
+            "label": "mapping(uint256 => struct ACPSimple.PayableDetails)",
+            "numberOfBytes": "32"
+          },
+          "t_mapping(t_uint256,t_uint256)": {
+            "label": "mapping(uint256 => uint256)",
+            "numberOfBytes": "32"
+          },
+          "t_mapping(t_uint8,t_array(t_uint256)dyn_storage)": {
+            "label": "mapping(uint8 => uint256[])",
+            "numberOfBytes": "32"
+          },
+          "t_string_storage": {
+            "label": "string",
+            "numberOfBytes": "32"
+          },
+          "t_struct(Job)1669_storage": {
+            "label": "struct ACPSimple.Job",
+            "members": [
+              {
+                "label": "id",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "0"
+              },
+              {
+                "label": "client",
+                "type": "t_address",
+                "offset": 0,
+                "slot": "1"
+              },
+              {
+                "label": "provider",
+                "type": "t_address",
+                "offset": 0,
+                "slot": "2"
+              },
+              {
+                "label": "budget",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "3"
+              },
+              {
+                "label": "amountClaimed",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "4"
+              },
+              {
+                "label": "phase",
+                "type": "t_uint8",
+                "offset": 0,
+                "slot": "5"
+              },
+              {
+                "label": "memoCount",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "6"
+              },
+              {
+                "label": "expiredAt",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "7"
+              },
+              {
+                "label": "evaluator",
+                "type": "t_address",
+                "offset": 0,
+                "slot": "8"
+              },
+              {
+                "label": "jobPaymentToken",
+                "type": "t_contract(IERC20)992",
+                "offset": 0,
+                "slot": "9"
+              }
+            ],
+            "numberOfBytes": "320"
+          },
+          "t_struct(Memo)3989_storage": {
+            "label": "struct InteractionLedger.Memo",
+            "members": [
+              {
+                "label": "content",
+                "type": "t_string_storage",
+                "offset": 0,
+                "slot": "0"
+              },
+              {
+                "label": "memoType",
+                "type": "t_enum(MemoType)4007",
+                "offset": 0,
+                "slot": "1"
+              },
+              {
+                "label": "isSecured",
+                "type": "t_bool",
+                "offset": 1,
+                "slot": "1"
+              },
+              {
+                "label": "nextPhase",
+                "type": "t_uint8",
+                "offset": 2,
+                "slot": "1"
+              },
+              {
+                "label": "jobId",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "2"
+              },
+              {
+                "label": "sender",
+                "type": "t_address",
+                "offset": 0,
+                "slot": "3"
+              }
+            ],
+            "numberOfBytes": "128"
+          },
+          "t_struct(PayableDetails)1766_storage": {
+            "label": "struct ACPSimple.PayableDetails",
+            "members": [
+              {
+                "label": "token",
+                "type": "t_address",
+                "offset": 0,
+                "slot": "0"
+              },
+              {
+                "label": "amount",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "1"
+              },
+              {
+                "label": "recipient",
+                "type": "t_address",
+                "offset": 0,
+                "slot": "2"
+              },
+              {
+                "label": "feeAmount",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "3"
+              },
+              {
+                "label": "feeType",
+                "type": "t_enum(FeeType)1774",
+                "offset": 0,
+                "slot": "4"
+              },
+              {
+                "label": "isExecuted",
+                "type": "t_bool",
+                "offset": 1,
+                "slot": "4"
+              }
+            ],
+            "numberOfBytes": "160"
+          },
+          "t_uint8": {
+            "label": "uint8",
+            "numberOfBytes": "1"
+          }
+        },
+        "namespaces": {
+          "erc7201:openzeppelin.storage.ReentrancyGuard": [
+            {
+              "contract": "ReentrancyGuardUpgradeable",
+              "label": "_status",
+              "type": "t_uint256",
+              "src": "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol:40",
+              "offset": 0,
+              "slot": "0"
+            }
+          ],
+          "erc7201:openzeppelin.storage.AccessControl": [
+            {
+              "contract": "AccessControlUpgradeable",
+              "label": "_roles",
+              "type": "t_mapping(t_bytes32,t_struct(RoleData)25_storage)",
+              "src": "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol:61",
+              "offset": 0,
+              "slot": "0"
+            }
+          ],
+          "erc7201:openzeppelin.storage.Initializable": [
+            {
+              "contract": "Initializable",
+              "label": "_initialized",
+              "type": "t_uint64",
+              "src": "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol:69",
+              "offset": 0,
+              "slot": "0"
+            },
+            {
+              "contract": "Initializable",
+              "label": "_initializing",
+              "type": "t_bool",
+              "src": "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol:73",
+              "offset": 8,
+              "slot": "0"
+            }
+          ]
+        }
+      },
+      "allAddresses": [
+        "0x79C29b668269811747Fd83945Ad535eBD34B5653",
+        "0x48fA2C9b4757b07C29975b716A1F799AB372BA4d"
+      ]
     }
   }
 }

@@ -758,7 +758,7 @@ contract ACPSimple is
         
         // Withdraw escrowed fee
         if (details.feeAmount > 0) {
-            _getJobPaymentToken(memo.jobId).safeTransfer(_msgSender(), details.feeAmount);
+            _getJobPaymentToken(memo.jobId).safeTransfer(memo.sender, details.feeAmount);
         }
         
         // Mark as executed to prevent double withdrawal

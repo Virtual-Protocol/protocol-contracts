@@ -1996,6 +1996,59 @@ describe("ACPSimple", function () {
           0
         )).to.be.revertedWith("Either amount or fee amount must be greater than 0");
       });
+
+      it("Should refund escrowed funds when payable escrow memo is rejected", async function () {
+        const { acp, client, provider, paymentToken, jobId } = await loadFixture(createJobInTransactionPhase);
+
+        const amount = ethers.parseEther("100");
+        const feeAmount = ethers.parseEther("10");
+        const tokenAddress = await paymentToken.getAddress();
+
+        // Check initial balances
+        const clientBalanceBefore = await paymentToken.balanceOf(client.address);
+        const contractBalanceBefore = await paymentToken.balanceOf(await acp.getAddress());
+
+        // Create memo with escrowed funds and fee
+        const memoTx = await acp.connect(client).createPayableMemo(
+          jobId,
+          "Transfer with fee to be rejected",
+          tokenAddress,
+          amount,
+          provider.address,
+          feeAmount,
+          FEE_TYPE.IMMEDIATE_FEE,
+          MEMO_TYPE.PAYABLE_TRANSFER_ESCROW,
+          PHASE_TRANSACTION,
+          0
+        );
+        const receipt = await memoTx.wait();
+        const memoId = receipt.logs[0].args[2];
+
+        // Verify funds are escrowed
+        const clientBalanceAfterEscrow = await paymentToken.balanceOf(client.address);
+        const contractBalanceAfterEscrow = await paymentToken.balanceOf(await acp.getAddress());
+
+        expect(clientBalanceAfterEscrow).to.equal(clientBalanceBefore - amount - feeAmount);
+        expect(contractBalanceAfterEscrow).to.equal(contractBalanceBefore + amount + feeAmount);
+
+        // Provider rejects memo
+        await expect(
+          acp.connect(provider).signMemo(memoId, false, "Rejected transfer")
+        )
+          .to.emit(acp, "MemoSigned")
+          .withArgs(memoId, false, "Rejected transfer");
+
+        // Check balances after rejection - should be refunded to original state
+        const clientBalanceAfterReject = await paymentToken.balanceOf(client.address);
+        const contractBalanceAfterReject = await paymentToken.balanceOf(await acp.getAddress());
+
+        expect(clientBalanceAfterReject).to.equal(clientBalanceBefore);
+        expect(contractBalanceAfterReject).to.equal(contractBalanceBefore);
+
+        // Check payable details marked as executed
+        const payableDetails = await acp.payableDetails(memoId);
+        expect(payableDetails.isExecuted).to.be.true;
+      });
     });
   });
 

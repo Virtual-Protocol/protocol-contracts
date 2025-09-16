@@ -421,7 +421,7 @@ contract ACPSimple is
             require(_isERC20(token), "Token must be ERC20");
         }
 
-        uint256 memoId = createMemo(jobId, content, memoType, false, nextPhase);
+        uint256 memoId = _createMemo(jobId, content, memoType, false, nextPhase);
 
         payableDetails[memoId] = PayableDetails({
             token: token,
@@ -580,6 +580,7 @@ contract ACPSimple is
                 _msgSender() == jobs[jobId].provider,
             "Only client or provider can create memo"
         );
+        require(!isPayableMemoType(memoType), "Invalid memo type");
         require(jobId > 0 && jobId <= jobCounter, "Job does not exist");
         Job storage job = jobs[jobId];
         require(job.phase < PHASE_COMPLETED, "Job is already completed");

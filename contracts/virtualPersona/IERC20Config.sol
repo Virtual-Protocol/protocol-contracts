@@ -14,7 +14,7 @@ interface IERC20Config {
     string symbol;
   }
 
-  struct ERC20SupplyParameters {
+  struct ERC20SupplyParameters { // for AgentToken
     uint256 maxSupply;
     uint256 lpSupply;
     uint256 vaultSupply;
@@ -24,7 +24,7 @@ interface IERC20Config {
     address vault;
   }
 
-  struct ERC20TaxParameters {
+  struct ERC20TaxParameters { // for AgentToken
     uint256 projectBuyTaxBasisPoints;
     uint256 projectSellTaxBasisPoints;
     uint256 taxSwapThresholdBasisPoints;

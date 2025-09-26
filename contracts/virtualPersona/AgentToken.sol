@@ -35,7 +35,7 @@ contract AgentToken is
     uint16 public projectBuyTaxBasisPoints;
     uint16 public projectSellTaxBasisPoints;
     uint16 public swapThresholdBasisPoints;
-    address public pairToken; // The token used to trade for this token
+    address public pairToken; // The token used to trade for this token, $Virtual
 
     /** @dev {_autoSwapInProgress} We start with {_autoSwapInProgress} ON, as we don't want to
      * call autoswap when processing initial liquidity from this address. We turn this OFF when

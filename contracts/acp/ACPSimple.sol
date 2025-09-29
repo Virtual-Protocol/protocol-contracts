@@ -399,7 +399,6 @@ contract ACPSimple is
         uint8 nextPhase,
         uint256 expiredAt
     ) external returns (uint256) {
-        require(jobId > 0 && jobId <= jobCounter, "Job does not exist");
         require(
             amount > 0 || feeAmount > 0,
             "Either amount or fee amount must be greater than 0"
@@ -412,8 +411,6 @@ contract ACPSimple is
         );
         require(expiredAt == 0 || expiredAt > block.timestamp + 1 minutes, "Expired at must be in the future");
 
-        IERC20 jobPaymentToken = _getJobPaymentToken(jobId);
-
         // If amount > 0, recipient must be valid
         if (amount > 0) {
             require(recipient != address(0), "Invalid recipient");
@@ -421,7 +418,7 @@ contract ACPSimple is
             require(_isERC20(token), "Token must be ERC20");
         }
 
-        uint256 memoId = createMemo(jobId, content, memoType, false, nextPhase);
+        uint256 memoId = _createNewMemo(jobId, content, memoType, false, nextPhase);
 
         payableDetails[memoId] = PayableDetails({
             token: token,
@@ -440,6 +437,7 @@ contract ACPSimple is
         }
 
         if (memoType == MemoType.PAYABLE_TRANSFER_ESCROW && feeAmount > 0) {
+            IERC20 jobPaymentToken = _getJobPaymentToken(jobId);
             jobPaymentToken.safeTransferFrom(_msgSender(), address(this), feeAmount);
         }
 
@@ -575,13 +573,24 @@ contract ACPSimple is
         bool isSecured,
         uint8 nextPhase
     ) public returns (uint256) {
-        require(
-            _msgSender() == jobs[jobId].client ||
-                _msgSender() == jobs[jobId].provider,
-            "Only client or provider can create memo"
-        );
+        require(!isPayableMemoType(memoType), "Invalid memo type");
+        return _createNewMemo(jobId, content, memoType, isSecured, nextPhase);
+    }
+
+    function _createNewMemo(
+        uint256 jobId,
+        string calldata content,
+        MemoType memoType,
+        bool isSecured,
+        uint8 nextPhase
+    ) internal returns (uint256) {
         require(jobId > 0 && jobId <= jobCounter, "Job does not exist");
         Job storage job = jobs[jobId];
+        require(
+            _msgSender() == job.client ||
+                _msgSender() == job.provider,
+            "Only client or provider can create memo"
+        );
         require(job.phase < PHASE_COMPLETED, "Job is already completed");
 
         uint256 newMemoId = _createMemo(
@@ -604,7 +613,7 @@ contract ACPSimple is
         }
 
         return newMemoId;
-    }
+    } 
 
     function isJobEvaluator(
         uint256 jobId,

@@ -510,6 +510,54 @@ describe("ACPSimple", function () {
         )
       ).to.emit(acp, "JobPhaseUpdated").withArgs(jobId, PHASE_TRANSACTION, PHASE_EVALUATION);
     });
+
+    it("Should revert when trying to create payable memo types with createMemo function", async function () {
+      const { acp, client, jobId } = await loadFixture(createJobInTransactionPhase);
+
+      // Try to create PAYABLE_REQUEST memo type with createMemo - should fail
+      await expect(
+        acp.connect(client).createMemo(
+          jobId,
+          "Payable request via createMemo",
+          MEMO_TYPE.PAYABLE_REQUEST,
+          false,
+          PHASE_TRANSACTION
+        )
+      ).to.be.revertedWith("Invalid memo type");
+
+      // Try to create PAYABLE_TRANSFER memo type with createMemo - should fail
+      await expect(
+        acp.connect(client).createMemo(
+          jobId,
+          "Payable transfer via createMemo",
+          MEMO_TYPE.PAYABLE_TRANSFER,
+          false,
+          PHASE_TRANSACTION
+        )
+      ).to.be.revertedWith("Invalid memo type");
+
+      // Try to create PAYABLE_TRANSFER_ESCROW memo type with createMemo - should fail
+      await expect(
+        acp.connect(client).createMemo(
+          jobId,
+          "Payable transfer escrow via createMemo",
+          MEMO_TYPE.PAYABLE_TRANSFER_ESCROW,
+          false,
+          PHASE_TRANSACTION
+        )
+      ).to.be.revertedWith("Invalid memo type");
+
+      // Verify that non-payable memo types still work with createMemo
+      await expect(
+        acp.connect(client).createMemo(
+          jobId,
+          "Regular message memo",
+          MEMO_TYPE.MESSAGE,
+          false,
+          PHASE_TRANSACTION
+        )
+      ).to.not.be.reverted;
+    });
   });
 
   describe("Payable Memos - Hedge Fund Use Case", function () {

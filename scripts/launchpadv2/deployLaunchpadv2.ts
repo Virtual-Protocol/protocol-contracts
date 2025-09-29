@@ -24,7 +24,7 @@ const { ethers, upgrades } = require("hardhat");
     }
 
     // Load arguments from the arguments file
-    const args = require("../arguments/newLaunchpadArguments");
+    const args = require("../arguments/launchpadv2Arguments");
 
     console.log("Deployment arguments loaded:", {
       virtualToken: args[0],

@@ -93,7 +93,7 @@ contract BondingV2 is
         uint256 teamTokenReservedSupply;
         address teamTokenReservedWallet;
     }
-    LaunchParams public _launchParams;
+    LaunchParams public launchParams;
     uint256 public constant VirtualIdBase = 1_000_000_000; // this is for BE to not have duplicated virtualId
 
     event PreLaunched(
@@ -106,7 +106,8 @@ contract BondingV2 is
         address indexed token,
         address indexed pair,
         uint,
-        uint256 initialPurchase
+        uint256 initialPurchase,
+        uint256 initialPurchasedAmount
     );
     event Deployed(address indexed token, uint256 amount0, uint256 amount1);
     event Graduated(address indexed token, address agentToken);
@@ -147,7 +148,7 @@ contract BondingV2 is
 
         agentFactory = agentFactory_;
         gradThreshold = gradThreshold_;
-        _launchParams.startTimeDelay = startTimeDelay_;
+        launchParams.startTimeDelay = startTimeDelay_;
     }
 
     function _checkIfProfileExists(address _user) internal view returns (bool) {
@@ -188,7 +189,7 @@ contract BondingV2 is
     }
 
     function setLaunchParams(LaunchParams memory params) public onlyOwner {
-        _launchParams = params;
+        launchParams = params;
     }
 
     function preLaunch(
@@ -198,9 +199,14 @@ contract BondingV2 is
         string memory desc,
         string memory img,
         string[4] memory urls,
-        uint256 purchaseAmount
+        uint256 purchaseAmount,
+        uint256 startTime
     ) public nonReentrant returns (address, address, uint, uint256) {
         if (purchaseAmount < fee || cores.length <= 0) {
+            revert InvalidInput();
+        }
+        // startTime must be at least startTimeDelay in the future
+        if (startTime < block.timestamp + launchParams.startTimeDelay) {
             revert InvalidInput();
         }
 
@@ -237,13 +243,13 @@ contract BondingV2 is
             );
 
         uint256 bondingCurveSupply = (initialSupply -
-            _launchParams.teamTokenReservedSupply) *
+            launchParams.teamTokenReservedSupply) *
             (10 ** IAgentToken(token).decimals()); // (1B - 550M) * 10^18 = 450M * 10^18
 
         address _pair = factory.createPair(
             token,
             assetToken,
-            block.timestamp + _launchParams.startTimeDelay
+            startTime
         );
 
         require(_approval(address(router), token, bondingCurveSupply)); // 450M in wei
@@ -255,8 +261,8 @@ contract BondingV2 is
         router.addInitialLiquidity(token, bondingCurveSupply, liquidity); // 450M
         // reset agentTokens will be transferred to the teamTokenReservedWallet
         IERC20(token).safeTransfer(
-            _launchParams.teamTokenReservedWallet,
-            _launchParams.teamTokenReservedSupply *
+            launchParams.teamTokenReservedWallet,
+            launchParams.teamTokenReservedSupply *
                 (10 ** IAgentToken(token).decimals()) // teamTokens in wei
         ); // 550M * 10^18
 
@@ -330,6 +336,7 @@ contract BondingV2 is
         // bondingContract will transfer initialPurchase $Virtual to pairAddress
         // pairAddress will transfer amountsOut $agentToken to bondingContract
         // bondingContract then will transfer all the amountsOut $agentToken to initBuyer
+        uint256 amountOut = 0;
         if (initialPurchase > 0) {
             IERC20(router.assetToken()).forceApprove(address(router), initialPurchase);
             uint256 amountOut = _buy(
@@ -340,7 +347,8 @@ contract BondingV2 is
                 block.timestamp + 300,
                 true // isInitialPurchase = true for creator's purchase
             );
-            IERC20(_tokenAddress).safeTransfer(initBuyer, amountOut);
+            // creator's initialBoughtToken need to go to be_ops_wallet for locking, not to initBuyer
+            IERC20(_tokenAddress).safeTransfer(launchParams.teamTokenReservedWallet, amountOut);
 
             // update initialPurchase and launchExecuted to prevent duplicate purchase
             _token.initialPurchase = 0;
@@ -350,7 +358,8 @@ contract BondingV2 is
             _tokenAddress,
             _token.pair,
             tokenInfo[_tokenAddress].virtualId,
-            initialPurchase
+            initialPurchase,
+            amountOut
         );
 
         return (

@@ -154,7 +154,7 @@ contract FPairV2 is IFPairV2, ReentrancyGuard {
     }
 
     function resetTime(uint256 newStartTime) public onlyRouter nonReentrant {
-        if (block.timestamp >= startTime) {
+        if (newStartTime < startTime) { // only allow extension of time
             revert InvalidStartTime();
         }
 

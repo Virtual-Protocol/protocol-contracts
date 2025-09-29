@@ -17,6 +17,7 @@ const {
   APPLICATION_THRESHOLD,
   INITIAL_SUPPLY,
   ERR_INVALID_START_TIME,
+  TEAM_TOKEN_RESERVED_SUPPLY,
 } = require("./const.js");
 
 describe("BondingV2", function () {
@@ -101,7 +102,9 @@ describe("BondingV2", function () {
       console.log("Purchase amount:", purchaseAmount.toString());
       console.log("Fee amount:", (await bondingV2.fee()).toString());
 
-      // Call preLaunch
+      // Call preLaunch with valid startTime (current time + START_TIME_DELAY + buffer)
+      // Add a small buffer to ensure startTime meets the validation requirement
+      const startTime = (await time.latest()) + START_TIME_DELAY + 1;
       const tx = await bondingV2
         .connect(user1)
         .preLaunch(
@@ -111,7 +114,8 @@ describe("BondingV2", function () {
           description,
           image,
           urls,
-          purchaseAmount
+          purchaseAmount,
+          startTime
         );
 
       const receipt = await tx.wait();
@@ -136,7 +140,7 @@ describe("BondingV2", function () {
         parsedEvent.args.initialPurchase.toString()
       );
 
-      const launchParams = await bondingV2._launchParams();
+      const launchParams = await bondingV2.launchParams();
       console.log("Launch params:", launchParams);
 
       // Verify token was created
@@ -192,6 +196,7 @@ describe("BondingV2", function () {
         "https://example.com",
       ];
       const purchaseAmount = ethers.parseEther("50"); // Less than fee
+      const startTime = (await time.latest()) + START_TIME_DELAY + 1;
 
       await expect(
         bondingV2
@@ -203,7 +208,8 @@ describe("BondingV2", function () {
             description,
             image,
             urls,
-            purchaseAmount
+            purchaseAmount,
+            startTime
           )
       ).to.be.revertedWithCustomError(bondingV2, ERR_INVALID_INPUT);
     });
@@ -225,6 +231,7 @@ describe("BondingV2", function () {
       ];
       const purchaseAmount = ethers.parseEther("1000");
 
+      const startTime = (await time.latest()) + START_TIME_DELAY + 1;
       await expect(
         bondingV2
           .connect(user1)
@@ -235,7 +242,8 @@ describe("BondingV2", function () {
             description,
             image,
             urls,
-            purchaseAmount
+            purchaseAmount,
+            startTime
           )
       ).to.be.revertedWithCustomError(bondingV2, ERR_INVALID_INPUT);
     });
@@ -269,6 +277,8 @@ describe("BondingV2", function () {
         .approve(addresses.bondingV2, purchaseAmount);
 
       // preLaunch should succeed with purchaseAmount = fee
+      // Add a small buffer to ensure startTime meets the validation requirement
+      const startTime = (await time.latest()) + START_TIME_DELAY + 1;
       const preLaunchTx = await bondingV2
         .connect(user1)
         .preLaunch(
@@ -278,7 +288,8 @@ describe("BondingV2", function () {
           description,
           image,
           urls,
-          purchaseAmount
+          purchaseAmount,
+          startTime
         );
 
       const preLaunchReceipt = await preLaunchTx.wait();
@@ -367,6 +378,7 @@ describe("BondingV2", function () {
         .connect(user1)
         .approve(addresses.bondingV2, purchaseAmount);
 
+      const startTime = (await time.latest()) + START_TIME_DELAY + 1;
       const tx = await bondingV2
         .connect(user1)
         .preLaunch(
@@ -376,7 +388,8 @@ describe("BondingV2", function () {
           description,
           image,
           urls,
-          purchaseAmount
+          purchaseAmount,
+          startTime
         );
 
       const receipt = await tx.wait();
@@ -518,6 +531,7 @@ describe("BondingV2", function () {
         .connect(user1)
         .approve(addresses.bondingV2, purchaseAmount);
 
+      const startTime = (await time.latest()) + START_TIME_DELAY + 1;
       const tx = await bondingV2
         .connect(user1)
         .preLaunch(
@@ -527,7 +541,8 @@ describe("BondingV2", function () {
           description,
           image,
           urls,
-          purchaseAmount
+          purchaseAmount,
+          startTime
         );
 
       const receipt = await tx.wait();
@@ -555,7 +570,7 @@ describe("BondingV2", function () {
     });
 
     it("Should allow buying tokens and bypass anti-sniper tax", async function () {
-      const { user1, user2 } = accounts;
+      const { owner, user1, user2 } = accounts;
       const { bondingV2, virtualToken, agentToken } = contracts;
 
       // Wait 30 minutes after launch to bypass anti-sniper tax
@@ -607,14 +622,28 @@ describe("BondingV2", function () {
         addresses.bondingV2
       );
       console.log("BondingV2 agentToken balance:", bondingV2AgentTokenBalance);
-      expectTokenBalanceEqual(
-        user1AgentTokenBalance,
-        ethers.parseEther("26925659.794506749"), // 450*10^6-450*10^6*14000/(14000+(1000-100)*99%)
-        "User1 agentToken"
+      const teamTokenReservedWalletBalance =
+        await actualTokenContract.balanceOf(owner.address);
+      console.log(
+        "teamTokenReservedWallet agentToken balance:",
+        teamTokenReservedWalletBalance
       );
+
+      // user1 (creator) should have 0 balance since initialPurchase tokens go to teamTokenReservedWallet
+      expect(user1AgentTokenBalance).to.equal(0);
+
+      // but teamTokenReservedWallet should have the initialPurchase tokens + TEAM_TOKEN_RESERVED_SUPPLY tokens
+      expectTokenBalanceEqual(
+        teamTokenReservedWalletBalance -
+          BigInt(TEAM_TOKEN_RESERVED_SUPPLY) * 10n ** 18n,
+        ethers.parseEther("26925659.794506749"), // 450*10^6-450*10^6*14000/(14000+(1000-100)*99%)
+        "teamTokenReservedWallet agentToken"
+      );
+
+      // user2 should get tokens from their 100 VIRTUAL purchase (with 1% tax after 30 minutes)
       expectTokenBalanceEqual(
         user2AgentTokenBalance,
-        ethers.parseEther("2794153.4142991216"), // 450*10^6-450*10^6*14000/(14000+(1000-100)*99% + 100*99%) - user1's balance
+        ethers.parseEther("2794153.4142991216"), // 450*10^6-450*10^6*14000/(14000+900+100*99%) - adjusted for no user1 balance
         "User2 agentToken"
       );
 
@@ -622,7 +651,7 @@ describe("BondingV2", function () {
     });
 
     it("Should allow buying tokens but incur anti-sniper tax", async function () {
-      const { user1, user2 } = accounts;
+      const { owner, user1, user2 } = accounts;
       const { bondingV2, virtualToken, agentToken } = contracts;
 
       await increaseTimeByMinutes(10);
@@ -633,10 +662,16 @@ describe("BondingV2", function () {
       const pair = await ethers.getContractAt("FPairV2", pairAddress);
       const pairStartTime = await pair.startTime();
       const timeElapsed = Number(currentTime) - Number(pairStartTime);
+      console.log(
+        "currentTime, pairStartTime, timeElapsed:",
+        currentTime,
+        pairStartTime,
+        timeElapsed
+      );
 
       // Verify we're past the 30-minute anti-sniper window
       expect(timeElapsed).to.be.greaterThan(10 * 60); // More than 10 minutes
-      // now tax should be 99-600*98/30/60 = 66.3333333333%
+      // now tax should be 99-603*98/30/60 = 66.17%
 
       console.log(
         "BondingV2 virtualToken balance:",
@@ -674,14 +709,31 @@ describe("BondingV2", function () {
         addresses.bondingV2
       );
       console.log("BondingV2 agentToken balance:", bondingV2AgentTokenBalance);
-      expectTokenBalanceEqual(
-        user1AgentTokenBalance,
-        ethers.parseEther("26925659.794506749"), // 450*10^6-450*10^6*14000/(14000+(1000-100)*99%)
-        "User1 agentToken"
+      const teamTokenReservedWalletBalance =
+        await actualTokenContract.balanceOf(owner.address);
+      console.log(
+        "teamTokenReservedWallet agentToken balance:",
+        teamTokenReservedWalletBalance
       );
+
+      // user1 (creator) should have 0 balance since initialPurchase tokens go to teamTokenReservedWallet
+      expect(user1AgentTokenBalance).to.equal(0);
+
+      // but teamTokenReservedWallet should have the initialPurchase tokens + TEAM_TOKEN_RESERVED_SUPPLY tokens
+      expectTokenBalanceEqual(
+        teamTokenReservedWalletBalance -
+          BigInt(TEAM_TOKEN_RESERVED_SUPPLY) * 10n ** 18n,
+        ethers.parseEther("26925659.794506749"), // 450*10^6-450*10^6*14000/(14000+(1000-100)*99%)
+        "teamTokenReservedWallet agentToken"
+      );
+
+      // user2 should get tokens from their 100 VIRTUAL purchase (with anti-sniper tax at ~10 minutes)
+      // Tax rate at 603 seconds ≈ 66.16%, so effective purchase = 100 * (1-0.6616) = 33.84 VIRTUAL
+      // This is an approximation since the bonding curve calculation is complex
       expectTokenBalanceEqual(
         user2AgentTokenBalance,
-        ethers.parseEther("954359.8597578289"), // 450*10^6-450*10^6*14000/(14000+(1000-100)*99% + 100*(1-66.3333333333%)) - user1's balance
+        // 450*10^6-450*10^6*14000/(14000+(1000-100)*99% + 100*(1-66.3333333333%)) - user1's balance
+        ethers.parseEther("935503.432510137"),
         "User2 agentToken"
       );
 
@@ -728,7 +780,7 @@ describe("BondingV2", function () {
       await bondingV2
         .connect(user1)
         .buy(toGraduateBuyAmount, tokenAddress, 0, (await time.latest()) + 300);
-      // verify user2's agent token balance
+      // verify user1's agent token balance after large purchase
       const user1AgentTokenBalance = await actualTokenContract.balanceOf(
         user1.address
       );
@@ -791,6 +843,7 @@ describe("BondingV2", function () {
         .connect(user1)
         .approve(addresses.bondingV2, purchaseAmount);
 
+      const startTime = (await time.latest()) + START_TIME_DELAY + 1;
       let tx = await bondingV2
         .connect(user1)
         .preLaunch(
@@ -800,7 +853,8 @@ describe("BondingV2", function () {
           description,
           image,
           urls,
-          purchaseAmount
+          purchaseAmount,
+          startTime
         );
 
       let receipt = await tx.wait();
@@ -880,6 +934,7 @@ describe("BondingV2", function () {
         .connect(user1)
         .approve(addresses.bondingV2, purchaseAmount);
 
+      const startTime = (await time.latest()) + START_TIME_DELAY + 1;
       const tx = await bondingV2
         .connect(user1)
         .preLaunch(
@@ -889,7 +944,8 @@ describe("BondingV2", function () {
           description,
           image,
           urls,
-          purchaseAmount
+          purchaseAmount,
+          startTime
         );
 
       const receipt = await tx.wait();

@@ -241,6 +241,106 @@ describe("BondingV2", function () {
     });
   });
 
+  describe("preLaunch with initialPurchase = creator fee 100", function () {
+    it("Should allow preLaunch with purchaseAmount equal to fee (100 VIRTUAL) and subsequent launch should succeed", async function () {
+      const { user1 } = accounts;
+      const { bondingV2, virtualToken } = contracts;
+      const { increaseTimeByDays } = require("./util");
+
+      // Test parameters
+      const tokenName = "Edge Case Token";
+      const tokenTicker = "EDGE";
+      const cores = [0, 1, 2];
+      const description = "Testing edge case with minimum purchase amount";
+      const image = "https://example.com/edge.png";
+      const urls = [
+        "https://twitter.com/edge",
+        "https://t.me/edge",
+        "https://youtube.com/edge",
+        "https://example.com/edge",
+      ];
+
+      // Use exactly the fee amount (100 VIRTUAL)
+      const purchaseAmount = ethers.parseEther("100"); // Exactly equal to fee
+
+      // Approve tokens
+      await virtualToken
+        .connect(user1)
+        .approve(addresses.bondingV2, purchaseAmount);
+
+      // preLaunch should succeed with purchaseAmount = fee
+      const preLaunchTx = await bondingV2
+        .connect(user1)
+        .preLaunch(
+          tokenName,
+          tokenTicker,
+          cores,
+          description,
+          image,
+          urls,
+          purchaseAmount
+        );
+
+      const preLaunchReceipt = await preLaunchTx.wait();
+      const preLaunchEvent = preLaunchReceipt.logs.find((log) => {
+        try {
+          const parsed = bondingV2.interface.parseLog(log);
+          return parsed.name === "PreLaunched";
+        } catch (e) {
+          return false;
+        }
+      });
+
+      expect(preLaunchEvent).to.not.be.undefined;
+      const tokenAddress = preLaunchEvent.args.token;
+      const pairAddress = preLaunchEvent.args.pair;
+
+      // Verify token was created
+      expect(tokenAddress).to.not.equal(ethers.ZeroAddress);
+      expect(pairAddress).to.not.equal(ethers.ZeroAddress);
+
+      // Advance time to reach startTime (1 day delay)
+      await increaseTimeByDays(1);
+
+      // launch() should succeed even though initialPurchase = 0 (purchaseAmount - fee = 100 - 100 = 0)
+      // This tests that the condition is purchaseAmount < fee (not <=)
+      const launchTx = await bondingV2.connect(user1).launch(tokenAddress);
+
+      const launchReceipt = await launchTx.wait();
+      const launchEvent = launchReceipt.logs.find((log) => {
+        try {
+          const parsed = bondingV2.interface.parseLog(log);
+          return parsed.name === "Launched";
+        } catch (e) {
+          return false;
+        }
+      });
+
+      expect(launchEvent).to.not.be.undefined;
+      expect(launchEvent.args.token).to.equal(tokenAddress);
+      expect(launchEvent.args.pair).to.equal(pairAddress);
+
+      // Verify that initialPurchase is 0 (since purchaseAmount - fee = 100 - 100 = 0)
+      // args[3] is the initialPurchase parameter (4th parameter, 0-indexed)
+      expect(launchEvent.args[3]).to.equal(0);
+
+      // Verify token state is updated correctly
+      const tokenInfo = await bondingV2.tokenInfo(tokenAddress);
+      expect(tokenInfo.launchExecuted).to.be.true;
+
+      // verify user1's agentToken balance is 0
+      const actualTokenContract = await ethers.getContractAt(
+        "AgentToken",
+        tokenAddress
+      );
+      const user1AgentTokenBalance = await actualTokenContract.balanceOf(
+        user1.address
+      );
+      console.log("User1 agentToken balance:", user1AgentTokenBalance);
+      expect(user1AgentTokenBalance).to.equal(ethers.parseEther("0"));
+    });
+  });
+
   describe("launch", function () {
     let tokenAddress;
     let pairAddress;
@@ -490,7 +590,7 @@ describe("BondingV2", function () {
         0, // amountOutMin
         (await time.latest()) + 300 // deadline
       );
-      // 获取实际创建的 token 合约实例
+      // get actual token contract instance
       const actualTokenContract = await ethers.getContractAt(
         "AgentToken",
         tokenAddress

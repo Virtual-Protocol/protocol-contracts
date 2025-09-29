@@ -200,7 +200,7 @@ contract BondingV2 is
         string[4] memory urls,
         uint256 purchaseAmount
     ) public nonReentrant returns (address, address, uint, uint256) {
-        if (purchaseAmount <= fee || cores.length <= 0) {
+        if (purchaseAmount < fee || cores.length <= 0) {
             revert InvalidInput();
         }
 
@@ -321,6 +321,7 @@ contract BondingV2 is
         if (_token.launchExecuted) {
             revert InvalidTokenStatus();
         }
+        _token.launchExecuted = true;
 
         uint256 initialPurchase = _token.initialPurchase;
         address initBuyer = _token.creator;
@@ -329,20 +330,21 @@ contract BondingV2 is
         // bondingContract will transfer initialPurchase $Virtual to pairAddress
         // pairAddress will transfer amountsOut $agentToken to bondingContract
         // bondingContract then will transfer all the amountsOut $agentToken to initBuyer
-        IERC20(router.assetToken()).forceApprove(address(router), initialPurchase);
-        uint256 amountOut = _buy(
-            address(this),
-            initialPurchase,
-            _tokenAddress,
-            0,
-            block.timestamp + 300,
-            true // isInitialPurchase = true for creator's purchase
-        );
-        IERC20(_tokenAddress).safeTransfer(initBuyer, amountOut);
+        if (initialPurchase > 0) {
+            IERC20(router.assetToken()).forceApprove(address(router), initialPurchase);
+            uint256 amountOut = _buy(
+                address(this),
+                initialPurchase, // will raise error if initialPurchase <= 0
+                _tokenAddress,
+                0,
+                block.timestamp + 300,
+                true // isInitialPurchase = true for creator's purchase
+            );
+            IERC20(_tokenAddress).safeTransfer(initBuyer, amountOut);
 
-        // update initialPurchase and launchExecuted to prevent duplicate purchase
-        _token.initialPurchase = 0;
-        _token.launchExecuted = true;
+            // update initialPurchase and launchExecuted to prevent duplicate purchase
+            _token.initialPurchase = 0;
+        }
 
         emit Launched(
             _tokenAddress,

@@ -723,7 +723,7 @@ contract ACPSimple is
 
         emit MemoSigned(memoId, isApproved, reason);
 
-        if (job.phase == PHASE_EVALUATION) {
+        if (job.phase == PHASE_EVALUATION && memo.nextPhase == PHASE_COMPLETED) {
             if (isApproved) {
                 _updateJobPhase(memo.jobId, PHASE_COMPLETED);
             } else {
@@ -731,7 +731,7 @@ contract ACPSimple is
             }
         } else if (job.phase == PHASE_REQUEST && !isApproved) {
             _updateJobPhase(memo.jobId, PHASE_REJECTED);
-        } else {
+        } else if (memo.nextPhase > job.phase) {
             if (isApproved) {
                 _updateJobPhase(memo.jobId, memo.nextPhase);
             }

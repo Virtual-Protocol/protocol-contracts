@@ -33,6 +33,7 @@ contract MockUniswapV2Pair is IUniswapV2Pair {
 
     // Add startTime for resetTime functionality compatibility with FPairV2
     uint256 public startTime;
+    uint256 public startTimeDelay;
 
     // Events for resetTime functionality
     event TimeReset(uint256 oldStartTime, uint256 newStartTime);
@@ -40,11 +41,18 @@ contract MockUniswapV2Pair is IUniswapV2Pair {
     // Errors for resetTime functionality
     error InvalidStartTime();
 
-    constructor(address _token0, address _token1, address _factory) {
+    constructor(
+        address _token0,
+        address _token1,
+        address _factory,
+        uint256 _startTime,
+        uint256 _startTimeDelay
+    ) {
         token0 = _token0;
         token1 = _token1;
         factory = _factory;
-        startTime = block.timestamp; // Initialize with current time
+        startTime = _startTime;
+        startTimeDelay = _startTimeDelay;
 
         uint256 chainId;
         assembly {
@@ -350,9 +358,8 @@ contract MockUniswapV2Pair is IUniswapV2Pair {
 
     // Add resetTime function for compatibility with FPairV2
     function resetTime(uint256 newStartTime) external {
-        // For mock purposes, we'll allow any caller (in real FPairV2 only router can call)
-        // Basic validation similar to FPairV2
-        if (block.timestamp >= startTime) {
+        // Ensure newStartTime meets the minimum delay requirement
+        if (newStartTime < block.timestamp + startTimeDelay) {
             revert InvalidStartTime();
         }
 

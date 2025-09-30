@@ -23,12 +23,14 @@ contract FPairV2 is IFPairV2, ReentrancyGuard {
 
     Pool private _pool;
     uint256 public startTime;
+    uint256 public startTimeDelay;
 
     constructor(
         address router_,
         address token0,
         address token1,
-        uint256 startTime_
+        uint256 startTime_,
+        uint256 startTimeDelay_
     ) {
         require(router_ != address(0), "Zero addresses are not allowed.");
         require(token0 != address(0), "Zero addresses are not allowed.");
@@ -38,6 +40,7 @@ contract FPairV2 is IFPairV2, ReentrancyGuard {
         tokenA = token0;
         tokenB = token1;
         startTime = startTime_;
+        startTimeDelay = startTimeDelay_;
     }
 
     event Mint(uint256 reserve0, uint256 reserve1);
@@ -154,7 +157,11 @@ contract FPairV2 is IFPairV2, ReentrancyGuard {
     }
 
     function resetTime(uint256 newStartTime) public onlyRouter nonReentrant {
-        if (newStartTime < startTime) { // only allow extension of time
+        if (block.timestamp >= startTime) {
+            revert InvalidStartTime();
+        }
+        // Ensure newStartTime meets the minimum delay requirement
+        if (newStartTime < block.timestamp + startTimeDelay) {
             revert InvalidStartTime();
         }
 

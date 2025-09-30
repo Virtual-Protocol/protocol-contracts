@@ -38,10 +38,13 @@ contract MockUniswapV2Factory is IUniswapV2Factory {
         require(_pairs[token0][token1] == address(0), "Pair exists");
 
         // Deploy a new MockUniswapV2Pair contract
+        // Use current timestamp and 1 hour delay as defaults for mock
         MockUniswapV2Pair newPair = new MockUniswapV2Pair(
             token0,
             token1,
-            address(this)
+            address(this),
+            block.timestamp,
+            3600 // 1 hour default delay
         );
         pair = address(newPair);
 

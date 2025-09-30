@@ -38,7 +38,7 @@ Create a `.env` file with the following variables:
 ```bash
 # === Basic Configuration ===
 DEPLOYER=0x...                    # Deployer wallet address
-NEW_LAUNCHPAD_BE_OPS_WALLET=0x... # Backend operations wallet
+BE_OPS_WALLET_2=0x... # Backend operations wallet
 CONTRACT_CONTROLLER=0x...         # Contract controller address
 ADMIN=0x...                       # Admin wallet address
 

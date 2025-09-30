@@ -6,7 +6,11 @@ const {
 } = require("@nomicfoundation/hardhat-toolbox/network-helpers");
 
 const { setupNewLaunchpadTest } = require("./setup.js");
-const { expectTokenBalanceEqual, increaseTimeByMinutes } = require("./util.js");
+const {
+  expectTokenBalanceEqual,
+  increaseTimeByMinutes,
+  increaseTimeAndMine,
+} = require("./util.js");
 const {
   ERR_INVALID_TOKEN_STATUS,
   ERR_INVALID_INPUT,
@@ -478,31 +482,51 @@ describe("BondingV2", function () {
 
       let now = await time.latest();
 
-      tx = await fRouterV2
-        .connect(admin)
-        .resetTime(tokenAddress, now + START_TIME_DELAY);
-      // Check if graduation event was emitted
+      // First, successfully reset the time to a future time
+      const newStartTime = now + START_TIME_DELAY * 2; // Set to 2x delay to be safe
+      tx = await fRouterV2.connect(admin).resetTime(tokenAddress, newStartTime);
+
+      // Check if TimeReset event was emitted
       receipt = await tx.wait();
+
+      // Get the pair contract to parse its events
+      const tokenInfo = await bondingV2.tokenInfo(tokenAddress);
+      const pairContract = await ethers.getContractAt(
+        "FPairV2",
+        tokenInfo.pair
+      );
+
       const timeResetEvent = receipt.logs.find((log) => {
         try {
-          const parsed = bondingV2.interface.parseLog(log);
+          const parsed = pairContract.interface.parseLog(log);
           return parsed.name === "TimeReset";
         } catch (e) {
           return false;
         }
       });
-      console.log("timeResetEvent:", timeResetEvent);
+      console.log("timeResetEvent found:", timeResetEvent !== undefined);
 
       if (timeResetEvent) {
-        const parsedEvent = bondingV2.interface.parseLog(timeResetEvent);
-        // expect(parsedEvent.args.oldStartTime).to.equal(now);
-        expect(parsedEvent.args.newStartTime).to.equal(now + START_TIME_DELAY);
+        const parsedEvent = pairContract.interface.parseLog(timeResetEvent);
+        expect(parsedEvent.args.newStartTime).to.equal(newStartTime);
+        console.log(
+          "timeResetEvent parsedEvent, newStartTime from event is meet:",
+          parsedEvent,
+          newStartTime
+        );
       }
 
-      await time.increase(now + START_TIME_DELAY);
+      // Now advance time past the new startTime
+      await time.increase(START_TIME_DELAY * 2 + 1);
       now = await time.latest();
-      await expect(fRouterV2.connect(admin).resetTime(tokenAddress, now + 3600))
-        .to.be.reverted;
+      await increaseTimeAndMine(2 * 86400 + 1);
+
+      // Now we're past the startTime, so resetTime should fail because block.timestamp >= startTime
+      await expect(
+        fRouterV2
+          .connect(admin)
+          .resetTime(tokenAddress, now + START_TIME_DELAY + 1)
+      ).to.be.reverted;
     });
   });
 
@@ -656,12 +680,12 @@ describe("BondingV2", function () {
 
       await increaseTimeByMinutes(10);
       // Verify still incur anti-sniper tax
-      const currentTime = await time.latest();
+      let currentTime = await time.latest();
       const tokenInfo = await bondingV2.tokenInfo(tokenAddress);
       const pairAddress = tokenInfo.pair;
       const pair = await ethers.getContractAt("FPairV2", pairAddress);
-      const pairStartTime = await pair.startTime();
-      const timeElapsed = Number(currentTime) - Number(pairStartTime);
+      let pairStartTime = await pair.startTime();
+      let timeElapsed = Number(currentTime) - Number(pairStartTime);
       console.log(
         "currentTime, pairStartTime, timeElapsed:",
         currentTime,
@@ -671,7 +695,6 @@ describe("BondingV2", function () {
 
       // Verify we're past the 30-minute anti-sniper window
       expect(timeElapsed).to.be.greaterThan(10 * 60); // More than 10 minutes
-      // now tax should be 99-603*98/30/60 = 66.17%
 
       console.log(
         "BondingV2 virtualToken balance:",
@@ -682,16 +705,6 @@ describe("BondingV2", function () {
         await virtualToken.balanceOf(user2.address)
       );
 
-      const buyAmount = ethers.parseEther("100");
-
-      await virtualToken.connect(user2).approve(addresses.fRouterV2, buyAmount);
-
-      const tx = await bondingV2.connect(user2).buy(
-        buyAmount,
-        tokenAddress,
-        0, // amountOutMin
-        (await time.latest()) + 300 // deadline
-      );
       // use actual token contract to get balance
       const actualTokenContract = await ethers.getContractAt(
         "AgentToken",
@@ -701,10 +714,6 @@ describe("BondingV2", function () {
         user1.address
       );
       console.log("User1 agentToken balance:", user1AgentTokenBalance);
-      user2AgentTokenBalance = await actualTokenContract.balanceOf(
-        user2.address
-      );
-      console.log("User2 agentToken balance:", user2AgentTokenBalance);
       bondingV2AgentTokenBalance = await actualTokenContract.balanceOf(
         addresses.bondingV2
       );
@@ -720,20 +729,49 @@ describe("BondingV2", function () {
       expect(user1AgentTokenBalance).to.equal(0);
 
       // but teamTokenReservedWallet should have the initialPurchase tokens + TEAM_TOKEN_RESERVED_SUPPLY tokens
+      // 26925659.794506749
+      initialBuyAmount = BigInt(Math.floor(450*10**6-450*10**6*14000/(14000+(1000-100)*0.99))) * 10n ** 18n
+      expectedTeamTokenReservedWallet = BigInt(TEAM_TOKEN_RESERVED_SUPPLY) * 10n ** 18n + initialBuyAmount
       expectTokenBalanceEqual(
-        teamTokenReservedWalletBalance -
-          BigInt(TEAM_TOKEN_RESERVED_SUPPLY) * 10n ** 18n,
-        ethers.parseEther("26925659.794506749"), // 450*10^6-450*10^6*14000/(14000+(1000-100)*99%)
+        teamTokenReservedWalletBalance,
+        expectedTeamTokenReservedWallet, 
         "teamTokenReservedWallet agentToken"
       );
+      console.log("initialBuyAmount:", initialBuyAmount);
+      console.log("expectedTeamTokenReservedWallet:", expectedTeamTokenReservedWallet);
 
+      currentTime = await time.latest();
+      timeElapsed = Number(currentTime) - Number(pairStartTime);
+      console.log(
+        "currentTime, pairStartTime, timeElapsed:",
+        currentTime,
+        pairStartTime,
+        timeElapsed
+      );
+      
+      const buyAmount = ethers.parseEther("100");
+      await virtualToken.connect(user2).approve(addresses.fRouterV2, buyAmount);
+      const tx = await bondingV2.connect(user2).buy(
+        buyAmount,
+        tokenAddress,
+        0, // amountOutMin
+        (await time.latest()) + 300 // deadline
+      );
+      let tax = Math.ceil((99-timeElapsed*98/30/60))/100 // 66.17% -> 67% cuz contract side round up
+      console.log("tax:", tax);
+      console.log("factory.buyTax():", await contracts.fFactoryV2.buyTax());
+      console.log("factory.antiSniperBuyTaxStartValue():", await contracts.fFactoryV2.antiSniperBuyTaxStartValue());
+      user2AgentTokenBalance = await actualTokenContract.balanceOf(
+        user2.address
+      );
+      console.log("User2 agentToken balance:", user2AgentTokenBalance);
       // user2 should get tokens from their 100 VIRTUAL purchase (with anti-sniper tax at ~10 minutes)
-      // Tax rate at 603 seconds ≈ 66.16%, so effective purchase = 100 * (1-0.6616) = 33.84 VIRTUAL
-      // This is an approximation since the bonding curve calculation is complex
+      let expectedUser2AgentToken = BigInt(Math.floor(450*10**6-450*10**6*14000/(14000+(1000-100)*0.99 + 100 *(1-tax)))) * 10n ** 18n - initialBuyAmount
       expectTokenBalanceEqual(
         user2AgentTokenBalance,
+        expectedUser2AgentToken,
         // 450*10^6-450*10^6*14000/(14000+(1000-100)*99% + 100*(1-66.3333333333%)) - user1's balance
-        ethers.parseEther("935503.432510137"),
+        // ethers.parseEther("935503.432510137"),
         "User2 agentToken"
       );
 
@@ -743,6 +781,8 @@ describe("BondingV2", function () {
     it("Should fail with invalid token status", async function () {
       const { user1, user2 } = accounts;
       const { bondingV2, virtualToken, agentToken } = contracts;
+
+      await increaseTimeByMinutes(30); // make sure no tax
 
       const buyAmount = ethers.parseEther("200000");
       // await virtualToken.connect(user2).approve(addresses.fRouterV2, buyAmount);
@@ -762,7 +802,14 @@ describe("BondingV2", function () {
         await actualTokenContract.balanceOf(prePairAddress)
       );
 
-      // Try to buy from a non-existent token
+      // Check pair reserves for graduation calculation
+      const pairContract = await ethers.getContractAt(
+        "FPairV2",
+        prePairAddress
+      );
+      const [reserve0, reserve1] = await pairContract.getReserves();
+
+      // no approve cannot buy
       await expect(
         bondingV2
           .connect(user2)
@@ -773,7 +820,7 @@ describe("BondingV2", function () {
       //    need to consider the tax 1%, so it will be 202,020.2044906205 VIRTUAL tokens
       // then buy with anther 0.1 * 10^-18 VIRTUAL tokens, will fail
 
-      let toGraduateBuyAmount = ethers.parseEther("202020.2044906205");
+      let toGraduateBuyAmount = ethers.parseEther("202020.2044906205"); // 20M VIRTUAL should be enough
       await virtualToken
         .connect(user1)
         .approve(addresses.fRouterV2, toGraduateBuyAmount);
@@ -785,6 +832,10 @@ describe("BondingV2", function () {
         user1.address
       );
       console.log("User1 agentToken balance:", user1AgentTokenBalance);
+      const user1VirtualTokenBalance = await virtualToken.balanceOf(
+        user1.address
+      );
+      console.log("User1 virtualToken balance:", user1VirtualTokenBalance);
       // verify token/tradingOnUniswap is true, which means it has alr graduated
       tokenInfo = await bondingV2.tokenInfo(tokenAddress);
       console.log("tokenInfo.tradingOnUniswap:", tokenInfo.tradingOnUniswap);

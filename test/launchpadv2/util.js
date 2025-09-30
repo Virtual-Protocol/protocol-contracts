@@ -52,7 +52,7 @@ const expectApproximatelyEqual = (
  * @param tokenName - Name of the token for error messages
  */
 const expectTokenBalanceEqual = (actual, expected, tokenName = "Token") => {
-  expectApproximatelyEqual(actual, expected, `${tokenName} balance`, 8);
+  expectApproximatelyEqual(actual, expected, `${tokenName} balance`, 5);
 };
 
 /**

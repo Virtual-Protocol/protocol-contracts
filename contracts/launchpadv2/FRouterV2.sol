@@ -227,7 +227,7 @@ contract FRouterV2 is
         }
 
         uint256 timeElapsed = block.timestamp - startTime;
-        uint256 antiSniperDuration = 30 minutes;
+        uint256 antiSniperDuration = 30 * 60;
 
         // If more than 30 minutes have passed, use normal buy tax
         if (timeElapsed >= antiSniperDuration) {

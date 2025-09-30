@@ -10,9 +10,9 @@ const { ethers, upgrades } = require("hardhat");
     if (!deployerAddress) {
       throw new Error("DEPLOYER not set in environment");
     }
-    const beOpsWallet = process.env.NEW_LAUNCHPAD_BE_OPS_WALLET;
+    const beOpsWallet = process.env.BE_OPS_WALLET;
     if (!beOpsWallet) {
-      throw new Error("NEW_LAUNCHPAD_BE_OPS_WALLET not set in environment");
+      throw new Error("BE_OPS_WALLET not set in environment");
     }
     const contractController = process.env.CONTRACT_CONTROLLER;
     if (!contractController) {

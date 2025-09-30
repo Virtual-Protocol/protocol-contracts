@@ -249,7 +249,8 @@ contract BondingV2 is
         address _pair = factory.createPair(
             token,
             assetToken,
-            startTime
+            startTime,
+            launchParams.startTimeDelay
         );
 
         require(_approval(address(router), token, bondingCurveSupply)); // 450M in wei

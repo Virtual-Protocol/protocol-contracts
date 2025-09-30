@@ -57,13 +57,20 @@ contract FFactoryV2 is
     function _createPair(
         address tokenA,
         address tokenB,
-        uint256 startTime
+        uint256 startTime,
+        uint256 startTimeDelay
     ) internal returns (address) {
         require(tokenA != address(0), "Zero addresses are not allowed.");
         require(tokenB != address(0), "Zero addresses are not allowed.");
         require(router != address(0), "No router");
 
-        FPairV2 pair_ = new FPairV2(router, tokenA, tokenB, startTime);
+        FPairV2 pair_ = new FPairV2(
+            router,
+            tokenA,
+            tokenB,
+            startTime,
+            startTimeDelay
+        );
 
         _pair[tokenA][tokenB] = address(pair_);
         _pair[tokenB][tokenA] = address(pair_);
@@ -78,9 +85,10 @@ contract FFactoryV2 is
     function createPair(
         address tokenA,
         address tokenB,
-        uint256 startTime
+        uint256 startTime,
+        uint256 startTimeDelay
     ) external onlyRole(CREATOR_ROLE) nonReentrant returns (address) {
-        return _createPair(tokenA, tokenB, startTime);
+        return _createPair(tokenA, tokenB, startTime, startTimeDelay);
     }
 
     function getPair(

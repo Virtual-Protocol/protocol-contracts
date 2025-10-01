@@ -133,6 +133,8 @@ describe("BondingV2", function () {
       });
 
       expect(event).to.not.be.undefined;
+      console.log("preLaunch succeed, tx:", tx);
+
       const parsedEvent = bondingV2.interface.parseLog(event);
       const tokenAddress = parsedEvent.args.token;
       const pairAddress = parsedEvent.args.pair;
@@ -345,7 +347,7 @@ describe("BondingV2", function () {
 
       // verify user1's agentToken balance is 0
       const actualTokenContract = await ethers.getContractAt(
-        "AgentToken",
+        "AgentTokenV2",
         tokenAddress
       );
       const user1AgentTokenBalance = await actualTokenContract.balanceOf(
@@ -631,7 +633,7 @@ describe("BondingV2", function () {
       );
       // get actual token contract instance
       const actualTokenContract = await ethers.getContractAt(
-        "AgentToken",
+        "AgentTokenV2",
         tokenAddress
       );
       user1AgentTokenBalance = await actualTokenContract.balanceOf(
@@ -707,7 +709,7 @@ describe("BondingV2", function () {
 
       // use actual token contract to get balance
       const actualTokenContract = await ethers.getContractAt(
-        "AgentToken",
+        "AgentTokenV2",
         tokenAddress
       );
       user1AgentTokenBalance = await actualTokenContract.balanceOf(
@@ -730,15 +732,26 @@ describe("BondingV2", function () {
 
       // but teamTokenReservedWallet should have the initialPurchase tokens + TEAM_TOKEN_RESERVED_SUPPLY tokens
       // 26925659.794506749
-      initialBuyAmount = BigInt(Math.floor(450*10**6-450*10**6*14000/(14000+(1000-100)*0.99))) * 10n ** 18n
-      expectedTeamTokenReservedWallet = BigInt(TEAM_TOKEN_RESERVED_SUPPLY) * 10n ** 18n + initialBuyAmount
+      initialBuyAmount =
+        BigInt(
+          Math.floor(
+            450 * 10 ** 6 -
+              (450 * 10 ** 6 * 14000) / (14000 + (1000 - 100) * 0.99)
+          )
+        ) *
+        10n ** 18n;
+      expectedTeamTokenReservedWallet =
+        BigInt(TEAM_TOKEN_RESERVED_SUPPLY) * 10n ** 18n + initialBuyAmount;
       expectTokenBalanceEqual(
         teamTokenReservedWalletBalance,
-        expectedTeamTokenReservedWallet, 
+        expectedTeamTokenReservedWallet,
         "teamTokenReservedWallet agentToken"
       );
       console.log("initialBuyAmount:", initialBuyAmount);
-      console.log("expectedTeamTokenReservedWallet:", expectedTeamTokenReservedWallet);
+      console.log(
+        "expectedTeamTokenReservedWallet:",
+        expectedTeamTokenReservedWallet
+      );
 
       currentTime = await time.latest();
       timeElapsed = Number(currentTime) - Number(pairStartTime);
@@ -748,7 +761,7 @@ describe("BondingV2", function () {
         pairStartTime,
         timeElapsed
       );
-      
+
       const buyAmount = ethers.parseEther("100");
       await virtualToken.connect(user2).approve(addresses.fRouterV2, buyAmount);
       const tx = await bondingV2.connect(user2).buy(
@@ -757,16 +770,28 @@ describe("BondingV2", function () {
         0, // amountOutMin
         (await time.latest()) + 300 // deadline
       );
-      let tax = Math.ceil((99-timeElapsed*98/30/60))/100 // 66.17% -> 67% cuz contract side round up
+      let tax = Math.ceil(99 - (timeElapsed * 98) / 30 / 60) / 100; // 66.17% -> 67% cuz contract side round up
       console.log("tax:", tax);
       console.log("factory.buyTax():", await contracts.fFactoryV2.buyTax());
-      console.log("factory.antiSniperBuyTaxStartValue():", await contracts.fFactoryV2.antiSniperBuyTaxStartValue());
+      console.log(
+        "factory.antiSniperBuyTaxStartValue():",
+        await contracts.fFactoryV2.antiSniperBuyTaxStartValue()
+      );
       user2AgentTokenBalance = await actualTokenContract.balanceOf(
         user2.address
       );
       console.log("User2 agentToken balance:", user2AgentTokenBalance);
       // user2 should get tokens from their 100 VIRTUAL purchase (with anti-sniper tax at ~10 minutes)
-      let expectedUser2AgentToken = BigInt(Math.floor(450*10**6-450*10**6*14000/(14000+(1000-100)*0.99 + 100 *(1-tax)))) * 10n ** 18n - initialBuyAmount
+      let expectedUser2AgentToken =
+        BigInt(
+          Math.floor(
+            450 * 10 ** 6 -
+              (450 * 10 ** 6 * 14000) /
+                (14000 + (1000 - 100) * 0.99 + 100 * (1 - tax))
+          )
+        ) *
+          10n ** 18n -
+        initialBuyAmount;
       expectTokenBalanceEqual(
         user2AgentTokenBalance,
         expectedUser2AgentToken,
@@ -794,7 +819,7 @@ describe("BondingV2", function () {
       let tokenInfo = await bondingV2.tokenInfo(tokenAddress);
       prePairAddress = tokenInfo.pair;
       const actualTokenContract = await ethers.getContractAt(
-        "AgentToken",
+        "AgentTokenV2",
         tokenAddress
       );
       console.log(
@@ -1102,6 +1127,593 @@ describe("BondingV2", function () {
       await expect(
         bondingV2.connect(user1).setDeployParams(deployParams)
       ).to.be.revertedWithCustomError(bondingV2, "OwnableUnauthorizedAccount");
+    });
+  });
+
+  describe("AgentTokenV2 Blacklist", function () {
+    let tokenAddress;
+    let actualTokenContract;
+    let uniswapV2PairAddress;
+
+    beforeEach(async function () {
+      const { user1 } = accounts;
+      const { bondingV2, virtualToken } = contracts;
+
+      // Create a token for testing
+      const tokenName = "Blacklist Test Token";
+      const tokenTicker = "BTT";
+      const cores = [0, 1, 2];
+      const description = "Token for blacklist testing";
+      const image = "https://example.com/blacklist.png";
+      const urls = [
+        "https://twitter.com/blacklist",
+        "https://t.me/blacklist",
+        "https://youtube.com/blacklist",
+        "https://example.com/blacklist",
+      ];
+      const purchaseAmount = ethers.parseEther("1000");
+
+      // Approve tokens
+      await virtualToken
+        .connect(user1)
+        .approve(addresses.bondingV2, purchaseAmount);
+
+      // preLaunch
+      const startTime = (await time.latest()) + START_TIME_DELAY + 1;
+      const preLaunchTx = await bondingV2
+        .connect(user1)
+        .preLaunch(
+          tokenName,
+          tokenTicker,
+          cores,
+          description,
+          image,
+          urls,
+          purchaseAmount,
+          startTime
+        );
+
+      const preLaunchReceipt = await preLaunchTx.wait();
+      const preLaunchEvent = preLaunchReceipt.logs.find((log) => {
+        try {
+          const parsed = bondingV2.interface.parseLog(log);
+          return parsed.name === "PreLaunched";
+        } catch (e) {
+          return false;
+        }
+      });
+
+      tokenAddress = preLaunchEvent.args.token;
+      pairAddress = preLaunchEvent.args.pair;
+
+      // Get actual token contract instance
+      actualTokenContract = await ethers.getContractAt(
+        "AgentTokenV2",
+        tokenAddress
+      );
+      uniswapV2PairAddress = await actualTokenContract.uniswapV2Pair();
+
+      // Advance time to reach startTime
+      await time.increase(START_TIME_DELAY + 1);
+
+      // Launch the token
+      await bondingV2.connect(user1).launch(tokenAddress);
+    });
+
+    it("Should only allow owner to add blacklist address", async function () {
+      const { owner, user1, user2 } = accounts;
+      const { fRouterV2 } = contracts;
+      const blacklistAddress = user2.address;
+
+      // User1 should not be able to add blacklist address, only the fRouterV2/owner can
+      await expect(
+        actualTokenContract.connect(user1).addBlacklistAddress(blacklistAddress)
+      ).to.be.reverted;
+      // Verify address is not blacklisted
+      expect(await actualTokenContract.blacklists(blacklistAddress)).to.be
+        .false;
+
+      // Owner should be able to add blacklist address
+      await expect(
+        actualTokenContract.connect(owner).addBlacklistAddress(blacklistAddress)
+      ).to.not.be.reverted;
+      // Verify address is blacklisted
+      expect(await actualTokenContract.blacklists(blacklistAddress)).to.be.true;
+
+      // Non-owner (user2) should not be able to add blacklist address
+      const randomAddress = ethers.Wallet.createRandom().address;
+      await expect(
+        actualTokenContract.connect(user2).addBlacklistAddress(randomAddress)
+      ).to.be.revertedWithCustomError(
+        actualTokenContract,
+        "CallerIsNotAdminNorFactory"
+      );
+
+      // Owner should be able to remove blacklist address
+      await expect(
+        actualTokenContract
+          .connect(owner)
+          .removeBlacklistAddress(blacklistAddress)
+      ).to.not.be.reverted;
+
+      // Verify address is no longer blacklisted
+      expect(await actualTokenContract.blacklists(blacklistAddress)).to.be
+        .false;
+    });
+
+    it("Should not allow transfer to blacklist address before graduation", async function () {
+      const { owner, user1, user2 } = accounts;
+      const { bondingV2, virtualToken } = contracts;
+      const blacklistAddress = ethers.Wallet.createRandom().address;
+
+      // Add address to blacklist
+      await actualTokenContract
+        .connect(owner)
+        .addBlacklistAddress(blacklistAddress);
+
+      // Buy some tokens for user2
+      const buyAmount = ethers.parseEther("1000");
+      await virtualToken.connect(user2).approve(addresses.fRouterV2, buyAmount);
+
+      await bondingV2.connect(user2).buy(
+        buyAmount,
+        tokenAddress,
+        0, // amountOutMin
+        (await time.latest()) + 300 // deadline
+      );
+
+      // Get user2's token balance
+      const user2Balance = await actualTokenContract.balanceOf(user2.address);
+      const user2BalanceBeforeTransfer = user2Balance;
+      console.log("user2BalanceBeforeTransfer:", user2BalanceBeforeTransfer);
+      expect(user2Balance).to.be.greaterThan(0);
+
+      // Try to transfer to blacklisted address - should fail
+      const transferAmount = ethers.parseEther("100");
+      await expect(
+        actualTokenContract
+          .connect(user2)
+          .transfer(blacklistAddress, transferAmount)
+      ).to.be.revertedWithCustomError(
+        actualTokenContract,
+        "TransferToBlacklistedAddress"
+      );
+
+      // Try transferFrom to blacklisted address - should also fail
+      await actualTokenContract
+        .connect(user2)
+        .approve(user1.address, transferAmount);
+      await expect(
+        actualTokenContract
+          .connect(user1)
+          .transferFrom(user2.address, blacklistAddress, transferAmount)
+      ).to.be.revertedWithCustomError(
+        actualTokenContract,
+        "TransferToBlacklistedAddress"
+      );
+
+      // Transfer to non-blacklisted address should work
+      await expect(
+        actualTokenContract
+          .connect(user2)
+          .transfer(user1.address, transferAmount)
+      ).to.not.be.reverted;
+      const user2BalanceAfterTransfer = await actualTokenContract.balanceOf(
+        user2.address
+      );
+      console.log("user2BalanceAfterTransfer:", user2BalanceAfterTransfer);
+      user1BalanceAfterTransfer = await actualTokenContract.balanceOf(
+        user1.address
+      );
+      console.log("user1BalanceAfterTransfer:", user1BalanceAfterTransfer);
+      expect(user2BalanceAfterTransfer).to.equal(
+        user2BalanceBeforeTransfer - transferAmount
+      );
+      expect(user1BalanceAfterTransfer).to.equal(transferAmount);
+    });
+
+    it("Should allow transfer to blacklist address after graduation and uniswapV2Pair liquidity is added", async function () {
+      const { owner, user1, user2 } = accounts;
+      const { bondingV2, virtualToken } = contracts;
+
+      console.log(
+        "blacklist before add manually, uniswapV2PairAddress should be blacklisted, randomBlacklistAddress should be not blacklisted"
+      );
+      expect(await actualTokenContract.blacklists(uniswapV2PairAddress)).to.be
+        .true;
+      const randomBlacklistAddress = ethers.Wallet.createRandom().address;
+      expect(await actualTokenContract.blacklists(randomBlacklistAddress)).to.be
+        .false;
+
+      // Add address to blacklist
+      await actualTokenContract
+        .connect(owner)
+        .addBlacklistAddress(randomBlacklistAddress);
+
+      // Buy enough tokens to graduate the token
+      // Need to buy enough to reduce reserve0 below gradThreshold
+      await increaseTimeByMinutes(30); // Ensure no anti-sniper tax
+
+      const graduationBuyAmount = ethers.parseEther("202020.2044906205");
+      await virtualToken
+        .connect(user2)
+        .approve(addresses.fRouterV2, graduationBuyAmount);
+
+      await bondingV2.connect(user2).buy(
+        graduationBuyAmount,
+        tokenAddress,
+        0, // amountOutMin
+        (await time.latest()) + 300 // deadline
+      );
+
+      console.log(
+        "blacklist after graduation, uniswapV2PairAddress should not be blacklisted, randomBlacklistAddress should be blacklisted"
+      );
+      expect(await actualTokenContract.blacklists(uniswapV2PairAddress)).to.be
+        .false;
+      expect(await actualTokenContract.blacklists(randomBlacklistAddress)).to.be
+        .true;
+
+      // Verify token has graduated
+      const tokenInfo = await bondingV2.tokenInfo(tokenAddress);
+      expect(tokenInfo.tradingOnUniswap).to.be.true;
+
+      // Get user2's token balance
+      const user2Balance = await actualTokenContract.balanceOf(user2.address);
+      const user2BalanceBeforeTransfer = user2Balance;
+      console.log("user2BalanceBeforeTransfer:", user2BalanceBeforeTransfer);
+      expect(user2Balance).to.be.greaterThan(0);
+
+      // After graduation, transfers to blacklisted addresses should still be blocked
+      // The blacklist restriction should persist even after graduation
+      const transferAmount = ethers.parseEther("100");
+      await expect(
+        actualTokenContract
+          .connect(user2)
+          .transfer(randomBlacklistAddress, transferAmount)
+      ).to.be.revertedWithCustomError(
+        actualTokenContract,
+        "TransferToBlacklistedAddress"
+      );
+
+      // Remove from blacklist
+      await actualTokenContract
+        .connect(owner)
+        .removeBlacklistAddress(randomBlacklistAddress);
+      console.log(
+        "blacklist after remove manually, uniswapV2PairAddress should be not blacklisted, randomBlacklistAddress should be not blacklisted"
+      );
+      expect(await actualTokenContract.blacklists(tokenAddress)).to.be.false;
+      expect(await actualTokenContract.blacklists(randomBlacklistAddress)).to.be
+        .false;
+
+      // Now transfer should work
+      await expect(
+        actualTokenContract
+          .connect(user2)
+          .transfer(randomBlacklistAddress, transferAmount)
+      ).to.not.be.reverted;
+
+      // Verify the transfer was successful
+      const blacklistBalance = await actualTokenContract.balanceOf(
+        randomBlacklistAddress
+      );
+      expect(blacklistBalance).to.equal(transferAmount);
+    });
+  });
+
+  describe("normal and anti-sniper tax vault", function () {
+    let tokenAddress;
+    let actualTokenContract;
+    let pairAddress;
+    let initialTaxVaultBalanceBeforeLaunch;
+    let initialAntiSniperTaxVaultBalanceBeforeLaunch;
+
+    beforeEach(async function () {
+      const { user1 } = accounts;
+      const { bondingV2, virtualToken } = contracts;
+      const { taxVault, antiSniperTaxVault } = addresses;
+
+      // Create a token for testing
+      const tokenName = "Tax Test Token";
+      const tokenTicker = "TTT";
+      const cores = [0, 1, 2];
+      const description = "Token for tax testing";
+      const image = "https://example.com/tax.png";
+      const urls = [
+        "https://twitter.com/tax",
+        "https://t.me/tax",
+        "https://youtube.com/tax",
+        "https://example.com/tax",
+      ];
+      const purchaseAmount = ethers.parseEther("1000");
+
+      // Approve tokens
+      await virtualToken
+        .connect(user1)
+        .approve(addresses.bondingV2, purchaseAmount);
+
+      // preLaunch
+      const startTime = (await time.latest()) + START_TIME_DELAY + 1;
+      const preLaunchTx = await bondingV2
+        .connect(user1)
+        .preLaunch(
+          tokenName,
+          tokenTicker,
+          cores,
+          description,
+          image,
+          urls,
+          purchaseAmount,
+          startTime
+        );
+
+      const preLaunchReceipt = await preLaunchTx.wait();
+      const preLaunchEvent = preLaunchReceipt.logs.find((log) => {
+        try {
+          const parsed = bondingV2.interface.parseLog(log);
+          return parsed.name === "PreLaunched";
+        } catch (e) {
+          return false;
+        }
+      });
+
+      tokenAddress = preLaunchEvent.args.token;
+      pairAddress = preLaunchEvent.args.pair;
+
+      // Get actual token contract instance
+      actualTokenContract = await ethers.getContractAt(
+        "AgentTokenV2",
+        tokenAddress
+      );
+
+      // Advance time to reach startTime
+      await time.increase(START_TIME_DELAY + 1);
+
+      initialTaxVaultBalanceBeforeLaunch = await virtualToken.balanceOf(
+        taxVault
+      );
+      initialAntiSniperTaxVaultBalanceBeforeLaunch =
+        await virtualToken.balanceOf(antiSniperTaxVault);
+      console.log(
+        "initialTaxVaultBalanceBeforeLaunch:",
+        ethers.formatEther(initialTaxVaultBalanceBeforeLaunch)
+      );
+      console.log(
+        "initialAntiSniperTaxVaultBalanceBeforeLaunch:",
+        ethers.formatEther(initialAntiSniperTaxVaultBalanceBeforeLaunch)
+      );
+
+      // Launch the token
+      await bondingV2.connect(user1).launch(tokenAddress);
+    });
+
+    it("when anti-sniper tax is incurred, tax should be splitted and should go to different vault", async function () {
+      const { user2 } = accounts;
+      const { virtualToken, fFactoryV2, bondingV2 } = contracts;
+
+      // Get initial balances of both tax vaults
+      const taxVault = await fFactoryV2.taxVault();
+      const antiSniperTaxVault = await fFactoryV2.antiSniperTaxVault();
+      // Verify tax vault addresses are different
+      expect(taxVault).to.not.equal(antiSniperTaxVault);
+
+      const initialTaxVaultBalance =
+        (await virtualToken.balanceOf(taxVault)) -
+        initialTaxVaultBalanceBeforeLaunch;
+      console.log(
+        "initialTaxVaultBalance:",
+        ethers.formatEther(initialTaxVaultBalance)
+      );
+      const initialAntiSniperTaxVaultBalance =
+        (await virtualToken.balanceOf(antiSniperTaxVault)) -
+        initialAntiSniperTaxVaultBalanceBeforeLaunch;
+      console.log(
+        "initialAntiSniperTaxVaultBalance:",
+        ethers.formatEther(initialAntiSniperTaxVaultBalance)
+      );
+
+      expect(initialTaxVaultBalance).to.be.equal(BigInt(9 * 10 ** 18));
+      expect(initialAntiSniperTaxVaultBalance).to.be.equal(0);
+
+      const currentTime = await time.latest();
+      const tokenInfo = await bondingV2.tokenInfo(tokenAddress);
+      const pairAddress = tokenInfo.pair;
+      const pair = await ethers.getContractAt("FPairV2", pairAddress);
+      const pairStartTime = await pair.startTime();
+      const timeElapsed = Number(currentTime) - Number(pairStartTime);
+      console.log(
+        "currentTime, pairStartTime, timeElapsed:",
+        currentTime,
+        pairStartTime,
+        timeElapsed
+      );
+      tax = Math.ceil(99 - (timeElapsed * 98) / 30 / 60) / 100; // 99% cuz contract side round up
+      console.log("tax:", tax);
+      console.log("factory.buyTax():", await contracts.fFactoryV2.buyTax());
+      console.log(
+        "factory.antiSniperBuyTaxStartValue():",
+        await contracts.fFactoryV2.antiSniperBuyTaxStartValue()
+      );
+
+      // Buy immediately after launch (within anti-sniper period)
+      const buyAmount = ethers.parseEther("1000");
+      await virtualToken.connect(user2).approve(addresses.fRouterV2, buyAmount);
+      const buyTx = await bondingV2.connect(user2).buy(
+        buyAmount,
+        tokenAddress,
+        0, // amountOutMin
+        (await time.latest()) + 300 // deadline
+      );
+
+      // Get final balances
+      const finalTaxVaultBalance =
+        (await virtualToken.balanceOf(taxVault)) -
+        initialTaxVaultBalanceBeforeLaunch;
+      console.log(
+        "finalTaxVaultBalance:",
+        ethers.formatEther(finalTaxVaultBalance)
+      );
+      const finalAntiSniperTaxVaultBalance =
+        (await virtualToken.balanceOf(antiSniperTaxVault)) -
+        initialAntiSniperTaxVaultBalanceBeforeLaunch;
+      console.log(
+        "finalAntiSniperTaxVaultBalance:",
+        ethers.formatEther(finalAntiSniperTaxVaultBalance)
+      );
+
+      expect(finalTaxVaultBalance).to.be.equal(
+        initialTaxVaultBalance +
+          BigInt(parseFloat(ethers.formatEther(buyAmount)) * 10 ** 18 * 0.01)
+      );
+      expect(finalAntiSniperTaxVaultBalance).to.be.equal(
+        initialAntiSniperTaxVaultBalance +
+          BigInt(
+            parseFloat(ethers.formatEther(buyAmount)) * 10 ** 18 * (tax - 0.01)
+          )
+      );
+    });
+
+    it("when anti-sniper tax is not incurred, only normal tax value will go to tax vault", async function () {
+      const { user2 } = accounts;
+      const { virtualToken, fFactoryV2, bondingV2 } = contracts;
+
+      // Wait for anti-sniper period to end (30 minutes + buffer)
+      await increaseTimeByMinutes(35);
+
+      // Get initial balances of both tax vaults
+      const taxVault = await fFactoryV2.taxVault();
+      const antiSniperTaxVault = await fFactoryV2.antiSniperTaxVault();
+      // Verify tax vault addresses
+      expect(taxVault).to.not.equal(antiSniperTaxVault);
+
+      const initialTaxVaultBalance =
+        (await virtualToken.balanceOf(taxVault)) -
+        initialTaxVaultBalanceBeforeLaunch;
+      const initialAntiSniperTaxVaultBalance =
+        (await virtualToken.balanceOf(antiSniperTaxVault)) -
+        initialAntiSniperTaxVaultBalanceBeforeLaunch;
+      console.log(
+        "initialTaxVaultBalance:",
+        ethers.formatEther(initialTaxVaultBalance)
+      );
+      console.log(
+        "initialAntiSniperTaxVaultBalance:",
+        ethers.formatEther(initialAntiSniperTaxVaultBalance)
+      );
+      expect(initialTaxVaultBalance).to.be.equal(BigInt(9 * 10 ** 18));
+      expect(initialAntiSniperTaxVaultBalance).to.be.equal(0);
+
+      // Buy after anti-sniper period
+      const buyAmount = ethers.parseEther("1000");
+      await virtualToken.connect(user2).approve(addresses.fRouterV2, buyAmount);
+
+      const currentTime = await time.latest();
+      const tokenInfo = await bondingV2.tokenInfo(tokenAddress);
+      const pairAddress = tokenInfo.pair;
+      const pair = await ethers.getContractAt("FPairV2", pairAddress);
+      const pairStartTime = await pair.startTime();
+      const timeElapsed = Number(currentTime) - Number(pairStartTime);
+      console.log(
+        "currentTime, pairStartTime, timeElapsed:",
+        currentTime,
+        pairStartTime,
+        timeElapsed
+      );
+      tax = Math.max(Math.ceil(99 - (timeElapsed * 98) / 30 / 60) / 100, 0.01); // 99% cuz contract side round up
+      console.log("tax:", tax);
+      console.log("factory.buyTax():", await contracts.fFactoryV2.buyTax());
+      console.log(
+        "factory.antiSniperBuyTaxStartValue():",
+        await contracts.fFactoryV2.antiSniperBuyTaxStartValue()
+      );
+
+      const buyTx = await bondingV2.connect(user2).buy(
+        buyAmount,
+        tokenAddress,
+        0, // amountOutMin
+        (await time.latest()) + 300 // deadline
+      );
+
+      // Get final balances
+      const finalTaxVaultBalance =
+        (await virtualToken.balanceOf(taxVault)) -
+        initialTaxVaultBalanceBeforeLaunch;
+      const finalAntiSniperTaxVaultBalance =
+        (await virtualToken.balanceOf(antiSniperTaxVault)) -
+        initialAntiSniperTaxVaultBalanceBeforeLaunch;
+      console.log(
+        "finalTaxVaultBalance:",
+        ethers.formatEther(finalTaxVaultBalance)
+      );
+      console.log(
+        "finalAntiSniperTaxVaultBalance:",
+        ethers.formatEther(finalAntiSniperTaxVaultBalance)
+      );
+      expect(finalTaxVaultBalance).to.be.equal(
+        initialTaxVaultBalance +
+          BigInt(parseFloat(ethers.formatEther(buyAmount)) * 10 ** 18 * 0.01)
+      );
+      expect(finalAntiSniperTaxVaultBalance).to.be.equal(
+        initialAntiSniperTaxVaultBalance +
+          BigInt(
+            parseFloat(ethers.formatEther(buyAmount)) * 10 ** 18 * (tax - 0.01)
+          )
+      );
+
+      // Test sell tax as well
+      const initialTaxVaultBalanceBeforeSell = await virtualToken.balanceOf(
+        taxVault
+      );
+      const initialAntiSniperTaxVaultBalanceBeforeSell =
+        await virtualToken.balanceOf(antiSniperTaxVault);
+
+      // Get user's agent token balance for selling
+      const userAgentTokenBalance = await actualTokenContract.balanceOf(
+        user2.address
+      );
+      expect(userAgentTokenBalance).to.be.greaterThan(0);
+
+      // Sell some tokens
+      const sellAmount = userAgentTokenBalance / 2n; // Sell half
+      await actualTokenContract
+        .connect(user2)
+        .approve(addresses.fRouterV2, sellAmount);
+
+      const sellTx = await bondingV2.connect(user2).sell(
+        sellAmount,
+        tokenAddress,
+        0, // amountOutMin
+        (await time.latest()) + 300 // deadline
+      );
+
+      // Get final balances after sell
+      const finalTaxVaultBalanceAfterSell = await virtualToken.balanceOf(
+        taxVault
+      );
+      const finalAntiSniperTaxVaultBalanceAfterSell =
+        await virtualToken.balanceOf(antiSniperTaxVault);
+
+      // Calculate sell tax amounts
+      const sellTaxAmount =
+        finalTaxVaultBalanceAfterSell - initialTaxVaultBalanceBeforeSell;
+      const sellAntiSniperTaxAmount =
+        finalAntiSniperTaxVaultBalanceAfterSell -
+        initialAntiSniperTaxVaultBalanceBeforeSell;
+
+      console.log("Sell tax amount:", ethers.formatEther(sellTaxAmount));
+      console.log(
+        "Sell anti-sniper tax amount:",
+        ethers.formatEther(sellAntiSniperTaxAmount)
+      );
+
+      // Verify sell tax behavior
+      expect(sellTaxAmount).to.be.greaterThan(0); // Normal sell tax should be collected
+      expect(sellAntiSniperTaxAmount).to.equal(0); // No anti-sniper tax on sells
+
+      // Get sell tax rate for verification
+      const sellTaxRate = await fFactoryV2.sellTax(); // Should be 1%
+      console.log("Sell tax rate:", sellTaxRate, "%");
     });
   });
 });

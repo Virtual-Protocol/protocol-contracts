@@ -144,20 +144,23 @@ contract FRouterV2 is
         address pair = factory.getPair(tokenAddress, assetToken);
 
         // Calculate tax - use normal buyTax for initial purchase, anti-sniper tax for others
-        uint256 fee;
+        uint256 normalTax = factory.buyTax(); // 
+        uint256 antiSniperTax;
         if (isInitialPurchase) {
-            fee = factory.buyTax(); // Always 1% for creator's initial purchase
+            // No anti-sniper tax for creator's initial purchase
         } else {
-            fee = _calculateAntiSniperTax(pair); // Anti-sniper tax for regular purchases
+            antiSniperTax = _calculateAntiSniperTax(pair) - normalTax; // Anti-sniper tax for regular purchases
         }
-        uint256 txFee = (fee * amountIn) / 100; // fee is in percentage
-        address feeTo = factory.taxVault();
 
-        uint256 amount = amountIn - txFee;
+        uint256 normalTxFee = (normalTax * amountIn) / 100; // tax is in percentage
+        uint256 antiSniperTxFee = (antiSniperTax * amountIn) / 100; // tax is in percentage
+
+        uint256 amount = amountIn - normalTxFee - antiSniperTxFee;
 
         IERC20(assetToken).safeTransferFrom(to, pair, amount);
 
-        IERC20(assetToken).safeTransferFrom(to, feeTo, txFee);
+        IERC20(assetToken).safeTransferFrom(to, factory.taxVault(), normalTxFee);
+        IERC20(assetToken).safeTransferFrom(to, factory.antiSniperTaxVault(), antiSniperTxFee);
 
         uint256 amountOut = getAmountsOut(tokenAddress, assetToken, amount);
 
@@ -165,9 +168,10 @@ contract FRouterV2 is
 
         IFPairV2(pair).swap(0, amountOut, amount, 0);
 
-        if (feeTo == taxManager) {
+        if (factory.taxVault() == taxManager) {
             IBondingTax(taxManager).swapForAsset();
         }
+        // TODO: do we need to swap for asset for antiSniperTaxVault?
 
         return (amount, amountOut);
     }

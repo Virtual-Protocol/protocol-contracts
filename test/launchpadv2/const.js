@@ -54,6 +54,10 @@ const ASSET_RATE = 5000;
 const GRAD_THRESHOLD = "29439252000000000000000000";
 const MAX_TX = 100; // 1%
 
+// FFactoryV2 constants
+const FFactoryV2_TAX_VAULT = "0x6dCF5c604B5E6B8c28a6bE1C629387485037beAc";
+const FFactoryV2_ANTI_SNIPER_TAX_VAULT = "0xa9bbF40dc8e522e96b534a3866a614f41b3B0593";
+
 module.exports = {
   // Error messages
   ERR_INVALID_TOKEN_STATUS,
@@ -98,4 +102,8 @@ module.exports = {
   ASSET_RATE,
   GRAD_THRESHOLD,
   MAX_TX,
+
+  // FFactoryV2 constants
+  FFactoryV2_TAX_VAULT,
+  FFactoryV2_ANTI_SNIPER_TAX_VAULT,
 };

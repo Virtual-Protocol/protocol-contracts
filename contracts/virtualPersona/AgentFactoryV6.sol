@@ -10,7 +10,7 @@ import "@openzeppelin/contracts/access/AccessControl.sol";
 import "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
 
 import "./IAgentFactoryV6.sol";
-import "./IAgentToken.sol";
+import "./IAgentTokenV2.sol";
 import "./IAgentVeToken.sol";
 import "./IAgentDAO.sol";
 import "./IAgentNft.sol";
@@ -224,9 +224,9 @@ contract AgentFactoryV6 is
         }
 
         // C2
-        address lp = IAgentToken(token).liquidityPools()[0];
+        address lp = IAgentTokenV2(token).liquidityPools()[0];
         IERC20(assetToken).safeTransfer(token, initialAmount);
-        IAgentToken(token).addInitialLiquidity(address(this));
+        IAgentTokenV2(token).addInitialLiquidity(address(this));
 
         // C3
         address veToken = _createNewAgentVeToken(
@@ -347,7 +347,7 @@ contract AgentFactoryV6 is
             revert AgentAlreadyExists();
         }
         _existingAgents[instance] = true;
-        IAgentToken(instance).initialize(
+        IAgentTokenV2(instance).initialize(
             [_tokenAdmin, _uniswapRouter, assetToken],
             abi.encode(name, symbol),
             tokenSupplyParams_,
@@ -553,5 +553,13 @@ contract AgentFactoryV6 is
         Application memory application = _applications[id];
 
         return IAgentNft(nft).virtualInfo(application.virtualId).token;
+    }
+
+    function addBlacklistAddress(address token, address blacklistAddress) public onlyRole(BONDING_ROLE) {
+        IAgentTokenV2(token).addBlacklistAddress(blacklistAddress);
+    }
+
+    function removeBlacklistAddress(address token, address blacklistAddress) public onlyRole(BONDING_ROLE) {
+        IAgentTokenV2(token).removeBlacklistAddress(blacklistAddress);
     }
 }

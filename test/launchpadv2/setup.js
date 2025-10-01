@@ -19,6 +19,8 @@ const {
   ASSET_RATE,
   GRAD_THRESHOLD,
   MAX_TX,
+  FFactoryV2_TAX_VAULT,
+  FFactoryV2_ANTI_SNIPER_TAX_VAULT,
 } = require("./const");
 
 async function setupNewLaunchpadTest() {
@@ -52,7 +54,7 @@ async function setupNewLaunchpadTest() {
     const FFactoryV2 = await ethers.getContractFactory("FFactoryV2");
     const fFactoryV2 = await upgrades.deployProxy(
       FFactoryV2,
-      [owner.address, BUY_TAX, SELL_TAX, ANTI_SNIPER_BUY_TAX_START_VALUE],
+      [FFactoryV2_TAX_VAULT, BUY_TAX, SELL_TAX, ANTI_SNIPER_BUY_TAX_START_VALUE, FFactoryV2_ANTI_SNIPER_TAX_VAULT],
       { initializer: "initialize" }
     );
     await fFactoryV2.waitForDeployment();
@@ -116,11 +118,11 @@ async function setupNewLaunchpadTest() {
     );
 
     // 8. Deploy AgentToken implementation
-    console.log("\n--- Deploying AgentToken implementation ---");
-    const AgentToken = await ethers.getContractFactory("AgentToken");
-    const agentToken = await AgentToken.deploy();
-    await agentToken.waitForDeployment();
-    console.log("AgentToken deployed at:", await agentToken.getAddress());
+    console.log("\n--- Deploying AgentTokenV2 implementation ---");
+    const AgentTokenV2 = await ethers.getContractFactory("AgentTokenV2");
+    const agentTokenV2 = await AgentTokenV2.deploy();
+    await agentTokenV2.waitForDeployment();
+    console.log("AgentTokenV2 deployed at:", await agentTokenV2.getAddress());
 
     // 8.5. Deploy MockAgentVeToken implementation
     console.log("\n--- Deploying MockAgentVeToken implementation ---");
@@ -159,7 +161,7 @@ async function setupNewLaunchpadTest() {
     const agentFactoryV6 = await upgrades.deployProxy(
       AgentFactoryV6,
       [
-        await agentToken.getAddress(), // tokenImplementation_
+        await agentTokenV2.getAddress(), // tokenImplementation_
         await mockAgentVeToken.getAddress(), // veTokenImplementation_
         await mockAgentDAO.getAddress(), // daoImplementation_
         await mockERC6551Registry.getAddress(), // tbaRegistry_
@@ -309,7 +311,7 @@ async function setupNewLaunchpadTest() {
       fRouterV2,
       mockUniswapFactory,
       mockUniswapRouter,
-      agentToken,
+      agentToken: agentTokenV2,
       mockAgentVeToken,
       mockAgentDAO,
       mockERC6551Registry,
@@ -332,13 +334,15 @@ async function setupNewLaunchpadTest() {
       fRouterV2: await fRouterV2.getAddress(),
       mockUniswapFactory: await mockUniswapFactory.getAddress(),
       mockUniswapRouter: await mockUniswapRouter.getAddress(),
-      agentToken: await agentToken.getAddress(),
+      agentToken: await agentTokenV2.getAddress(),
       mockAgentVeToken: await mockAgentVeToken.getAddress(),
       mockAgentDAO: await mockAgentDAO.getAddress(),
       mockERC6551Registry: await mockERC6551Registry.getAddress(),
       agentNftV2: await agentNftV2.getAddress(),
       agentFactoryV6: await agentFactoryV6.getAddress(),
       bondingV2: await bondingV2.getAddress(),
+      taxVault: await fFactoryV2.taxVault(),
+      antiSniperTaxVault: await fFactoryV2.antiSniperTaxVault(),
     };
 
     setup.params = {
@@ -366,7 +370,7 @@ async function setupNewLaunchpadTest() {
     console.log("- FRouterV2:", setup.addresses.fRouterV2);
     console.log("- MockUniswapV2Factory:", setup.addresses.mockUniswapFactory);
     console.log("- MockUniswapV2Router02:", setup.addresses.mockUniswapRouter);
-    console.log("- AgentToken:", setup.addresses.agentToken);
+    console.log("- AgentTokenV2:", setup.addresses.agentToken);
     console.log("- MockAgentVeToken:", setup.addresses.mockAgentVeToken);
     console.log("- MockAgentDAO:", setup.addresses.mockAgentDAO);
     console.log("- MockERC6551Registry:", setup.addresses.mockERC6551Registry);

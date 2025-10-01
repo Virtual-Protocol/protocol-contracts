@@ -12,7 +12,7 @@ import "./FFactoryV2.sol";
 import "./IFPairV2.sol";
 import "./FRouterV2.sol";
 import "../virtualPersona/IAgentFactoryV6.sol";
-import "../virtualPersona/IAgentToken.sol";
+import "../virtualPersona/IAgentTokenV2.sol";
 
 contract BondingV2 is
     Initializable,
@@ -94,7 +94,8 @@ contract BondingV2 is
         address teamTokenReservedWallet;
     }
     LaunchParams public launchParams;
-    uint256 public constant VirtualIdBase = 1_000_000_000; // this is for BE to not have duplicated virtualId
+    // this is for BE to separate with old virtualId from bondingV1, but this field is not used yet
+    uint256 public constant VirtualIdBase = 2_000_000_000;
 
     event PreLaunched(
         address indexed token,
@@ -241,10 +242,12 @@ contract BondingV2 is
                 0, // applicationThreshold_
                 msg.sender // token creator
             );
+        // this is to prevent transfer to blacklist address before graduation
+        IAgentFactoryV6(agentFactory).addBlacklistAddress(token, IAgentTokenV2(token).uniswapV2Pair());
 
         uint256 bondingCurveSupply = (initialSupply -
             launchParams.teamTokenReservedSupply) *
-            (10 ** IAgentToken(token).decimals()); // (1B - 550M) * 10^18 = 450M * 10^18
+            (10 ** IAgentTokenV2(token).decimals()); // (1B - 550M) * 10^18 = 450M * 10^18
 
         address _pair = factory.createPair(
             token,
@@ -264,7 +267,7 @@ contract BondingV2 is
         IERC20(token).safeTransfer(
             launchParams.teamTokenReservedWallet,
             launchParams.teamTokenReservedSupply *
-                (10 ** IAgentToken(token).decimals()) // teamTokens in wei
+                (10 ** IAgentTokenV2(token).decimals()) // teamTokens in wei
         ); // 550M * 10^18
 
         tokenInfos.push(token);
@@ -501,6 +504,9 @@ contract BondingV2 is
                 _token.applicationId,
                 assetBalance
             );
+        
+        // remove blacklist address after graduation, cuz executeBondingCurveApplicationSalt we will transfer all left agentTokens to the uniswapV2Pair
+        IAgentFactoryV6(agentFactory).removeBlacklistAddress(tokenAddress, IAgentTokenV2(tokenAddress).uniswapV2Pair());
 
         // previously executeBondingCurveApplicationSalt will create agentToken and do two parts:
         //      1. (lpSupply = all left $preToken in prePairAddress) $agentToken mint to agentTokenAddress

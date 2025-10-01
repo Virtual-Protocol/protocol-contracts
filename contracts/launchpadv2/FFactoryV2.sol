@@ -25,6 +25,7 @@ contract FFactoryV2 is
     uint256 public buyTax;
     uint256 public sellTax;
     uint256 public antiSniperBuyTaxStartValue; // Starting tax value for anti-sniper (in basis points)
+    address public antiSniperTaxVault;
 
     event PairCreated(
         address indexed tokenA,
@@ -42,7 +43,8 @@ contract FFactoryV2 is
         address taxVault_,
         uint256 buyTax_,
         uint256 sellTax_,
-        uint256 antiSniperBuyTaxStartValue_
+        uint256 antiSniperBuyTaxStartValue_,
+        address antiSniperTaxVault_
     ) external initializer {
         __AccessControl_init();
         __ReentrancyGuard_init();
@@ -52,6 +54,7 @@ contract FFactoryV2 is
         buyTax = buyTax_;
         sellTax = sellTax_;
         antiSniperBuyTaxStartValue = antiSniperBuyTaxStartValue_;
+        antiSniperTaxVault = antiSniperTaxVault_;
     }
 
     function _createPair(

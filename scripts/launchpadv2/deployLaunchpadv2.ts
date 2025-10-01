@@ -48,6 +48,8 @@ const { ethers, upgrades } = require("hardhat");
       uniswapV2Factory: args[18],
       uniswapV2Router: args[19],
       agentNftV2: args[20],
+      taxVault: args[21],
+      antiSniperTaxVault: args[22],
     });
 
     // 1. Deploy FFactoryV2
@@ -56,10 +58,11 @@ const { ethers, upgrades } = require("hardhat");
     const fFactoryV2 = await upgrades.deployProxy(
       FFactoryV2,
       [
-        process.env.CONTRACT_CONTROLLER, // initialOwner
+        args[21], // taxVault
         args[1], // buyTax
         args[2], // sellTax
         args[3], // antiSniperBuyTaxStartValue
+        args[22], // antiSniperTaxVault
       ],
       {
         initializer: "initialize",
@@ -113,13 +116,13 @@ const { ethers, upgrades } = require("hardhat");
     await tx0_5.wait();
     console.log("ADMIN_ROLE granted to CONTRACT_CONTROLLER");
 
-    // 4. Deploy AgentToken implementation
-    console.log("\n--- Deploying AgentToken implementation ---");
-    const AgentToken = await ethers.getContractFactory("AgentToken");
-    const agentToken = await AgentToken.deploy();
-    await agentToken.waitForDeployment();
-    const agentTokenAddress = await agentToken.getAddress();
-    console.log("AgentToken implementation deployed at:", agentTokenAddress);
+    // 4. Deploy AgentTokenV2 implementation
+    console.log("\n--- Deploying AgentTokenV2 implementation ---");
+    const AgentTokenV2 = await ethers.getContractFactory("AgentTokenV2");
+    const agentTokenV2 = await AgentTokenV2.deploy();
+    await agentTokenV2.waitForDeployment();
+    const agentTokenV2Address = await agentTokenV2.getAddress();
+    console.log("AgentTokenV2 implementation deployed at:", agentTokenV2Address);
 
     // 5. Deploy MockAgentVeToken implementation (for production, use real AgentVeToken)
     console.log("\n--- Deploying AgentVeToken implementation ---");
@@ -157,7 +160,7 @@ const { ethers, upgrades } = require("hardhat");
     const agentFactoryV6 = await upgrades.deployProxy(
       AgentFactoryV6,
       [
-        agentTokenAddress, // tokenImplementation_
+        agentTokenV2Address, // tokenImplementation_
         agentVeTokenAddress, // veTokenImplementation_
         agentDAOAddress, // daoImplementation_
         args[12], // tbaRegistry_
@@ -331,14 +334,25 @@ const { ethers, upgrades } = require("hardhat");
     );
 
     // Grant EXECUTOR_ROLE to admin in FRouterV2
-    const tx8 = await fRouterV2.grantRole(
+    const tx8_1 = await fRouterV2.grantRole(
       await fRouterV2.EXECUTOR_ROLE(),
       process.env.ADMIN
     );
+    await tx8_1.wait();
+    console.log(
+      "Granted EXECUTOR_ROLE of FRouterV2 to ADMIN:",
+      process.env.ADMIN
+    );
+
+    // Grant EXECUTOR_ROLE to BE_OPS_WALLET in FRouterV2
+    const tx8 = await fRouterV2.grantRole(
+      await fRouterV2.EXECUTOR_ROLE(),
+      process.env.BE_OPS_WALLET
+    );
     await tx8.wait();
     console.log(
-      "Granted EXECUTOR_ROLE of FRouterV2 to Admin:",
-      process.env.ADMIN
+      "Granted EXECUTOR_ROLE of FRouterV2 to BE_OPS_WALLET:",
+      process.env.BE_OPS_WALLET
     );
 
     // Grant BONDING_ROLE to BondingV2 in AgentFactoryV6
@@ -422,7 +436,7 @@ const { ethers, upgrades } = require("hardhat");
     // 16. Print deployment summary
     console.log("\n=== NewLaunchpad Deployment Summary ===");
     console.log("All contracts deployed and configured:");
-    console.log("- AgentToken (implementation):", agentTokenAddress);
+    console.log("- AgentTokenV2 (implementation):", agentTokenV2Address);
     console.log("- AgentVeToken (implementation):", agentVeTokenAddress);
     console.log("- AgentDAO (implementation):", agentDAOAddress);
     // console.log("- ERC6551Registry (implementation):", erc6551RegistryAddress);

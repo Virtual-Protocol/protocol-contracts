@@ -51,4 +51,8 @@ interface IAgentFactoryV6 {
         address vault,
         bytes32 salt
     ) external returns (address);
+
+    function addBlacklistAddress(address token, address blacklistAddress) external;
+
+    function removeBlacklistAddress(address token, address blacklistAddress) external;
 }

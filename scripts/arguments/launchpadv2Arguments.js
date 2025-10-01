@@ -45,4 +45,8 @@ module.exports = [
   process.env.UNISWAP_V2_ROUTER || "0x1689E7B1F10000AE47eBfE339a4f69dECd19F602",
   // AgentNftV2 address
   process.env.AGENT_NFT_V2 || "0x756C50FF360f0e1061Ca7A3e9125e4c3027C3cDD",
+  // TaxVault address
+  process.env.FFactoryV2_TAX_VAULT || "0x6dCF5c604B5E6B8c28a6bE1C629387485037beAc",
+  // AntiSniperTaxVault address
+  process.env.FFactoryV2_ANTI_SNIPER_TAX_VAULT || "0xa9bbF40dc8e522e96b534a3866a614f41b3B0593",
 ];

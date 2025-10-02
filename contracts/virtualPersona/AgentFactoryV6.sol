@@ -25,6 +25,8 @@ contract AgentFactoryV6 is
     using SafeERC20 for IERC20;
 
     uint256 private _nextId;
+    // this is for BE to fill virtual.personaProposalId field, AgentFactoryV6 should start from 60_000_000_000
+    uint256 public constant nextIdBase = 60_000_000_000;
     address public tokenImplementation;
     address public daoImplementation;
     address public nft;
@@ -145,7 +147,7 @@ contract AgentFactoryV6 is
         tbaRegistry = tbaRegistry_;
         nft = nft_;
         applicationThreshold = applicationThreshold_;
-        _nextId = nextId_;
+        _nextId = nextId_ + nextIdBase;
         _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
         _vault = vault_;
     }

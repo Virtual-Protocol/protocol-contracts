@@ -82,9 +82,6 @@ contract BondingV2 is
 
     DeployParams private _deployParams;
 
-    mapping(address => Profile) public profile;
-    address[] public profiles;
-
     mapping(address => Token) public tokenInfo;
     address[] public tokenInfos;
 
@@ -95,7 +92,7 @@ contract BondingV2 is
     }
     LaunchParams public launchParams;
     // this is for BE to separate with old virtualId from bondingV1, but this field is not used yet
-    uint256 public constant VirtualIdBase = 2_000_000_000;
+    uint256 public constant VirtualIdBase = 20_000_000_000;
 
     event PreLaunched(
         address indexed token,
@@ -150,10 +147,6 @@ contract BondingV2 is
         agentFactory = agentFactory_;
         gradThreshold = gradThreshold_;
         launchParams.startTimeDelay = startTimeDelay_;
-    }
-
-    function _checkIfProfileExists(address _user) internal view returns (bool) {
-        return profile[_user].user == _user;
     }
 
     function _approval(
@@ -306,13 +299,6 @@ contract BondingV2 is
         newToken.data.prevPrice = price;
         newToken.data.lastUpdated = block.timestamp;
 
-        if (_checkIfProfileExists(msg.sender)) {
-            profile[msg.sender].tokens.push(token);
-        } else {
-            profile[msg.sender].user = msg.sender;
-            profile[msg.sender].tokens.push(token);
-        }
-
         emit PreLaunched(
             token,
             _pair,
@@ -331,9 +317,6 @@ contract BondingV2 is
         if (_token.launchExecuted) {
             revert InvalidTokenStatus();
         }
-        _token.launchExecuted = true;
-
-        uint256 initialPurchase = _token.initialPurchase;
 
         // Make initial purchase for creator
         // bondingContract will transfer initialPurchase $Virtual to pairAddress
@@ -341,6 +324,7 @@ contract BondingV2 is
         // bondingContract then will transfer all the amountsOut $agentToken to teamTokenReservedWallet
         // in the BE, teamTokenReservedWallet will split it out for the initialBuy and 550M
         uint256 amountOut = 0;
+        uint256 initialPurchase = _token.initialPurchase;
         if (initialPurchase > 0) {
             IERC20(router.assetToken()).forceApprove(address(router), initialPurchase);
             amountOut = _buy(
@@ -365,6 +349,7 @@ contract BondingV2 is
             initialPurchase,
             amountOut
         );
+        _token.launchExecuted = true;
 
         return (
             _tokenAddress,
@@ -475,9 +460,6 @@ contract BondingV2 is
             revert InvalidTokenStatus();
         }
 
-        _token.trading = false;
-        _token.tradingOnUniswap = true;
-
         // Transfer asset tokens to bonding contract
         address pairAddress = factory.getPair(
             tokenAddress,
@@ -526,13 +508,18 @@ contract BondingV2 is
             );
         _token.agentToken = agentToken;
 
-        router.approval(
-            pairAddress,
-            agentToken,
-            address(this),
-            IERC20(agentToken).balanceOf(pairAddress)
-        );
+        // this is not needed, previously need to do this because of
+        //     1. (vaultSupply = 1B - lpSupply) $agentToken will mint to prePairAddress
+        //     2. then in unwrapToken, we will transfer burn preToken of each account and transfer same amount of agentToken to them from prePairAddress
+        // router.approval(
+        //     pairAddress,
+        //     agentToken,
+        //     address(this),
+        //     IERC20(agentToken).balanceOf(pairAddress)
+        // );
 
         emit Graduated(tokenAddress, agentToken);
+        _token.trading = false;
+        _token.tradingOnUniswap = true;
     }
 }

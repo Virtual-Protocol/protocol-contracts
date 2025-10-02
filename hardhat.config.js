@@ -40,6 +40,16 @@ module.exports = {
         viaIR: false,
       },
     },
+    "contracts/newLaunchpad/BondingV2.sol": {
+      version: "0.8.26",
+      settings: {
+        optimizer: {
+          enabled: true,
+          runs: 200,
+        },
+        viaIR: false,
+      },
+    },
   },
   namedAccounts: {
     deployer: `privatekey://${process.env.PRIVATE_KEY}`,
@@ -52,10 +62,10 @@ module.exports = {
         chainId: 84532,
         urls: {
           apiURL: "https://api.etherscan.io/v2/api",
-          browserURL: "https://sepolia.basescan.org/"
-        }
-      }
-    ]
+          browserURL: "https://sepolia.basescan.org/",
+        },
+      },
+    ],
   },
   networks: {
     sepolia: {
@@ -77,7 +87,7 @@ module.exports = {
     },
     base_sepolia: {
       url: "https://sepolia.base.org",
-      accounts: [process.env.PRIVATE_KEY]
+      accounts: [process.env.PRIVATE_KEY],
     },
     base_sepolia_fire: {
       url: "https://sepolia.base.org",

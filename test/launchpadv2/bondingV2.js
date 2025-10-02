@@ -1191,7 +1191,8 @@ describe("BondingV2", function () {
         "AgentTokenV2",
         tokenAddress
       );
-      uniswapV2PairAddress = await actualTokenContract.uniswapV2Pair();
+      uniswapV2PairAddress = (await actualTokenContract.liquidityPools())[0];
+      console.log("uniswapV2PairAddress:", uniswapV2PairAddress);
 
       // Advance time to reach startTime
       await time.increase(START_TIME_DELAY + 1);
@@ -1714,6 +1715,425 @@ describe("BondingV2", function () {
       // Get sell tax rate for verification
       const sellTaxRate = await fFactoryV2.sellTax(); // Should be 1%
       console.log("Sell tax rate:", sellTaxRate, "%");
+    });
+  });
+
+  describe("AgentVeTokenV2 remove liquidity", function () {
+    let tokenAddress;
+    let veTokenAddress;
+    let actualTokenContract;
+    let veTokenContract;
+    let uniswapV2PairAddress;
+
+    beforeEach(async function () {
+      const { user1, user2 } = accounts;
+      const { bondingV2, virtualToken } = contracts;
+
+      // Create a token for testing
+      const tokenName = "LP Removal Test Token";
+      const tokenTicker = "LRTT";
+      const cores = [0, 1, 2];
+      const description = "Token for LP removal testing";
+      const image = "https://example.com/lpremoval.png";
+      const urls = [
+        "https://twitter.com/lpremoval",
+        "https://t.me/lpremoval",
+        "https://youtube.com/lpremoval",
+        "https://example.com/lpremoval",
+      ];
+      const purchaseAmount = ethers.parseEther("1000");
+
+      // Approve tokens
+      await virtualToken
+        .connect(user1)
+        .approve(addresses.bondingV2, purchaseAmount);
+
+      // preLaunch
+      const startTime = (await time.latest()) + START_TIME_DELAY + 1;
+      const preLaunchTx = await bondingV2
+        .connect(user1)
+        .preLaunch(
+          tokenName,
+          tokenTicker,
+          cores,
+          description,
+          image,
+          urls,
+          purchaseAmount,
+          startTime
+        );
+
+      const preLaunchReceipt = await preLaunchTx.wait();
+      const preLaunchEvent = preLaunchReceipt.logs.find((log) => {
+        try {
+          const parsed = bondingV2.interface.parseLog(log);
+          return parsed.name === "PreLaunched";
+        } catch (e) {
+          return false;
+        }
+      });
+
+      tokenAddress = preLaunchEvent.args.token;
+      const pairAddress = preLaunchEvent.args.pair;
+
+      // Get actual token contract instance
+      actualTokenContract = await ethers.getContractAt(
+        "AgentTokenV2",
+        tokenAddress
+      );
+
+      // Advance time to reach startTime
+      await time.increase(START_TIME_DELAY + 1);
+
+      // Launch the token
+      await bondingV2.connect(user1).launch(tokenAddress);
+
+      // Buy enough tokens to graduate the token
+      await increaseTimeByMinutes(30); // Ensure no anti-sniper tax
+
+      const graduationBuyAmount = ethers.parseEther("202020.2044906205");
+      await virtualToken
+        .connect(user2)
+        .approve(addresses.fRouterV2, graduationBuyAmount);
+
+      await bondingV2.connect(user2).buy(
+        graduationBuyAmount,
+        tokenAddress,
+        0, // amountOutMin
+        (await time.latest()) + 300 // deadline
+      );
+
+      // Verify token has graduated
+      const tokenInfo = await bondingV2.tokenInfo(tokenAddress);
+      expect(tokenInfo.tradingOnUniswap).to.be.true;
+      expect(tokenInfo.agentToken).to.not.equal(ethers.ZeroAddress);
+
+      console.log("Token graduated successfully");
+      console.log("AgentToken address:", tokenInfo.agentToken);
+
+      // Get the veToken address from the AgentNft
+      const agentNft = contracts.agentNftV2;
+
+      // Get the next virtualId to know how many to check
+      const nextVirtualId = await agentNft.nextVirtualId();
+      console.log("Next virtualId:", nextVirtualId.toString());
+
+      // Find the virtualId that corresponds to our agentToken
+      let foundVirtualId = null;
+
+      for (let i = 1; i < nextVirtualId; i++) {
+        try {
+          const virtualInfo = await agentNft.virtualInfo(i);
+          console.log(`VirtualId ${i}:`, {
+            token: virtualInfo.token,
+            veToken: virtualInfo.veToken,
+            dao: virtualInfo.dao,
+            lp: virtualInfo.lp,
+          });
+
+          if (virtualInfo.token === tokenInfo.agentToken) {
+            foundVirtualId = i;
+            // Get the veToken from virtualLP
+            const virtualLP = await agentNft.virtualLP(i);
+            veTokenAddress = virtualLP.veToken;
+            console.log("Found matching virtualId:", i);
+            console.log("VeToken address:", veTokenAddress);
+            console.log("LP pool address:", virtualLP.pool);
+            break;
+          }
+        } catch (e) {
+          console.log(`Error getting virtualInfo for ${i}:`, e.message);
+          continue;
+        }
+      }
+
+      if (!foundVirtualId) {
+        console.log(
+          "Could not find virtualId for agentToken:",
+          tokenInfo.agentToken
+        );
+        console.log("Available virtualIds and their tokens:");
+        for (let i = 1; i < nextVirtualId; i++) {
+          try {
+            const virtualInfo = await agentNft.virtualInfo(i);
+            console.log(`  ${i}: ${virtualInfo.token}`);
+          } catch (e) {
+            console.log(`  ${i}: Error - ${e.message}`);
+          }
+        }
+      }
+
+      expect(foundVirtualId).to.not.be.null;
+      expect(veTokenAddress).to.not.equal(ethers.ZeroAddress);
+
+      // Get veToken contract instance
+      veTokenContract = await ethers.getContractAt(
+        "AgentVeTokenV2",
+        veTokenAddress
+      );
+
+      console.log("Token graduated successfully");
+      console.log("AgentToken address:", tokenInfo.agentToken);
+      console.log("VeToken address:", veTokenAddress);
+    });
+
+    it("After graduation, call agentVeTokenV2.removeLpLiquidity should be allowed for the agentFactoryV6", async function () {
+      const { owner, admin, user1 } = accounts;
+      const { agentFactoryV6, virtualToken } = contracts;
+
+      // Verify the veToken exists and has the correct asset token
+      expect(veTokenAddress).to.not.equal(ethers.ZeroAddress);
+      const assetTokenFromVeToken = await veTokenContract.assetToken();
+      console.log("Asset token from veToken:", assetTokenFromVeToken);
+
+      // Check founder's veToken balance
+      const founder = await veTokenContract.founder();
+      const founderVeTokenBalance = await veTokenContract.balanceOf(founder);
+      const veTokenOwner = await veTokenContract.owner();
+      console.log("Founder:", founder);
+      console.log("VeToken Owner:", veTokenOwner);
+      console.log(
+        "Founder veToken balance at the beginning:", founderVeTokenBalance);
+
+      expect(founderVeTokenBalance).to.be.greaterThan(0);
+
+      // Grant REMOVE_LIQUIDITY_ROLE to admin
+      const REMOVE_LIQUIDITY_ROLE =
+        await agentFactoryV6.REMOVE_LIQUIDITY_ROLE();
+
+      // no need to grant role to admin, it's already granted in setup.js
+      // await agentFactoryV6
+      //   .connect(owner)
+      //   .grantRole(REMOVE_LIQUIDITY_ROLE, admin.address);
+
+      // Verify admin has the role
+      expect(await agentFactoryV6.hasRole(REMOVE_LIQUIDITY_ROLE, admin.address))
+        .to.be.true;
+
+      // Get initial balances
+      const initialVirtualBalance = await virtualToken.balanceOf(user1.address);
+      const initialAgentTokenBalance = await actualTokenContract.balanceOf(
+        user1.address
+      );
+
+      console.log(
+        "Initial VIRTUAL balance of user1:",
+        ethers.formatEther(initialVirtualBalance)
+      );
+      console.log(
+        "Initial AgentToken balance of user1:",
+        ethers.formatEther(initialAgentTokenBalance)
+      );
+
+      // Calculate removal amount (remove half of founder's veToken balance)
+      const removalAmount = founderVeTokenBalance / 2n;
+      console.log("Removal amount:", removalAmount);
+
+      // Test that AgentFactoryV6 has the removeLpLiquidity function
+      // Note: There's a bug in AgentFactoryV6.removeLpLiquidity where it uses assetToken as router
+      // For this test, we'll verify the function exists and has the right signature
+      expect(typeof agentFactoryV6.removeLpLiquidity).to.equal("function");
+
+      // For demonstration, let's show what the correct call would look like
+      // calling the veToken directly with factory permission
+      const factoryAddress = addresses.agentFactoryV6;
+      const factorySigner = await ethers.getImpersonatedSigner(factoryAddress);
+
+      // Give factory some ETH for gas (using setBalance instead of transfer)
+      await network.provider.send("hardhat_setBalance", [
+        factoryAddress,
+        "0x1000000000000000000", // 1 ETH in hex
+      ]);
+
+      const mockRouterAddress = addresses.mockUniswapRouter;
+      // This would work if called by the factory with correct router
+      const tx = await veTokenContract.connect(factorySigner).removeLpLiquidity(
+        mockRouterAddress, // correct router address
+        removalAmount, // veTokenAmount
+        user1.address, // recipient
+        0, // amountAMin (minimum tokenA)
+        0, // amountBMin (minimum tokenB)
+        (await time.latest()) + 300 // deadline
+      );
+
+      // Verify the transaction succeeded
+      expect(tx).to.not.be.undefined;
+
+      // Check that LiquidityRemoved event was emitted
+      const receipt = await tx.wait();
+      const liquidityRemovedEvent = receipt.logs.find((log) => {
+        try {
+          const parsed = veTokenContract.interface.parseLog(log);
+          return parsed.name === "LiquidityRemoved";
+        } catch (e) {
+          return false;
+        }
+      });
+
+      expect(liquidityRemovedEvent).to.not.be.undefined;
+
+      if (liquidityRemovedEvent) {
+        const parsedEvent = veTokenContract.interface.parseLog(
+          liquidityRemovedEvent
+        );
+        expect(parsedEvent.args.veTokenHolder).to.equal(founder);
+        expect(parsedEvent.args.veTokenAmount).to.equal(removalAmount);
+        expect(parsedEvent.args.recipient).to.equal(user1.address);
+
+        console.log(
+          "✅ Liquidity removed successfully via factory permission:"
+        );
+        console.log(
+          "- veTokenAmount (LP tokens):",
+          ethers.formatEther(parsedEvent.args.veTokenAmount)
+        );
+        console.log(
+          "- amountA (tokenA received):",
+          ethers.formatEther(parsedEvent.args.amountA)
+        );
+        console.log(
+          "- amountB (tokenB received):",
+          ethers.formatEther(parsedEvent.args.amountB)
+        );
+        console.log(
+          "📝 Note: In MockRouter, amountA + amountB = veTokenAmount due to simplified 1:1 split logic"
+        );
+        console.log(
+          "🔍 In real Uniswap V2, amounts depend on pool reserves and LP token supply"
+        );
+      }
+
+      // Verify founder's veToken balance decreased
+      const founderVeTokenBalanceAfter1stRemoval = await veTokenContract.balanceOf(
+        founder
+      );
+      console.log("Founder veToken balance after 1st factory permission removal:", founderVeTokenBalanceAfter1stRemoval);
+      expect(founderVeTokenBalanceAfter1stRemoval).to.equal(
+        founderVeTokenBalance - removalAmount
+      );
+
+      console.log(
+        "✅ Test completed: AgentVeTokenV2.removeLpLiquidity works when called by factory" +
+        "\n"
+      );
+
+      // except for the factorySigner, the admin should also be able to call removeLpLiquidity
+      const adminTx = await agentFactoryV6
+        .connect(admin)
+        .removeLpLiquidity(
+          veTokenAddress,
+          user1.address,
+          removalAmount,
+          0,
+          0,
+          (await time.latest()) + 300
+        );
+      expect(adminTx).to.not.be.undefined;
+      const adminReceipt = await adminTx.wait();
+      const adminLiquidityRemovedEvent = adminReceipt.logs.find((log) => {
+        try {
+          const parsed = veTokenContract.interface.parseLog(log);
+          return parsed.name === "LiquidityRemoved";
+        } catch (e) {
+          return false;
+        }
+      });
+      expect(adminLiquidityRemovedEvent).to.not.be.undefined;
+      if (adminLiquidityRemovedEvent) {
+        const parsedEvent = veTokenContract.interface.parseLog(
+          adminLiquidityRemovedEvent
+        );
+        expect(parsedEvent.args.veTokenHolder).to.equal(founder);
+        expect(parsedEvent.args.veTokenAmount).to.equal(removalAmount);
+        expect(parsedEvent.args.recipient).to.equal(user1.address);
+        console.log("✅ Liquidity removed successfully via admin permission:");
+        console.log(
+          "- veTokenAmount (LP tokens):",
+          ethers.formatEther(parsedEvent.args.veTokenAmount)
+        );
+        console.log(
+          "- amountA (tokenA received):",
+          ethers.formatEther(parsedEvent.args.amountA)
+        );
+        console.log(
+          "- amountB (tokenB received):",
+          ethers.formatEther(parsedEvent.args.amountB)
+        );
+        console.log(
+          "📝 Note: In MockRouter, amountA + amountB = veTokenAmount due to simplified 1:1 split logic"
+        );
+        console.log(
+          "🔍 In real Uniswap V2, amounts depend on pool reserves and LP token supply"
+        );
+      }
+
+      // Verify founder's veToken balance decreased
+      const founderVeTokenBalanceAfter2ndRemoval = await veTokenContract.balanceOf(
+        founder
+      );
+      console.log("Founder veToken balance after 2nd factory permission removal:", founderVeTokenBalanceAfter2ndRemoval);
+      expect(founderVeTokenBalanceAfter2ndRemoval).to.equal(founderVeTokenBalanceAfter1stRemoval - removalAmount);
+
+      console.log(
+        "✅ Test completed: AgentVeTokenV2.removeLpLiquidity works when called by admin" +
+        "\n"
+      );
+    });
+
+    it("Should not allow non-admin to call removeLpLiquidity", async function () {
+      const { user1, user2 } = accounts;
+      const { agentFactoryV6 } = contracts;
+
+      // Get founder's veToken balance
+      const founder = await veTokenContract.founder();
+      const founderVeTokenBalance = await veTokenContract.balanceOf(founder);
+      const removalAmount = founderVeTokenBalance / 2n;
+
+      // user2 (non-admin) should not be able to call removeLpLiquidity
+      await expect(
+        agentFactoryV6
+          .connect(user2)
+          .removeLpLiquidity(
+            veTokenAddress,
+            user1.address,
+            removalAmount,
+            0,
+            0,
+            (await time.latest()) + 300
+          )
+      ).to.be.reverted; // Should be reverted due to missing REMOVE_LIQUIDITY_ROLE
+    });
+
+    it("Should not allow removeLpLiquidity with insufficient veToken balance", async function () {
+      const { owner, admin, user1 } = accounts;
+      const { agentFactoryV6 } = contracts;
+
+      // Grant REMOVE_LIQUIDITY_ROLE to admin
+      const REMOVE_LIQUIDITY_ROLE =
+        await agentFactoryV6.REMOVE_LIQUIDITY_ROLE();
+      await agentFactoryV6
+        .connect(owner)
+        .grantRole(REMOVE_LIQUIDITY_ROLE, admin.address);
+
+      // Get founder's veToken balance
+      const founder = await veTokenContract.founder();
+      const founderVeTokenBalance = await veTokenContract.balanceOf(founder);
+
+      // Try to remove more than available balance
+      const excessiveAmount = founderVeTokenBalance + ethers.parseEther("1000");
+
+      await expect(
+        agentFactoryV6
+          .connect(admin)
+          .removeLpLiquidity(
+            veTokenAddress,
+            user1.address,
+            excessiveAmount,
+            0,
+            0,
+            (await time.latest()) + 300
+          )
+      ).to.be.revertedWith("Insufficient veToken balance");
     });
   });
 });

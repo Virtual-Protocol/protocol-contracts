@@ -11,7 +11,7 @@ import "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
 
 import "./IAgentFactoryV6.sol";
 import "./IAgentTokenV2.sol";
-import "./IAgentVeToken.sol";
+import "./IAgentVeTokenV2.sol";
 import "./IAgentDAO.sol";
 import "./IAgentNft.sol";
 import "../libs/IERC6551Registry.sol";
@@ -64,7 +64,7 @@ contract AgentFactoryV6 is
         address proposer; // token creator
         uint8[] cores;
         uint256 proposalEndBlock;
-        uint256 virtualId;
+        uint256 virtualId; // this will be set to 0 if the application is not executed, and set to the nft.nextVirtualId() if the application is executed
         bytes32 tbaSalt;
         address tbaImplementation;
         uint32 daoVotingPeriod;
@@ -112,6 +112,7 @@ contract AgentFactoryV6 is
     uint16 private _tokenMultiplier; // Unused
 
     bytes32 public constant BONDING_ROLE = keccak256("BONDING_ROLE");
+    bytes32 public constant REMOVE_LIQUIDITY_ROLE = keccak256("REMOVE_LIQUIDITY_ROLE");
 
     ///////////////////////////////////////////////////////////////
 
@@ -279,7 +280,7 @@ contract AgentFactoryV6 is
 
         // C7
         IERC20(lp).approve(veToken, type(uint256).max);
-        IAgentVeToken(veToken).stake(
+        IAgentVeTokenV2(veToken).stake(
             IERC20(lp).balanceOf(address(this)),
             application.proposer,
             defaultDelegatee
@@ -366,7 +367,7 @@ contract AgentFactoryV6 is
         bool canStake
     ) internal returns (address instance) {
         instance = Clones.clone(veTokenImplementation);
-        IAgentVeToken(instance).initialize(
+        IAgentVeTokenV2(instance).initialize(
             name,
             symbol,
             founder,
@@ -561,5 +562,11 @@ contract AgentFactoryV6 is
 
     function removeBlacklistAddress(address token, address blacklistAddress) public onlyRole(BONDING_ROLE) {
         IAgentTokenV2(token).removeBlacklistAddress(blacklistAddress);
+    }
+
+    // amountAMin must be the amount of the uniswapPair.token0() that will be received
+    // amountBMin must be the amount of the uniswapPair.token1() that will be received
+    function removeLpLiquidity(address veToken, address recipient, uint256 veTokenAmount, uint256 amountAMin, uint256 amountBMin, uint256 deadline) public onlyRole(REMOVE_LIQUIDITY_ROLE) {
+        IAgentVeTokenV2(veToken).removeLpLiquidity(_uniswapRouter, veTokenAmount, recipient, amountAMin, amountBMin, deadline);
     }
 }

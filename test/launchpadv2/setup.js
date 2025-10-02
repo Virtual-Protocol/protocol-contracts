@@ -124,16 +124,16 @@ async function setupNewLaunchpadTest() {
     await agentTokenV2.waitForDeployment();
     console.log("AgentTokenV2 deployed at:", await agentTokenV2.getAddress());
 
-    // 8.5. Deploy MockAgentVeToken implementation
-    console.log("\n--- Deploying MockAgentVeToken implementation ---");
-    const MockAgentVeToken = await ethers.getContractFactory(
-      "MockAgentVeToken"
+    // 8.5. Deploy AgentVeTokenV2 implementation
+    console.log("\n--- Deploying AgentVeTokenV2 implementation ---");
+    const AgentVeTokenV2 = await ethers.getContractFactory(
+      "AgentVeTokenV2"
     );
-    const mockAgentVeToken = await MockAgentVeToken.deploy();
-    await mockAgentVeToken.waitForDeployment();
+    const agentVeTokenV2 = await AgentVeTokenV2.deploy();
+    await agentVeTokenV2.waitForDeployment();
     console.log(
-      "MockAgentVeToken deployed at:",
-      await mockAgentVeToken.getAddress()
+      "AgentVeTokenV2 deployed at:",
+      await agentVeTokenV2.getAddress()
     );
 
     // 8.6. Deploy MockAgentDAO implementation
@@ -162,7 +162,7 @@ async function setupNewLaunchpadTest() {
       AgentFactoryV6,
       [
         await agentTokenV2.getAddress(), // tokenImplementation_
-        await mockAgentVeToken.getAddress(), // veTokenImplementation_
+        await agentVeTokenV2.getAddress(), // veTokenImplementation_
         await mockAgentDAO.getAddress(), // daoImplementation_
         await mockERC6551Registry.getAddress(), // tbaRegistry_
         await virtualToken.getAddress(), // assetToken_
@@ -273,6 +273,13 @@ async function setupNewLaunchpadTest() {
     );
     console.log("BONDING_ROLE granted to BondingV2 in AgentFactoryV6");
 
+    // Grant REMOVE_LIQUIDITY_ROLE to BondingV2 in AgentFactoryV6
+    await agentFactoryV6.grantRole(
+      await agentFactoryV6.REMOVE_LIQUIDITY_ROLE(),
+      await admin.getAddress()
+    );
+    console.log("REMOVE_LIQUIDITY_ROLE granted to ADMIN in AgentFactoryV6");
+
     // Grant CREATOR_ROLE to BondingV2 in FFactoryV2
     await fFactoryV2.grantRole(
       await fFactoryV2.CREATOR_ROLE(),
@@ -312,7 +319,7 @@ async function setupNewLaunchpadTest() {
       mockUniswapFactory,
       mockUniswapRouter,
       agentToken: agentTokenV2,
-      mockAgentVeToken,
+      agentVeToken: agentVeTokenV2,
       mockAgentDAO,
       mockERC6551Registry,
       agentNftV2,
@@ -335,7 +342,7 @@ async function setupNewLaunchpadTest() {
       mockUniswapFactory: await mockUniswapFactory.getAddress(),
       mockUniswapRouter: await mockUniswapRouter.getAddress(),
       agentToken: await agentTokenV2.getAddress(),
-      mockAgentVeToken: await mockAgentVeToken.getAddress(),
+      agentVeToken: await agentVeTokenV2.getAddress(),
       mockAgentDAO: await mockAgentDAO.getAddress(),
       mockERC6551Registry: await mockERC6551Registry.getAddress(),
       agentNftV2: await agentNftV2.getAddress(),
@@ -371,7 +378,7 @@ async function setupNewLaunchpadTest() {
     console.log("- MockUniswapV2Factory:", setup.addresses.mockUniswapFactory);
     console.log("- MockUniswapV2Router02:", setup.addresses.mockUniswapRouter);
     console.log("- AgentTokenV2:", setup.addresses.agentToken);
-    console.log("- MockAgentVeToken:", setup.addresses.mockAgentVeToken);
+    console.log("- AgentVeTokenV2:", setup.addresses.agentVeToken);
     console.log("- MockAgentDAO:", setup.addresses.mockAgentDAO);
     console.log("- MockERC6551Registry:", setup.addresses.mockERC6551Registry);
     console.log("- AgentNftV2:", setup.addresses.agentNftV2);

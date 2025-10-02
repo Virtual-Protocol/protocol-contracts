@@ -6,12 +6,7 @@ import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "./IERC20Config.sol";
 import "./IErrors.sol";
 
-interface IAgentTokenV2 is
-    IERC20,
-    IERC20Config,
-    IERC20Metadata,
-    IErrors
-{
+interface IAgentTokenV2 is IERC20, IERC20Config, IERC20Metadata, IErrors {
     event AutoSwapThresholdUpdated(uint256 oldThreshold, uint256 newThreshold);
 
     event ExternalCallError(uint256 identifier);
@@ -284,6 +279,4 @@ interface IAgentTokenV2 is
     function addBlacklistAddress(address addr) external;
 
     function removeBlacklistAddress(address addr) external;
-
-    function uniswapV2Pair() external view returns (address);
 }

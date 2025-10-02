@@ -240,11 +240,15 @@ contract AgentTokenV2 is
         return (uniswapV2Pair_);
     }
 
-    function addBlacklistAddress(address blacklistAddress) external onlyOwnerOrFactory {
+    function addBlacklistAddress(
+        address blacklistAddress
+    ) external onlyOwnerOrFactory {
         blacklists[blacklistAddress] = true;
     }
 
-    function removeBlacklistAddress(address blacklistAddress) external onlyOwnerOrFactory {
+    function removeBlacklistAddress(
+        address blacklistAddress
+    ) external onlyOwnerOrFactory {
         delete blacklists[blacklistAddress];
     }
 

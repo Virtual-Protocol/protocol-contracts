@@ -366,6 +366,17 @@ const { ethers, upgrades } = require("hardhat");
       bondingV2Address
     );
 
+    // Grant REMOVE_LIQUIDITY_ROLE to BondingV2 in AgentFactoryV6
+    const tx9_1 = await agentFactoryV6.grantRole(
+      await agentFactoryV6.REMOVE_LIQUIDITY_ROLE(),
+      admin
+    );
+    await tx9_1.wait();
+    console.log(
+      "Granted REMOVE_LIQUIDITY_ROLE of AgentFactoryV6 to ADMIN:",
+      admin
+    );
+
     // Grant CREATOR_ROLE to BondingV2 in FFactoryV2
     const tx10 = await fFactoryV2.grantRole(
       await fFactoryV2.CREATOR_ROLE(),

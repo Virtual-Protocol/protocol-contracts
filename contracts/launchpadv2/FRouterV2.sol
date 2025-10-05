@@ -24,6 +24,7 @@ contract FRouterV2 is
     FFactoryV2 public factory;
     address public assetToken;
     address public taxManager;
+    address public antiSniperTaxManager;
 
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() {
@@ -127,6 +128,7 @@ contract FRouterV2 is
         if (feeTo == taxManager) {
             IBondingTax(taxManager).swapForAsset();
         }
+        // no antiSniper tax for sell, thus no swapForAsset for antiSniperTaxManager
 
         return (amountIn, amountOut);
     }
@@ -171,7 +173,9 @@ contract FRouterV2 is
         if (factory.taxVault() == taxManager) {
             IBondingTax(taxManager).swapForAsset();
         }
-        // TODO: do we need to swap for asset for antiSniperTaxVault?
+        if (factory.antiSniperTaxVault() == antiSniperTaxManager) {
+            IBondingTax(antiSniperTaxManager).swapForAsset();
+        }
 
         return (amount, amountOut);
     }
@@ -200,6 +204,10 @@ contract FRouterV2 is
 
     function setTaxManager(address newManager) public onlyRole(ADMIN_ROLE) {
         taxManager = newManager;
+    }
+
+    function setAntiSniperTaxManager(address newManager) public onlyRole(ADMIN_ROLE) {
+        antiSniperTaxManager = newManager;
     }
 
     function resetTime(

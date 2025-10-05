@@ -8,10 +8,10 @@ module.exports = [
   // ANTI_SNIPER_BUY_TAX_START_VALUE (percentage)
   process.env.ANTI_SNIPER_BUY_TAX_START_VALUE || "99",
   // Fee address
-  process.env.NEW_LAUNCHPAD_FEE_ADDRESS ||
+  process.env.LAUNCHPAD_V2_FEE_ADDRESS ||
     "0xd56dc8b053027d4f5309c60678dec898aa6c0106", // vp-test-2
   // Fee amount
-  process.env.NEW_LAUNCHPAD_FEE_AMOUNT || "100000", // 100 tokens
+  process.env.LAUNCHPAD_V2_FEE_AMOUNT || "100000", // 100 tokens
   // Initial supply
   process.env.INITIAL_SUPPLY || "1000000000",
   // Asset rate

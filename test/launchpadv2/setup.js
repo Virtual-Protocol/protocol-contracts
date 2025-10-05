@@ -21,6 +21,12 @@ const {
   MAX_TX,
   FFactoryV2_TAX_VAULT,
   FFactoryV2_ANTI_SNIPER_TAX_VAULT,
+  TAX_MANAGER_DEFAULT_ADMIN,
+  TAX_MANAGER_CBBTC_TOKEN,
+  TAX_MANAGER_AERODROME_ROUTER,
+  TAX_MANAGER_TREASURY,
+  TAX_MANAGER_MIN_SWAP_THRESHOLD,
+  TAX_MANAGER_MAX_SWAP_THRESHOLD,
 } = require("./const");
 
 async function setupNewLaunchpadTest() {
@@ -70,6 +76,66 @@ async function setupNewLaunchpadTest() {
     );
     await fRouterV2.waitForDeployment();
     console.log("FRouterV2 deployed at:", await fRouterV2.getAddress());
+
+    // use TAX_MANAGER_CBBTC_TOKEN to mock a erc20 token
+    const CBBTC = await ethers.getContractFactory("MockERC20");
+    const cbbtc = await CBBTC.deploy(
+      "CBBTC",
+      "CBBTC",
+      owner.address,
+      ethers.parseEther("10000000000")
+    );
+    await cbbtc.waitForDeployment();
+    console.log("CBBTC deployed at:", await cbbtc.getAddress());
+
+    // 3.1. Deploy BondingTax
+    console.log("\n--- Deploying TaxManagerForFRouterV2 ---");
+    const BondingTax = await ethers.getContractFactory("BondingTax");
+    const taxManagerForFRouterV2 = await upgrades.deployProxy(BondingTax,
+      [
+        owner.address,
+        await virtualToken.getAddress(),
+        await cbbtc.getAddress(),
+        TAX_MANAGER_AERODROME_ROUTER,
+        await fRouterV2.getAddress(),
+        TAX_MANAGER_TREASURY,
+        TAX_MANAGER_MIN_SWAP_THRESHOLD,
+        TAX_MANAGER_MAX_SWAP_THRESHOLD,
+      ],
+      {
+        initializer: "initialize",
+        initialOwner: process.env.CONTRACT_CONTROLLER,
+      }
+    );
+    await taxManagerForFRouterV2.waitForDeployment();
+    console.log("TaxManagerForFRouterV2 deployed to:", taxManagerForFRouterV2.target);
+
+    // 3.2. Deploy AntiSniperTaxManager
+    console.log("\n--- Deploying AntiSniperTaxManagerForFRouterV2 ---");
+    const antiSniperTaxManagerForFRouterV2 = await upgrades.deployProxy(BondingTax, 
+      [
+        owner.address,
+        await virtualToken.getAddress(),
+        await cbbtc.getAddress(),
+        TAX_MANAGER_AERODROME_ROUTER,
+        await fRouterV2.getAddress(),
+        TAX_MANAGER_TREASURY,
+        TAX_MANAGER_MIN_SWAP_THRESHOLD,
+        TAX_MANAGER_MAX_SWAP_THRESHOLD,
+      ],
+      {
+        initializer: "initialize",
+        initialOwner: process.env.CONTRACT_CONTROLLER,
+      }
+    );
+    await antiSniperTaxManagerForFRouterV2.waitForDeployment();
+    console.log("AntiSniperTaxManagerForFRouterV2 deployed to:", antiSniperTaxManagerForFRouterV2.target);
+
+    console.log("\n--- Setting TaxManager and AntiSniperTaxManager in FRouterV2 ---");
+    await fRouterV2.connect(owner).grantRole(await fRouterV2.ADMIN_ROLE(), owner.address);
+    await fRouterV2.connect(owner).setTaxManager(await taxManagerForFRouterV2.getAddress());
+    await fRouterV2.connect(owner).setAntiSniperTaxManager(await antiSniperTaxManagerForFRouterV2.getAddress());
+    console.log("TaxManager and AntiSniperTaxManager set in FRouterV2");
 
     // 4. Grant ADMIN_ROLE to owner and set Router in FFactoryV2
     console.log("\n--- Granting ADMIN_ROLE to owner in FFactoryV2 ---");

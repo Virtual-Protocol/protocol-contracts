@@ -179,6 +179,19 @@ const { ethers, upgrades } = require("hardhat");
     const agentFactoryV6Address = await agentFactoryV6.getAddress();
     console.log("AgentFactoryV6 deployed at:", agentFactoryV6Address);
 
+    // grant minter role of agentNftV2 to agentFactoryV6
+    const agentNftV2 = await ethers.getContractAt(
+      "AgentNftV2",
+      args[20],
+      process.env.ADMIN
+    );
+    const tx1_4 = await agentNftV2.grantRole(
+      await agentNftV2.MINTER_ROLE(),
+      agentFactoryV6Address
+    );
+    await tx1_4.wait();
+    console.log("MINTER_ROLE granted to agentFactoryV6");
+
     // 9. Grant DEFAULT_ADMIN_ROLE to deployer temporarily for AgentFactoryV6
     console.log(
       "\n--- Granting DEFAULT_ADMIN_ROLE to deployer temporarily for AgentFactoryV6 ---"

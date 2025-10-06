@@ -599,10 +599,10 @@ describe("BondingV2", function () {
       const { owner, user1, user2 } = accounts;
       const { bondingV2, virtualToken, agentToken } = contracts;
 
-      // Wait 30 minutes after launch to bypass anti-sniper tax
-      await increaseTimeByMinutes(30);
+      // Wait 98 minutes after launch to bypass anti-sniper tax
+      await increaseTimeByMinutes(98);
 
-      // Verify anti-sniper tax is bypassed after 30 minutes
+      // Verify anti-sniper tax is bypassed after 98 minutes
       const currentTime = await time.latest();
       const tokenInfo = await bondingV2.tokenInfo(tokenAddress);
       const pairAddress = tokenInfo.pair;
@@ -610,8 +610,8 @@ describe("BondingV2", function () {
       const pairStartTime = await pair.startTime();
       const timeElapsed = Number(currentTime) - Number(pairStartTime);
 
-      // Verify we're past the 30-minute anti-sniper window
-      expect(timeElapsed).to.be.greaterThan(30 * 60); // More than 30 minutes
+      // Verify we're past the 98-minute anti-sniper window
+      expect(timeElapsed).to.be.greaterThan(98 * 60); // More than 98 minutes
 
       console.log(
         "BondingV2 virtualToken balance:",
@@ -666,7 +666,7 @@ describe("BondingV2", function () {
         "teamTokenReservedWallet agentToken"
       );
 
-      // user2 should get tokens from their 100 VIRTUAL purchase (with 1% tax after 30 minutes)
+      // user2 should get tokens from their 100 VIRTUAL purchase (with 1% tax after 98 minutes)
       expectTokenBalanceEqual(
         user2AgentTokenBalance,
         ethers.parseEther("2794153.4142991216"), // 450*10^6-450*10^6*14000/(14000+900+100*99%) - adjusted for no user1 balance
@@ -695,7 +695,7 @@ describe("BondingV2", function () {
         timeElapsed
       );
 
-      // Verify we're past the 30-minute anti-sniper window
+      // Verify we're past the 98-minute anti-sniper window
       expect(timeElapsed).to.be.greaterThan(10 * 60); // More than 10 minutes
 
       console.log(
@@ -770,7 +770,7 @@ describe("BondingV2", function () {
         0, // amountOutMin
         (await time.latest()) + 300 // deadline
       );
-      let tax = Math.ceil(99 - (timeElapsed * 98) / 30 / 60) / 100; // 66.17% -> 67% cuz contract side round up
+      let tax = Math.ceil(99 - timeElapsed / 60) / 100; // 99% - 1% per minute, contract side rounds up
       console.log("tax:", tax);
       console.log("factory.buyTax():", await contracts.fFactoryV2.buyTax());
       console.log(
@@ -807,7 +807,7 @@ describe("BondingV2", function () {
       const { user1, user2 } = accounts;
       const { bondingV2, virtualToken, agentToken } = contracts;
 
-      await increaseTimeByMinutes(30); // make sure no tax
+      await increaseTimeByMinutes(98); // make sure no tax
 
       const buyAmount = ethers.parseEther("200000");
       // await virtualToken.connect(user2).approve(addresses.fRouterV2, buyAmount);
@@ -1333,7 +1333,7 @@ describe("BondingV2", function () {
 
       // Buy enough tokens to graduate the token
       // Need to buy enough to reduce reserve0 below gradThreshold
-      await increaseTimeByMinutes(30); // Ensure no anti-sniper tax
+      await increaseTimeByMinutes(98); // Ensure no anti-sniper tax
 
       const graduationBuyAmount = ethers.parseEther("202020.2044906205");
       await virtualToken
@@ -1529,7 +1529,7 @@ describe("BondingV2", function () {
         pairStartTime,
         timeElapsed
       );
-      tax = Math.ceil(99 - (timeElapsed * 98) / 30 / 60) / 100; // 99% cuz contract side round up
+      tax = Math.ceil(99 - timeElapsed / 60) / 100; // 99% - 1% per minute, contract side rounds up
       console.log("tax:", tax);
       console.log("factory.buyTax():", await contracts.fFactoryV2.buyTax());
       console.log(
@@ -1579,8 +1579,8 @@ describe("BondingV2", function () {
       const { user2 } = accounts;
       const { virtualToken, fFactoryV2, bondingV2 } = contracts;
 
-      // Wait for anti-sniper period to end (30 minutes + buffer)
-      await increaseTimeByMinutes(35);
+      // Wait for anti-sniper period to end (98 minutes + buffer)
+      await increaseTimeByMinutes(100);
 
       // Get initial balances of both tax vaults
       const taxVault = await fFactoryV2.taxVault();
@@ -1789,7 +1789,7 @@ describe("BondingV2", function () {
       await bondingV2.connect(user1).launch(tokenAddress);
 
       // Buy enough tokens to graduate the token
-      await increaseTimeByMinutes(30); // Ensure no anti-sniper tax
+      await increaseTimeByMinutes(98); // Ensure no anti-sniper tax
 
       const graduationBuyAmount = ethers.parseEther("202020.2044906205");
       await virtualToken
@@ -1893,7 +1893,9 @@ describe("BondingV2", function () {
       console.log("Founder:", founder);
       console.log("VeToken Owner:", veTokenOwner);
       console.log(
-        "Founder veToken balance at the beginning:", founderVeTokenBalance);
+        "Founder veToken balance at the beginning:",
+        founderVeTokenBalance
+      );
 
       expect(founderVeTokenBalance).to.be.greaterThan(0);
 
@@ -2004,17 +2006,19 @@ describe("BondingV2", function () {
       }
 
       // Verify founder's veToken balance decreased
-      const founderVeTokenBalanceAfter1stRemoval = await veTokenContract.balanceOf(
-        founder
+      const founderVeTokenBalanceAfter1stRemoval =
+        await veTokenContract.balanceOf(founder);
+      console.log(
+        "Founder veToken balance after 1st factory permission removal:",
+        founderVeTokenBalanceAfter1stRemoval
       );
-      console.log("Founder veToken balance after 1st factory permission removal:", founderVeTokenBalanceAfter1stRemoval);
       expect(founderVeTokenBalanceAfter1stRemoval).to.equal(
         founderVeTokenBalance - removalAmount
       );
 
       console.log(
         "✅ Test completed: AgentVeTokenV2.removeLpLiquidity works when called by factory" +
-        "\n"
+          "\n"
       );
 
       // except for the factorySigner, the admin should also be able to call removeLpLiquidity
@@ -2068,15 +2072,19 @@ describe("BondingV2", function () {
       }
 
       // Verify founder's veToken balance decreased
-      const founderVeTokenBalanceAfter2ndRemoval = await veTokenContract.balanceOf(
-        founder
+      const founderVeTokenBalanceAfter2ndRemoval =
+        await veTokenContract.balanceOf(founder);
+      console.log(
+        "Founder veToken balance after 2nd factory permission removal:",
+        founderVeTokenBalanceAfter2ndRemoval
       );
-      console.log("Founder veToken balance after 2nd factory permission removal:", founderVeTokenBalanceAfter2ndRemoval);
-      expect(founderVeTokenBalanceAfter2ndRemoval).to.equal(founderVeTokenBalanceAfter1stRemoval - removalAmount);
+      expect(founderVeTokenBalanceAfter2ndRemoval).to.equal(
+        founderVeTokenBalanceAfter1stRemoval - removalAmount
+      );
 
       console.log(
         "✅ Test completed: AgentVeTokenV2.removeLpLiquidity works when called by admin" +
-        "\n"
+          "\n"
       );
     });
 

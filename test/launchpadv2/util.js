@@ -13,7 +13,7 @@
 // - expectPriceEqual(actual, expected, description)
 //
 // Usage Examples:
-// await increaseTimeByMinutes(30); // Wait 30 minutes and update block.timestamp
+// await increaseTimeByMinutes(98); // Wait 98 minutes and update block.timestamp
 // expectTokenBalanceEqual(balance, expectedBalance, "USDT"); // Compare token balances
 
 const { expect } = require("chai");

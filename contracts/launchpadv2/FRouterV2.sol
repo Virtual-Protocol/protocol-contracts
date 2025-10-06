@@ -146,7 +146,7 @@ contract FRouterV2 is
         address pair = factory.getPair(tokenAddress, assetToken);
 
         // Calculate tax - use normal buyTax for initial purchase, anti-sniper tax for others
-        uint256 normalTax = factory.buyTax(); // 
+        uint256 normalTax = factory.buyTax(); //
         uint256 antiSniperTax;
         if (isInitialPurchase) {
             // No anti-sniper tax for creator's initial purchase
@@ -161,8 +161,16 @@ contract FRouterV2 is
 
         IERC20(assetToken).safeTransferFrom(to, pair, amount);
 
-        IERC20(assetToken).safeTransferFrom(to, factory.taxVault(), normalTxFee);
-        IERC20(assetToken).safeTransferFrom(to, factory.antiSniperTaxVault(), antiSniperTxFee);
+        IERC20(assetToken).safeTransferFrom(
+            to,
+            factory.taxVault(),
+            normalTxFee
+        );
+        IERC20(assetToken).safeTransferFrom(
+            to,
+            factory.antiSniperTaxVault(),
+            antiSniperTxFee
+        );
 
         uint256 amountOut = getAmountsOut(tokenAddress, assetToken, amount);
 
@@ -206,7 +214,9 @@ contract FRouterV2 is
         taxManager = newManager;
     }
 
-    function setAntiSniperTaxManager(address newManager) public onlyRole(ADMIN_ROLE) {
+    function setAntiSniperTaxManager(
+        address newManager
+    ) public onlyRole(ADMIN_ROLE) {
         antiSniperTaxManager = newManager;
     }
 
@@ -223,7 +233,7 @@ contract FRouterV2 is
 
     /**
      * @dev Calculate anti-sniper tax based on time elapsed since pair start
-     * Tax starts at 99% and linearly decreases to 1% over 30 minutes
+     * Tax starts at 99% and decreases by 1% per minute to 1% over 98 minutes
      * @param pairAddress The address of the pair
      * @return taxPercentage Tax in percentage (1 = 1%)
      */
@@ -239,20 +249,23 @@ contract FRouterV2 is
         }
 
         uint256 timeElapsed = block.timestamp - startTime;
-        uint256 antiSniperDuration = 30 * 60;
+        uint256 antiSniperDuration = 98 * 60; // 98 minutes in seconds
 
-        // If more than 30 minutes have passed, use normal buy tax
+        // If more than 98 minutes have passed, use normal buy tax
         if (timeElapsed >= antiSniperDuration) {
             return factory.buyTax();
         }
 
-        // Linear decay from 99% to 1% over 30 minutes
-        // tax = 99 - (timeElapsed * (99 - 1) / 30 minutes)
+        // Tax decreases by 1% per minute from 99% to 1%
+        // tax = 99 - (timeElapsed / 60) * 1
         uint256 startTax = factory.antiSniperBuyTaxStartValue();
-        uint256 endTax = factory.buyTax();
-        uint256 taxReduction = (timeElapsed * (startTax - endTax)) /
-            antiSniperDuration;
+        uint256 minutesElapsed = timeElapsed / 60;
+        uint256 taxReduction = minutesElapsed; // 1% per minute
 
-        return startTax - taxReduction;
+        // Ensure tax doesn't go below the normal buy tax
+        uint256 calculatedTax = startTax - taxReduction;
+        uint256 endTax = factory.buyTax();
+
+        return calculatedTax > endTax ? calculatedTax : endTax;
     }
 }

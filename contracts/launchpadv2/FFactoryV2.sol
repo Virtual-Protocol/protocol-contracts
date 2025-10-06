@@ -109,7 +109,8 @@ contract FFactoryV2 is
         address newVault_,
         uint256 buyTax_,
         uint256 sellTax_,
-        uint256 antiSniperBuyTaxStartValue_
+        uint256 antiSniperBuyTaxStartValue_,
+        address antiSniperTaxVault_
     ) public onlyRole(ADMIN_ROLE) {
         require(newVault_ != address(0), "Zero addresses are not allowed.");
 
@@ -117,6 +118,7 @@ contract FFactoryV2 is
         buyTax = buyTax_;
         sellTax = sellTax_;
         antiSniperBuyTaxStartValue = antiSniperBuyTaxStartValue_;
+        antiSniperTaxVault = antiSniperTaxVault_;
     }
 
     function setRouter(address router_) public onlyRole(ADMIN_ROLE) {

@@ -45,7 +45,6 @@ const TEAM_TOKEN_RESERVED_SUPPLY = "550000000"; // 550M tokens
 const BUY_TAX = 1; // 1% (percentage)
 const SELL_TAX = 1; // 1% (percentage)
 const ANTI_SNIPER_BUY_TAX_START_VALUE = 99; // 99% (percentage)
-const APPLICATION_THRESHOLD = "100000000000000000000"; // 100 VIRTUAL tokens
 
 // Bonding curve constants
 // const K = "3000000000000";
@@ -103,7 +102,6 @@ module.exports = {
   BUY_TAX,
   SELL_TAX,
   ANTI_SNIPER_BUY_TAX_START_VALUE,
-  APPLICATION_THRESHOLD,
 
   // Bonding curve constants
   // K,

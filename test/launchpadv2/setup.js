@@ -14,7 +14,6 @@ const {
   BUY_TAX,
   SELL_TAX,
   ANTI_SNIPER_BUY_TAX_START_VALUE,
-  APPLICATION_THRESHOLD,
   K,
   ASSET_RATE,
   GRAD_THRESHOLD,
@@ -233,7 +232,6 @@ async function setupNewLaunchpadTest() {
         await mockERC6551Registry.getAddress(), // tbaRegistry_
         await virtualToken.getAddress(), // assetToken_
         await agentNftV2.getAddress(), // nft_
-        APPLICATION_THRESHOLD, // applicationThreshold_
         owner.address, // vault_
         1, // nextId_
       ],
@@ -429,7 +427,6 @@ async function setupNewLaunchpadTest() {
       vaultSupply: VAULT_SUPPLY,
       buyTax: BUY_TAX,
       sellTax: SELL_TAX,
-      applicationThreshold: APPLICATION_THRESHOLD,
       k: K,
       assetRate: ASSET_RATE,
       gradThreshold: GRAD_THRESHOLD,

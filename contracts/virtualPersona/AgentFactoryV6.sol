@@ -31,7 +31,6 @@ contract AgentFactoryV6 is
     address public daoImplementation;
     address public nft;
     address public tbaRegistry; // Token bound account
-    uint256 public applicationThreshold;
 
     address[] public allTokens;
     address[] public allDAOs;
@@ -134,7 +133,6 @@ contract AgentFactoryV6 is
         address tbaRegistry_,
         address assetToken_,
         address nft_,
-        uint256 applicationThreshold_,
         address vault_,
         uint256 nextId_
     ) public initializer {
@@ -146,7 +144,6 @@ contract AgentFactoryV6 is
         assetToken = assetToken_;
         tbaRegistry = tbaRegistry_;
         nft = nft_;
-        applicationThreshold = applicationThreshold_;
         _nextId = nextId_ + nextIdBase;
         _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
         _vault = vault_;
@@ -385,13 +382,6 @@ contract AgentFactoryV6 is
 
     function totalAgents() public view returns (uint256) {
         return allTokens.length;
-    }
-
-    function setApplicationThreshold(
-        uint256 newThreshold
-    ) public onlyRole(DEFAULT_ADMIN_ROLE) {
-        applicationThreshold = newThreshold;
-        emit ApplicationThresholdUpdated(newThreshold);
     }
 
     function setVault(address newVault) public onlyRole(DEFAULT_ADMIN_ROLE) {

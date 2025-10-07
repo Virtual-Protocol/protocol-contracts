@@ -181,9 +181,9 @@ contract FRouterV2 is
         if (factory.taxVault() == taxManager) {
             IBondingTax(taxManager).swapForAsset();
         }
-        if (factory.antiSniperTaxVault() == antiSniperTaxManager) {
-            IBondingTax(antiSniperTaxManager).swapForAsset();
-        }
+        // if (factory.antiSniperTaxVault() == antiSniperTaxManager) {
+        //     IBondingTax(antiSniperTaxManager).swapForAsset();
+        // }
 
         return (amount, amountOut);
     }

@@ -312,22 +312,6 @@ const { ethers, upgrades } = require("hardhat");
     const agentFactoryV6Address = await agentFactoryV6.getAddress();
     console.log("AgentFactoryV6 deployed at:", agentFactoryV6Address);
 
-    // 13. Grant MINTER_ROLE of agentNftV2 to agentFactoryV6
-    console.log(
-      "\n--- Granting MINTER_ROLE of agentNftV2 to agentFactoryV6 ---"
-    );
-    const agentNftV2Contract = await ethers.getContractAt(
-      "AgentNftV2",
-      agentNftV2,
-      process.env.deployer
-    );
-    const tx6_1 = await agentNftV2Contract.grantRole(
-      await agentNftV2Contract.MINTER_ROLE(),
-      agentFactoryV6Address
-    );
-    await tx6_1.wait();
-    console.log("MINTER_ROLE of agentNftV2 granted to agentFactoryV6");
-
     // 14. Grant DEFAULT_ADMIN_ROLE to deployer temporarily for AgentFactoryV6, for setParams()
     console.log(
       "\n--- Granting DEFAULT_ADMIN_ROLE to deployer temporarily for AgentFactoryV6 ---"
@@ -583,6 +567,23 @@ const { ethers, upgrades } = require("hardhat");
     );
     await tx17.wait();
     console.log("Revoked DEFAULT_ADMIN_ROLE of FRouterV2 from Deployer:", await deployer.getAddress());
+
+    // finally, need admin_private_key to do this
+    // 24. Grant MINTER_ROLE of agentNftV2 to agentFactoryV6
+    console.log(
+      "\n--- Granting MINTER_ROLE of agentNftV2 to agentFactoryV6 ---"
+    );
+    const agentNftV2Contract = await ethers.getContractAt(
+      "AgentNftV2",
+      agentNftV2,
+      process.env.deployer
+    );
+    const tx6_1 = await agentNftV2Contract.grantRole(
+      await agentNftV2Contract.MINTER_ROLE(),
+      agentFactoryV6Address
+    );
+    await tx6_1.wait();
+    console.log("MINTER_ROLE of agentNftV2 granted to agentFactoryV6");
 
     // 24. Print deployment summary
     console.log("\n=== NewLaunchpad Deployment Summary ===");

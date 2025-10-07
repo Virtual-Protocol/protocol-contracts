@@ -261,6 +261,9 @@ contract FRouterV2 is
         uint256 startTax = factory.antiSniperBuyTaxStartValue();
         uint256 minutesElapsed = timeElapsed / 60;
         uint256 taxReduction = minutesElapsed; // 1% per minute
+        if (startTax <= taxReduction) {
+            return factory.buyTax();
+        }
 
         // Ensure tax doesn't go below the normal buy tax
         uint256 calculatedTax = startTax - taxReduction;

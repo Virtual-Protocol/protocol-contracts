@@ -41,8 +41,8 @@ const { ethers, upgrades } = require("hardhat");
     if (!antiSniperBuyTaxStartValue) {
       throw new Error("ANTI_SNIPER_BUY_TAX_START_VALUE not set in environment");
     }
-    const feeAddress = process.env.LAUNCHPAD_V2_FEE_ADDRESS;
-    if (!feeAddress) {
+    const creationFeeToAddress = process.env.LAUNCHPAD_V2_FEE_ADDRESS;
+    if (!creationFeeToAddress) {
       throw new Error("LAUNCHPAD_V2_FEE_ADDRESS not set in environment");
     }
     const feeAmount = process.env.LAUNCHPAD_V2_FEE_AMOUNT;
@@ -162,13 +162,21 @@ const { ethers, upgrades } = require("hardhat");
     if (!agentFactoryV6NextId) {
       throw new Error("AGENT_FACTORY_V6_NEXT_ID not set in environment");
     }
+    const antiSniperTaxVaultAddress = process.env.ANTI_SNIPER_TAX_VAULT;
+    if (!antiSniperTaxVaultAddress) {
+      throw new Error("ANTI_SNIPER_TAX_VAULT not set in environment");
+    }
+    const taxSwapThresholdBasisPoints = process.env.TAX_SWAP_THRESHOLD_BASIS_POINTS;
+    if (!taxSwapThresholdBasisPoints) {
+      throw new Error("TAX_SWAP_THRESHOLD_BASIS_POINTS not set in environment");
+    }
 
     console.log("Deployment arguments loaded:", {
       virtualToken,
       buyTax,
       sellTax,
       antiSniperBuyTaxStartValue,
-      feeAddress,
+      feeAddress: creationFeeToAddress,
       feeAmount,
       initialSupply,
       assetRate,
@@ -197,6 +205,8 @@ const { ethers, upgrades } = require("hardhat");
       agentFactoryV6Vault,
       agentFactoryV6MaturityDuration,
       agentFactoryV6NextId,
+      antiSniperTaxVaultAddress,
+      taxSwapThresholdBasisPoints,
     });
 
     // 1. Deploy FFactoryV2, must happen before FRouterV2,
@@ -210,7 +220,7 @@ const { ethers, upgrades } = require("hardhat");
         buyTax, // buyTax
         sellTax, // sellTax
         antiSniperBuyTaxStartValue, // antiSniperBuyTaxStartValue
-        "0x0000000000000000000000000000000000000000", // antiSniperTaxVault, set null for now
+        antiSniperTaxVaultAddress, // antiSniperTaxVault
       ],
       {
         initializer: "initialize",
@@ -252,14 +262,14 @@ const { ethers, upgrades } = require("hardhat");
     await tx0.wait();
     console.log("ADMIN_ROLE of FFactoryV2 granted to deployer temporarily");
 
-    // 4.0 Grant ADMIN_ROLE of FFactoryV2 to CONTRACT_CONTROLLER, for setRouter and setTaxParams
-    console.log("\n--- Granting ADMIN_ROLE to CONTRACT_CONTROLLER ---");
+    // 4.0 Grant ADMIN_ROLE of FFactoryV2 to ADMIN, for setRouter and setTaxParams
+    console.log("\n--- Granting ADMIN_ROLE to ADMIN ---");
     const tx0_5 = await fFactoryV2.grantRole(
       await fFactoryV2.ADMIN_ROLE(),
-      process.env.CONTRACT_CONTROLLER
+      process.env.ADMIN
     );
     await tx0_5.wait();
-    console.log("ADMIN_ROLE granted to CONTRACT_CONTROLLER");
+    console.log("ADMIN_ROLE granted to ADMIN");
 
     // 4.1 set fRouterV2Address in FFactoryV2
     console.log("\n--- Setting fRouterV2Address in FFactoryV2 ---");
@@ -267,41 +277,41 @@ const { ethers, upgrades } = require("hardhat");
     await tx1.wait();
     console.log("fRouterV2Address set in FFactoryV2");
 
-    // 5. Deploy antiSniperTaxVault
-    console.log("\n--- Deploying AntiSniperTaxManager ---");
-    const BondingTax = await ethers.getContractFactory("BondingTax");
-    const antiSniperTaxVault = await upgrades.deployProxy(
-      BondingTax,
-      [
-        taxManagerDefaultAdmin,
-        virtualToken,
-        taxManagerCbbtcToken,
-        taxManagerAerodromeRouter,
-        fRouterV2Address,
-        taxManagerTreasury,
-        taxManagerMinSwapThreshold,
-        taxManagerMaxSwapThreshold,
-      ],
-      {
-        initializer: "initialize",
-        initialOwner: process.env.CONTRACT_CONTROLLER,
-      }
-    );
-    await antiSniperTaxVault.waitForDeployment();
-    const antiSniperTaxVaultAddress = await antiSniperTaxVault.getAddress();
-    console.log("AntiSniperTaxManager deployed to:", antiSniperTaxVaultAddress);
+    // // 5. Deploy antiSniperTaxVault
+    // console.log("\n--- Deploying AntiSniperTaxManager ---");
+    // const BondingTax = await ethers.getContractFactory("BondingTax");
+    // const antiSniperTaxVault = await upgrades.deployProxy(
+    //   BondingTax,
+    //   [
+    //     taxManagerDefaultAdmin,
+    //     virtualToken,
+    //     taxManagerCbbtcToken,
+    //     taxManagerAerodromeRouter,
+    //     fRouterV2Address,
+    //     taxManagerTreasury,
+    //     taxManagerMinSwapThreshold,
+    //     taxManagerMaxSwapThreshold,
+    //   ],
+    //   {
+    //     initializer: "initialize",
+    //     initialOwner: process.env.CONTRACT_CONTROLLER,
+    //   }
+    // );
+    // await antiSniperTaxVault.waitForDeployment();
+    // const antiSniperTaxVaultAddress = await antiSniperTaxVault.getAddress();
+    // console.log("AntiSniperTaxManager deployed to:", antiSniperTaxVaultAddress);
 
-    // 6. Set tax params for fFactoryV2
-    console.log("\n--- Setting tax params for fFactoryV2 ---");
-    const tx2 = await fFactoryV2.setTaxParams(
-      taxVault,
-      buyTax,
-      sellTax,
-      antiSniperBuyTaxStartValue,
-      antiSniperTaxVaultAddress
-    );
-    await tx2.wait();
-    console.log("Tax params set for fFactoryV2");
+    // // 6. Set tax params for fFactoryV2
+    // console.log("\n--- Setting tax params for fFactoryV2 ---");
+    // const tx2 = await fFactoryV2.setTaxParams(
+    //   taxVault,
+    //   buyTax,
+    //   sellTax,
+    //   antiSniperBuyTaxStartValue,
+    //   antiSniperTaxVaultAddress
+    // );
+    // await tx2.wait();
+    // console.log("Tax params set for fFactoryV2");
 
     // 7. Grant ADMIN_ROLE of fRouterV2 to deployer temporarily, for setTaxManager and setAntiSniperTaxManager
     console.log(
@@ -340,7 +350,7 @@ const { ethers, upgrades } = require("hardhat");
     );
 
     // 11. Deploy AgentVeTokenV2 implementation
-    console.log("\n--- Deploying AgentVeToken implementation ---");
+    console.log("\n--- Deploying AgentVeTokenV2 implementation ---");
     const AgentVeTokenV2 = await ethers.getContractFactory("AgentVeTokenV2");
     const agentVeTokenV2 = await AgentVeTokenV2.deploy();
     await agentVeTokenV2.waitForDeployment();
@@ -362,7 +372,7 @@ const { ethers, upgrades } = require("hardhat");
         tbaRegistry, // tbaRegistry_
         virtualToken, // assetToken_ (virtualToken)
         agentNftV2, // nft_ (AgentNftV2)
-        applicationThreshold, // applicationThreshold_
+        applicationThreshold, // applicationThreshold_, todo: delete this
         agentFactoryV6Vault, // vault_, who will hold all the NFTs
         agentFactoryV6NextId, // nextId_
       ],
@@ -407,8 +417,8 @@ const { ethers, upgrades } = require("hardhat");
     const tx8_1 = await agentFactoryV6.setParams(
       agentFactoryV6MaturityDuration, // maturityDuration
       uniswapV2Router, // uniswapRouter
-      process.env.CONTRACT_CONTROLLER, // defaultDelegatee, @todo: need to confirm the address
-      process.env.CONTRACT_CONTROLLER // tokenAdmin, @todo: need to confirm the address
+      process.env.ADMIN, // defaultDelegatee,
+      process.env.ADMIN // tokenAdmin,
     );
     await tx8_1.wait();
     console.log("setParams() called successfully for AgentFactoryV6");
@@ -419,28 +429,10 @@ const { ethers, upgrades } = require("hardhat");
     );
     const tx1_6 = await agentFactoryV6.grantRole(
       await agentFactoryV6.DEFAULT_ADMIN_ROLE(),
-      process.env.CONTRACT_CONTROLLER
+      process.env.ADMIN
     );
     await tx1_6.wait();
     console.log("DEFAULT_ADMIN_ROLE granted to CONTRACT_CONTROLLER");
-
-    // 17. Set token params for AgentFactoryV6
-    console.log("\n--- Setting token params for AgentFactoryV6 ---");
-    const tx3 = await agentFactoryV6.setTokenParams(
-      initialSupply, // maxSupply (initialSupply)
-      "0", // lpSupply
-      initialSupply, // vaultSupply (initialSupply)
-      initialSupply, // maxTokensPerWallet (initialSupply)
-      initialSupply, // maxTokensPerTxn (initialSupply)
-      0, // botProtectionDurationInSeconds
-      agentFactoryV6Vault, // vault
-      buyTax, // projectBuyTaxBasisPoints (buyTax)
-      sellTax, // projectSellTaxBasisPoints (sellTax)
-      1000, // taxSwapThresholdBasisPoints
-      feeAddress // projectTaxRecipient (fee address)
-    );
-    await tx3.wait();
-    console.log("Token params set for AgentFactoryV6");
 
     // 18. Deploy BondingV2
     console.log("\n--- Deploying BondingV2 ---");
@@ -450,7 +442,7 @@ const { ethers, upgrades } = require("hardhat");
       [
         fFactoryV2Address, // factory_
         fRouterV2Address, // router_
-        feeAddress, // feeTo_ (fee address), @todo: need to confirm the address
+        creationFeeToAddress, // feeTo_ (fee address), @todo: need to confirm the address
         feeAmount, // fee_ (fee amount)
         initialSupply, // initialSupply_
         assetRate, // assetRate_
@@ -467,6 +459,24 @@ const { ethers, upgrades } = require("hardhat");
     await bondingV2.waitForDeployment();
     const bondingV2Address = await bondingV2.getAddress();
     console.log("BondingV2 deployed at:", bondingV2Address);
+
+    // 17. Set token params for AgentFactoryV6
+    console.log("\n--- Setting token params for AgentFactoryV6 ---");
+    const tx3 = await agentFactoryV6.setTokenParams(
+      initialSupply, // maxSupply (initialSupply)
+      "0", // lpSupply
+      initialSupply, // vaultSupply (initialSupply)
+      initialSupply, // maxTokensPerWallet (initialSupply)
+      initialSupply, // maxTokensPerTxn (initialSupply)
+      0, // botProtectionDurationInSeconds
+      bondingV2Address, // vault
+      buyTax, // projectBuyTaxBasisPoints (buyTax)
+      sellTax, // projectSellTaxBasisPoints (sellTax)
+      taxSwapThresholdBasisPoints, // taxSwapThresholdBasisPoints, todo: configurable VP demon
+      creationFeeToAddress // projectTaxRecipient (fee address)
+    );
+    await tx3.wait();
+    console.log("Token params set for AgentFactoryV6");
 
     // 19. Set DeployParams and LaunchParams for BondingV2 (deployer is owner initially)
     console.log("\n--- Setting DeployParams for BondingV2 ---");
@@ -526,27 +536,29 @@ const { ethers, upgrades } = require("hardhat");
       bondingV2Address
     );
 
-    // 22.4 Grant DEFAULT_ADMIN_ROLE of FRouterV2 to CONTRACT_CONTROLLER
-    const tx6_5 = await fRouterV2.grantRole(
-      await fRouterV2.DEFAULT_ADMIN_ROLE(),
-      process.env.CONTRACT_CONTROLLER
-    );
-    await tx6_5.wait();
-    console.log(
-      "Granted DEFAULT_ADMIN_ROLE of FRouterV2 to CONTRACT_CONTROLLER:",
-      process.env.CONTRACT_CONTROLLER
-    );
+    //todo: DEFAULT_ADMIN_ROLE auto given to CONTRACT_CONTROLLER?
 
-    // 22.5 Grant EXECUTOR_ROLE of FRouterV2 to admin
-    const tx8_11 = await fRouterV2.grantRole(
-      await fRouterV2.EXECUTOR_ROLE(),
-      process.env.ADMIN
-    );
-    await tx8_11.wait();
-    console.log(
-      "Granted EXECUTOR_ROLE of FRouterV2 to ADMIN:",
-      process.env.ADMIN
-    );
+    // // 22.4 Grant DEFAULT_ADMIN_ROLE of FRouterV2 to CONTRACT_CONTROLLER
+    // const tx6_5 = await fRouterV2.grantRole(
+    //   await fRouterV2.DEFAULT_ADMIN_ROLE(),
+    //   process.env.CONTRACT_CONTROLLER
+    // );
+    // await tx6_5.wait();
+    // console.log(
+    //   "Granted DEFAULT_ADMIN_ROLE of FRouterV2 to CONTRACT_CONTROLLER:",
+    //   process.env.CONTRACT_CONTROLLER
+    // );
+
+    // // 22.5 Grant EXECUTOR_ROLE of FRouterV2 to admin
+    // const tx8_11 = await fRouterV2.grantRole(
+    //   await fRouterV2.EXECUTOR_ROLE(),
+    //   process.env.ADMIN
+    // );
+    // await tx8_11.wait();
+    // console.log(
+    //   "Granted EXECUTOR_ROLE of FRouterV2 to ADMIN:",
+    //   process.env.ADMIN
+    // );
 
     // 22.6 Grant EXECUTOR_ROLE of FRouterV2 to BE_OPS_WALLET, for resetTime()
     const tx8 = await fRouterV2.grantRole(

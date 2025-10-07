@@ -117,11 +117,6 @@ const { ethers, upgrades } = require("hardhat");
     if (!taxVault) {
       throw new Error("FFactoryV2_TAX_VAULT not set in environment");
     }
-    // const antiSniperTaxVault =
-    //   process.env.FFactoryV2_ANTI_SNIPER_TAX_VAULT;
-    // if (!antiSniperTaxVault) {
-    //   throw new Error("FFactoryV2_ANTI_SNIPER_TAX_VAULT not set in environment");
-    // }
     const taxManagerDefaultAdmin = process.env.TAX_MANAGER_DEFAULT_ADMIN;
     if (!taxManagerDefaultAdmin) {
       throw new Error("TAX_MANAGER_DEFAULT_ADMIN not set in environment");

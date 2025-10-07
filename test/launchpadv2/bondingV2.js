@@ -2144,4 +2144,154 @@ describe("BondingV2", function () {
       ).to.be.revertedWith("Insufficient veToken balance");
     });
   });
+
+  describe(
+    "first sell when no virtuals in the pool will fail \n" +
+      "due to IFPairV2(pair).transferAsset(to, amount); insufficient balance",
+    function () {
+      it("Should fail when trying to sell tokens when pool has insufficient virtual tokens", async function () {
+        const { user1, user2 } = accounts;
+        const { bondingV2, virtualToken, fRouterV2 } = contracts;
+
+        // Create and launch a token
+        const tokenName = "Test Token Insufficient Liquidity";
+        const tokenTicker = "TESTIL";
+        const cores = [0, 1, 2];
+        const description = "Test token with insufficient liquidity";
+        const image = "https://example.com/image.png";
+        const urls = [
+          "https://twitter.com/test",
+          "https://t.me/test",
+          "https://youtube.com/test",
+          "https://example.com",
+        ];
+        const purchaseAmount = ethers.parseEther("100");
+
+        await virtualToken
+          .connect(user1)
+          .approve(addresses.bondingV2, purchaseAmount);
+
+        const startTime = (await time.latest()) + START_TIME_DELAY + 1;
+        const tx = await bondingV2
+          .connect(user1)
+          .preLaunch(
+            tokenName,
+            tokenTicker,
+            cores,
+            description,
+            image,
+            urls,
+            purchaseAmount,
+            startTime
+          );
+
+        const receipt = await tx.wait();
+        const event = receipt.logs.find((log) => {
+          try {
+            const parsed = bondingV2.interface.parseLog(log);
+            return parsed.name === "PreLaunched";
+          } catch (e) {
+            return false;
+          }
+        });
+
+        expect(event).to.not.be.undefined;
+        const parsedEvent = bondingV2.interface.parseLog(event);
+        const tokenAddress = parsedEvent.args.token;
+
+        // Wait for start time and launch
+        await time.increase(START_TIME_DELAY + 1);
+        await bondingV2.launch(tokenAddress);
+
+        // Get the pair address
+        const pairAddress = await contracts.fFactoryV2.getPair(
+          tokenAddress,
+          addresses.virtualToken
+        );
+        const pair = await ethers.getContractAt("FPairV2", pairAddress);
+        let [reserveA, reserveB] = await pair.getReserves();
+        console.log(
+          "before buy Pair reserves - reserveA:",
+          ethers.formatEther(reserveA)
+        );
+        console.log(
+          "before buy Pair reserves - reserveB:",
+          ethers.formatEther(reserveB)
+        );
+        let pairVirtualBalance = await virtualToken.balanceOf(pairAddress);
+        console.log(
+          "before buy Pair virtual token balance:",
+          ethers.formatEther(pairVirtualBalance)
+        );
+
+        // Get the token contract
+        const tokenContract = await ethers.getContractAt(
+          "@openzeppelin/contracts/token/ERC20/IERC20.sol:IERC20",
+          tokenAddress
+        );
+
+        // Get the teamTokenReservedWallet address from BondingV2 contract
+        const bondingV2Contract = await ethers.getContractAt(
+          "BondingV2",
+          bondingV2
+        );
+        const launchParams = await bondingV2Contract.launchParams();
+        const teamTokenReservedWallet = launchParams.teamTokenReservedWallet;
+        console.log("Team token reserved wallet:", teamTokenReservedWallet);
+
+        // Transfer tokens from teamTokenReservedWallet to user2
+        const transferAmount = ethers.parseEther("1000"); // Transfer 1000 tokens
+        await tokenContract
+          .connect(await ethers.getSigner(teamTokenReservedWallet))
+          .transfer(user2.address, transferAmount);
+
+        // Check user2's token balance after transfer
+        const user2TokenBalance = await tokenContract.balanceOf(user2.address);
+        console.log(
+          "User2 token balance after transfer:",
+          ethers.formatEther(user2TokenBalance)
+        );
+
+        // Check the pair's virtual token balance (should be 0 since no buy happened)
+        pairVirtualBalance = await virtualToken.balanceOf(pairAddress);
+        console.log(
+          "Pair virtual token balance (should be 0):",
+          ethers.formatEther(pairVirtualBalance)
+        );
+
+        // Now try to sell tokens when pool has no virtual tokens
+        const sellAmount = ethers.parseEther("100"); // Try to sell 100 tokens
+
+        // Approve the router to spend tokens
+        await tokenContract
+          .connect(user2)
+          .approve(addresses.fRouterV2, sellAmount);
+
+        // Calculate what the expected amountOut would be
+        const expectedAmountOut = await fRouterV2.getAmountsOut(
+          tokenAddress,
+          ethers.ZeroAddress,
+          sellAmount
+        );
+        console.log(
+          "Expected amountOut:",
+          ethers.formatEther(expectedAmountOut)
+        );
+        console.log(
+          "Available virtual tokens:",
+          ethers.formatEther(pairVirtualBalance)
+        );
+
+        // This should fail because pool has no virtual tokens to transfer
+        await expect(
+          bondingV2.connect(user2).sell(
+            sellAmount,
+            tokenAddress,
+            0, // amountOutMin
+            (await time.latest()) + 300 // deadline
+          )
+        ).to.be.reverted; // Should fail due to insufficient virtual token balance in pair
+      });
+    }
+  );
 });

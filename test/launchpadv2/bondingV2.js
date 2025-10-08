@@ -2876,4 +2876,75 @@ describe("BondingV2", function () {
       ).to.be.revertedWithCustomError(bondingV2, "InvalidInput");
     });
   });
+
+  describe("buy and sell before launch:", function () {
+    it("Should fail when trying to buy & sell before launch", async function () {
+      const { bondingV2, virtualToken } = contracts;
+      const { user1 } = accounts;
+      const tokenName = "Test Token Not Exists";
+      const tokenTicker = "TESTNE";
+      const cores = [0, 1, 2];
+      const description = "Test token that doesn't exist";
+      const image = "https://example.com/image.png";
+      const urls = [
+        "https://twitter.com/test",
+        "https://t.me/test",
+        "https://youtube.com/test",
+        "https://example.com",
+      ];
+      const purchaseAmount = ethers.parseEther("1000");
+
+      await virtualToken
+        .connect(user1)
+        .approve(addresses.bondingV2, purchaseAmount);
+
+      const startTime = (await time.latest()) + START_TIME_DELAY + 1;
+      const tx = await bondingV2
+        .connect(user1)
+        .preLaunch(
+          tokenName,
+          tokenTicker,
+          cores,
+          description,
+          image,
+          urls,
+          purchaseAmount,
+          startTime
+        );
+
+      const receipt = await tx.wait();
+      const event = receipt.logs.find((log) => {
+        try {
+          const parsed = bondingV2.interface.parseLog(log);
+          return parsed.name === "PreLaunched";
+        } catch (e) {
+          return false;
+        }
+      });
+
+      expect(event).to.not.be.undefined;
+      const parsedEvent = bondingV2.interface.parseLog(event);
+      tokenAddress = parsedEvent.args.token;
+      pairAddress = parsedEvent.args.pair;
+
+      amountIn = ethers.parseEther("100");
+      await virtualToken.connect(user1).approve(addresses.fRouterV2, amountIn);
+      await expect(bondingV2.buy(amountIn, tokenAddress, 0, (await time.latest()) + 300)).to.be.revertedWithCustomError(bondingV2, "InvalidTokenStatus");
+      sellAmount = ethers.parseEther("100");
+      agentToken = await ethers.getContractAt("AgentTokenV2", tokenAddress);
+      await agentToken.connect(user1).approve(addresses.fRouterV2, sellAmount);
+      await expect(bondingV2.connect(user1).sell(sellAmount, tokenAddress, 0, (await time.latest()) + 300)).to.be.revertedWithCustomError(bondingV2, "InvalidTokenStatus");
+      console.log("user1 virtual token balance before launch:", await virtualToken.balanceOf(user1.address));
+      console.log("user1 balance of agentToken before launch:", await agentToken.balanceOf(user1.address));
+
+      // launch the token and wait for start time delay, then buy will succeed
+      await time.increase(START_TIME_DELAY + 1);
+      await bondingV2.launch(tokenAddress);
+      await expect(bondingV2.connect(user1).buy(amountIn, tokenAddress, 0, (await time.latest()) + 300)).to.not.be.reverted;
+      console.log("user1 virtual token balance after buy:", await virtualToken.balanceOf(user1.address));
+       console.log("user1 balance of agentToken after buy:", await agentToken.balanceOf(user1.address));
+      await expect(bondingV2.connect(user1).sell(sellAmount, tokenAddress, 0, (await time.latest()) + 300)).to.not.be.reverted;
+      console.log("user1 balance of agentToken after sell:", await agentToken.balanceOf(user1.address));
+    });
+  });
 });

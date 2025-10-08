@@ -420,9 +420,16 @@ contract BondingV2 is
         uint256 amountOutMin,
         uint256 deadline
     ) public returns (bool) {
+        // this alrealy prevented it's a not-exists token
         if (!tokenInfo[tokenAddress].trading) {
             revert InvalidTokenStatus();
         }
+
+        // this is to prevent sell before launch
+        if (!tokenInfo[tokenAddress].launchExecuted) {
+            revert InvalidTokenStatus();
+        }
+
         if (block.timestamp > deadline) {
             revert InvalidInput();
         }
@@ -503,7 +510,13 @@ contract BondingV2 is
         uint256 amountOutMin,
         uint256 deadline
     ) public payable returns (bool) {
+        // this alrealy prevented it's a not-exists token
         if (!tokenInfo[tokenAddress].trading) {
+            revert InvalidTokenStatus();
+        }
+
+        // this is to prevent sell before launch
+        if (!tokenInfo[tokenAddress].launchExecuted) {
             revert InvalidTokenStatus();
         }
 

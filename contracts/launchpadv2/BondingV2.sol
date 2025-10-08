@@ -358,6 +358,11 @@ contract BondingV2 is
     ) public nonReentrant returns (address, address, uint, uint256) {
         Token storage _token = tokenInfo[_tokenAddress];
 
+        // Validate that the token exists and was properly prelaunched
+        if (_token.token == address(0) || _token.pair == address(0)) {
+            revert InvalidInput();
+        }
+
         if (_token.launchExecuted) {
             revert InvalidTokenStatus();
         }

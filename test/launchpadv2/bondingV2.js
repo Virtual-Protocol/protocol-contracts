@@ -2812,4 +2812,68 @@ describe("BondingV2", function () {
       console.log("- Other token info fields remain unchanged");
     });
   });
+
+  describe("call launch for a token that hasn't prelaunched or not exist:", function () {
+    it("Should fail when trying to launch a token that doesn't exist", async function () {
+      const { bondingV2 } = contracts;
+      const tokenAddress = ethers.ZeroAddress;
+      await expect(
+        bondingV2.launch(tokenAddress)
+      ).to.be.revertedWithCustomError(bondingV2, "InvalidInput");
+    });
+
+    it("Should fail when trying to launch a token that hasn't prelaunched", async function () {
+      const { bondingV2, virtualToken } = contracts;
+      const { user1 } = accounts;
+      const tokenAddressHasNotPreLaunched = ethers.ZeroAddress;
+      const tokenName = "Test Token Not Exists";
+      const tokenTicker = "TESTNE";
+      const cores = [0, 1, 2];
+      const description = "Test token that doesn't exist";
+      const image = "https://example.com/image.png";
+      const urls = [
+        "https://twitter.com/test",
+        "https://t.me/test",
+        "https://youtube.com/test",
+        "https://example.com",
+      ];
+      const purchaseAmount = ethers.parseEther("1000");
+
+      await virtualToken
+        .connect(user1)
+        .approve(addresses.bondingV2, purchaseAmount);
+
+      const startTime = (await time.latest()) + START_TIME_DELAY + 1;
+      const tx = await bondingV2
+        .connect(user1)
+        .preLaunch(
+          tokenName,
+          tokenTicker,
+          cores,
+          description,
+          image,
+          urls,
+          purchaseAmount,
+          startTime
+        );
+
+      const receipt = await tx.wait();
+      const event = receipt.logs.find((log) => {
+        try {
+          const parsed = bondingV2.interface.parseLog(log);
+          return parsed.name === "PreLaunched";
+        } catch (e) {
+          return false;
+        }
+      });
+
+      expect(event).to.not.be.undefined;
+      const parsedEvent = bondingV2.interface.parseLog(event);
+      tokenAddress = parsedEvent.args.token;
+      pairAddress = parsedEvent.args.pair;
+      await expect(
+        bondingV2.launch(tokenAddressHasNotPreLaunched)
+      ).to.be.revertedWithCustomError(bondingV2, "InvalidInput");
+    });
+  });
 });

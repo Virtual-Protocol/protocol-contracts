@@ -367,6 +367,15 @@ contract BondingV2 is
             revert InvalidTokenStatus();
         }
 
+        // If initialPurchase == 0, the function marks the token as launched
+        // while swaps remain blocked (since enabling depends solely on time),
+        // resulting in an inconsistent “launched but not tradable” state, also the 550M is go to teamTokenReservedWallet
+        // so we need to check the start time of the pair
+        IFPairV2 pair = IFPairV2(_token.pair);
+        if (block.timestamp < pair.startTime()) {
+            revert InvalidInput();
+        }
+
         // Make initial purchase for creator
         // bondingContract will transfer initialPurchase $Virtual to pairAddress
         // pairAddress will transfer amountsOut $agentToken to bondingContract

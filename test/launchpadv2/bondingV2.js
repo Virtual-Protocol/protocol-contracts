@@ -462,12 +462,12 @@ describe("BondingV2", function () {
       expect(parsedEvent.args.pair).to.equal(pairAddress);
     });
 
-    it("Should fail if start time has not passed", async function () {
+    it("Should fail to launch if start time has not passed", async function () {
       const { bondingV2 } = contracts;
 
-      await expect(bondingV2.launch(tokenAddress)).to.be.revertedWith(
-        "Swap not started"
-      );
+      await expect(
+        bondingV2.launch(tokenAddress)
+      ).to.be.revertedWithCustomError(bondingV2, "InvalidInput");
     });
 
     it("cannot reset satrt time if it's over", async function () {
@@ -2929,22 +2929,51 @@ describe("BondingV2", function () {
 
       amountIn = ethers.parseEther("100");
       await virtualToken.connect(user1).approve(addresses.fRouterV2, amountIn);
-      await expect(bondingV2.buy(amountIn, tokenAddress, 0, (await time.latest()) + 300)).to.be.revertedWithCustomError(bondingV2, "InvalidTokenStatus");
+      await expect(
+        bondingV2.buy(amountIn, tokenAddress, 0, (await time.latest()) + 300)
+      ).to.be.revertedWithCustomError(bondingV2, "InvalidTokenStatus");
       sellAmount = ethers.parseEther("100");
       agentToken = await ethers.getContractAt("AgentTokenV2", tokenAddress);
       await agentToken.connect(user1).approve(addresses.fRouterV2, sellAmount);
-      await expect(bondingV2.connect(user1).sell(sellAmount, tokenAddress, 0, (await time.latest()) + 300)).to.be.revertedWithCustomError(bondingV2, "InvalidTokenStatus");
-      console.log("user1 virtual token balance before launch:", await virtualToken.balanceOf(user1.address));
-      console.log("user1 balance of agentToken before launch:", await agentToken.balanceOf(user1.address));
+      await expect(
+        bondingV2
+          .connect(user1)
+          .sell(sellAmount, tokenAddress, 0, (await time.latest()) + 300)
+      ).to.be.revertedWithCustomError(bondingV2, "InvalidTokenStatus");
+      console.log(
+        "user1 virtual token balance before launch:",
+        await virtualToken.balanceOf(user1.address)
+      );
+      console.log(
+        "user1 balance of agentToken before launch:",
+        await agentToken.balanceOf(user1.address)
+      );
 
       // launch the token and wait for start time delay, then buy will succeed
       await time.increase(START_TIME_DELAY + 1);
       await bondingV2.launch(tokenAddress);
-      await expect(bondingV2.connect(user1).buy(amountIn, tokenAddress, 0, (await time.latest()) + 300)).to.not.be.reverted;
-      console.log("user1 virtual token balance after buy:", await virtualToken.balanceOf(user1.address));
-       console.log("user1 balance of agentToken after buy:", await agentToken.balanceOf(user1.address));
-      await expect(bondingV2.connect(user1).sell(sellAmount, tokenAddress, 0, (await time.latest()) + 300)).to.not.be.reverted;
-      console.log("user1 balance of agentToken after sell:", await agentToken.balanceOf(user1.address));
+      await expect(
+        bondingV2
+          .connect(user1)
+          .buy(amountIn, tokenAddress, 0, (await time.latest()) + 300)
+      ).to.not.be.reverted;
+      console.log(
+        "user1 virtual token balance after buy:",
+        await virtualToken.balanceOf(user1.address)
+      );
+      console.log(
+        "user1 balance of agentToken after buy:",
+        await agentToken.balanceOf(user1.address)
+      );
+      await expect(
+        bondingV2
+          .connect(user1)
+          .sell(sellAmount, tokenAddress, 0, (await time.latest()) + 300)
+      ).to.not.be.reverted;
+      console.log(
+        "user1 balance of agentToken after sell:",
+        await agentToken.balanceOf(user1.address)
+      );
     });
   });
 });

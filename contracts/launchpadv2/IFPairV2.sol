@@ -32,4 +32,8 @@ interface IFPairV2 {
     function resetTime(uint256 newStartTime) external;
 
     function startTime() external view returns (uint256);
+
+    function setTaxStartTime(uint256 _taxStartTime) external;
+
+    function taxStartTime() external view returns (uint256);
 }

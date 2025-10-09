@@ -241,16 +241,29 @@ contract FRouterV2 is
         address pairAddress
     ) private view returns (uint256) {
         IFPairV2 pair = IFPairV2(pairAddress);
-        uint256 startTime = pair.startTime();
 
+        uint256 startTime = pair.startTime();
         // If trading hasn't started yet, use maximum tax
         if (block.timestamp < startTime) {
             return factory.antiSniperBuyTaxStartValue();
         }
 
-        uint256 timeElapsed = block.timestamp - startTime;
-        uint256 antiSniperDuration = 98 * 60; // 98 minutes in seconds
+        uint256 finalTaxStartTime = startTime;
+        // Try to get taxStartTime safely for backward compatibility
+        uint256 taxStartTime = 0;
+        try pair.taxStartTime() returns (uint256 _taxStartTime) {
+            taxStartTime = _taxStartTime;
+        } catch {
+            // Old pair contract doesn't have taxStartTime function
+            // Use startTime for backward compatibility
+            taxStartTime = 0;
+        }
+        if (taxStartTime > 0) {
+            finalTaxStartTime = taxStartTime; // use taxStartTime if it's set (for new pairs)
+        }
 
+        uint256 timeElapsed = block.timestamp - finalTaxStartTime;
+        uint256 antiSniperDuration = 98 * 60; // 98 minutes in seconds
         // If more than 98 minutes have passed, use normal buy tax
         if (timeElapsed >= antiSniperDuration) {
             return factory.buyTax();
@@ -276,5 +289,13 @@ contract FRouterV2 is
         address pairAddress
     ) public view returns (bool) {
         return _calculateAntiSniperTax(pairAddress) > factory.buyTax();
+    }
+
+    function setTaxStartTime(
+        address pairAddress,
+        uint256 _taxStartTime
+    ) public onlyRole(EXECUTOR_ROLE) {
+        IFPairV2 pair = IFPairV2(pairAddress);
+        pair.setTaxStartTime(_taxStartTime);
     }
 }

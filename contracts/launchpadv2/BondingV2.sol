@@ -376,6 +376,9 @@ contract BondingV2 is
             revert InvalidInput();
         }
 
+        // Set tax start time to current block timestamp for proper anti-sniper tax calculation
+        router.setTaxStartTime(_token.pair, block.timestamp);
+
         // Make initial purchase for creator
         // bondingContract will transfer initialPurchase $Virtual to pairAddress
         // pairAddress will transfer amountsOut $agentToken to bondingContract
@@ -414,8 +417,6 @@ contract BondingV2 is
             amountOut
         );
         _token.launchExecuted = true;
-
-        
 
         return (
             _tokenAddress,

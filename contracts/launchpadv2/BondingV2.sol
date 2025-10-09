@@ -415,6 +415,8 @@ contract BondingV2 is
         );
         _token.launchExecuted = true;
 
+        
+
         return (
             _tokenAddress,
             _token.pair,

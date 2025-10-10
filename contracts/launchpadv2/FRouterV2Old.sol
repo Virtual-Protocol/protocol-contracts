@@ -11,7 +11,7 @@ import "./FFactoryV2.sol";
 import "./IFPairV2.sol";
 import "../tax/IBondingTax.sol";
 
-contract FRouterV2 is
+contract FRouterV2Old is
     Initializable,
     AccessControlUpgradeable,
     ReentrancyGuardUpgradeable
@@ -270,11 +270,5 @@ contract FRouterV2 is
         uint256 endTax = factory.buyTax();
 
         return calculatedTax > endTax ? calculatedTax : endTax;
-    }
-
-    function hasAntiSniperTax(
-        address pairAddress
-    ) public view returns (bool) {
-        return _calculateAntiSniperTax(pairAddress) > factory.buyTax();
     }
 }

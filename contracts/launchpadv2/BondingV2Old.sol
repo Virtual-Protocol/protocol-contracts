@@ -14,7 +14,7 @@ import "./FRouterV2.sol";
 import "../virtualPersona/IAgentFactoryV6.sol";
 import "../virtualPersona/IAgentTokenV2.sol";
 
-contract BondingV2 is
+contract BondingV2Old is
     Initializable,
     ReentrancyGuardUpgradeable,
     OwnableUpgradeable
@@ -431,7 +431,7 @@ contract BondingV2 is
             tokenInfo[tokenAddress].data.lastUpdated = block.timestamp;
         }
 
-        if (newReserveA <= gradThreshold && !router.hasAntiSniperTax(pairAddress) && tokenInfo[tokenAddress].trading) {
+        if (newReserveA <= gradThreshold && tokenInfo[tokenAddress].trading) {
             _openTradingOnUniswap(tokenAddress);
         }
 

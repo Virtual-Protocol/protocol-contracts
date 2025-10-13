@@ -107,6 +107,12 @@ contract BondingV2 is
         uint256 initialPurchase,
         uint256 initialPurchasedAmount
     );
+    event CancelledLaunch(
+        address indexed token,
+        address indexed pair,
+        uint,
+        uint256 initialPurchase
+    );
     event Deployed(address indexed token, uint256 amount0, uint256 amount1);
     event Graduated(address indexed token, address agentToken);
 
@@ -236,7 +242,10 @@ contract BondingV2 is
                 msg.sender // token creator
             );
         // this is to prevent transfer to blacklist address before graduation
-        IAgentFactoryV6(agentFactory).addBlacklistAddress(token, IAgentTokenV2(token).liquidityPools()[0]);
+        IAgentFactoryV6(agentFactory).addBlacklistAddress(
+            token,
+            IAgentTokenV2(token).liquidityPools()[0]
+        );
 
         uint256 bondingCurveSupply = (initialSupply -
             launchParams.teamTokenReservedSupply) *
@@ -309,6 +318,41 @@ contract BondingV2 is
         return (token, _pair, tokenInfo[token].virtualId, initialPurchase);
     }
 
+    function cancelLaunch(address _tokenAddress) public {
+        Token storage _token = tokenInfo[_tokenAddress];
+
+        // Validate that the token exists and was properly prelaunched
+        if (_token.token == address(0) || _token.pair == address(0)) {
+            revert InvalidInput();
+        }
+
+        if (msg.sender != _token.creator) {
+            revert InvalidInput();
+        }
+
+        // Validate that the token has not been launched (or cancelled)
+        if (_token.launchExecuted) {
+            revert InvalidTokenStatus();
+        }
+
+        if (_token.initialPurchase > 0) {
+            IERC20(router.assetToken()).safeTransfer(
+                _token.creator,
+                _token.initialPurchase
+            );
+        }
+
+        _token.initialPurchase = 0; // prevent duplicate transfer initialPurchase back to the creator
+        _token.launchExecuted = true; // pretend it has been launched (cancelled) and prevent duplicate launch
+
+        emit CancelledLaunch(
+            _tokenAddress,
+            _token.pair,
+            tokenInfo[_tokenAddress].virtualId,
+            _token.initialPurchase
+        );
+    }
+
     function launch(
         address _tokenAddress
     ) public nonReentrant returns (address, address, uint, uint256) {
@@ -326,7 +370,10 @@ contract BondingV2 is
         uint256 amountOut = 0;
         uint256 initialPurchase = _token.initialPurchase;
         if (initialPurchase > 0) {
-            IERC20(router.assetToken()).forceApprove(address(router), initialPurchase);
+            IERC20(router.assetToken()).forceApprove(
+                address(router),
+                initialPurchase
+            );
             amountOut = _buy(
                 address(this),
                 initialPurchase, // will raise error if initialPurchase <= 0
@@ -336,7 +383,10 @@ contract BondingV2 is
                 true // isInitialPurchase = true for creator's purchase
             );
             // creator's initialBoughtToken need to go to teamTokenReservedWallet for locking, not to creator
-            IERC20(_tokenAddress).safeTransfer(launchParams.teamTokenReservedWallet, amountOut);
+            IERC20(_tokenAddress).safeTransfer(
+                launchParams.teamTokenReservedWallet,
+                amountOut
+            );
 
             // update initialPurchase and launchExecuted to prevent duplicate purchase
             _token.initialPurchase = 0;
@@ -431,7 +481,11 @@ contract BondingV2 is
             tokenInfo[tokenAddress].data.lastUpdated = block.timestamp;
         }
 
-        if (newReserveA <= gradThreshold && !router.hasAntiSniperTax(pairAddress) && tokenInfo[tokenAddress].trading) {
+        if (
+            newReserveA <= gradThreshold &&
+            !router.hasAntiSniperTax(pairAddress) &&
+            tokenInfo[tokenAddress].trading
+        ) {
             _openTradingOnUniswap(tokenAddress);
         }
 
@@ -486,9 +540,12 @@ contract BondingV2 is
                 _token.applicationId,
                 assetBalance
             );
-        
+
         // remove blacklist address after graduation, cuz executeBondingCurveApplicationSalt we will transfer all left agentTokens to the uniswapV2Pair
-        IAgentFactoryV6(agentFactory).removeBlacklistAddress(tokenAddress, IAgentTokenV2(tokenAddress).liquidityPools()[0]);
+        IAgentFactoryV6(agentFactory).removeBlacklistAddress(
+            tokenAddress,
+            IAgentTokenV2(tokenAddress).liquidityPools()[0]
+        );
 
         // previously executeBondingCurveApplicationSalt will create agentToken and do two parts:
         //      1. (lpSupply = all left $preToken in prePairAddress) $agentToken mint to agentTokenAddress

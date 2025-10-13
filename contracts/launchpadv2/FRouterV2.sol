@@ -275,6 +275,6 @@ contract FRouterV2 is
     function hasAntiSniperTax(
         address pairAddress
     ) public view returns (bool) {
-        return factory.buyTax() < factory.antiSniperBuyTaxStartValue();
+        return _calculateAntiSniperTax(pairAddress) > factory.buyTax();
     }
 }

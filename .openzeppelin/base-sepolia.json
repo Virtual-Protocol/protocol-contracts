@@ -37337,7 +37337,8 @@
         }
       },
       "allAddresses": [
-        "0x168013f918bB85705268A2D1c2E243A3295CE12A"
+        "0x168013f918bB85705268A2D1c2E243A3295CE12A",
+        "0x66349484a344067577ab6ff66EEE48b359C30aaE"
       ]
     },
     "7776726b2d7de838b383ff62eceb5033b21258b5e9b748c3086d81c552d5d42a": {
@@ -38020,7 +38021,7 @@
             "label": "factory",
             "offset": 0,
             "slot": "0",
-            "type": "t_contract(FFactoryV2)5440",
+            "type": "t_contract(FFactoryV2)40966",
             "contract": "FRouterV2",
             "src": "contracts/launchpadv2/FRouterV2.sol:24"
           },
@@ -38082,7 +38083,7 @@
             ],
             "numberOfBytes": "32"
           },
-          "t_struct(InitializableStorage)211_storage": {
+          "t_struct(InitializableStorage)1512_storage": {
             "label": "struct Initializable.InitializableStorage",
             "members": [
               {
@@ -38100,7 +38101,7 @@
             ],
             "numberOfBytes": "32"
           },
-          "t_struct(ReentrancyGuardStorage)296_storage": {
+          "t_struct(ReentrancyGuardStorage)2531_storage": {
             "label": "struct ReentrancyGuardUpgradeable.ReentrancyGuardStorage",
             "members": [
               {
@@ -38138,7 +38139,7 @@
             "label": "uint64",
             "numberOfBytes": "8"
           },
-          "t_contract(FFactoryV2)5440": {
+          "t_contract(FFactoryV2)40966": {
             "label": "contract FFactoryV2",
             "numberOfBytes": "20"
           }
@@ -38183,7 +38184,11 @@
             }
           ]
         }
-      }
+      },
+      "allAddresses": [
+        "0xAd5DA439f94d447e9E27045DDe2956C6D9040267",
+        "0x74E3269C1D28c2d28D869B45FB49B4A5E782Be6f"
+      ]
     }
   }
 }

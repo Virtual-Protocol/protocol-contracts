@@ -9,12 +9,12 @@ import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "../pool/IUniswapV2Router02.sol";
 import "../pool/IUniswapV2Factory.sol";
 import "../pool/IUniswapV2Pair.sol";
-import "./IAgentToken.sol";
+import "./IAgentTokenV2.sol";
 import "./IAgentFactory.sol";
 
-contract AgentToken is
+contract AgentTokenV2 is
     ContextUpgradeable,
-    IAgentToken,
+    IAgentTokenV2,
     Ownable2StepUpgradeable
 {
     using EnumerableSet for EnumerableSet.AddressSet;
@@ -64,6 +64,8 @@ contract AgentToken is
     EnumerableSet.AddressSet private _liquidityPools;
 
     IAgentFactory private _factory; // Single source of truth
+
+    mapping(address => bool) public blacklists;
 
     /**
      * @dev {onlyOwnerOrFactory}
@@ -236,6 +238,18 @@ contract AgentToken is
         _liquidityPools.add(uniswapV2Pair_);
 
         return (uniswapV2Pair_);
+    }
+
+    function addBlacklistAddress(
+        address blacklistAddress
+    ) external onlyOwnerOrFactory {
+        blacklists[blacklistAddress] = true;
+    }
+
+    function removeBlacklistAddress(
+        address blacklistAddress
+    ) external onlyOwnerOrFactory {
+        delete blacklists[blacklistAddress];
     }
 
     /**
@@ -1176,7 +1190,15 @@ contract AgentToken is
         address from,
         address to,
         uint256 amount
-    ) internal virtual {}
+    ) internal virtual {
+        // Skip blacklist check for mint (from == address(0)) and burn (to == address(0)) operations
+        if (from != address(0) && to != address(0)) {
+            // Check if the recipient is blacklisted
+            if (blacklists[to]) {
+                revert TransferToBlacklistedAddress();
+            }
+        }
+    }
 
     /**
      * @dev Hook that is called after any transfer of tokens. This includes

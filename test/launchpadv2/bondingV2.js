@@ -2294,4 +2294,522 @@ describe("BondingV2", function () {
       });
     }
   );
+
+  describe("cancelLaunch", function () {
+    it("Should fail when token does not exist", async function () {
+      const { user1 } = accounts;
+      const { bondingV2 } = contracts;
+
+      // Use a random address that doesn't exist in the system
+      const nonExistentToken = ethers.Wallet.createRandom().address;
+
+      await expect(
+        bondingV2.connect(user1).cancelLaunch(nonExistentToken)
+      ).to.be.revertedWithCustomError(bondingV2, ERR_INVALID_INPUT);
+    });
+
+    it("Should fail when msg.sender is not the creator", async function () {
+      const { user1, user2 } = accounts;
+      const { bondingV2, virtualToken } = contracts;
+
+      // Create a token with user1
+      const tokenName = "Cancel Test Token";
+      const tokenTicker = "CANCEL";
+      const cores = [0, 1, 2];
+      const description = "Token for cancel testing";
+      const image = "https://example.com/cancel.png";
+      const urls = [
+        "https://twitter.com/cancel",
+        "https://t.me/cancel",
+        "https://youtube.com/cancel",
+        "https://example.com/cancel",
+      ];
+      const purchaseAmount = ethers.parseEther("1000");
+
+      await virtualToken
+        .connect(user1)
+        .approve(addresses.bondingV2, purchaseAmount);
+
+      const startTime = (await time.latest()) + START_TIME_DELAY + 1;
+      const tx = await bondingV2
+        .connect(user1)
+        .preLaunch(
+          tokenName,
+          tokenTicker,
+          cores,
+          description,
+          image,
+          urls,
+          purchaseAmount,
+          startTime
+        );
+
+      const receipt = await tx.wait();
+      const event = receipt.logs.find((log) => {
+        try {
+          const parsed = bondingV2.interface.parseLog(log);
+          return parsed.name === "PreLaunched";
+        } catch (e) {
+          return false;
+        }
+      });
+
+      const parsedEvent = bondingV2.interface.parseLog(event);
+      const tokenAddress = parsedEvent.args.token;
+
+      // user2 (not the creator) tries to cancel
+      await expect(
+        bondingV2.connect(user2).cancelLaunch(tokenAddress)
+      ).to.be.revertedWithCustomError(bondingV2, ERR_INVALID_INPUT);
+    });
+
+    it("Should fail when token has already been launched", async function () {
+      const { user1 } = accounts;
+      const { bondingV2, virtualToken } = contracts;
+
+      // Create and launch a token
+      const tokenName = "Already Launched Token";
+      const tokenTicker = "LAUNCHED";
+      const cores = [0, 1, 2];
+      const description = "Token already launched";
+      const image = "https://example.com/launched.png";
+      const urls = [
+        "https://twitter.com/launched",
+        "https://t.me/launched",
+        "https://youtube.com/launched",
+        "https://example.com/launched",
+      ];
+      const purchaseAmount = ethers.parseEther("1000");
+
+      await virtualToken
+        .connect(user1)
+        .approve(addresses.bondingV2, purchaseAmount);
+
+      const startTime = (await time.latest()) + START_TIME_DELAY + 1;
+      const tx = await bondingV2
+        .connect(user1)
+        .preLaunch(
+          tokenName,
+          tokenTicker,
+          cores,
+          description,
+          image,
+          urls,
+          purchaseAmount,
+          startTime
+        );
+
+      const receipt = await tx.wait();
+      const event = receipt.logs.find((log) => {
+        try {
+          const parsed = bondingV2.interface.parseLog(log);
+          return parsed.name === "PreLaunched";
+        } catch (e) {
+          return false;
+        }
+      });
+
+      const parsedEvent = bondingV2.interface.parseLog(event);
+      const tokenAddress = parsedEvent.args.token;
+
+      // Wait and launch the token
+      await time.increase(START_TIME_DELAY + 1);
+      await bondingV2.connect(user1).launch(tokenAddress);
+
+      // Try to cancel after launch - should fail
+      await expect(
+        bondingV2.connect(user1).cancelLaunch(tokenAddress)
+      ).to.be.revertedWithCustomError(bondingV2, ERR_INVALID_TOKEN_STATUS);
+    });
+
+    it("Should successfully cancel launch and transfer virtual tokens when initialPurchase > 0", async function () {
+      const { user1 } = accounts;
+      const { bondingV2, virtualToken } = contracts;
+
+      // Create a token
+      const tokenName = "Cancel Success Token";
+      const tokenTicker = "SUCCESS";
+      const cores = [0, 1, 2];
+      const description = "Token for successful cancel";
+      const image = "https://example.com/success.png";
+      const urls = [
+        "https://twitter.com/success",
+        "https://t.me/success",
+        "https://youtube.com/success",
+        "https://example.com/success",
+      ];
+      const purchaseAmount = ethers.parseEther("1000");
+      const fee = await bondingV2.fee();
+      const expectedInitialPurchase = purchaseAmount - fee;
+
+      // Get user1's initial virtual token balance
+      const initialUser1Balance = await virtualToken.balanceOf(user1.address);
+      const initialBondingBalance = await virtualToken.balanceOf(
+        addresses.bondingV2
+      );
+
+      await virtualToken
+        .connect(user1)
+        .approve(addresses.bondingV2, purchaseAmount);
+
+      const startTime = (await time.latest()) + START_TIME_DELAY + 1;
+      const tx = await bondingV2
+        .connect(user1)
+        .preLaunch(
+          tokenName,
+          tokenTicker,
+          cores,
+          description,
+          image,
+          urls,
+          purchaseAmount,
+          startTime
+        );
+
+      const receipt = await tx.wait();
+      const event = receipt.logs.find((log) => {
+        try {
+          const parsed = bondingV2.interface.parseLog(log);
+          return parsed.name === "PreLaunched";
+        } catch (e) {
+          return false;
+        }
+      });
+
+      const parsedEvent = bondingV2.interface.parseLog(event);
+      const tokenAddress = parsedEvent.args.token;
+      const pairAddress = parsedEvent.args.pair;
+
+      // Get token contract instance
+      const agentTokenContract = await ethers.getContractAt(
+        "AgentTokenV2",
+        tokenAddress
+      );
+
+      // Verify bonding contract received the initialPurchase amount
+      const bondingBalanceAfterPreLaunch = await virtualToken.balanceOf(
+        addresses.bondingV2
+      );
+      expect(bondingBalanceAfterPreLaunch).to.equal(
+        initialBondingBalance + expectedInitialPurchase
+      );
+
+      // Get token info before cancel
+      let tokenInfo = await bondingV2.tokenInfo(tokenAddress);
+      expect(tokenInfo.initialPurchase).to.equal(expectedInitialPurchase);
+      expect(tokenInfo.launchExecuted).to.be.false;
+
+      // Cancel the launch
+      const cancelTx = await bondingV2
+        .connect(user1)
+        .cancelLaunch(tokenAddress);
+      const cancelReceipt = await cancelTx.wait();
+
+      // Verify CancelledLaunch event was emitted
+      const cancelEvent = cancelReceipt.logs.find((log) => {
+        try {
+          const parsed = bondingV2.interface.parseLog(log);
+          return parsed.name === "CancelledLaunch";
+        } catch (e) {
+          return false;
+        }
+      });
+
+      expect(cancelEvent).to.not.be.undefined;
+      const parsedCancelEvent = bondingV2.interface.parseLog(cancelEvent);
+      expect(parsedCancelEvent.args.token).to.equal(tokenAddress);
+      expect(parsedCancelEvent.args.pair).to.equal(pairAddress);
+
+      // Verify virtual tokens were transferred back to creator
+      const user1BalanceAfterCancel = await virtualToken.balanceOf(
+        user1.address
+      );
+      const bondingBalanceAfterCancel = await virtualToken.balanceOf(
+        addresses.bondingV2
+      );
+
+      // Note: user1 paid purchaseAmount, got back expectedInitialPurchase (fee was sent to feeTo)
+      expect(user1BalanceAfterCancel).to.equal(
+        initialUser1Balance - purchaseAmount + expectedInitialPurchase
+      );
+      expect(bondingBalanceAfterCancel).to.equal(initialBondingBalance);
+
+      // Verify token info was updated
+      tokenInfo = await bondingV2.tokenInfo(tokenAddress);
+      expect(tokenInfo.initialPurchase).to.equal(0);
+      expect(tokenInfo.launchExecuted).to.be.true;
+
+      console.log("✅ Cancel launch successful:");
+      console.log(
+        "- Initial purchase returned:",
+        ethers.formatEther(expectedInitialPurchase)
+      );
+      console.log(
+        "- Token info updated: initialPurchase = 0, launchExecuted = true"
+      );
+    });
+
+    it("Should successfully cancel launch without transfer when initialPurchase = 0", async function () {
+      const { user1 } = accounts;
+      const { bondingV2, virtualToken } = contracts;
+
+      // Create a token with purchase amount equal to fee (so initialPurchase = 0)
+      const tokenName = "Zero Initial Purchase Token";
+      const tokenTicker = "ZERO";
+      const cores = [0, 1, 2];
+      const description = "Token with zero initial purchase";
+      const image = "https://example.com/zero.png";
+      const urls = [
+        "https://twitter.com/zero",
+        "https://t.me/zero",
+        "https://youtube.com/zero",
+        "https://example.com/zero",
+      ];
+      const fee = await bondingV2.fee();
+      const purchaseAmount = fee; // Exactly equal to fee, so initialPurchase = 0
+
+      const initialUser1Balance = await virtualToken.balanceOf(user1.address);
+      const initialBondingBalance = await virtualToken.balanceOf(
+        addresses.bondingV2
+      );
+
+      await virtualToken
+        .connect(user1)
+        .approve(addresses.bondingV2, purchaseAmount);
+
+      const startTime = (await time.latest()) + START_TIME_DELAY + 1;
+      const tx = await bondingV2
+        .connect(user1)
+        .preLaunch(
+          tokenName,
+          tokenTicker,
+          cores,
+          description,
+          image,
+          urls,
+          purchaseAmount,
+          startTime
+        );
+
+      const receipt = await tx.wait();
+      const event = receipt.logs.find((log) => {
+        try {
+          const parsed = bondingV2.interface.parseLog(log);
+          return parsed.name === "PreLaunched";
+        } catch (e) {
+          return false;
+        }
+      });
+
+      const parsedEvent = bondingV2.interface.parseLog(event);
+      const tokenAddress = parsedEvent.args.token;
+
+      // Verify initialPurchase is 0
+      let tokenInfo = await bondingV2.tokenInfo(tokenAddress);
+      expect(tokenInfo.initialPurchase).to.equal(0);
+
+      // Cancel the launch
+      const cancelTx = await bondingV2
+        .connect(user1)
+        .cancelLaunch(tokenAddress);
+      const cancelReceipt = await cancelTx.wait();
+
+      // Verify CancelledLaunch event was emitted
+      const cancelEvent = cancelReceipt.logs.find((log) => {
+        try {
+          const parsed = bondingV2.interface.parseLog(log);
+          return parsed.name === "CancelledLaunch";
+        } catch (e) {
+          return false;
+        }
+      });
+
+      expect(cancelEvent).to.not.be.undefined;
+
+      // Verify no virtual tokens were transferred (since initialPurchase was 0)
+      const user1BalanceAfterCancel = await virtualToken.balanceOf(
+        user1.address
+      );
+      const bondingBalanceAfterCancel = await virtualToken.balanceOf(
+        addresses.bondingV2
+      );
+
+      // User should have lost only the fee
+      expect(user1BalanceAfterCancel).to.equal(
+        initialUser1Balance - purchaseAmount
+      );
+      // Bonding contract balance should remain the same (no initialPurchase to return)
+      expect(bondingBalanceAfterCancel).to.equal(initialBondingBalance);
+
+      // Verify token info was updated
+      tokenInfo = await bondingV2.tokenInfo(tokenAddress);
+      expect(tokenInfo.initialPurchase).to.equal(0);
+      expect(tokenInfo.launchExecuted).to.be.true;
+
+      console.log("✅ Cancel launch with zero initialPurchase successful:");
+      console.log("- No tokens transferred (initialPurchase was 0)");
+      console.log(
+        "- Token info updated: initialPurchase = 0, launchExecuted = true"
+      );
+    });
+
+    it("Should fail when trying to cancel again after already cancelled", async function () {
+      const { user1 } = accounts;
+      const { bondingV2, virtualToken } = contracts;
+
+      // Create a token
+      const tokenName = "Double Cancel Token";
+      const tokenTicker = "DOUBLE";
+      const cores = [0, 1, 2];
+      const description = "Token for double cancel testing";
+      const image = "https://example.com/double.png";
+      const urls = [
+        "https://twitter.com/double",
+        "https://t.me/double",
+        "https://youtube.com/double",
+        "https://example.com/double",
+      ];
+      const purchaseAmount = ethers.parseEther("1000");
+
+      await virtualToken
+        .connect(user1)
+        .approve(addresses.bondingV2, purchaseAmount);
+
+      const startTime = (await time.latest()) + START_TIME_DELAY + 1;
+      const tx = await bondingV2
+        .connect(user1)
+        .preLaunch(
+          tokenName,
+          tokenTicker,
+          cores,
+          description,
+          image,
+          urls,
+          purchaseAmount,
+          startTime
+        );
+
+      const receipt = await tx.wait();
+      const event = receipt.logs.find((log) => {
+        try {
+          const parsed = bondingV2.interface.parseLog(log);
+          return parsed.name === "PreLaunched";
+        } catch (e) {
+          return false;
+        }
+      });
+
+      const parsedEvent = bondingV2.interface.parseLog(event);
+      const tokenAddress = parsedEvent.args.token;
+
+      // Cancel the launch for the first time
+      await bondingV2.connect(user1).cancelLaunch(tokenAddress);
+
+      // Try to cancel again - should fail
+      await expect(
+        bondingV2.connect(user1).cancelLaunch(tokenAddress)
+      ).to.be.revertedWithCustomError(bondingV2, ERR_INVALID_TOKEN_STATUS);
+    });
+
+    it("Should verify all state changes after successful cancel", async function () {
+      const { user1 } = accounts;
+      const { bondingV2, virtualToken } = contracts;
+
+      // Create a token
+      const tokenName = "State Verification Token";
+      const tokenTicker = "STATE";
+      const cores = [0, 1, 2];
+      const description = "Token for state verification";
+      const image = "https://example.com/state.png";
+      const urls = [
+        "https://twitter.com/state",
+        "https://t.me/state",
+        "https://youtube.com/state",
+        "https://example.com/state",
+      ];
+      const purchaseAmount = ethers.parseEther("1000");
+      const fee = await bondingV2.fee();
+      const expectedInitialPurchase = purchaseAmount - fee;
+
+      await virtualToken
+        .connect(user1)
+        .approve(addresses.bondingV2, purchaseAmount);
+
+      const startTime = (await time.latest()) + START_TIME_DELAY + 1;
+      const tx = await bondingV2
+        .connect(user1)
+        .preLaunch(
+          tokenName,
+          tokenTicker,
+          cores,
+          description,
+          image,
+          urls,
+          purchaseAmount,
+          startTime
+        );
+
+      const receipt = await tx.wait();
+      const event = receipt.logs.find((log) => {
+        try {
+          const parsed = bondingV2.interface.parseLog(log);
+          return parsed.name === "PreLaunched";
+        } catch (e) {
+          return false;
+        }
+      });
+
+      const parsedEvent = bondingV2.interface.parseLog(event);
+      const tokenAddress = parsedEvent.args.token;
+      const pairAddress = parsedEvent.args.pair;
+      const virtualId = parsedEvent.args[2];
+
+      // Get initial state
+      let tokenInfo = await bondingV2.tokenInfo(tokenAddress);
+      expect(tokenInfo.creator).to.equal(user1.address);
+      expect(tokenInfo.token).to.equal(tokenAddress);
+      expect(tokenInfo.pair).to.equal(pairAddress);
+      expect(tokenInfo.initialPurchase).to.equal(expectedInitialPurchase);
+      expect(tokenInfo.launchExecuted).to.be.false;
+
+      // Cancel the launch
+      const cancelTx = await bondingV2
+        .connect(user1)
+        .cancelLaunch(tokenAddress);
+      const cancelReceipt = await cancelTx.wait();
+
+      // Verify CancelledLaunch event with all parameters
+      const cancelEvent = cancelReceipt.logs.find((log) => {
+        try {
+          const parsed = bondingV2.interface.parseLog(log);
+          return parsed.name === "CancelledLaunch";
+        } catch (e) {
+          return false;
+        }
+      });
+
+      expect(cancelEvent).to.not.be.undefined;
+      const parsedCancelEvent = bondingV2.interface.parseLog(cancelEvent);
+      expect(parsedCancelEvent.args.token).to.equal(tokenAddress);
+      expect(parsedCancelEvent.args.pair).to.equal(pairAddress);
+      expect(parsedCancelEvent.args[2]).to.equal(virtualId);
+      // Note: initialPurchase in event should be 0 because it's read after being set to 0
+      expect(parsedCancelEvent.args.initialPurchase).to.equal(0);
+
+      // Verify final state
+      tokenInfo = await bondingV2.tokenInfo(tokenAddress);
+      expect(tokenInfo.initialPurchase).to.equal(0);
+      expect(tokenInfo.launchExecuted).to.be.true;
+      // Other fields should remain unchanged
+      expect(tokenInfo.creator).to.equal(user1.address);
+      expect(tokenInfo.token).to.equal(tokenAddress);
+      expect(tokenInfo.pair).to.equal(pairAddress);
+
+      console.log("✅ All state changes verified:");
+      console.log("- initialPurchase: reset to 0");
+      console.log("- launchExecuted: set to true");
+      console.log("- CancelledLaunch event emitted with correct parameters");
+      console.log("- Other token info fields remain unchanged");
+    });
+  });
 });

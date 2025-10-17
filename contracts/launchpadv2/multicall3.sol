@@ -87,7 +87,7 @@ contract Multicall3 {
     /// @return returnData An array of bytes containing the responses
     function aggregate(
         Call[] calldata calls
-    ) public payable returns (uint256 blockNumber, bytes[] memory returnData) {
+    ) public onlyOwnerOrAdmin payable returns (uint256 blockNumber, bytes[] memory returnData) {
         blockNumber = block.number;
         uint256 length = calls.length;
         returnData = new bytes[](length);
@@ -111,7 +111,7 @@ contract Multicall3 {
     function tryAggregate(
         bool requireSuccess,
         Call[] calldata calls
-    ) public payable returns (Result[] memory returnData) {
+    ) public onlyOwnerOrAdmin payable returns (Result[] memory returnData) {
         uint256 length = calls.length;
         returnData = new Result[](length);
         Call calldata call;
@@ -140,6 +140,7 @@ contract Multicall3 {
         Call[] calldata calls
     )
         public
+        onlyOwnerOrAdmin
         payable
         returns (
             uint256 blockNumber,
@@ -162,6 +163,7 @@ contract Multicall3 {
         Call[] calldata calls
     )
         public
+        onlyOwnerOrAdmin
         payable
         returns (
             uint256 blockNumber,
@@ -180,7 +182,7 @@ contract Multicall3 {
     /// @return returnData An array of Result structs
     function aggregate3(
         Call3[] calldata calls
-    ) public payable returns (Result[] memory returnData) {
+    ) public onlyOwnerOrAdmin payable returns (Result[] memory returnData) {
         uint256 length = calls.length;
         returnData = new Result[](length);
         Call3 calldata calli;
@@ -229,7 +231,7 @@ contract Multicall3 {
     /// @return returnData An array of Result structs
     function aggregate3Value(
         Call3Value[] calldata calls
-    ) public payable returns (Result[] memory returnData) {
+    ) public onlyOwnerOrAdmin payable returns (Result[] memory returnData) {
         uint256 valAccumulator;
         uint256 length = calls.length;
         returnData = new Result[](length);

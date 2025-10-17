@@ -5,9 +5,13 @@ async function main() {
     console.log("\n=== Multicall3 Deployment Starting ===");
 
     // Check for required environment variables
-    const contractController = process.env.CONTRACT_CONTROLLER;
-    if (!contractController) {
-      throw new Error("CONTRACT_CONTROLLER not set in environment");
+    const adminAddress = process.env.ADMIN;
+    if (!adminAddress) {
+      throw new Error("ADMIN not set in environment");
+    }
+    const beOpsWallet = process.env.BE_OPS_WALLET;
+    if (!beOpsWallet) {
+      throw new Error("BE_OPS_WALLET not set in environment");
     }
 
     // Get deployer
@@ -18,7 +22,7 @@ async function main() {
       ethers.formatEther(await ethers.provider.getBalance(deployer.address)),
       "ETH"
     );
-    console.log("Target owner (CONTRACT_CONTROLLER):", contractController);
+    console.log("Target owner (ADMIN):", adminAddress);
 
     // Deploy Multicall3
     console.log("\n--- Deploying Multicall3 ---");
@@ -32,48 +36,27 @@ async function main() {
 
     // Optional: Grant admin role if ADMIN is set in environment
     // Note: This must be done BEFORE ownership transfer
-    const adminAddress = process.env.ADMIN;
-    if (
-      adminAddress &&
-      adminAddress.toLowerCase() !== deployer.address.toLowerCase() &&
-      adminAddress.toLowerCase() !== contractController.toLowerCase()
-    ) {
-      console.log("\n--- Granting Admin Role ---");
-      console.log("⚠️  Note: Granting admin BEFORE ownership transfer");
-      const tx = await multicall3.grantAdmin(adminAddress);
-      await tx.wait();
-      console.log("✅ Admin role granted to:", adminAddress);
-      console.log("✅ Is admin:", await multicall3.isAdmin(adminAddress));
-    } else if (adminAddress) {
-      console.log(
-        "\n⚠️  ADMIN is the same as deployer or CONTRACT_CONTROLLER, no admin grant needed"
-      );
-    }
+    console.log("\n--- Granting Admin Role to BE Ops Wallet ---");
+    console.log("⚠️  Note: Granting admin BEFORE ownership transfer");
+    const tx = await multicall3.grantAdmin(beOpsWallet);
+    await tx.wait();
+    console.log("✅ Admin role granted to:", beOpsWallet);
+    console.log("✅ beOpsWallet Is admin:", await multicall3.isAdmin(beOpsWallet));
 
     // Transfer ownership to CONTRACT_CONTROLLER if different from deployer
-    if (contractController.toLowerCase() !== deployer.address.toLowerCase()) {
+    if (adminAddress && adminAddress.toLowerCase() !== deployer.address.toLowerCase()) {
       console.log("\n--- Transferring Ownership ---");
-      const transferTx = await multicall3.transferOwnership(contractController);
+      const transferTx = await multicall3.transferOwnership(adminAddress);
       await transferTx.wait();
-      console.log("✅ Ownership transferred to:", contractController);
-      console.log("✅ Current owner:", await multicall3.owner());
-    } else {
-      console.log(
-        "\n⚠️  CONTRACT_CONTROLLER is the same as deployer, no transfer needed"
-      );
+      console.log("✅ Ownership transferred to:", adminAddress);
+      console.log("✅ New current owner:", await multicall3.owner());
     }
 
     // Display deployment summary
     console.log("\n=== Deployment Summary ===");
     console.log("Multicall3:", multicall3Address);
-    console.log("Owner:", contractController);
-    if (
-      adminAddress &&
-      adminAddress.toLowerCase() !== deployer.address.toLowerCase() &&
-      adminAddress.toLowerCase() !== contractController.toLowerCase()
-    ) {
-      console.log("Admin:", adminAddress);
-    }
+    console.log("Owner:", adminAddress);
+    console.log("Admin:", adminAddress);
 
     // Display verification commands
     console.log("\n=== Verification Commands ===");

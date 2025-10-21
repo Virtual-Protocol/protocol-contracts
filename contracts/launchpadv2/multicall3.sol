@@ -386,7 +386,7 @@ contract Multicall3 {
         address token,
         address spender,
         uint256 amount
-    ) public onlyOwnerOrAdmin returns (bool) {
+    ) public onlyOwnerOrAdmin {
         require(token != address(0), "Multicall3: token is the zero address");
         require(
             spender != address(0),
@@ -397,7 +397,6 @@ contract Multicall3 {
         require(success, "Multicall3: approve failed");
 
         emit TokenApproved(token, spender, amount);
-        return success;
     }
 
     /// @notice Batch approve multiple tokens to multiple spenders
@@ -428,7 +427,7 @@ contract Multicall3 {
         address token,
         address to,
         uint256 amount
-    ) public onlyOwner returns (bool) {
+    ) public onlyOwner {
         require(token != address(0), "Multicall3: token is the zero address");
         require(to != address(0), "Multicall3: recipient is the zero address");
 
@@ -436,7 +435,6 @@ contract Multicall3 {
         require(success, "Multicall3: transfer failed");
 
         emit TokenTransferred(token, to, amount);
-        return success;
     }
 
     /// @notice Batch transfer multiple tokens

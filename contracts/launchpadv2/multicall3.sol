@@ -87,7 +87,12 @@ contract Multicall3 {
     /// @return returnData An array of bytes containing the responses
     function aggregate(
         Call[] calldata calls
-    ) public onlyOwnerOrAdmin payable returns (uint256 blockNumber, bytes[] memory returnData) {
+    )
+        public
+        payable
+        onlyOwnerOrAdmin
+        returns (uint256 blockNumber, bytes[] memory returnData)
+    {
         blockNumber = block.number;
         uint256 length = calls.length;
         returnData = new bytes[](length);
@@ -111,7 +116,7 @@ contract Multicall3 {
     function tryAggregate(
         bool requireSuccess,
         Call[] calldata calls
-    ) public onlyOwnerOrAdmin payable returns (Result[] memory returnData) {
+    ) public payable onlyOwnerOrAdmin returns (Result[] memory returnData) {
         uint256 length = calls.length;
         returnData = new Result[](length);
         Call calldata call;
@@ -140,8 +145,8 @@ contract Multicall3 {
         Call[] calldata calls
     )
         public
-        onlyOwnerOrAdmin
         payable
+        onlyOwnerOrAdmin
         returns (
             uint256 blockNumber,
             bytes32 blockHash,
@@ -163,8 +168,8 @@ contract Multicall3 {
         Call[] calldata calls
     )
         public
-        onlyOwnerOrAdmin
         payable
+        onlyOwnerOrAdmin
         returns (
             uint256 blockNumber,
             bytes32 blockHash,
@@ -182,7 +187,7 @@ contract Multicall3 {
     /// @return returnData An array of Result structs
     function aggregate3(
         Call3[] calldata calls
-    ) public onlyOwnerOrAdmin payable returns (Result[] memory returnData) {
+    ) public payable onlyOwnerOrAdmin returns (Result[] memory returnData) {
         uint256 length = calls.length;
         returnData = new Result[](length);
         Call3 calldata calli;
@@ -231,7 +236,7 @@ contract Multicall3 {
     /// @return returnData An array of Result structs
     function aggregate3Value(
         Call3Value[] calldata calls
-    ) public onlyOwnerOrAdmin payable returns (Result[] memory returnData) {
+    ) public payable onlyOwnerOrAdmin returns (Result[] memory returnData) {
         uint256 valAccumulator;
         uint256 length = calls.length;
         returnData = new Result[](length);
@@ -272,7 +277,7 @@ contract Multicall3 {
                         0x44,
                         0x4d756c746963616c6c333a2063616c6c206661696c6564000000000000000000
                     )
-                    revert(0x00, 0x84)
+                    revert(0x00, 0x64)
                 }
             }
             unchecked {

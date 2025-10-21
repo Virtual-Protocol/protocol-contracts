@@ -154,7 +154,7 @@ contract Multicall3 {
         )
     {
         blockNumber = block.number;
-        blockHash = blockhash(block.number);
+        blockHash = blockhash(block.number - 1);
         returnData = tryAggregate(requireSuccess, calls);
     }
 

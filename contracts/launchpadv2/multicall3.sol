@@ -396,7 +396,7 @@ contract Multicall3 {
         );
 
         // Use SafeERC20 for non-standard token compatibility
-        IERC20(token).safeApprove(spender, amount);
+        SafeERC20.forceApprove(IERC20(token), spender, amount);
 
         emit TokenApproved(token, spender, amount);
     }
@@ -434,7 +434,7 @@ contract Multicall3 {
         require(to != address(0), "Multicall3: recipient is the zero address");
 
         // Use SafeERC20 for non-standard token compatibility
-        IERC20(token).safeTransfer(to, amount);
+        SafeERC20.safeTransfer(IERC20(token), to, amount);
 
         emit TokenTransferred(token, to, amount);
     }
@@ -482,7 +482,7 @@ contract Multicall3 {
         require(balance >= amount, "Multicall3: insufficient token balance");
 
         // Use SafeERC20 for non-standard token compatibility
-        IERC20(token).safeTransfer(to, amount);
+        SafeERC20.safeTransfer(IERC20(token), to, amount);
 
         emit TokenTransferred(token, to, amount);
     }

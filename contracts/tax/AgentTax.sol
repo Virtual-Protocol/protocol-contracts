@@ -24,6 +24,8 @@ contract AgentTax is Initializable, AccessControlUpgradeable {
 
     bytes32 public constant ADMIN_ROLE = keccak256("ADMIN_ROLE");
     bytes32 public constant EXECUTOR_ROLE = keccak256("EXECUTOR_ROLE");
+    bytes32 public constant EXECUTOR_V2_ROLE = keccak256("EXECUTOR_V2_ROLE");
+    uint256 internal constant MIN_PROTOTYPE_V2_ONCHAIN_VIRTUAL_ID = 10**12;
 
     uint256 internal constant DENOM = 10000;
 
@@ -318,6 +320,19 @@ contract AgentTax is Initializable, AccessControlUpgradeable {
         );
         recipient.creator = creator;
         emit CreatorUpdated(agentId, oldCreator, creator);
+    }
+
+    function updateCreatorForPrototypeV2Agents(uint256 agentId, address tba, address creator) public onlyRole(EXECUTOR_V2_ROLE) {
+        // 10^12 is the first fake prototypeV2OnchainVirtualId
+        require(agentId >= MIN_PROTOTYPE_V2_ONCHAIN_VIRTUAL_ID, "Only for prototype v2 agents");
+
+        require(tba != address(0), "Invalid TBA");
+        require(creator != address(0), "Invalid creator");
+
+        TaxRecipient storage recipient = _agentRecipients[agentId];
+        recipient.tba = tba;
+        recipient.creator = creator;
+        emit CreatorUpdated(agentId, tba, creator);
     }
 
     function dcaSell(

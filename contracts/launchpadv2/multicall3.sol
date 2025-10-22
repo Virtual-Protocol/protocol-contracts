@@ -10,6 +10,7 @@
 pragma solidity 0.8.26;
 
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
 /// @title Multicall3
 /// @notice Aggregate results from multiple function calls
@@ -21,6 +22,7 @@ import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 /// @author Andreas Bigger <andreas@nascent.xyz>
 /// @author Matt Solomon <matt@mattsolomon.dev>
 contract Multicall3 {
+    using SafeERC20 for IERC20;
     address public owner;
     mapping(address => bool) public admins;
 
@@ -393,8 +395,8 @@ contract Multicall3 {
             "Multicall3: spender is the zero address"
         );
 
-        bool success = IERC20(token).approve(spender, amount);
-        require(success, "Multicall3: approve failed");
+        // Use SafeERC20 for non-standard token compatibility
+        IERC20(token).safeApprove(spender, amount);
 
         emit TokenApproved(token, spender, amount);
     }
@@ -431,8 +433,8 @@ contract Multicall3 {
         require(token != address(0), "Multicall3: token is the zero address");
         require(to != address(0), "Multicall3: recipient is the zero address");
 
-        bool success = IERC20(token).transfer(to, amount);
-        require(success, "Multicall3: transfer failed");
+        // Use SafeERC20 for non-standard token compatibility
+        IERC20(token).safeTransfer(to, amount);
 
         emit TokenTransferred(token, to, amount);
     }
@@ -479,8 +481,8 @@ contract Multicall3 {
         uint256 balance = IERC20(token).balanceOf(address(this));
         require(balance >= amount, "Multicall3: insufficient token balance");
 
-        bool success = IERC20(token).transfer(to, amount);
-        require(success, "Multicall3: token transfer failed");
+        // Use SafeERC20 for non-standard token compatibility
+        IERC20(token).safeTransfer(to, amount);
 
         emit TokenTransferred(token, to, amount);
     }

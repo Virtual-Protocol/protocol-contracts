@@ -114,6 +114,10 @@ const { ethers, upgrades } = require("hardhat");
     if (!taxVault) {
       throw new Error("FFactoryV2_TAX_VAULT not set in environment");
     }
+    const fRouterV2TaxManager = process.env.FRouterV2_TAX_MANAGER;
+    if (!fRouterV2TaxManager) {
+      throw new Error("FRouterV2_TAX_MANAGER not set in environment");
+    }
     const agentDAO = process.env.AGENT_DAO;
     if (!agentDAO) {
       throw new Error("AGENT_DAO not set in environment");
@@ -254,9 +258,9 @@ const { ethers, upgrades } = require("hardhat");
 
     // 8. Set taxManager for FRouterV2
     console.log("\n--- Setting TaxManager for FRouterV2 ---");
-    const tx4_1 = await fRouterV2.setTaxManager(taxVault);
+    const tx4_1 = await fRouterV2.setTaxManager(fRouterV2TaxManager);
     await tx4_1.wait();
-    console.log("TaxManager set for FRouterV2");
+    console.log("TaxManager set for FRouterV2: ", fRouterV2TaxManager);
 
     // 9. Set antiSniperTaxManager for FRouterV2
     console.log("\n--- Setting AntiSniperTaxManager for FRouterV2 ---");

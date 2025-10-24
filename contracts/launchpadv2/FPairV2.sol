@@ -24,6 +24,7 @@ contract FPairV2 is IFPairV2, ReentrancyGuard {
     Pool private _pool;
     uint256 public startTime;
     uint256 public startTimeDelay;
+    uint256 public taxStartTime; // Time when anti-sniper tax starts counting down
 
     constructor(
         address router_,
@@ -41,6 +42,7 @@ contract FPairV2 is IFPairV2, ReentrancyGuard {
         tokenB = token1;
         startTime = startTime_;
         startTimeDelay = startTimeDelay_;
+        taxStartTime = 0; // Initialize to 0, will be set when launched
     }
 
     event Mint(uint256 reserve0, uint256 reserve1);
@@ -53,6 +55,7 @@ contract FPairV2 is IFPairV2, ReentrancyGuard {
     );
 
     event TimeReset(uint256 oldStartTime, uint256 newStartTime);
+    event TaxStartTimeSet(uint256 taxStartTime);
 
     modifier onlyRouter() {
         require(router == msg.sender, "Only router can call this function");
@@ -168,5 +171,11 @@ contract FPairV2 is IFPairV2, ReentrancyGuard {
         uint256 oldStartTime = startTime;
         startTime = newStartTime;
         emit TimeReset(oldStartTime, newStartTime);
+    }
+
+    function setTaxStartTime(uint256 _taxStartTime) public onlyRouter {
+        require(_taxStartTime > 0, "Tax start time must be greater than 0");
+        taxStartTime = _taxStartTime;
+        emit TaxStartTimeSet(_taxStartTime);
     }
 }

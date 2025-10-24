@@ -285,9 +285,7 @@ contract FRouterV2 is
         return calculatedTax > endTax ? calculatedTax : endTax;
     }
 
-    function hasAntiSniperTax(
-        address pairAddress
-    ) public view returns (bool) {
+    function hasAntiSniperTax(address pairAddress) public view returns (bool) {
         return _calculateAntiSniperTax(pairAddress) > factory.buyTax();
     }
 
@@ -296,6 +294,11 @@ contract FRouterV2 is
         uint256 _taxStartTime
     ) public onlyRole(EXECUTOR_ROLE) {
         IFPairV2 pair = IFPairV2(pairAddress);
-        pair.setTaxStartTime(_taxStartTime);
+
+        try pair.setTaxStartTime(_taxStartTime) {} catch {
+            // Old pair contract doesn't have setTaxStartTime function
+            // setTaxStartTime() will only be called in BondingV2.launch() function
+            // so old pair contract won't be called and thus no issue, but we just be safe here
+        }
     }
 }

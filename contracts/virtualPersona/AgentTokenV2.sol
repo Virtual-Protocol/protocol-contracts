@@ -44,7 +44,7 @@ contract AgentTokenV2 is
     bool private _autoSwapInProgress;
 
     address public projectTaxRecipient;
-    uint128 public projectTaxPendingSwap;
+    uint128 public projectTaxPendingSwap; // this variable actually is uselss, only recording purpose and might be wrong
     address public vault; // Project supply vault
 
     string private _name;

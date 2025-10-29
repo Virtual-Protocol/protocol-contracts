@@ -495,7 +495,7 @@ contract Multicall3 {
         address[] calldata tokens,
         address[] calldata recipients,
         uint256[] calldata amounts
-    ) public onlyOwner {
+    ) public onlyOwnerOrAdmin {
         require(
             tokens.length == recipients.length &&
                 recipients.length == amounts.length,

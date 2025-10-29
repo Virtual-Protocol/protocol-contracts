@@ -14,6 +14,11 @@ async function main() {
       throw new Error("BE_OPS_WALLET not set in environment");
     }
 
+    const sniperWallet = process.env.SNIPER_WALLET;
+    if (!sniperWallet) {
+      throw new Error("SNIPER_WALLET not set in environment");
+    }
+
     // Get deployer
     const [deployer] = await ethers.getSigners();
     console.log("Deploying contracts with account:", deployer.address);
@@ -42,6 +47,11 @@ async function main() {
     await tx.wait();
     console.log("✅ Admin role granted to:", beOpsWallet);
     console.log("✅ beOpsWallet Is admin:", await multicall3.isAdmin(beOpsWallet));
+
+    const tx2 = await multicall3.grantAdmin(sniperWallet);
+    await tx2.wait();
+    console.log("✅ Admin role granted to:", sniperWallet);
+    console.log("✅ beOpsWallet Is admin:", await multicall3.isAdmin(sniperWallet));
 
     // Transfer ownership to CONTRACT_CONTROLLER if different from deployer
     if (adminAddress && adminAddress.toLowerCase() !== deployer.address.toLowerCase()) {

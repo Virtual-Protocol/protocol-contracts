@@ -8,6 +8,7 @@ const {
 const { setupNewLaunchpadTest } = require("./setup.js");
 const {
   expectTokenBalanceEqual,
+  expectApproximatelyEqual,
   increaseTimeByMinutes,
   increaseTimeAndMine,
 } = require("./util.js");
@@ -462,12 +463,12 @@ describe("BondingV2", function () {
       expect(parsedEvent.args.pair).to.equal(pairAddress);
     });
 
-    it("Should fail if start time has not passed", async function () {
+    it("Should fail to launch if start time has not passed", async function () {
       const { bondingV2 } = contracts;
 
-      await expect(bondingV2.launch(tokenAddress)).to.be.revertedWith(
-        "Swap not started"
-      );
+      await expect(
+        bondingV2.launch(tokenAddress)
+      ).to.be.revertedWithCustomError(bondingV2, "InvalidInput");
     });
 
     it("cannot reset satrt time if it's over", async function () {
@@ -2810,6 +2811,295 @@ describe("BondingV2", function () {
       console.log("- launchExecuted: set to true");
       console.log("- CancelledLaunch event emitted with correct parameters");
       console.log("- Other token info fields remain unchanged");
+    });
+  });
+
+  describe("call launch for a token that hasn't prelaunched or not exist:", function () {
+    it("Should fail when trying to launch a token that doesn't exist", async function () {
+      const { bondingV2 } = contracts;
+      const tokenAddress = ethers.ZeroAddress;
+      await expect(
+        bondingV2.launch(tokenAddress)
+      ).to.be.revertedWithCustomError(bondingV2, "InvalidInput");
+    });
+
+    it("Should fail when trying to launch a token that hasn't prelaunched", async function () {
+      const { bondingV2, virtualToken } = contracts;
+      const { user1 } = accounts;
+      const tokenAddressHasNotPreLaunched = ethers.ZeroAddress;
+      const tokenName = "Test Token Not Exists";
+      const tokenTicker = "TESTNE";
+      const cores = [0, 1, 2];
+      const description = "Test token that doesn't exist";
+      const image = "https://example.com/image.png";
+      const urls = [
+        "https://twitter.com/test",
+        "https://t.me/test",
+        "https://youtube.com/test",
+        "https://example.com",
+      ];
+      const purchaseAmount = ethers.parseEther("1000");
+
+      await virtualToken
+        .connect(user1)
+        .approve(addresses.bondingV2, purchaseAmount);
+
+      const startTime = (await time.latest()) + START_TIME_DELAY + 1;
+      const tx = await bondingV2
+        .connect(user1)
+        .preLaunch(
+          tokenName,
+          tokenTicker,
+          cores,
+          description,
+          image,
+          urls,
+          purchaseAmount,
+          startTime
+        );
+
+      const receipt = await tx.wait();
+      const event = receipt.logs.find((log) => {
+        try {
+          const parsed = bondingV2.interface.parseLog(log);
+          return parsed.name === "PreLaunched";
+        } catch (e) {
+          return false;
+        }
+      });
+
+      expect(event).to.not.be.undefined;
+      const parsedEvent = bondingV2.interface.parseLog(event);
+      tokenAddress = parsedEvent.args.token;
+      pairAddress = parsedEvent.args.pair;
+      await expect(
+        bondingV2.launch(tokenAddressHasNotPreLaunched)
+      ).to.be.revertedWithCustomError(bondingV2, "InvalidInput");
+    });
+  });
+
+  describe("buy and sell before launch:", function () {
+    it("Should fail when trying to buy & sell before launch", async function () {
+      const { bondingV2, virtualToken } = contracts;
+      const { user1 } = accounts;
+      const tokenName = "Test Token Not Exists";
+      const tokenTicker = "TESTNE";
+      const cores = [0, 1, 2];
+      const description = "Test token that doesn't exist";
+      const image = "https://example.com/image.png";
+      const urls = [
+        "https://twitter.com/test",
+        "https://t.me/test",
+        "https://youtube.com/test",
+        "https://example.com",
+      ];
+      const purchaseAmount = ethers.parseEther("1000");
+
+      await virtualToken
+        .connect(user1)
+        .approve(addresses.bondingV2, purchaseAmount);
+
+      const startTime = (await time.latest()) + START_TIME_DELAY + 1;
+      const tx = await bondingV2
+        .connect(user1)
+        .preLaunch(
+          tokenName,
+          tokenTicker,
+          cores,
+          description,
+          image,
+          urls,
+          purchaseAmount,
+          startTime
+        );
+
+      const receipt = await tx.wait();
+      const event = receipt.logs.find((log) => {
+        try {
+          const parsed = bondingV2.interface.parseLog(log);
+          return parsed.name === "PreLaunched";
+        } catch (e) {
+          return false;
+        }
+      });
+
+      expect(event).to.not.be.undefined;
+      const parsedEvent = bondingV2.interface.parseLog(event);
+      tokenAddress = parsedEvent.args.token;
+      pairAddress = parsedEvent.args.pair;
+
+      amountIn = ethers.parseEther("100");
+      await virtualToken.connect(user1).approve(addresses.fRouterV2, amountIn);
+      await expect(
+        bondingV2.buy(amountIn, tokenAddress, 0, (await time.latest()) + 300)
+      ).to.be.revertedWithCustomError(bondingV2, "InvalidTokenStatus");
+      sellAmount = ethers.parseEther("100");
+      agentToken = await ethers.getContractAt("AgentTokenV2", tokenAddress);
+      await agentToken.connect(user1).approve(addresses.fRouterV2, sellAmount);
+      await expect(
+        bondingV2
+          .connect(user1)
+          .sell(sellAmount, tokenAddress, 0, (await time.latest()) + 300)
+      ).to.be.revertedWithCustomError(bondingV2, "InvalidTokenStatus");
+      console.log(
+        "user1 virtual token balance before launch:",
+        await virtualToken.balanceOf(user1.address)
+      );
+      console.log(
+        "user1 balance of agentToken before launch:",
+        await agentToken.balanceOf(user1.address)
+      );
+
+      // launch the token and wait for start time delay, then buy will succeed
+      await time.increase(START_TIME_DELAY + 1);
+      await bondingV2.launch(tokenAddress);
+      await expect(
+        bondingV2
+          .connect(user1)
+          .buy(amountIn, tokenAddress, 0, (await time.latest()) + 300)
+      ).to.not.be.reverted;
+      console.log(
+        "user1 virtual token balance after buy:",
+        await virtualToken.balanceOf(user1.address)
+      );
+      console.log(
+        "user1 balance of agentToken after buy:",
+        await agentToken.balanceOf(user1.address)
+      );
+      await expect(
+        bondingV2
+          .connect(user1)
+          .sell(sellAmount, tokenAddress, 0, (await time.latest()) + 300)
+      ).to.not.be.reverted;
+      console.log(
+        "user1 balance of agentToken after sell:",
+        await agentToken.balanceOf(user1.address)
+      );
+    });
+  });
+
+  describe("launch() get delayed time, and anti-sniper tax should still from 99% to 1%", function () {
+    it("Should calculate anti-sniper tax from launch time even when launch is delayed", async function () {
+      const { bondingV2, virtualToken, fRouterV2, fFactoryV2 } = contracts;
+      const { user1, user2 } = accounts;
+
+      // Create a token with startTime far in the future
+      const tokenName = "Delayed Launch Token";
+      const tokenTicker = "DLT";
+      const cores = [0, 1, 2];
+      const description = "Token with delayed launch";
+      const image = "https://example.com/image.png";
+      const urls = [
+        "https://twitter.com/test",
+        "https://t.me/test",
+        "https://youtube.com/test",
+        "https://example.com",
+      ];
+      const purchaseAmount = ethers.parseEther("100"); // means no initial buy
+
+      await virtualToken
+        .connect(user1)
+        .approve(addresses.bondingV2, purchaseAmount);
+
+      // Set startTime to be START_TIME_DELAY + 1 in the future
+      const startTime = (await time.latest()) + START_TIME_DELAY + 1;
+
+      const tx = await bondingV2
+        .connect(user1)
+        .preLaunch(
+          tokenName,
+          tokenTicker,
+          cores,
+          description,
+          image,
+          urls,
+          purchaseAmount,
+          startTime
+        );
+
+      const receipt = await tx.wait();
+      const event = receipt.logs.find((log) => {
+        try {
+          const parsed = bondingV2.interface.parseLog(log);
+          return parsed.name === "PreLaunched";
+        } catch (e) {
+          return false;
+        }
+      });
+
+      expect(event).to.not.be.undefined;
+      const parsedEvent = bondingV2.interface.parseLog(event);
+      const tokenAddress = parsedEvent.args.token;
+      const pairAddress = parsedEvent.args.pair;
+
+      console.log("Prelaunch time:", (await time.latest()).toString());
+      console.log("Pair startTime:", startTime.toString());
+
+      // Wait for startTime to pass (this simulates the delay)
+      await increaseTimeByMinutes(START_TIME_DELAY + 1);
+      await time.increase(START_TIME_DELAY + 1);
+
+      // Wait additional time to simulate launch delay (e.g., 60 minutes)
+      const additionalDelay = 60 * 60; // 60 minutes
+      await increaseTimeByMinutes(additionalDelay);
+      await time.increase(additionalDelay);
+
+      const launchTime = await time.latest();
+      console.log("Launch time (after delay):", launchTime.toString());
+      console.log(
+        "Time elapsed since prelaunch:",
+        launchTime - (startTime - START_TIME_DELAY - 1)
+      );
+
+      // Now launch the token (this should set taxStartTime to current time)
+      await bondingV2.launch(tokenAddress);
+
+      // Get the pair contract to verify taxStartTime was set correctly
+      const pair = await ethers.getContractAt("FPairV2", pairAddress);
+      const taxStartTime = await pair.taxStartTime();
+
+      console.log("Tax startTime is:", taxStartTime.toString());
+      console.log(
+        "Difference between launch time and tax start time:",
+        Number(launchTime) - Number(taxStartTime)
+      );
+
+      // Verify that taxStartTime is set to launch time, not prelaunch time
+      expect(Number(taxStartTime)).to.be.closeTo(Number(launchTime), 2); // Allow 2 seconds tolerance
+
+      // Now test that anti-sniper tax starts from 99% at launch time
+      const buyAmount = ethers.parseEther("100");
+      await virtualToken.connect(user2).approve(addresses.fRouterV2, buyAmount);
+
+      // Buy immediately after launch - should get maximum anti-sniper tax (99%)
+      const tx2 = await bondingV2
+        .connect(user2)
+        .buy(buyAmount, tokenAddress, 0, (await time.latest()) + 300);
+
+      // do calculation based on agentToken amount got to check if tax is using 99
+      // get agentToken balance of user2 after first buy
+      actualTokenContract = await ethers.getContractAt("AgentTokenV2", tokenAddress);
+      const agentTokenBalanceAfterFirstBuy = await actualTokenContract.balanceOf(user2.address);
+
+      let expectedUser2AgentToken =
+        BigInt(
+          Math.floor(
+            450 * 10 ** 6 -
+              (450 * 10 ** 6 * 14000) /
+                (14000 + 100 * (1 - 0.99))
+          )
+        ) *
+          10n ** 18n;
+        expectApproximatelyEqual(
+        agentTokenBalanceAfterFirstBuy,
+        expectedUser2AgentToken,
+        "User2 agentToken after first buy",
+        significantDigits=0
+      );
+
+      console.log(
+        "✅ Anti-sniper tax is correctly calculated from launch time, not prelaunch time"
+      );
     });
   });
 });

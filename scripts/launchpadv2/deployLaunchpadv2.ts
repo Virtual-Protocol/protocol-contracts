@@ -110,8 +110,10 @@ const { ethers, upgrades } = require("hardhat");
     if (!agentNftV2) {
       throw new Error("AGENT_NFT_V2 not set in environment");
     }
-    const taxVault = process.env.FFactoryV2_TAX_VAULT;
-    if (!taxVault) {
+    // FFactoryV2_TAX_VAULT must be a taxManager contract, but if we can 
+    // make sure FFactoryV2_TAX_VAULT != FRouter.taxManager, then FFactoryV2_TAX_VAULT can be an EOA wallet
+    const fFactoryV2TaxVault = process.env.FFactoryV2_TAX_VAULT;
+    if (!fFactoryV2TaxVault) {
       throw new Error("FFactoryV2_TAX_VAULT not set in environment");
     }
     const fRouterV2TaxManager = process.env.FRouterV2_TAX_MANAGER;
@@ -168,7 +170,8 @@ const { ethers, upgrades } = require("hardhat");
       uniswapV2Factory,
       uniswapV2Router,
       agentNftV2,
-      taxVault,
+      fFactoryV2TaxVault: fFactoryV2TaxVault,
+      fRouterV2TaxManager: fRouterV2TaxManager,
       agentDAO,
       agentFactoryV6Vault,
       agentFactoryV6MaturityDuration,
@@ -184,7 +187,7 @@ const { ethers, upgrades } = require("hardhat");
     const fFactoryV2 = await upgrades.deployProxy(
       FFactoryV2,
       [
-        taxVault, // taxVault
+        fFactoryV2TaxVault, // taxVault
         buyTax, // buyTax
         sellTax, // sellTax
         antiSniperBuyTaxStartValue, // antiSniperBuyTaxStartValue

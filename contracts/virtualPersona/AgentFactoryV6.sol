@@ -288,31 +288,6 @@ contract AgentFactoryV6 is
         emit NewPersona(virtualId, token, dao, tbaAddress, veToken, lp);
     }
 
-    function executeApplication(
-        uint256 id,
-        bool canStake,
-        bytes32 salt
-    ) public noReentrant {
-        // This will bootstrap an Agent with following components:
-        // C1: Agent Token
-        // C2: LP Pool + Initial liquidity
-        // C3: Agent veToken
-        // C4: Agent DAO
-        // C5: Agent NFT
-        // C6: TBA
-        // C7: Stake liquidity token to get veToken
-
-        Application storage application = _applications[id];
-
-        require(
-            msg.sender == application.proposer ||
-                hasRole(WITHDRAW_ROLE, msg.sender),
-            "Not proposer"
-        );
-
-        _executeApplication(id, canStake, _tokenSupplyParams, salt, true);
-    }
-
     function _createNewDAO(
         string memory name,
         IVotes token,

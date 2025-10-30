@@ -358,9 +358,26 @@ contract BondingV2 is
     ) public nonReentrant returns (address, address, uint, uint256) {
         Token storage _token = tokenInfo[_tokenAddress];
 
+        // Validate that the token exists and was properly prelaunched
+        if (_token.token == address(0) || _token.pair == address(0)) {
+            revert InvalidInput();
+        }
+
         if (_token.launchExecuted) {
             revert InvalidTokenStatus();
         }
+
+        // If initialPurchase == 0, the function marks the token as launched
+        // while swaps remain blocked (since enabling depends solely on time),
+        // resulting in an inconsistent “launched but not tradable” state, also the 550M is go to teamTokenReservedWallet
+        // so we need to check the start time of the pair
+        IFPairV2 pair = IFPairV2(_token.pair);
+        if (block.timestamp < pair.startTime()) {
+            revert InvalidInput();
+        }
+
+        // Set tax start time to current block timestamp for proper anti-sniper tax calculation
+        router.setTaxStartTime(_token.pair, block.timestamp);
 
         // Make initial purchase for creator
         // bondingContract will transfer initialPurchase $Virtual to pairAddress
@@ -415,9 +432,16 @@ contract BondingV2 is
         uint256 amountOutMin,
         uint256 deadline
     ) public returns (bool) {
+        // this alrealy prevented it's a not-exists token
         if (!tokenInfo[tokenAddress].trading) {
             revert InvalidTokenStatus();
         }
+
+        // this is to prevent sell before launch
+        if (!tokenInfo[tokenAddress].launchExecuted) {
+            revert InvalidTokenStatus();
+        }
+
         if (block.timestamp > deadline) {
             revert InvalidInput();
         }
@@ -498,7 +522,13 @@ contract BondingV2 is
         uint256 amountOutMin,
         uint256 deadline
     ) public payable returns (bool) {
+        // this alrealy prevented it's a not-exists token
         if (!tokenInfo[tokenAddress].trading) {
+            revert InvalidTokenStatus();
+        }
+
+        // this is to prevent sell before launch
+        if (!tokenInfo[tokenAddress].launchExecuted) {
             revert InvalidTokenStatus();
         }
 

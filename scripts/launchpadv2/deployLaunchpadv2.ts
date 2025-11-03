@@ -263,7 +263,7 @@ const { ethers, upgrades } = require("hardhat");
     console.log("\n--- Setting TaxManager for FRouterV2 ---");
     const tx4_1 = await fRouterV2.setTaxManager(fRouterV2TaxManager);
     await tx4_1.wait();
-    console.log("TaxManager set for FRouterV2");
+    console.log("TaxManager set for FRouterV2: ", fRouterV2TaxManager);
 
     // 9. Set antiSniperTaxManager for FRouterV2
     console.log("\n--- Setting AntiSniperTaxManager for FRouterV2 ---");

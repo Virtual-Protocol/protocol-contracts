@@ -36,6 +36,15 @@ const { ethers, upgrades } = require("hardhat");
     if (!sellTax) {
       throw new Error("SELL_TAX not set in environment");
     }
+
+    const factoryBuyTax = process.env.FACTORY_BUY_TAX;
+    if (!factoryBuyTax) {
+      throw new Error("FACTORY_BUY_TAX not set in environment");
+    }
+    const factorySellTax = process.env.FACTORY_SELL_TAX;
+    if (!factorySellTax) {
+      throw new Error("FACTORY_SELL_TAX not set in environment");
+    }
     const antiSniperBuyTaxStartValue =
       process.env.ANTI_SNIPER_BUY_TAX_START_VALUE;
     if (!antiSniperBuyTaxStartValue) {
@@ -153,6 +162,8 @@ const { ethers, upgrades } = require("hardhat");
       virtualToken,
       buyTax,
       sellTax,
+      factoryBuyTax,
+      factorySellTax,
       antiSniperBuyTaxStartValue,
       feeAddress: creationFeeToAddress,
       feeAmount,
@@ -377,8 +388,8 @@ const { ethers, upgrades } = require("hardhat");
       initialSupply, // maxTokensPerTxn (initialSupply)
       0, // botProtectionDurationInSeconds
       bondingV2Address, // vault
-      buyTax, // projectBuyTaxBasisPoints (buyTax)
-      sellTax, // projectSellTaxBasisPoints (sellTax)
+      factoryBuyTax, // projectBuyTaxBasisPoints (factoryBuyTax)
+      factorySellTax, // projectSellTaxBasisPoints (factorySellTax)
       taxSwapThresholdBasisPoints, // taxSwapThresholdBasisPoints, todo: configurable VP demon
       creationFeeToAddress // projectTaxRecipient (fee address)
     );

@@ -86,7 +86,7 @@ module.exports = {
       },
     },
     base_sepolia: {
-      url: "https://sepolia.base.org",
+      url: "https://base-sepolia.drpc.org",
       accounts: [process.env.PRIVATE_KEY],
     },
     base_sepolia_fire: {

@@ -249,7 +249,7 @@ contract BondingV3 is
 
         uint256 bondingCurveSupply = (initialSupply -
             launchParams.teamTokenReservedSupply) *
-            (10 ** IAgentTokenV2(token).decimals()); // (1B - 550M) * 10^18 = 450M * 10^18
+            (10 ** IAgentTokenV2(token).decimals()); // (1B - 20M) * 10^18 = 980M * 10^18
 
         address _pair = factory.createPair(
             token,
@@ -258,13 +258,13 @@ contract BondingV3 is
             launchParams.startTimeDelay
         );
 
-        require(_approval(address(router), token, bondingCurveSupply)); // 450M in wei
+        require(_approval(address(router), token, bondingCurveSupply)); // 980M in wei
 
         uint256 liquidity = (((((K * 10000) / assetRate) * 10000 ether) /
             bondingCurveSupply) * 1 ether) / 10000;
         uint256 price = bondingCurveSupply / liquidity;
 
-        router.addInitialLiquidity(token, bondingCurveSupply, liquidity); // 450M
+        router.addInitialLiquidity(token, bondingCurveSupply, liquidity); // 980M
         // reset agentTokens will be transferred to the teamTokenReservedWallet
         IERC20(token).safeTransfer(
             launchParams.teamTokenReservedWallet,

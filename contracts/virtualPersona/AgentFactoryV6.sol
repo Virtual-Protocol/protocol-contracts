@@ -108,7 +108,7 @@ contract AgentFactoryV6 is
     address public defaultDelegatee;
 
     // Default agent token params
-    bytes private _tokenSupplyParams;
+    bytes private _tokenSupplyParams; // deprecated
     bytes private _tokenTaxParams;
     uint16 private _tokenMultiplier; // Unused
 
@@ -386,28 +386,11 @@ contract AgentFactoryV6 is
     }
 
     function setTokenParams(
-        uint256 maxSupply,
-        uint256 lpSupply,
-        uint256 vaultSupply,
-        uint256 maxTokensPerWallet,
-        uint256 maxTokensPerTxn,
-        uint256 botProtectionDurationInSeconds,
-        address vault,
         uint256 projectBuyTaxBasisPoints,
         uint256 projectSellTaxBasisPoints,
         uint256 taxSwapThresholdBasisPoints,
         address projectTaxRecipient
     ) public onlyRole(DEFAULT_ADMIN_ROLE) {
-        require((lpSupply + vaultSupply) <= maxSupply, "Invalid supply");
-        _tokenSupplyParams = abi.encode(
-            maxSupply,
-            lpSupply,
-            vaultSupply,
-            maxTokensPerWallet,
-            maxTokensPerTxn,
-            botProtectionDurationInSeconds,
-            vault
-        );
         _tokenTaxParams = abi.encode(
             projectBuyTaxBasisPoints,
             projectSellTaxBasisPoints,

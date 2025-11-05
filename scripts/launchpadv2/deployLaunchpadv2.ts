@@ -28,22 +28,22 @@ const { ethers, upgrades } = require("hardhat");
     if (!virtualToken) {
       throw new Error("BRIDGED_TOKEN not set in environment");
     }
-    const buyTax = process.env.BUY_TAX;
-    if (!buyTax) {
-      throw new Error("BUY_TAX not set in environment");
+    const prototypeBuyTax = process.env.PROTOTYPE_BUY_TAX;
+    if (!prototypeBuyTax) {
+      throw new Error("PROTOTYPE_BUY_TAX not set in environment");
     }
-    const sellTax = process.env.SELL_TAX;
-    if (!sellTax) {
-      throw new Error("SELL_TAX not set in environment");
+    const prototypeSellTax = process.env.PROTOTYPE_SELL_TAX;
+    if (!prototypeSellTax) {
+      throw new Error("PROTOTYPE_SELL_TAX not set in environment");
     }
 
-    const factoryBuyTax = process.env.FACTORY_BUY_TAX;
-    if (!factoryBuyTax) {
-      throw new Error("FACTORY_BUY_TAX not set in environment");
+    const sentientBuyTax = process.env.SENTIENT_BUY_TAX;
+    if (!sentientBuyTax) {
+      throw new Error("SENTIENT_BUY_TAX not set in environment");
     }
-    const factorySellTax = process.env.FACTORY_SELL_TAX;
-    if (!factorySellTax) {
-      throw new Error("FACTORY_SELL_TAX not set in environment");
+    const sentientSellTax = process.env.SENTIENT_SELL_TAX;
+    if (!sentientSellTax) {
+      throw new Error("SENTIENT_SELL_TAX not set in environment");
     }
     const antiSniperBuyTaxStartValue =
       process.env.ANTI_SNIPER_BUY_TAX_START_VALUE;
@@ -167,10 +167,10 @@ const { ethers, upgrades } = require("hardhat");
 
     console.log("Deployment arguments loaded:", {
       virtualToken,
-      buyTax,
-      sellTax,
-      factoryBuyTax,
-      factorySellTax,
+      buyTax: prototypeBuyTax,
+      sellTax: prototypeSellTax,
+      factoryBuyTax: sentientBuyTax,
+      factorySellTax: sentientSellTax,
       antiSniperBuyTaxStartValue,
       feeAddress: creationFeeToAddress,
       feeAmount,
@@ -207,8 +207,8 @@ const { ethers, upgrades } = require("hardhat");
       FFactoryV2,
       [
         fFactoryV2TaxVault, // taxVault
-        buyTax, // buyTax
-        sellTax, // sellTax
+        prototypeBuyTax, // buyTax
+        prototypeSellTax, // sellTax
         antiSniperBuyTaxStartValue, // antiSniperBuyTaxStartValue
         antiSniperTaxVaultAddress, // antiSniperTaxVault
       ],
@@ -396,8 +396,8 @@ const { ethers, upgrades } = require("hardhat");
       initialSupply, // maxTokensPerTxn (initialSupply)
       0, // botProtectionDurationInSeconds
       bondingV2Address, // vault
-      factoryBuyTax, // projectBuyTaxBasisPoints (factoryBuyTax)
-      factorySellTax, // projectSellTaxBasisPoints (factorySellTax)
+      sentientBuyTax, // projectBuyTaxBasisPoints (sentientBuyTax)
+      sentientSellTax, // projectSellTaxBasisPoints (sentientSellTax)
       taxSwapThresholdBasisPoints, // taxSwapThresholdBasisPoints, todo: configurable VP demon
       agentTokenTaxManager // projectTaxRecipient (fee address)
     );

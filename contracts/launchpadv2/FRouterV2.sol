@@ -23,8 +23,8 @@ contract FRouterV2 is
 
     FFactoryV2 public factory;
     address public assetToken;
-    address public taxManager;
-    address public antiSniperTaxManager;
+    address public taxManager; // deprecated
+    address public antiSniperTaxManager; // deprecated
 
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() {

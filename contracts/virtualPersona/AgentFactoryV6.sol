@@ -113,7 +113,8 @@ contract AgentFactoryV6 is
     uint16 private _tokenMultiplier; // Unused
 
     bytes32 public constant BONDING_ROLE = keccak256("BONDING_ROLE");
-    bytes32 public constant REMOVE_LIQUIDITY_ROLE = keccak256("REMOVE_LIQUIDITY_ROLE");
+    bytes32 public constant REMOVE_LIQUIDITY_ROLE =
+        keccak256("REMOVE_LIQUIDITY_ROLE");
 
     ///////////////////////////////////////////////////////////////
 
@@ -296,6 +297,7 @@ contract AgentFactoryV6 is
         bytes32 salt
     ) internal returns (address instance) {
         instance = Clones.cloneDeterministic(daoImplementation, salt);
+        // here just to share _existingAgents mapping with agentToken and daoImplementation duplication checking
         if (_existingAgents[instance]) {
             revert AgentAlreadyExists();
         }
@@ -523,17 +525,37 @@ contract AgentFactoryV6 is
         return IAgentNft(nft).virtualInfo(application.virtualId).token;
     }
 
-    function addBlacklistAddress(address token, address blacklistAddress) public onlyRole(BONDING_ROLE) {
+    function addBlacklistAddress(
+        address token,
+        address blacklistAddress
+    ) public onlyRole(BONDING_ROLE) {
         IAgentTokenV2(token).addBlacklistAddress(blacklistAddress);
     }
 
-    function removeBlacklistAddress(address token, address blacklistAddress) public onlyRole(BONDING_ROLE) {
+    function removeBlacklistAddress(
+        address token,
+        address blacklistAddress
+    ) public onlyRole(BONDING_ROLE) {
         IAgentTokenV2(token).removeBlacklistAddress(blacklistAddress);
     }
 
     // amountAMin must be the amount of the uniswapPair.token0() that will be received
     // amountBMin must be the amount of the uniswapPair.token1() that will be received
-    function removeLpLiquidity(address veToken, address recipient, uint256 veTokenAmount, uint256 amountAMin, uint256 amountBMin, uint256 deadline) public onlyRole(REMOVE_LIQUIDITY_ROLE) {
-        IAgentVeTokenV2(veToken).removeLpLiquidity(_uniswapRouter, veTokenAmount, recipient, amountAMin, amountBMin, deadline);
+    function removeLpLiquidity(
+        address veToken,
+        address recipient,
+        uint256 veTokenAmount,
+        uint256 amountAMin,
+        uint256 amountBMin,
+        uint256 deadline
+    ) public onlyRole(REMOVE_LIQUIDITY_ROLE) {
+        IAgentVeTokenV2(veToken).removeLpLiquidity(
+            _uniswapRouter,
+            veTokenAmount,
+            recipient,
+            amountAMin,
+            amountBMin,
+            deadline
+        );
     }
 }

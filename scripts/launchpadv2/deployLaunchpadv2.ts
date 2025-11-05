@@ -158,6 +158,13 @@ const { ethers, upgrades } = require("hardhat");
       throw new Error("TAX_SWAP_THRESHOLD_BASIS_POINTS not set in environment");
     }
 
+
+    const agentTokenTaxManager =
+      process.env.AGENT_TOKEN_TAX_MANAGER;
+    if (!agentTokenTaxManager) {
+      throw new Error("AGENT_TOKEN_TAX_MANAGER not set in environment");
+    }
+
     console.log("Deployment arguments loaded:", {
       virtualToken,
       buyTax,
@@ -189,6 +196,7 @@ const { ethers, upgrades } = require("hardhat");
       agentFactoryV6NextId,
       antiSniperTaxVaultAddress,
       taxSwapThresholdBasisPoints,
+      agentTokenTaxManager
     });
 
     // 1. Deploy FFactoryV2, must happen before FRouterV2,
@@ -391,7 +399,7 @@ const { ethers, upgrades } = require("hardhat");
       factoryBuyTax, // projectBuyTaxBasisPoints (factoryBuyTax)
       factorySellTax, // projectSellTaxBasisPoints (factorySellTax)
       taxSwapThresholdBasisPoints, // taxSwapThresholdBasisPoints, todo: configurable VP demon
-      creationFeeToAddress // projectTaxRecipient (fee address)
+      agentTokenTaxManager // projectTaxRecipient (fee address)
     );
     await tx3.wait();
     console.log("Token params set for AgentFactoryV6");

@@ -75,7 +75,7 @@ const { ethers, upgrades } = require("hardhat");
     }
 
     console.log("Deployment arguments loaded:", {
-      feeAddress: creationFeeToAddress,
+      creationFeeToAddress,
       feeAmount,
       initialSupply,
       assetRate,

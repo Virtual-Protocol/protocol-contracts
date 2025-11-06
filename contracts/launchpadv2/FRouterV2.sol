@@ -103,6 +103,7 @@ contract FRouterV2 is
     ) public nonReentrant onlyRole(EXECUTOR_ROLE) returns (uint256, uint256) {
         require(tokenAddress != address(0), "Zero addresses are not allowed.");
         require(to != address(0), "Zero addresses are not allowed.");
+        require(amountIn > 0, "amountIn must be greater than 0");
 
         address pairAddress = factory.getPair(tokenAddress, assetToken);
 

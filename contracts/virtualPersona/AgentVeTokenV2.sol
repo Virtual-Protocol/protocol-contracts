@@ -193,7 +193,7 @@ contract AgentVeTokenV2 is
 
         // Get the router with removeLiquidity function
         IUniswapV2Router03 router = IUniswapV2Router03(uniswapRouter);
-        
+
         // Get token addresses from the LP pair
         IUniswapV2Pair pair = IUniswapV2Pair(assetToken);
         address token0 = pair.token0();
@@ -215,6 +215,10 @@ contract AgentVeTokenV2 is
         returns (uint256 amountA, uint256 amountB) {
             // 3. Burn same veTokenAmount of the veToken from the veTokenHolder
             _burn(founder, veTokenAmount);
+            _balanceCheckpoints[founder].push(
+                clock(),
+                SafeCast.toUint208(balanceOf(founder))
+            );
 
             // Emit event for successful liquidity removal
             emit LiquidityRemoved(

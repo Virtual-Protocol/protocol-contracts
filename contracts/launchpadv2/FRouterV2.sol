@@ -193,16 +193,16 @@ contract FRouterV2 is
         address pair = factory.getPair(tokenAddress, assetToken);
 
         // Calculate tax - use normal buyTax for initial purchase, anti-sniper tax for others
-        uint256 normalTax = factory.buyTax(); //
+        uint256 normalTax = factory.buyTax();
+        uint256 eastWorldTax;
+        if (isRobotics) {
+            eastWorldTax = factory.eastWorldBuyTax();
+        }
         uint256 antiSniperTax;
         if (isInitialPurchase) {
             // No anti-sniper tax for creator's initial purchase
         } else {
             antiSniperTax = _calculateAntiSniperTax(pair) - normalTax; // Anti-sniper tax for regular purchases
-        }
-        uint256 eastWorldTax;
-        if (isRobotics) {
-            eastWorldTax = factory.eastWorldBuyTax();
         }
         if (100 - normalTax - eastWorldTax - antiSniperTax < 0) {
             antiSniperTax = 100 - normalTax - eastWorldTax; // collect normalTax and eastWorldTax first

@@ -29,7 +29,6 @@ contract FFactoryV2 is
     uint256 public roboticsBuyTax;
     uint256 public roboticsSellTax;
     address public roboticsTaxVault;
-    address public roboticsTaxManager;
 
     event PairCreated(
         address indexed tokenA,

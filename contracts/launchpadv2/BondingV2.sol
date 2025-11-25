@@ -204,7 +204,18 @@ contract BondingV2 is
         uint256 startTime,
         bool isRobotics
     ) public nonReentrant returns (address, address, uint, uint256) {
-        return _preLaunch(_name, _ticker, cores, desc, img, urls, purchaseAmount, startTime, isRobotics);
+        return
+            _preLaunch(
+                _name,
+                _ticker,
+                cores,
+                desc,
+                img,
+                urls,
+                purchaseAmount,
+                startTime,
+                isRobotics
+            );
     }
 
     function preLaunch(
@@ -217,7 +228,18 @@ contract BondingV2 is
         uint256 purchaseAmount,
         uint256 startTime
     ) public nonReentrant returns (address, address, uint, uint256) {
-        return _preLaunch(_name, _ticker, cores, desc, img, urls, purchaseAmount, startTime, false);
+        return
+            _preLaunch(
+                _name,
+                _ticker,
+                cores,
+                desc,
+                img,
+                urls,
+                purchaseAmount,
+                startTime,
+                false
+            );
     }
 
     function _preLaunch(
@@ -253,15 +275,16 @@ contract BondingV2 is
             .createNewAgentTokenAndApplication(
                 _name, // without "fun " prefix
                 _ticker,
-                abi.encode( // tokenSupplyParams
-                        initialSupply,
-                        0, // lpSupply, will mint to agentTokenAddress
-                        initialSupply, // vaultSupply, will mint to vault
-                        initialSupply,
-                        initialSupply,
-                        0,
-                        address(this) // vault, is the bonding contract itself
-                    ),
+                abi.encode(
+                    // tokenSupplyParams
+                    initialSupply,
+                    0, // lpSupply, will mint to agentTokenAddress
+                    initialSupply, // vaultSupply, will mint to vault
+                    initialSupply,
+                    initialSupply,
+                    0,
+                    address(this) // vault, is the bonding contract itself
+                ),
                 cores,
                 _deployParams.tbaSalt,
                 _deployParams.tbaImplementation,

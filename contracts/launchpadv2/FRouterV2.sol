@@ -135,19 +135,19 @@ contract FRouterV2 is
 
         uint fee = factory.sellTax();
         uint256 txFee = (fee * amountOut) / 100;
-        uint256 eastWorldTax;
+        uint256 roboticsTax;
         if (isRobotics) {
-            eastWorldTax = factory.eastWorldSellTax();
+            roboticsTax = factory.roboticsSellTax();
         }
-        uint256 eastWorldTxFee = (eastWorldTax * amountOut) / 100; // tax is in percentage
+        uint256 roboticsTxFee = (roboticsTax * amountOut) / 100; // tax is in percentage
 
-        uint256 amount = amountOut - txFee - eastWorldTxFee;
+        uint256 amount = amountOut - txFee - roboticsTxFee;
         address feeTo = factory.taxVault();
 
         pair.transferAsset(to, amount);
         pair.transferAsset(feeTo, txFee);
-        if (eastWorldTxFee > 0) {
-            pair.transferAsset(factory.eastWorldTaxVault(), eastWorldTxFee);
+        if (roboticsTxFee > 0) {
+            pair.transferAsset(factory.roboticsTaxVault(), roboticsTxFee);
         }
 
         pair.swap(amountIn, 0, 0, amountOut);
@@ -194,9 +194,9 @@ contract FRouterV2 is
 
         // Calculate tax - use normal buyTax for initial purchase, anti-sniper tax for others
         uint256 normalTax = factory.buyTax();
-        uint256 eastWorldTax;
+        uint256 roboticsTax;
         if (isRobotics) {
-            eastWorldTax = factory.eastWorldBuyTax();
+            roboticsTax = factory.roboticsBuyTax();
         }
         uint256 antiSniperTax;
         if (isInitialPurchase) {
@@ -204,15 +204,15 @@ contract FRouterV2 is
         } else {
             antiSniperTax = _calculateAntiSniperTax(pair) - normalTax; // Anti-sniper tax for regular purchases
         }
-        if (100 - normalTax - eastWorldTax - antiSniperTax < 0) {
-            antiSniperTax = 100 - normalTax - eastWorldTax; // collect normalTax and eastWorldTax first
+        if (100 - normalTax - roboticsTax - antiSniperTax < 0) {
+            antiSniperTax = 100 - normalTax - roboticsTax; // collect normalTax and roboticsTax first
         }
 
         uint256 normalTxFee = (normalTax * amountIn) / 100; // tax is in percentage
         uint256 antiSniperTxFee = (antiSniperTax * amountIn) / 100; // tax is in percentage
-        uint256 eastWorldTxFee = (eastWorldTax * amountIn) / 100; // tax is in percentage
+        uint256 roboticsTxFee = (roboticsTax * amountIn) / 100; // tax is in percentage
 
-        uint256 amount = amountIn - normalTxFee - antiSniperTxFee - eastWorldTxFee;
+        uint256 amount = amountIn - normalTxFee - antiSniperTxFee - roboticsTxFee;
 
         IERC20(assetToken).safeTransferFrom(to, pair, amount);
 
@@ -228,11 +228,11 @@ contract FRouterV2 is
                 antiSniperTxFee
             );
         }
-        if (eastWorldTxFee > 0) {
+        if (roboticsTxFee > 0) {
             IERC20(assetToken).safeTransferFrom(
                 to,
-                    factory.eastWorldTaxVault(),
-                    eastWorldTxFee
+                    factory.roboticsTaxVault(),
+                    roboticsTxFee
                 );
         }
 

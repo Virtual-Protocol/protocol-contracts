@@ -96,11 +96,29 @@ contract FRouterV2 is
         return (amountToken_, amountAsset_);
     }
 
+    function sellV2(
+        uint256 amountIn,
+        address tokenAddress,
+        address to,
+        bool isRobotics
+    ) public nonReentrant onlyRole(EXECUTOR_ROLE) returns (uint256, uint256) {
+        return _sell(amountIn, tokenAddress, to, isRobotics);
+    }
+
     function sell(
         uint256 amountIn,
         address tokenAddress,
         address to
     ) public nonReentrant onlyRole(EXECUTOR_ROLE) returns (uint256, uint256) {
+        return _sell(amountIn, tokenAddress, to, false);
+    }
+
+    function _sell(
+        uint256 amountIn,
+        address tokenAddress,
+        address to,
+        bool isRobotics
+    ) internal onlyRole(EXECUTOR_ROLE) returns (uint256, uint256) {
         require(tokenAddress != address(0), "Zero addresses are not allowed.");
         require(to != address(0), "Zero addresses are not allowed.");
         require(amountIn > 0, "amountIn must be greater than 0");
@@ -117,12 +135,20 @@ contract FRouterV2 is
 
         uint fee = factory.sellTax();
         uint256 txFee = (fee * amountOut) / 100;
+        uint256 eastWorldTax;
+        if (isRobotics) {
+            eastWorldTax = factory.eastWorldSellTax();
+        }
+        uint256 eastWorldTxFee = (eastWorldTax * amountOut) / 100; // tax is in percentage
 
-        uint256 amount = amountOut - txFee;
+        uint256 amount = amountOut - txFee - eastWorldTxFee;
         address feeTo = factory.taxVault();
 
         pair.transferAsset(to, amount);
         pair.transferAsset(feeTo, txFee);
+        if (eastWorldTxFee > 0) {
+            pair.transferAsset(factory.eastWorldTaxVault(), eastWorldTxFee);
+        }
 
         pair.swap(amountIn, 0, 0, amountOut);
 
@@ -134,12 +160,32 @@ contract FRouterV2 is
         return (amountIn, amountOut);
     }
 
+    function buyV2(
+        uint256 amountIn,
+        address tokenAddress,
+        address to,
+        bool isInitialPurchase,
+        bool isRobotics
+    ) public onlyRole(EXECUTOR_ROLE) nonReentrant returns (uint256, uint256) {
+        return _buy(amountIn, tokenAddress, to, isInitialPurchase, isRobotics);
+    }
+
     function buy(
         uint256 amountIn,
         address tokenAddress,
         address to,
         bool isInitialPurchase
     ) public onlyRole(EXECUTOR_ROLE) nonReentrant returns (uint256, uint256) {
+        return _buy(amountIn, tokenAddress, to, isInitialPurchase, false);
+    }
+
+    function _buy(
+        uint256 amountIn,
+        address tokenAddress,
+        address to,
+        bool isInitialPurchase,
+        bool isRobotics
+    ) internal onlyRole(EXECUTOR_ROLE) returns (uint256, uint256) {
         require(tokenAddress != address(0), "Zero addresses are not allowed.");
         require(to != address(0), "Zero addresses are not allowed.");
         require(amountIn > 0, "amountIn must be greater than 0");
@@ -154,11 +200,19 @@ contract FRouterV2 is
         } else {
             antiSniperTax = _calculateAntiSniperTax(pair) - normalTax; // Anti-sniper tax for regular purchases
         }
+        uint256 eastWorldTax;
+        if (isRobotics) {
+            eastWorldTax = factory.eastWorldBuyTax();
+        }
+        if (100 - normalTax - eastWorldTax - antiSniperTax < 0) {
+            antiSniperTax = 100 - normalTax - eastWorldTax; // collect normalTax and eastWorldTax first
+        }
 
         uint256 normalTxFee = (normalTax * amountIn) / 100; // tax is in percentage
         uint256 antiSniperTxFee = (antiSniperTax * amountIn) / 100; // tax is in percentage
+        uint256 eastWorldTxFee = (eastWorldTax * amountIn) / 100; // tax is in percentage
 
-        uint256 amount = amountIn - normalTxFee - antiSniperTxFee;
+        uint256 amount = amountIn - normalTxFee - antiSniperTxFee - eastWorldTxFee;
 
         IERC20(assetToken).safeTransferFrom(to, pair, amount);
 
@@ -172,6 +226,13 @@ contract FRouterV2 is
             factory.antiSniperTaxVault(),
             antiSniperTxFee
         );
+        if (eastWorldTxFee > 0) {
+            IERC20(assetToken).safeTransferFrom(
+                to,
+                    factory.eastWorldTaxVault(),
+                    eastWorldTxFee
+                );
+        }
 
         uint256 amountOut = getAmountsOut(tokenAddress, assetToken, amount);
 

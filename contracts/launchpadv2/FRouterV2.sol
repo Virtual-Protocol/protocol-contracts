@@ -221,11 +221,13 @@ contract FRouterV2 is
             factory.taxVault(),
             normalTxFee
         );
-        IERC20(assetToken).safeTransferFrom(
-            to,
-            factory.antiSniperTaxVault(),
-            antiSniperTxFee
-        );
+        if (antiSniperTxFee > 0) {
+            IERC20(assetToken).safeTransferFrom(
+                to,
+                factory.antiSniperTaxVault(),
+                antiSniperTxFee
+            );
+        }
         if (eastWorldTxFee > 0) {
             IERC20(assetToken).safeTransferFrom(
                 to,

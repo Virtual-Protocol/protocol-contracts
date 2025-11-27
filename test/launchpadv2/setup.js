@@ -14,6 +14,9 @@ const {
   BUY_TAX,
   SELL_TAX,
   ANTI_SNIPER_BUY_TAX_START_VALUE,
+  ROBOTICS_BUY_TAX,
+  ROBOTICS_SELL_TAX,
+  ROBOTICS_TAX_VAULT,
   K,
   ASSET_RATE,
   GRAD_THRESHOLD,
@@ -59,7 +62,13 @@ async function setupNewLaunchpadTest() {
     const FFactoryV2 = await ethers.getContractFactory("FFactoryV2");
     const fFactoryV2 = await upgrades.deployProxy(
       FFactoryV2,
-      [FFactoryV2_TAX_VAULT, BUY_TAX, SELL_TAX, ANTI_SNIPER_BUY_TAX_START_VALUE, FFactoryV2_ANTI_SNIPER_TAX_VAULT],
+      [
+        FFactoryV2_TAX_VAULT,
+        BUY_TAX,
+        SELL_TAX,
+        ANTI_SNIPER_BUY_TAX_START_VALUE,
+        FFactoryV2_ANTI_SNIPER_TAX_VAULT,
+      ],
       { initializer: "initialize" }
     );
     await fFactoryV2.waitForDeployment();
@@ -90,7 +99,8 @@ async function setupNewLaunchpadTest() {
     // 3.1. Deploy BondingTax
     console.log("\n--- Deploying TaxManagerForFRouterV2 ---");
     const BondingTax = await ethers.getContractFactory("BondingTax");
-    const taxManagerForFRouterV2 = await upgrades.deployProxy(BondingTax,
+    const taxManagerForFRouterV2 = await upgrades.deployProxy(
+      BondingTax,
       [
         owner.address,
         await virtualToken.getAddress(),
@@ -107,11 +117,15 @@ async function setupNewLaunchpadTest() {
       }
     );
     await taxManagerForFRouterV2.waitForDeployment();
-    console.log("TaxManagerForFRouterV2 deployed to:", taxManagerForFRouterV2.target);
+    console.log(
+      "TaxManagerForFRouterV2 deployed to:",
+      taxManagerForFRouterV2.target
+    );
 
     // 3.2. Deploy AntiSniperTaxManager
     console.log("\n--- Deploying AntiSniperTaxManagerForFRouterV2 ---");
-    const antiSniperTaxManagerForFRouterV2 = await upgrades.deployProxy(BondingTax, 
+    const antiSniperTaxManagerForFRouterV2 = await upgrades.deployProxy(
+      BondingTax,
       [
         owner.address,
         await virtualToken.getAddress(),
@@ -128,12 +142,25 @@ async function setupNewLaunchpadTest() {
       }
     );
     await antiSniperTaxManagerForFRouterV2.waitForDeployment();
-    console.log("AntiSniperTaxManagerForFRouterV2 deployed to:", antiSniperTaxManagerForFRouterV2.target);
+    console.log(
+      "AntiSniperTaxManagerForFRouterV2 deployed to:",
+      antiSniperTaxManagerForFRouterV2.target
+    );
 
-    console.log("\n--- Setting TaxManager and AntiSniperTaxManager in FRouterV2 ---");
-    await fRouterV2.connect(owner).grantRole(await fRouterV2.ADMIN_ROLE(), owner.address);
-    await fRouterV2.connect(owner).setTaxManager(await taxManagerForFRouterV2.getAddress());
-    await fRouterV2.connect(owner).setAntiSniperTaxManager(await antiSniperTaxManagerForFRouterV2.getAddress());
+    console.log(
+      "\n--- Setting TaxManager and AntiSniperTaxManager in FRouterV2 ---"
+    );
+    await fRouterV2
+      .connect(owner)
+      .grantRole(await fRouterV2.ADMIN_ROLE(), owner.address);
+    await fRouterV2
+      .connect(owner)
+      .setTaxManager(await taxManagerForFRouterV2.getAddress());
+    await fRouterV2
+      .connect(owner)
+      .setAntiSniperTaxManager(
+        await antiSniperTaxManagerForFRouterV2.getAddress()
+      );
     console.log("TaxManager and AntiSniperTaxManager set in FRouterV2");
 
     // 4. Grant ADMIN_ROLE to owner and set Router in FFactoryV2
@@ -144,6 +171,18 @@ async function setupNewLaunchpadTest() {
     console.log("\n--- Setting Router in FFactoryV2 ---");
     await fFactoryV2.setRouter(await fRouterV2.getAddress());
     console.log("Router set in FFactoryV2");
+
+    // 4.5 Set Robotics Tax Params in FFactoryV2
+    console.log("\n--- Setting Robotics Tax Params in FFactoryV2 ---");
+    await fFactoryV2.setRoboticsTaxParams(
+      ROBOTICS_BUY_TAX,
+      ROBOTICS_SELL_TAX,
+      ROBOTICS_TAX_VAULT
+    );
+    console.log("Robotics tax params set in FFactoryV2");
+    console.log("  Robotics Buy Tax:", ROBOTICS_BUY_TAX, "%");
+    console.log("  Robotics Sell Tax:", ROBOTICS_SELL_TAX, "%");
+    console.log("  Robotics Tax Vault:", ROBOTICS_TAX_VAULT);
 
     // 5. Deploy AgentNftV2
     console.log("\n--- Deploying AgentNftV2 ---");
@@ -191,9 +230,7 @@ async function setupNewLaunchpadTest() {
 
     // 8.5. Deploy AgentVeTokenV2 implementation
     console.log("\n--- Deploying AgentVeTokenV2 implementation ---");
-    const AgentVeTokenV2 = await ethers.getContractFactory(
-      "AgentVeTokenV2"
-    );
+    const AgentVeTokenV2 = await ethers.getContractFactory("AgentVeTokenV2");
     const agentVeTokenV2 = await AgentVeTokenV2.deploy();
     await agentVeTokenV2.waitForDeployment();
     console.log(
@@ -256,13 +293,6 @@ async function setupNewLaunchpadTest() {
     // Set token params for AgentFactoryV6
     console.log("\n--- Setting token params for AgentFactoryV6 ---");
     await agentFactoryV6.setTokenParams(
-      INITIAL_SUPPLY, // maxSupply
-      LP_SUPPLY, // lpSupply
-      VAULT_SUPPLY, // vaultSupply
-      INITIAL_SUPPLY, // maxTokensPerWallet
-      INITIAL_SUPPLY, // maxTokensPerTxn
-      0, // botProtectionDurationInSeconds
-      owner.address, // vault
       BUY_TAX, // projectBuyTaxBasisPoints
       SELL_TAX, // projectSellTaxBasisPoints
       1000, // taxSwapThresholdBasisPoints

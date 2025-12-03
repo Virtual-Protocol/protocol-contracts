@@ -299,10 +299,12 @@ contract AgentETax is
 
     function dcaSell(
         address[] memory tokenAddresses,
-        uint256 slippage,
+        uint256 minConversionRate,
+        uint256 rateDenom,
         uint256 maxOverride
     ) public onlyRole(EXECUTOR_ROLE) {
-        require(slippage <= DENOM, "Invalid slippage");
+        require(minConversionRate > 0, "Invalid conversion rate");
+        require(rateDenom > 0, "Invalid rate denominator");
         require(tokenAddresses.length <= 100, "Too many tokens");
         for (uint i = 0; i < tokenAddresses.length; i++) {
             address tokenAddress = tokenAddresses[i];
@@ -315,17 +317,11 @@ contract AgentETax is
                 continue;
             }
 
-            address[] memory path = new address[](2);
-            path[0] = taxToken;
-            path[1] = assetToken;
+            if (amountToSwap > maxOverride) {
+                amountToSwap = maxOverride;
+            }
 
-            uint256[] memory amountsOut = router.getAmountsOut(
-                amountToSwap,
-                path
-            );
-
-            uint256 minOutput = amountsOut[1] -
-                ((amountsOut[1] * slippage) / DENOM);
+            uint256 minOutput = (amountToSwap * minConversionRate) / rateDenom;
 
             _swapForAsset(tokenAddress, minOutput, maxOverride);
         }

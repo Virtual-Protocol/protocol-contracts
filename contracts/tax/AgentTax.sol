@@ -345,9 +345,11 @@ contract AgentTax is Initializable, AccessControlUpgradeable {
     function dcaSell(
         uint256[] memory agentIds,
         uint256 minConversionRate,
+        uint256 rateDenom,
         uint256 maxOverride
     ) public onlyRole(EXECUTOR_ROLE) {
-        require(minConversionRate == 0, "Invalid conversion rate");
+        require(minConversionRate > 0, "Invalid conversion rate");
+        require(rateDenom > 0, "Invalid rate denominator");
         uint256 agentId;
         for (uint i = 0; i < agentIds.length; i++) {
             agentId = agentIds[i];
@@ -356,10 +358,15 @@ contract AgentTax is Initializable, AccessControlUpgradeable {
             uint256 amountToSwap = agentAmounts.amountCollected -
                 agentAmounts.amountSwapped;
 
+            if (amountToSwap < minSwapThreshold) {
+                continue;
+            }
+
             if (amountToSwap > maxOverride) {
                 amountToSwap = maxOverride;
             }
-            uint256 minOutput = (amountToSwap * minConversionRate) / DENOM;
+            
+            uint256 minOutput = (amountToSwap * minConversionRate) / rateDenom;
             _swapForAsset(agentId, minOutput, maxOverride);
         }
     }

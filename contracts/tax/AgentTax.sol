@@ -25,7 +25,7 @@ contract AgentTax is Initializable, AccessControlUpgradeable {
     bytes32 public constant ADMIN_ROLE = keccak256("ADMIN_ROLE");
     bytes32 public constant EXECUTOR_ROLE = keccak256("EXECUTOR_ROLE");
     bytes32 public constant EXECUTOR_V2_ROLE = keccak256("EXECUTOR_V2_ROLE");
-    uint256 internal constant MIN_PROTOTYPE_V2_ONCHAIN_VIRTUAL_ID = 10**12;
+    uint256 internal constant MIN_PROTOTYPE_V2_ONCHAIN_VIRTUAL_ID = 10 ** 12;
 
     uint256 internal constant DENOM = 10000;
 
@@ -322,9 +322,16 @@ contract AgentTax is Initializable, AccessControlUpgradeable {
         emit CreatorUpdated(agentId, oldCreator, creator);
     }
 
-    function updateCreatorForPrototypeV2Agents(uint256 agentId, address tba, address creator) public onlyRole(EXECUTOR_V2_ROLE) {
+    function updateCreatorForPrototypeV2Agents(
+        uint256 agentId,
+        address tba,
+        address creator
+    ) public onlyRole(EXECUTOR_V2_ROLE) {
         // 10^12 is the first fake prototypeV2OnchainVirtualId
-        require(agentId >= MIN_PROTOTYPE_V2_ONCHAIN_VIRTUAL_ID, "Only for prototype v2 agents");
+        require(
+            agentId >= MIN_PROTOTYPE_V2_ONCHAIN_VIRTUAL_ID,
+            "Only for prototype v2 agents"
+        );
 
         require(tba != address(0), "Invalid TBA");
         require(creator != address(0), "Invalid creator");
@@ -337,10 +344,12 @@ contract AgentTax is Initializable, AccessControlUpgradeable {
 
     function dcaSell(
         uint256[] memory agentIds,
-        uint256 slippage,
+        uint256 minConversionRate,
+        uint256 rateDenom,
         uint256 maxOverride
     ) public onlyRole(EXECUTOR_ROLE) {
-        require(slippage <= DENOM, "Invalid slippage");
+        require(minConversionRate > 0, "Invalid conversion rate");
+        require(rateDenom > 0, "Invalid rate denominator");
         uint256 agentId;
         for (uint i = 0; i < agentIds.length; i++) {
             agentId = agentIds[i];
@@ -349,11 +358,15 @@ contract AgentTax is Initializable, AccessControlUpgradeable {
             uint256 amountToSwap = agentAmounts.amountCollected -
                 agentAmounts.amountSwapped;
 
+            if (amountToSwap < minSwapThreshold) {
+                continue;
+            }
+
             if (amountToSwap > maxOverride) {
                 amountToSwap = maxOverride;
             }
-
-            uint256 minOutput = ((amountToSwap * (DENOM - slippage)) / DENOM);
+            
+            uint256 minOutput = (amountToSwap * minConversionRate) / rateDenom;
             _swapForAsset(agentId, minOutput, maxOverride);
         }
     }

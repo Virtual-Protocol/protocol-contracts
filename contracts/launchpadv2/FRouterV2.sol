@@ -96,11 +96,29 @@ contract FRouterV2 is
         return (amountToken_, amountAsset_);
     }
 
+    function sellV2(
+        uint256 amountIn,
+        address tokenAddress,
+        address to,
+        bool isRobotics
+    ) public nonReentrant onlyRole(EXECUTOR_ROLE) returns (uint256, uint256) {
+        return _sell(amountIn, tokenAddress, to, isRobotics);
+    }
+
     function sell(
         uint256 amountIn,
         address tokenAddress,
         address to
     ) public nonReentrant onlyRole(EXECUTOR_ROLE) returns (uint256, uint256) {
+        return _sell(amountIn, tokenAddress, to, false);
+    }
+
+    function _sell(
+        uint256 amountIn,
+        address tokenAddress,
+        address to,
+        bool isRobotics
+    ) internal onlyRole(EXECUTOR_ROLE) returns (uint256, uint256) {
         require(tokenAddress != address(0), "Zero addresses are not allowed.");
         require(to != address(0), "Zero addresses are not allowed.");
         require(amountIn > 0, "amountIn must be greater than 0");
@@ -117,12 +135,20 @@ contract FRouterV2 is
 
         uint fee = factory.sellTax();
         uint256 txFee = (fee * amountOut) / 100;
+        uint256 roboticsTax = 0;
+        if (isRobotics) {
+            roboticsTax = factory.roboticsSellTax();
+        }
+        uint256 roboticsTxFee = (roboticsTax * amountOut) / 100; // tax is in percentage
 
-        uint256 amount = amountOut - txFee;
+        uint256 amount = amountOut - txFee - roboticsTxFee;
         address feeTo = factory.taxVault();
 
         pair.transferAsset(to, amount);
         pair.transferAsset(feeTo, txFee);
+        if (roboticsTxFee > 0) {
+            pair.transferAsset(factory.roboticsTaxVault(), roboticsTxFee);
+        }
 
         pair.swap(amountIn, 0, 0, amountOut);
 
@@ -134,12 +160,32 @@ contract FRouterV2 is
         return (amountIn, amountOut);
     }
 
+    function buyV2(
+        uint256 amountIn,
+        address tokenAddress,
+        address to,
+        bool isInitialPurchase,
+        bool isRobotics
+    ) public onlyRole(EXECUTOR_ROLE) nonReentrant returns (uint256, uint256) {
+        return _buy(amountIn, tokenAddress, to, isInitialPurchase, isRobotics);
+    }
+
     function buy(
         uint256 amountIn,
         address tokenAddress,
         address to,
         bool isInitialPurchase
     ) public onlyRole(EXECUTOR_ROLE) nonReentrant returns (uint256, uint256) {
+        return _buy(amountIn, tokenAddress, to, isInitialPurchase, false);
+    }
+
+    function _buy(
+        uint256 amountIn,
+        address tokenAddress,
+        address to,
+        bool isInitialPurchase,
+        bool isRobotics
+    ) internal onlyRole(EXECUTOR_ROLE) returns (uint256, uint256) {
         require(tokenAddress != address(0), "Zero addresses are not allowed.");
         require(to != address(0), "Zero addresses are not allowed.");
         require(amountIn > 0, "amountIn must be greater than 0");
@@ -147,18 +193,27 @@ contract FRouterV2 is
         address pair = factory.getPair(tokenAddress, assetToken);
 
         // Calculate tax - use normal buyTax for initial purchase, anti-sniper tax for others
-        uint256 normalTax = factory.buyTax(); //
+        uint256 normalTax = factory.buyTax();
+        uint256 roboticsTax = 0;
+        if (isRobotics) {
+            roboticsTax = factory.roboticsBuyTax();
+        }
         uint256 antiSniperTax;
         if (isInitialPurchase) {
             // No anti-sniper tax for creator's initial purchase
         } else {
-            antiSniperTax = _calculateAntiSniperTax(pair) - normalTax; // Anti-sniper tax for regular purchases
+            antiSniperTax = _calculateAntiSniperTax(pair); // Anti-sniper tax for regular purchases
+        }
+        // Ensure total tax does not exceed 99% (user must receive at least 1%)
+        if (normalTax + roboticsTax + antiSniperTax > 99) {
+            antiSniperTax = 99 - normalTax - roboticsTax; // collect normalTax and roboticsTax first
         }
 
         uint256 normalTxFee = (normalTax * amountIn) / 100; // tax is in percentage
         uint256 antiSniperTxFee = (antiSniperTax * amountIn) / 100; // tax is in percentage
+        uint256 roboticsTxFee = (roboticsTax * amountIn) / 100; // tax is in percentage
 
-        uint256 amount = amountIn - normalTxFee - antiSniperTxFee;
+        uint256 amount = amountIn - normalTxFee - antiSniperTxFee - roboticsTxFee;
 
         IERC20(assetToken).safeTransferFrom(to, pair, amount);
 
@@ -167,11 +222,20 @@ contract FRouterV2 is
             factory.taxVault(),
             normalTxFee
         );
-        IERC20(assetToken).safeTransferFrom(
-            to,
-            factory.antiSniperTaxVault(),
-            antiSniperTxFee
-        );
+        if (antiSniperTxFee > 0) {
+            IERC20(assetToken).safeTransferFrom(
+                to,
+                factory.antiSniperTaxVault(),
+                antiSniperTxFee
+            );
+        }
+        if (roboticsTxFee > 0) {
+            IERC20(assetToken).safeTransferFrom(
+                to,
+                factory.roboticsTaxVault(),
+                roboticsTxFee
+            );
+        }
 
         uint256 amountOut = getAmountsOut(tokenAddress, assetToken, amount);
 
@@ -234,7 +298,7 @@ contract FRouterV2 is
 
     /**
      * @dev Calculate anti-sniper tax based on time elapsed since pair start
-     * Tax starts at 99% and decreases by 1% per minute to 1% over 98 minutes
+     * Tax starts at 99% and decreases by 1% per minute to 0% over 99 minutes
      * @param pairAddress The address of the pair
      * @return taxPercentage Tax in percentage (1 = 1%)
      */
@@ -243,13 +307,7 @@ contract FRouterV2 is
     ) private view returns (uint256) {
         IFPairV2 pair = IFPairV2(pairAddress);
 
-        uint256 startTime = pair.startTime();
-        // If trading hasn't started yet, use maximum tax
-        if (block.timestamp < startTime) {
-            return factory.antiSniperBuyTaxStartValue();
-        }
-
-        uint256 finalTaxStartTime = startTime;
+        uint256 finalTaxStartTime = pair.startTime();
         // Try to get taxStartTime safely for backward compatibility
         uint256 taxStartTime = 0;
         try pair.taxStartTime() returns (uint256 _taxStartTime) {
@@ -262,32 +320,26 @@ contract FRouterV2 is
         if (taxStartTime > 0) {
             finalTaxStartTime = taxStartTime; // use taxStartTime if it's set (for new pairs)
         }
+        // If trading hasn't started yet, use maximum tax
+        if (block.timestamp < finalTaxStartTime) {
+            return factory.antiSniperBuyTaxStartValue();
+        }
 
+        // Tax decreases by 1% per minute from 99% to 0%
+        // tax = 99% - (timeElapsed / 60) * 1%
+        uint256 startTax = factory.antiSniperBuyTaxStartValue(); // 99%
         uint256 timeElapsed = block.timestamp - finalTaxStartTime;
-        uint256 antiSniperDuration = 98 * 60; // 98 minutes in seconds
-        // If more than 98 minutes have passed, use normal buy tax
-        if (timeElapsed >= antiSniperDuration) {
-            return factory.buyTax();
-        }
+        uint256 taxReduction = timeElapsed / 60; // 1% per minute
 
-        // Tax decreases by 1% per minute from 99% to 1%
-        // tax = 99 - (timeElapsed / 60) * 1
-        uint256 startTax = factory.antiSniperBuyTaxStartValue();
-        uint256 minutesElapsed = timeElapsed / 60;
-        uint256 taxReduction = minutesElapsed; // 1% per minute
+        // return early cuz contract not allow negative value
         if (startTax <= taxReduction) {
-            return factory.buyTax();
+            return 0;
         }
-
-        // Ensure tax doesn't go below the normal buy tax
-        uint256 calculatedTax = startTax - taxReduction;
-        uint256 endTax = factory.buyTax();
-
-        return calculatedTax > endTax ? calculatedTax : endTax;
+        return startTax - taxReduction;
     }
 
     function hasAntiSniperTax(address pairAddress) public view returns (bool) {
-        return _calculateAntiSniperTax(pairAddress) > factory.buyTax();
+        return _calculateAntiSniperTax(pairAddress) > 0;
     }
 
     function setTaxStartTime(

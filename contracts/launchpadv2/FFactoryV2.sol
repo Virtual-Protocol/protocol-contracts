@@ -26,6 +26,9 @@ contract FFactoryV2 is
     uint256 public sellTax;
     uint256 public antiSniperBuyTaxStartValue; // Starting tax value for anti-sniper (in basis points)
     address public antiSniperTaxVault;
+    uint256 public roboticsBuyTax;
+    uint256 public roboticsSellTax;
+    address public roboticsTaxVault;
 
     event PairCreated(
         address indexed tokenA,
@@ -119,6 +122,16 @@ contract FFactoryV2 is
         sellTax = sellTax_;
         antiSniperBuyTaxStartValue = antiSniperBuyTaxStartValue_;
         antiSniperTaxVault = antiSniperTaxVault_;
+    }
+
+    function setRoboticsTaxParams(
+        uint256 buyTax_,
+        uint256 sellTax_,
+        address taxVault_
+    ) public onlyRole(ADMIN_ROLE) {
+        roboticsBuyTax = buyTax_;
+        roboticsSellTax = sellTax_;
+        roboticsTaxVault = taxVault_;
     }
 
     function setRouter(address router_) public onlyRole(ADMIN_ROLE) {

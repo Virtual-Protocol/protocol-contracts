@@ -56,6 +56,7 @@ contract BondingV3 is
         uint256 initialPurchase;
         uint256 virtualId;
         bool launchExecuted;
+        bool isRobotics;
     }
 
     struct Data {
@@ -192,6 +193,31 @@ contract BondingV3 is
         launchParams = params;
     }
 
+    function preLaunchV2(
+        string memory _name,
+        string memory _ticker,
+        uint8[] memory cores,
+        string memory desc,
+        string memory img,
+        string[4] memory urls,
+        uint256 purchaseAmount,
+        uint256 startTime,
+        bool isRobotics
+    ) public nonReentrant returns (address, address, uint, uint256) {
+        return
+            _preLaunch(
+                _name,
+                _ticker,
+                cores,
+                desc,
+                img,
+                urls,
+                purchaseAmount,
+                startTime,
+                isRobotics
+            );
+    }
+
     function preLaunch(
         string memory _name,
         string memory _ticker,
@@ -202,6 +228,31 @@ contract BondingV3 is
         uint256 purchaseAmount,
         uint256 startTime
     ) public nonReentrant returns (address, address, uint, uint256) {
+        return
+            _preLaunch(
+                _name,
+                _ticker,
+                cores,
+                desc,
+                img,
+                urls,
+                purchaseAmount,
+                startTime,
+                false
+            );
+    }
+
+    function _preLaunch(
+        string memory _name,
+        string memory _ticker,
+        uint8[] memory cores,
+        string memory desc,
+        string memory img,
+        string[4] memory urls,
+        uint256 purchaseAmount,
+        uint256 startTime,
+        bool isRobotics
+    ) internal returns (address, address, uint, uint256) {
         if (purchaseAmount < fee || cores.length <= 0) {
             revert InvalidInput();
         }
@@ -224,15 +275,16 @@ contract BondingV3 is
             .createNewAgentTokenAndApplication(
                 _name, // without "fun " prefix
                 _ticker,
-                abi.encode( // tokenSupplyParams
-                        initialSupply,
-                        0, // lpSupply, will mint to agentTokenAddress
-                        initialSupply, // vaultSupply, will mint to vault
-                        initialSupply,
-                        initialSupply,
-                        0,
-                        address(this) // vault, is the bonding contract itself
-                    ),
+                abi.encode(
+                    // tokenSupplyParams
+                    initialSupply,
+                    0, // lpSupply, will mint to agentTokenAddress
+                    initialSupply, // vaultSupply, will mint to vault
+                    initialSupply,
+                    initialSupply,
+                    0,
+                    address(this) // vault, is the bonding contract itself
+                ),
                 cores,
                 _deployParams.tbaSalt,
                 _deployParams.tbaImplementation,
@@ -293,6 +345,7 @@ contract BondingV3 is
         newToken.initialPurchase = initialPurchase;
         newToken.virtualId = VirtualIdBase + tokenInfos.length;
         newToken.launchExecuted = false;
+        newToken.isRobotics = isRobotics;
 
         // Set Data struct fields
         newToken.data.token = token;
@@ -446,10 +499,12 @@ contract BondingV3 is
             revert InvalidInput();
         }
 
-        (uint256 amount0In, uint256 amount1Out) = router.sell(
+        bool isRobotics = tokenInfo[tokenAddress].isRobotics;
+        (uint256 amount0In, uint256 amount1Out) = router.sellV2(
             amountIn,
             tokenAddress,
-            msg.sender
+            msg.sender,
+            isRobotics
         );
 
         if (amount1Out < amountOutMin) {
@@ -486,11 +541,13 @@ contract BondingV3 is
 
         (uint256 reserveA, uint256 reserveB) = pair.getReserves();
 
-        (uint256 amount1In, uint256 amount0Out) = router.buy(
+        bool isRobotics = tokenInfo[tokenAddress].isRobotics;
+        (uint256 amount1In, uint256 amount0Out) = router.buyV2(
             amountIn,
             tokenAddress,
             buyer,
-            isInitialPurchase
+            isInitialPurchase,
+            isRobotics
         );
 
         if (amount0Out < amountOutMin) {

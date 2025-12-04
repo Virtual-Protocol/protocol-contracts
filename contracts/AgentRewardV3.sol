@@ -2,20 +2,14 @@
 pragma solidity ^0.8.20;
 import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import "@openzeppelin/contracts/token/ERC721/IERC721.sol";
 import "@openzeppelin/contracts/utils/math/Math.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/access/AccessControl.sol";
-import "@openzeppelin/contracts/utils/math/Math.sol";
-import {IERC5805} from "@openzeppelin/contracts/interfaces/IERC5805.sol";
 import {SafeCast} from "@openzeppelin/contracts/utils/math/SafeCast.sol";
 import "./virtualPersona/IAgentNft.sol";
-import "./virtualPersona/IAgentToken.sol";
 import "./virtualPersona/IAgentDAO.sol";
 import "./virtualPersona/IAgentVeToken.sol";
 import "./libs/RewardSettingsCheckpointsV2.sol";
-import "./contribution/IContributionNft.sol";
-import "./contribution/IServiceNft.sol";
 import "./libs/TokenSaver.sol";
 import "./IAgentRewardV3.sol";
 

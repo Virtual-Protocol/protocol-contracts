@@ -601,7 +601,7 @@ describe("BondingV2", function () {
       const { bondingV2, virtualToken, agentToken } = contracts;
 
       // Wait 98 minutes after launch to bypass anti-sniper tax
-      await increaseTimeByMinutes(98);
+      await increaseTimeByMinutes(99);
 
       // Verify anti-sniper tax is bypassed after 98 minutes
       const currentTime = await time.latest();
@@ -696,7 +696,6 @@ describe("BondingV2", function () {
         timeElapsed
       );
 
-      // Verify we're past the 98-minute anti-sniper window
       expect(timeElapsed).to.be.greaterThan(10 * 60); // More than 10 minutes
 
       console.log(
@@ -772,6 +771,7 @@ describe("BondingV2", function () {
         (await time.latest()) + 300 // deadline
       );
       let tax = Math.ceil(99 - timeElapsed / 60) / 100; // 99% - 1% per minute, contract side rounds up
+      const normalBuyTax = Number(await contracts.fFactoryV2.buyTax()) / 100; // Normal buy tax (1%)
       console.log("tax:", tax);
       console.log("factory.buyTax():", await contracts.fFactoryV2.buyTax());
       console.log(
@@ -783,12 +783,14 @@ describe("BondingV2", function () {
       );
       console.log("User2 agentToken balance:", user2AgentTokenBalance);
       // user2 should get tokens from their 100 VIRTUAL purchase (with anti-sniper tax at ~10 minutes)
+      // The contract applies both normal buy tax (1%) and anti-sniper tax separately
+      // Effective amount = 100 * (1 - normalBuyTax - antiSniperTax)
       let expectedUser2AgentToken =
         BigInt(
           Math.floor(
             450 * 10 ** 6 -
               (450 * 10 ** 6 * 14000) /
-                (14000 + (1000 - 100) * 0.99 + 100 * (1 - tax))
+                (14000 + (1000 - 100) * 0.99 + 100 * (1 - normalBuyTax - tax))
           )
         ) *
           10n ** 18n -
@@ -808,7 +810,7 @@ describe("BondingV2", function () {
       const { user1, user2 } = accounts;
       const { bondingV2, virtualToken, agentToken } = contracts;
 
-      await increaseTimeByMinutes(98); // make sure no tax
+      await increaseTimeByMinutes(99); // make sure no tax
 
       const buyAmount = ethers.parseEther("200000");
       // await virtualToken.connect(user2).approve(addresses.fRouterV2, buyAmount);
@@ -1334,7 +1336,7 @@ describe("BondingV2", function () {
 
       // Buy enough tokens to graduate the token
       // Need to buy enough to reduce reserve0 below gradThreshold
-      await increaseTimeByMinutes(98); // Ensure no anti-sniper tax
+      await increaseTimeByMinutes(99); // Ensure no anti-sniper tax
 
       const graduationBuyAmount = ethers.parseEther("202020.2044906205");
       await virtualToken
@@ -1790,7 +1792,7 @@ describe("BondingV2", function () {
       await bondingV2.connect(user1).launch(tokenAddress);
 
       // Buy enough tokens to graduate the token
-      await increaseTimeByMinutes(98); // Ensure no anti-sniper tax
+      await increaseTimeByMinutes(99); // Ensure no anti-sniper tax
 
       const graduationBuyAmount = ethers.parseEther("202020.2044906205");
       await virtualToken
@@ -3078,23 +3080,25 @@ describe("BondingV2", function () {
 
       // do calculation based on agentToken amount got to check if tax is using 99
       // get agentToken balance of user2 after first buy
-      actualTokenContract = await ethers.getContractAt("AgentTokenV2", tokenAddress);
-      const agentTokenBalanceAfterFirstBuy = await actualTokenContract.balanceOf(user2.address);
+      actualTokenContract = await ethers.getContractAt(
+        "AgentTokenV2",
+        tokenAddress
+      );
+      const agentTokenBalanceAfterFirstBuy =
+        await actualTokenContract.balanceOf(user2.address);
 
       let expectedUser2AgentToken =
         BigInt(
           Math.floor(
-            450 * 10 ** 6 -
-              (450 * 10 ** 6 * 14000) /
-                (14000 + 100 * (1 - 0.99))
+            450 * 10 ** 6 - (450 * 10 ** 6 * 14000) / (14000 + 100 * (1 - 0.99))
           )
         ) *
-          10n ** 18n;
-        expectApproximatelyEqual(
+        10n ** 18n;
+      expectApproximatelyEqual(
         agentTokenBalanceAfterFirstBuy,
         expectedUser2AgentToken,
         "User2 agentToken after first buy",
-        significantDigits=0
+        (significantDigits = 0)
       );
 
       console.log(

@@ -256,13 +256,6 @@ async function setupNewLaunchpadTest() {
     // Set token params for AgentFactoryV6
     console.log("\n--- Setting token params for AgentFactoryV6 ---");
     await agentFactoryV6.setTokenParams(
-      INITIAL_SUPPLY, // maxSupply
-      LP_SUPPLY, // lpSupply
-      VAULT_SUPPLY, // vaultSupply
-      INITIAL_SUPPLY, // maxTokensPerWallet
-      INITIAL_SUPPLY, // maxTokensPerTxn
-      0, // botProtectionDurationInSeconds
-      owner.address, // vault
       BUY_TAX, // projectBuyTaxBasisPoints
       SELL_TAX, // projectSellTaxBasisPoints
       1000, // taxSwapThresholdBasisPoints

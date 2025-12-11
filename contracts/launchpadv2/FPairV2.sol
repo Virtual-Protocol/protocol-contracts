@@ -174,7 +174,8 @@ contract FPairV2 is IFPairV2, ReentrancyGuard {
     }
 
     function setTaxStartTime(uint256 _taxStartTime) public onlyRouter {
-        require(_taxStartTime > 0, "Tax start time must be greater than 0");
+        // BE will input the _taxStartTime = time when call Launch(), so it's always after or at least equal to the startTime
+        require(_taxStartTime >= startTime, "Tax start time must be greater than startTime");
         taxStartTime = _taxStartTime;
         emit TaxStartTimeSet(_taxStartTime);
     }

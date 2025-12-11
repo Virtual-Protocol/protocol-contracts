@@ -389,13 +389,6 @@ const { ethers, upgrades } = require("hardhat");
     // 17. Set token params for AgentFactoryV6
     console.log("\n--- Setting token params for AgentFactoryV6 ---");
     const tx3 = await agentFactoryV6.setTokenParams(
-      initialSupply, // maxSupply (initialSupply)
-      "0", // lpSupply
-      initialSupply, // vaultSupply (initialSupply)
-      initialSupply, // maxTokensPerWallet (initialSupply)
-      initialSupply, // maxTokensPerTxn (initialSupply)
-      0, // botProtectionDurationInSeconds
-      bondingV2Address, // vault
       sentientBuyTax, // projectBuyTaxBasisPoints (sentientBuyTax)
       sentientSellTax, // projectSellTaxBasisPoints (sentientSellTax)
       taxSwapThresholdBasisPoints, // taxSwapThresholdBasisPoints, todo: configurable VP demon

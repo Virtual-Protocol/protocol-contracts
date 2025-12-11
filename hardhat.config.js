@@ -73,7 +73,10 @@ module.exports = {
       accounts: [process.env.PRIVATE_KEY],
     },
     base: {
-      url: "https://mainnet.base.org",
+      url:
+        process.env.BASE_RPC_URL ||
+        process.env.RPC_URL ||
+        "https://mainnet.base.org",
       accounts: [process.env.PRIVATE_KEY],
     },
     base_fire: {
@@ -86,7 +89,10 @@ module.exports = {
       },
     },
     base_sepolia: {
-      url: "https://base-sepolia.drpc.org",
+      url:
+        process.env.BASE_SEPOLIA_RPC_URL ||
+        process.env.RPC_URL ||
+        "https://base-sepolia.drpc.org",
       accounts: [process.env.PRIVATE_KEY],
     },
     base_sepolia_fire: {

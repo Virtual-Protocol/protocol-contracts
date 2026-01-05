@@ -16,23 +16,28 @@ contract veVirtual is
 {
     using SafeERC20 for IERC20;
     struct Lock {
-        uint256 amount;
+        uint256 amount; // if isEco is true, then this is the percentage of the totalEcoLockAmount, otherwise it is the amount of tokens staked
         uint256 start;
         uint256 end;
         uint8 numWeeks; // Active duration in weeks. Reset to maxWeeks if autoRenew is true.
         bool autoRenew;
         uint256 id;
+        bool isEco; // If true, this is an eco lock managed by ecoVeVirtualAddress, cannot be withdrawn by user
     }
 
     uint16 public constant DENOM = 10000;
+    uint256 public constant DENOM_18 = 1e18; // For percentage calculations (1e18 = 100%)
     bytes32 public constant ADMIN_ROLE = keccak256("ADMIN_ROLE");
     uint256 public constant MAX_POSITIONS = 200;
 
     address public baseToken;
     mapping(address => Lock[]) public locks;
+    mapping(address => Lock) public ecoLocks; // Separate mapping for eco locks (one per trader)
     uint256 private _nextId;
 
     uint8 public maxWeeks;
+    address public ecoVeVirtualAddress; // Address that holds the underlying tokens for eco locks
+    uint256 public totalEcoLockAmount; // Total amount of tokens staked for eco traders (held by ecoVeVirtualAddress)
 
     event Stake(
         address indexed user,
@@ -45,6 +50,12 @@ contract veVirtual is
     event AutoRenew(address indexed user, uint256 id, bool autoRenew);
 
     event AdminUnlocked(bool adminUnlocked);
+    event StakeForEcoTraders(
+        address indexed trader,
+        uint256 id,
+        uint256 amount,
+        uint8 numWeeks
+    );
     bool public adminUnlocked;
 
     function initialize(
@@ -98,6 +109,24 @@ contract veVirtual is
         for (uint i = 0; i < locks[account].length; i++) {
             balance += _balanceOfLockAt(locks[account][i], timestamp);
         }
+        // Include eco lock if it exists (with actual amount calculation)
+        if (ecoLocks[account].id != 0) {
+            Lock memory ecoLock = ecoLocks[account];
+            // Calculate actual amount for eco lock
+            uint256 actualAmount = _getEcoLockActualAmount(account);
+
+            // Create a temporary lock with actual amount for balance calculation
+            Lock memory tempLock = Lock({
+                amount: actualAmount,
+                start: ecoLock.start,
+                end: ecoLock.end,
+                numWeeks: ecoLock.numWeeks,
+                autoRenew: ecoLock.autoRenew,
+                id: ecoLock.id,
+                isEco: ecoLock.isEco
+            });
+            balance += _balanceOfLockAt(tempLock, timestamp);
+        }
         return balance;
     }
 
@@ -109,7 +138,22 @@ contract veVirtual is
         address account,
         uint256 index
     ) public view returns (uint256) {
-        return _balanceOfLock(locks[account][index]);
+        Lock memory lock = locks[account][index];
+        // If it's an eco lock, calculate actual amount
+        if (lock.isEco) {
+            uint256 actualAmount = _getEcoLockActualAmount(account);
+            Lock memory tempLock = Lock({
+                amount: actualAmount,
+                start: lock.start,
+                end: lock.end,
+                numWeeks: lock.numWeeks,
+                autoRenew: lock.autoRenew,
+                id: lock.id,
+                isEco: lock.isEco
+            });
+            return _balanceOfLock(tempLock);
+        }
+        return _balanceOfLock(lock);
     }
 
     function _balanceOfLockAt(
@@ -163,7 +207,8 @@ contract veVirtual is
             end: end,
             numWeeks: numWeeks,
             autoRenew: autoRenew,
-            id: _nextId++
+            id: _nextId++,
+            isEco: false
         });
         locks[_msgSender()].push(lock);
         emit Stake(_msgSender(), lock.id, amount, numWeeks);
@@ -199,6 +244,7 @@ contract veVirtual is
         address account = _msgSender();
         uint256 index = _indexOf(account, id);
         Lock memory lock = locks[account][index];
+        require(!lock.isEco, "Cannot withdraw eco lock");
         require(
             block.timestamp >= lock.end || adminUnlocked,
             "Lock is not expired"
@@ -223,6 +269,7 @@ contract veVirtual is
         uint256 index = _indexOf(account, id);
 
         Lock storage lock = locks[account][index];
+        require(!lock.isEco, "Cannot modify eco lock");
         lock.autoRenew = !lock.autoRenew;
         lock.numWeeks = maxWeeks;
         lock.start = block.timestamp;
@@ -235,6 +282,7 @@ contract veVirtual is
         address account = _msgSender();
         uint256 index = _indexOf(account, id);
         Lock storage lock = locks[account][index];
+        require(!lock.isEco, "Cannot modify eco lock");
         require(lock.autoRenew == false, "Lock is auto-renewing");
         require(block.timestamp < lock.end, "Lock is expired");
         require(
@@ -296,6 +344,176 @@ contract veVirtual is
         for (uint i = 0; i < locks[account].length; i++) {
             amount += locks[account][i].amount;
         }
+        // Include eco lock if it exists (with actual amount calculation)
+        if (ecoLocks[account].id != 0) {
+            uint256 actualAmount = _getEcoLockActualAmount(account);
+            amount += actualAmount;
+        }
         return amount;
+    }
+
+    /// @notice Set the ecoVeVirtualAddress that holds underlying tokens for eco locks
+    /// @param ecoVeVirtualAddress_ The address that holds the underlying tokens
+    function setEcoVeVirtualAddress(
+        address ecoVeVirtualAddress_
+    ) external onlyRole(ADMIN_ROLE) {
+        require(
+            ecoVeVirtualAddress_ != address(0),
+            "Invalid ecoVeVirtualAddress"
+        );
+        ecoVeVirtualAddress = ecoVeVirtualAddress_;
+    }
+
+    /// @notice Get the actual amount for an eco lock (multiplied by totalEcoLockAmount)
+    /// @param account The account to get the actual amount for
+    /// @return The actual amount (percentage * totalEcoLockAmount / DENOM_18)
+    function _getEcoLockActualAmount(
+        address account
+    ) internal view returns (uint256) {
+        if (ecoLocks[account].id == 0) {
+            return 0;
+        }
+        if (totalEcoLockAmount == 0) {
+            return 0;
+        }
+        // trader's actual amount = trader's percentage * totalEcoLockAmount / DENOM_18
+        return (ecoLocks[account].amount * totalEcoLockAmount) / DENOM_18;
+    }
+
+    /// @notice Internal function to create or update an eco lock
+    /// @param account The account to create/update eco lock for
+    /// @param amount The percentage for the eco lock (in 1e18 format)
+    function _createOrUpdateEcoLock(address account, uint256 amount) internal {
+        require(
+            account != ecoVeVirtualAddress,
+            "Cannot create lock for ecoVeVirtualAddress"
+        );
+        require(
+            totalEcoLockAmount > 0,
+            "totalEcoLockAmount must be greater than 0"
+        );
+
+        uint8 numWeeks = maxWeeks;
+        uint256 end = block.timestamp + uint256(numWeeks) * 1 weeks;
+
+        Lock storage existingLock = ecoLocks[account];
+
+        // Calculate old actual amount before updating
+        uint256 oldActualAmount = 0;
+        if (existingLock.id != 0) {
+            oldActualAmount =
+                (existingLock.amount * totalEcoLockAmount) /
+                DENOM_18;
+        }
+
+        if (existingLock.id == 0) {
+            // Create new eco lock
+            Lock memory newLock = Lock({
+                amount: amount,
+                start: block.timestamp,
+                end: end,
+                numWeeks: numWeeks,
+                autoRenew: true,
+                id: _nextId++,
+                isEco: true
+            });
+            ecoLocks[account] = newLock;
+            emit StakeForEcoTraders(account, newLock.id, amount, numWeeks);
+
+            // Calculate actual amount for voting units
+            uint256 actualAmount = (amount * totalEcoLockAmount) / DENOM_18;
+            if (actualAmount > 0) {
+                _transferVotingUnits(address(0), account, actualAmount);
+            }
+        } else {
+            // Update existing eco lock
+            existingLock.amount = amount;
+            existingLock.start = block.timestamp;
+            existingLock.end = end;
+
+            // Calculate new actual amount for voting units
+            uint256 newActualAmount = (amount * totalEcoLockAmount) / DENOM_18;
+
+            // Update voting units (ensure positive difference)
+            if (newActualAmount > oldActualAmount) {
+                // mint voting units
+                _transferVotingUnits(
+                    address(0),
+                    account,
+                    newActualAmount - oldActualAmount
+                );
+            } else if (newActualAmount < oldActualAmount) {
+                // Ensure we don't underflow, and also burn voting units
+                _transferVotingUnits(
+                    account,
+                    address(0),
+                    oldActualAmount - newActualAmount
+                );
+            }
+        }
+    }
+
+    function stakeForEcoTraders(uint256 amount) external nonReentrant {
+        require(amount > 0, "Amount must be greater than 0");
+        require(
+            _msgSender() == ecoVeVirtualAddress,
+            "sender is not ecoVeVirtualAddress"
+        );
+
+        IERC20(baseToken).safeTransferFrom(_msgSender(), address(this), amount);
+
+        // Add to total eco lock amount (no lock created for ecoVeVirtualAddress)
+        totalEcoLockAmount += amount;
+    }
+
+    /// @notice Stake tokens for eco traders (tokens are held by ecoVeVirtualAddress)
+    /// @param userAddresses Array of trader addresses to receive locks
+    /// @param percentages Array of percentages for each trader (in 1e18 format, must sum to DENOM_18)
+    /// @dev This function creates or updates eco locks for traders but doesn't transfer tokens
+    ///      The underlying tokens are held by ecoVeVirtualAddress
+    ///      Percentages are in 1e18 format (1e18 = 100%)
+    function updateEcoTradersPercentages(
+        address[] calldata userAddresses,
+        uint256[] calldata percentages
+    ) external onlyRole(ADMIN_ROLE) nonReentrant {
+        require(
+            userAddresses.length == percentages.length,
+            "Arrays length mismatch"
+        );
+        require(
+            ecoVeVirtualAddress != address(0),
+            "EcoVeVirtualAddress not set"
+        );
+        require(
+            totalEcoLockAmount > 0,
+            "totalEcoLockAmount must be greater than 0"
+        );
+
+        for (uint i = 0; i < percentages.length; i++) {
+            require(percentages[i] > 0, "Percentage must be greater than 0");
+            require(
+                percentages[i] <= DENOM_18,
+                "Percentage cannot exceed 100%"
+            );
+        }
+
+        for (uint i = 0; i < userAddresses.length; i++) {
+            address trader = userAddresses[i];
+            require(trader != address(0), "Invalid trader address");
+            require(
+                trader != ecoVeVirtualAddress,
+                "Cannot set percentage for ecoVeVirtualAddress"
+            );
+
+            // Create or update eco lock for trader (store percentage)
+            _createOrUpdateEcoLock(trader, percentages[i]);
+        }
+    }
+
+    /// @notice Get the eco lock for a trader
+    /// @param trader The trader address
+    /// @return lock The eco lock (id will be 0 if no eco lock exists)
+    function getEcoLock(address trader) external view returns (Lock memory) {
+        return ecoLocks[trader];
     }
 }

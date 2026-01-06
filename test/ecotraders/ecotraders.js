@@ -9,12 +9,12 @@ const { upgrades } = require("hardhat");
 
 describe("veVirtual - Eco Traders", function () {
   let virtual, veVirtual;
-  let deployer, staker, trader1, trader2, trader3, ecoVeVirtualAddress;
+  let deployer, staker, trader1, trader2, trader3, ecoVeVirtualStaker;
 
   const DENOM_18 = ethers.parseEther("1"); // 1e18 = 100%
 
   before(async function () {
-    [deployer, staker, trader1, trader2, trader3, ecoVeVirtualAddress] =
+    [deployer, staker, trader1, trader2, trader3, ecoVeVirtualStaker] =
       await ethers.getSigners();
   });
 
@@ -33,12 +33,12 @@ describe("veVirtual - Eco Traders", function () {
       { initializer: "initialize" }
     );
 
-    // Set ecoVeVirtualAddress
-    await veVirtual.setEcoVeVirtualAddress(ecoVeVirtualAddress.address);
+    // Set ecoVeVirtualStaker
+    await veVirtual.setEcoVeVirtualStaker(ecoVeVirtualStaker.address);
 
     // Transfer tokens to test accounts
     await virtual.transfer(staker.address, parseEther("100000"));
-    await virtual.transfer(ecoVeVirtualAddress.address, parseEther("1000000"));
+    await virtual.transfer(ecoVeVirtualStaker.address, parseEther("1000000"));
   });
 
   describe("Basic Regression Tests", function () {
@@ -210,36 +210,36 @@ describe("veVirtual - Eco Traders", function () {
   });
 
   describe("Eco Lock Functionality", function () {
-    it("should allow ecoVeVirtualAddress to stake tokens", async function () {
+    it("should allow ecoVeVirtualStaker to stake tokens", async function () {
       const amount = parseEther("100000");
       await virtual
-        .connect(ecoVeVirtualAddress)
+        .connect(ecoVeVirtualStaker)
         .approve(veVirtual.target, amount);
 
-      await veVirtual.connect(ecoVeVirtualAddress).stakeForEcoTraders(amount);
+      await veVirtual.connect(ecoVeVirtualStaker).stakeForEcoTraders(amount);
 
       expect(await veVirtual.totalEcoLockAmount()).to.be.equal(amount);
       expect(await virtual.balanceOf(veVirtual.target)).to.be.equal(amount);
     });
 
-    it("should prevent non-ecoVeVirtualAddress from calling stakeForEcoTraders", async function () {
+    it("should prevent non-ecoVeVirtualStaker from calling stakeForEcoTraders", async function () {
       await virtual
         .connect(staker)
         .approve(veVirtual.target, parseEther("1000"));
 
       await expect(
         veVirtual.connect(staker).stakeForEcoTraders(parseEther("1000"))
-      ).to.be.revertedWith("sender is not ecoVeVirtualAddress");
+      ).to.be.revertedWith("sender is not ecoVeVirtualStaker");
     });
 
     it("should create eco locks for traders with percentages", async function () {
-      // First, ecoVeVirtualAddress stakes tokens
+      // First, ecoVeVirtualStaker stakes tokens
       const totalAmount = parseEther("100000");
       await virtual
-        .connect(ecoVeVirtualAddress)
+        .connect(ecoVeVirtualStaker)
         .approve(veVirtual.target, totalAmount);
       await veVirtual
-        .connect(ecoVeVirtualAddress)
+        .connect(ecoVeVirtualStaker)
         .stakeForEcoTraders(totalAmount);
 
       // Admin distributes percentages to traders
@@ -273,10 +273,10 @@ describe("veVirtual - Eco Traders", function () {
     it("should update existing eco locks when called again", async function () {
       const totalAmount = parseEther("100000");
       await virtual
-        .connect(ecoVeVirtualAddress)
+        .connect(ecoVeVirtualStaker)
         .approve(veVirtual.target, totalAmount);
       await veVirtual
-        .connect(ecoVeVirtualAddress)
+        .connect(ecoVeVirtualStaker)
         .stakeForEcoTraders(totalAmount);
 
       // First distribution
@@ -313,10 +313,10 @@ describe("veVirtual - Eco Traders", function () {
       // Eco lock setup
       const totalAmount = parseEther("50000");
       await virtual
-        .connect(ecoVeVirtualAddress)
+        .connect(ecoVeVirtualStaker)
         .approve(veVirtual.target, totalAmount);
       await veVirtual
-        .connect(ecoVeVirtualAddress)
+        .connect(ecoVeVirtualStaker)
         .stakeForEcoTraders(totalAmount);
 
       await veVirtual.updateEcoTradersPercentages(
@@ -333,10 +333,10 @@ describe("veVirtual - Eco Traders", function () {
     it("should prevent traders from withdrawing eco locks", async function () {
       const totalAmount = parseEther("100000");
       await virtual
-        .connect(ecoVeVirtualAddress)
+        .connect(ecoVeVirtualStaker)
         .approve(veVirtual.target, totalAmount);
       await veVirtual
-        .connect(ecoVeVirtualAddress)
+        .connect(ecoVeVirtualStaker)
         .stakeForEcoTraders(totalAmount);
 
       await veVirtual.updateEcoTradersPercentages(
@@ -353,21 +353,21 @@ describe("veVirtual - Eco Traders", function () {
       ).to.be.revertedWith("Lock not found"); // Because eco locks are not in locks[] array
     });
 
-    it("should prevent creating eco lock for ecoVeVirtualAddress", async function () {
+    it("should prevent creating eco lock for ecoVeVirtualStaker", async function () {
       const totalAmount = parseEther("100000");
       await virtual
-        .connect(ecoVeVirtualAddress)
+        .connect(ecoVeVirtualStaker)
         .approve(veVirtual.target, totalAmount);
       await veVirtual
-        .connect(ecoVeVirtualAddress)
+        .connect(ecoVeVirtualStaker)
         .stakeForEcoTraders(totalAmount);
 
       await expect(
         veVirtual.updateEcoTradersPercentages(
-          [ecoVeVirtualAddress.address],
+          [ecoVeVirtualStaker.address],
           [ethers.parseEther("0.5")]
         )
-      ).to.be.revertedWith("Cannot set percentage for ecoVeVirtualAddress");
+      ).to.be.revertedWith("Cannot set percentage for ecoVeVirtualStaker");
     });
 
     it("should prevent updating eco locks when totalEcoLockAmount is zero", async function () {
@@ -382,10 +382,10 @@ describe("veVirtual - Eco Traders", function () {
     it("should validate percentage limits", async function () {
       const totalAmount = parseEther("100000");
       await virtual
-        .connect(ecoVeVirtualAddress)
+        .connect(ecoVeVirtualStaker)
         .approve(veVirtual.target, totalAmount);
       await veVirtual
-        .connect(ecoVeVirtualAddress)
+        .connect(ecoVeVirtualStaker)
         .stakeForEcoTraders(totalAmount);
 
       // Percentage exceeds 100%
@@ -405,10 +405,10 @@ describe("veVirtual - Eco Traders", function () {
     it("should update voting power when eco locks are created/updated", async function () {
       const totalAmount = parseEther("100000");
       await virtual
-        .connect(ecoVeVirtualAddress)
+        .connect(ecoVeVirtualStaker)
         .approve(veVirtual.target, totalAmount);
       await veVirtual
-        .connect(ecoVeVirtualAddress)
+        .connect(ecoVeVirtualStaker)
         .stakeForEcoTraders(totalAmount);
 
       await veVirtual.connect(trader1).delegate(trader1.address);
@@ -444,17 +444,17 @@ describe("veVirtual - Eco Traders", function () {
     it("should handle multiple stakeForEcoTraders calls", async function () {
       const amount1 = parseEther("50000");
       await virtual
-        .connect(ecoVeVirtualAddress)
+        .connect(ecoVeVirtualStaker)
         .approve(veVirtual.target, amount1);
-      await veVirtual.connect(ecoVeVirtualAddress).stakeForEcoTraders(amount1);
+      await veVirtual.connect(ecoVeVirtualStaker).stakeForEcoTraders(amount1);
 
       expect(await veVirtual.totalEcoLockAmount()).to.be.equal(amount1);
 
       const amount2 = parseEther("30000");
       await virtual
-        .connect(ecoVeVirtualAddress)
+        .connect(ecoVeVirtualStaker)
         .approve(veVirtual.target, amount2);
-      await veVirtual.connect(ecoVeVirtualAddress).stakeForEcoTraders(amount2);
+      await veVirtual.connect(ecoVeVirtualStaker).stakeForEcoTraders(amount2);
 
       expect(await veVirtual.totalEcoLockAmount()).to.be.equal(
         amount1 + amount2
@@ -475,10 +475,10 @@ describe("veVirtual - Eco Traders", function () {
     it("should prevent traders from modifying eco locks", async function () {
       const totalAmount = parseEther("100000");
       await virtual
-        .connect(ecoVeVirtualAddress)
+        .connect(ecoVeVirtualStaker)
         .approve(veVirtual.target, totalAmount);
       await veVirtual
-        .connect(ecoVeVirtualAddress)
+        .connect(ecoVeVirtualStaker)
         .stakeForEcoTraders(totalAmount);
 
       await veVirtual.updateEcoTradersPercentages(
@@ -503,10 +503,10 @@ describe("veVirtual - Eco Traders", function () {
       // Eco lock setup
       const totalAmount = parseEther("50000");
       await virtual
-        .connect(ecoVeVirtualAddress)
+        .connect(ecoVeVirtualStaker)
         .approve(veVirtual.target, totalAmount);
       await veVirtual
-        .connect(ecoVeVirtualAddress)
+        .connect(ecoVeVirtualStaker)
         .stakeForEcoTraders(totalAmount);
 
       await veVirtual.updateEcoTradersPercentages(
@@ -522,10 +522,10 @@ describe("veVirtual - Eco Traders", function () {
     it("should handle eco lock balance decay correctly", async function () {
       const totalAmount = parseEther("100000");
       await virtual
-        .connect(ecoVeVirtualAddress)
+        .connect(ecoVeVirtualStaker)
         .approve(veVirtual.target, totalAmount);
       await veVirtual
-        .connect(ecoVeVirtualAddress)
+        .connect(ecoVeVirtualStaker)
         .stakeForEcoTraders(totalAmount);
 
       await veVirtual.updateEcoTradersPercentages(
@@ -545,10 +545,10 @@ describe("veVirtual - Eco Traders", function () {
     it("should handle array length mismatch", async function () {
       const totalAmount = parseEther("100000");
       await virtual
-        .connect(ecoVeVirtualAddress)
+        .connect(ecoVeVirtualStaker)
         .approve(veVirtual.target, totalAmount);
       await veVirtual
-        .connect(ecoVeVirtualAddress)
+        .connect(ecoVeVirtualStaker)
         .stakeForEcoTraders(totalAmount);
 
       await expect(
@@ -562,10 +562,10 @@ describe("veVirtual - Eco Traders", function () {
     it("should handle zero address validation", async function () {
       const totalAmount = parseEther("100000");
       await virtual
-        .connect(ecoVeVirtualAddress)
+        .connect(ecoVeVirtualStaker)
         .approve(veVirtual.target, totalAmount);
       await veVirtual
-        .connect(ecoVeVirtualAddress)
+        .connect(ecoVeVirtualStaker)
         .stakeForEcoTraders(totalAmount);
 
       await expect(
@@ -586,13 +586,13 @@ describe("veVirtual - Eco Traders", function () {
       await veVirtual.connect(staker).stake(parseEther("1000"), 104, true);
       await veVirtual.connect(staker).stake(parseEther("2000"), 104, true);
 
-      // 2. EcoVeVirtualAddress stakes
+      // 2. EcoVeVirtualStaker stakes
       const totalAmount = parseEther("200000");
       await virtual
-        .connect(ecoVeVirtualAddress)
+        .connect(ecoVeVirtualStaker)
         .approve(veVirtual.target, totalAmount);
       await veVirtual
-        .connect(ecoVeVirtualAddress)
+        .connect(ecoVeVirtualStaker)
         .stakeForEcoTraders(totalAmount);
 
       // 3. Distribute to traders

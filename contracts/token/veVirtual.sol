@@ -22,7 +22,7 @@ contract veVirtual is
         uint8 numWeeks; // Active duration in weeks. Reset to maxWeeks if autoRenew is true.
         bool autoRenew;
         uint256 id;
-        bool isEco; // If true, this is an eco lock managed by ecoVeVirtualAddress, cannot be withdrawn by user
+        bool isEco; // If true, this is an eco lock managed by ecoVeVirtualStaker, cannot be withdrawn by user
     }
 
     uint16 public constant DENOM = 10000;
@@ -36,8 +36,8 @@ contract veVirtual is
     uint256 private _nextId;
 
     uint8 public maxWeeks;
-    address public ecoVeVirtualAddress; // Address that holds the underlying tokens for eco locks
-    uint256 public totalEcoLockAmount; // Total amount of tokens staked for eco traders (held by ecoVeVirtualAddress)
+    address public ecoVeVirtualStaker; // Address that holds the underlying tokens for eco locks
+    uint256 public totalEcoLockAmount; // Total amount of tokens staked for eco traders (held by ecoVeVirtualStaker)
 
     event Stake(
         address indexed user,
@@ -352,16 +352,16 @@ contract veVirtual is
         return amount;
     }
 
-    /// @notice Set the ecoVeVirtualAddress that holds underlying tokens for eco locks
-    /// @param ecoVeVirtualAddress_ The address that holds the underlying tokens
-    function setEcoVeVirtualAddress(
-        address ecoVeVirtualAddress_
+    /// @notice Set the ecoVeVirtualStaker that holds underlying tokens for eco locks
+    /// @param ecoVeVirtualStaker_ The address that holds the underlying tokens
+    function setEcoVeVirtualStaker(
+        address ecoVeVirtualStaker_
     ) external onlyRole(ADMIN_ROLE) {
         require(
-            ecoVeVirtualAddress_ != address(0),
-            "Invalid ecoVeVirtualAddress"
+            ecoVeVirtualStaker_ != address(0),
+            "Invalid ecoVeVirtualStaker"
         );
-        ecoVeVirtualAddress = ecoVeVirtualAddress_;
+        ecoVeVirtualStaker = ecoVeVirtualStaker_;
     }
 
     /// @notice Get the actual amount for an eco lock (multiplied by totalEcoLockAmount)
@@ -385,8 +385,8 @@ contract veVirtual is
     /// @param amount The percentage for the eco lock (in 1e18 format)
     function _createOrUpdateEcoLock(address account, uint256 amount) internal {
         require(
-            account != ecoVeVirtualAddress,
-            "Cannot create lock for ecoVeVirtualAddress"
+            account != ecoVeVirtualStaker,
+            "Cannot create lock for ecoVeVirtualStaker"
         );
         require(
             totalEcoLockAmount > 0,
@@ -456,21 +456,21 @@ contract veVirtual is
     function stakeForEcoTraders(uint256 amount) external nonReentrant {
         require(amount > 0, "Amount must be greater than 0");
         require(
-            _msgSender() == ecoVeVirtualAddress,
-            "sender is not ecoVeVirtualAddress"
+            _msgSender() == ecoVeVirtualStaker,
+            "sender is not ecoVeVirtualStaker"
         );
 
         IERC20(baseToken).safeTransferFrom(_msgSender(), address(this), amount);
 
-        // Add to total eco lock amount (no lock created for ecoVeVirtualAddress)
+        // Add to total eco lock amount (no lock created for ecoVeVirtualStaker)
         totalEcoLockAmount += amount;
     }
 
-    /// @notice Stake tokens for eco traders (tokens are held by ecoVeVirtualAddress)
+    /// @notice Stake tokens for eco traders (tokens are held by ecoVeVirtualStaker)
     /// @param userAddresses Array of trader addresses to receive locks
     /// @param percentages Array of percentages for each trader (in 1e18 format, must sum to DENOM_18)
     /// @dev This function creates or updates eco locks for traders but doesn't transfer tokens
-    ///      The underlying tokens are held by ecoVeVirtualAddress
+    ///      The underlying tokens are held by ecoVeVirtualStaker
     ///      Percentages are in 1e18 format (1e18 = 100%)
     function updateEcoTradersPercentages(
         address[] calldata userAddresses,
@@ -481,8 +481,8 @@ contract veVirtual is
             "Arrays length mismatch"
         );
         require(
-            ecoVeVirtualAddress != address(0),
-            "EcoVeVirtualAddress not set"
+            ecoVeVirtualStaker != address(0),
+            "ecoVeVirtualStaker not set"
         );
         require(
             totalEcoLockAmount > 0,
@@ -501,8 +501,8 @@ contract veVirtual is
             address trader = userAddresses[i];
             require(trader != address(0), "Invalid trader address");
             require(
-                trader != ecoVeVirtualAddress,
-                "Cannot set percentage for ecoVeVirtualAddress"
+                trader != ecoVeVirtualStaker,
+                "Cannot set percentage for ecoVeVirtualStaker"
             );
 
             // Create or update eco lock for trader (store percentage)

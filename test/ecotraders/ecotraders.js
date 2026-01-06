@@ -33,7 +33,11 @@ describe("veVirtual - Eco Traders", function () {
       { initializer: "initialize" }
     );
 
-    // Set ecoVeVirtualStaker
+    // Grant ECO_ROLE to deployer (deployer has ADMIN_ROLE from initialize)
+    const ECO_ROLE = await veVirtual.ECO_ROLE();
+    await veVirtual.grantRole(ECO_ROLE, deployer.address);
+
+    // Set ecoVeVirtualStaker (requires ECO_ROLE)
     await veVirtual.setEcoVeVirtualStaker(ecoVeVirtualStaker.address);
 
     // Transfer tokens to test accounts
@@ -368,6 +372,37 @@ describe("veVirtual - Eco Traders", function () {
           [ethers.parseEther("0.5")]
         )
       ).to.be.revertedWith("Cannot set percentage for ecoVeVirtualStaker");
+    });
+
+    it("should prevent non-ECO_ROLE from calling setEcoVeVirtualStaker", async function () {
+      await expect(
+        veVirtual.connect(staker).setEcoVeVirtualStaker(trader1.address)
+      ).to.be.revertedWithCustomError(
+        veVirtual,
+        "AccessControlUnauthorizedAccount"
+      );
+    });
+
+    it("should prevent non-ECO_ROLE from calling updateEcoTradersPercentages", async function () {
+      const totalAmount = parseEther("100000");
+      await virtual
+        .connect(ecoVeVirtualStaker)
+        .approve(veVirtual.target, totalAmount);
+      await veVirtual
+        .connect(ecoVeVirtualStaker)
+        .stakeForEcoTraders(totalAmount);
+
+      await expect(
+        veVirtual
+          .connect(staker)
+          .updateEcoTradersPercentages(
+            [trader1.address],
+            [ethers.parseEther("0.5")]
+          )
+      ).to.be.revertedWithCustomError(
+        veVirtual,
+        "AccessControlUnauthorizedAccount"
+      );
     });
 
     it("should prevent updating eco locks when totalEcoLockAmount is zero", async function () {

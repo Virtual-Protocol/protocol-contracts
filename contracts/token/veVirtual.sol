@@ -57,6 +57,7 @@ contract veVirtual is
         uint8 numWeeks
     );
     bool public adminUnlocked;
+    bytes32 public constant ECO_ROLE = keccak256("ECO_ROLE");
 
     function initialize(
         address baseToken_,
@@ -356,7 +357,7 @@ contract veVirtual is
     /// @param ecoVeVirtualStaker_ The address that holds the underlying tokens
     function setEcoVeVirtualStaker(
         address ecoVeVirtualStaker_
-    ) external onlyRole(ADMIN_ROLE) {
+    ) external onlyRole(ECO_ROLE) {
         require(
             ecoVeVirtualStaker_ != address(0),
             "Invalid ecoVeVirtualStaker"
@@ -475,7 +476,7 @@ contract veVirtual is
     function updateEcoTradersPercentages(
         address[] calldata userAddresses,
         uint256[] calldata percentages
-    ) external onlyRole(ADMIN_ROLE) nonReentrant {
+    ) external onlyRole(ECO_ROLE) nonReentrant {
         require(
             userAddresses.length == percentages.length,
             "Arrays length mismatch"

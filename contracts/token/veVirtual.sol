@@ -26,18 +26,14 @@ contract veVirtual is
     }
 
     uint16 public constant DENOM = 10000;
-    uint256 public constant DENOM_18 = 1e18; // For percentage calculations (1e18 = 100%)
     bytes32 public constant ADMIN_ROLE = keccak256("ADMIN_ROLE");
     uint256 public constant MAX_POSITIONS = 200;
 
     address public baseToken;
     mapping(address => Lock[]) public locks;
-    mapping(address => Lock) public ecoLocks; // Separate mapping for eco locks (one per trader)
     uint256 private _nextId;
 
     uint8 public maxWeeks;
-    address public ecoVeVirtualStaker; // Address that holds the underlying tokens for eco locks
-    uint256 public totalEcoLockAmount; // Total amount of tokens staked for eco traders (held by ecoVeVirtualStaker)
 
     event Stake(
         address indexed user,
@@ -57,6 +53,10 @@ contract veVirtual is
         uint8 numWeeks
     );
     bool public adminUnlocked;
+    uint256 public constant DENOM_18 = 1e18; // For percentage calculations (1e18 = 100%)
+    mapping(address => Lock) public ecoLocks; // Separate mapping for eco locks (one per trader)
+    address public ecoVeVirtualStaker; // Address that holds the underlying tokens for eco locks
+    uint256 public totalEcoLockAmount; // Total amount of tokens staked for eco traders (held by ecoVeVirtualStaker)
     bytes32 public constant ECO_ROLE = keccak256("ECO_ROLE");
 
     function initialize(

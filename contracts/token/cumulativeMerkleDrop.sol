@@ -68,9 +68,9 @@ contract CumulativeMerkleDrop is Ownable, ICumulativeMerkleDrop {
             // Approve veVirtual contract to spend tokens from this contract
             IERC20(token).forceApprove(veVirtualContract, amount);
 
-            // Call ecoTraderStakeFor on veVirtual contract
+            // Call stakeEcoLockFor on veVirtual contract
             // This will transfer tokens from this contract and create an eco lock for the account
-            veVirtual(veVirtualContract).ecoTraderStakeFor(account, amount);
+            veVirtual(veVirtualContract).stakeEcoLockFor(account, amount);
 
             emit Claimed(account, amount);
         }

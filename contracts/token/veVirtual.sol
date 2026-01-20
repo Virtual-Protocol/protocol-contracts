@@ -16,7 +16,7 @@ contract veVirtual is
 {
     using SafeERC20 for IERC20;
     struct Lock {
-        uint256 amount; // if isEco is true, then this is the percentage of the totalEcoLockAmount, otherwise it is the amount of tokens staked
+        uint256 amount;
         uint256 start;
         uint256 end;
         uint8 numWeeks; // Active duration in weeks. Reset to maxWeeks if autoRenew is true.
@@ -46,18 +46,14 @@ contract veVirtual is
     event AutoRenew(address indexed user, uint256 id, bool autoRenew);
 
     event AdminUnlocked(bool adminUnlocked);
-    event StakeForEcoTraders(
+    event StakeForEcoTrader(
         address indexed trader,
         uint256 id,
         uint256 amount,
         uint8 numWeeks
     );
     bool public adminUnlocked;
-    uint256 public constant DENOM_18 = 1e18; // For percentage calculations (1e18 = 100%)
     mapping(address => Lock) public ecoLocks; // Separate mapping for eco locks (one per trader)
-    address public ecoVeVirtualStaker; // Address that holds the underlying tokens for eco locks
-    uint256 public totalEcoLockAmount; // Total amount of tokens staked for eco traders (held by ecoVeVirtualStaker)
-    bytes32 public constant ECO_ROLE = keccak256("ECO_ROLE");
 
     function initialize(
         address baseToken_,
@@ -122,8 +118,7 @@ contract veVirtual is
         address account,
         uint256 index
     ) public view returns (uint256) {
-        Lock memory lock = locks[account][index];
-        return _balanceOfLock(lock);
+        return _balanceOfLock(locks[account][index]);
     }
 
     function _balanceOfLockAt(
@@ -185,13 +180,14 @@ contract veVirtual is
         _transferVotingUnits(address(0), _msgSender(), amount);
     }
 
-    /// @notice Stake tokens for eco traders
+    /// @notice Stake tokens for eco traders (creates an eco lock)
     /// @dev Creates a lock with autoRenew = true, maxWeeks, and isEco = true
     ///      Users cannot modify (withdraw, toggleAutoRenew, extend) eco locks
     ///      Can be called by users themselves or by contracts (e.g., CumulativeMerkleDrop)
+    ///      If user already has an eco lock, updates the amount instead of creating a new lock
     /// @param account The account to create the eco lock for (use msg.sender for self-staking)
     /// @param amount The amount of tokens to stake (transferred from caller)
-    function ecoTraderStakeFor(
+    function stakeEcoLockFor(
         address account,
         uint256 amount
     ) external nonReentrant {
@@ -202,7 +198,12 @@ contract veVirtual is
         IERC20(baseToken).safeTransferFrom(_msgSender(), address(this), amount);
 
         _createOrUpdateEcoLock(account, amount);
-        emit StakeForEcoTraders(account, ecoLocks[account].id, amount, maxWeeks);
+        emit StakeForEcoTrader(
+            account,
+            ecoLocks[account].id,
+            amount,
+            maxWeeks
+        );
         _transferVotingUnits(address(0), account, amount);
     }
 
@@ -235,7 +236,7 @@ contract veVirtual is
         address account = _msgSender();
         uint256 index = _indexOf(account, id);
         Lock memory lock = locks[account][index];
-        require(!lock.isEco, "Cannot withdraw eco lock");
+        require(!lock.isEco, "Cannot withdraw eco lock"); // redundant check since eco locks are not in locks[] array
         require(
             block.timestamp >= lock.end || adminUnlocked,
             "Lock is not expired"
@@ -260,7 +261,7 @@ contract veVirtual is
         uint256 index = _indexOf(account, id);
 
         Lock storage lock = locks[account][index];
-        require(!lock.isEco, "Cannot modify eco lock");
+        require(!lock.isEco, "Cannot modify eco lock"); // redundant check since eco locks are not in locks[] array
         lock.autoRenew = !lock.autoRenew;
         lock.numWeeks = maxWeeks;
         lock.start = block.timestamp;
@@ -273,7 +274,7 @@ contract veVirtual is
         address account = _msgSender();
         uint256 index = _indexOf(account, id);
         Lock storage lock = locks[account][index];
-        require(!lock.isEco, "Cannot modify eco lock");
+        require(!lock.isEco, "Cannot modify eco lock"); // redundant check since eco locks are not in locks[] array
         require(lock.autoRenew == false, "Lock is auto-renewing");
         require(block.timestamp < lock.end, "Lock is expired");
         require(
@@ -356,17 +357,19 @@ contract veVirtual is
                 isEco: true
             });
             ecoLocks[account] = newLock;
-            _transferVotingUnits(address(0), account, amount);
         } else {
             // Update existing eco lock
             existingLock.amount += amount;
             existingLock.start = block.timestamp;
             existingLock.end = block.timestamp + uint256(maxWeeks) * 1 weeks;
-            _transferVotingUnits(address(0), account, amount);
         }
 
-        emit StakeForEcoTraders(account, ecoLocks[account].id, existingLock.amount, maxWeeks);
-
+        emit StakeForEcoTrader(
+            account,
+            ecoLocks[account].id,
+            existingLock.amount,
+            maxWeeks
+        );
         // add new voting units
         _transferVotingUnits(address(0), account, amount);
     }

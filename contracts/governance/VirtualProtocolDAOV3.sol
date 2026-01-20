@@ -4,12 +4,20 @@ pragma solidity ^0.8.20;
 import "@openzeppelin/contracts/governance/Governor.sol";
 import "@openzeppelin/contracts/governance/extensions/GovernorSettings.sol";
 import "@openzeppelin/contracts/governance/extensions/GovernorStorage.sol";
-import "@openzeppelin/contracts/governance/extensions/GovernorVotes.sol";
 import "@openzeppelin/contracts/governance/extensions/GovernorVotesQuorumFraction.sol";
+import "@openzeppelin/contracts/utils/math/SafeCast.sol";
+import "@openzeppelin/contracts/utils/types/Time.sol";
+import "@openzeppelin/contracts/utils/structs/Checkpoints.sol";
 import "./GovernorCountingVP.sol";
 import "../token/IVEVirtual.sol";
+import "../token/IVirtizen.sol";
 
-contract VirtualProtocolDAOV2 is
+/**
+ * @title VirtualProtocolDAOV3
+ * @notice Governance contract that supports both veVIRTUAL and Virtizen tokens for voting
+ * @dev This version combines voting power from both tokens
+ */
+contract VirtualProtocolDAOV3 is
     Governor,
     GovernorSettings,
     GovernorStorage,
@@ -21,7 +29,8 @@ contract VirtualProtocolDAOV2 is
     Checkpoints.Trace224 private _totalSupplyCheckpoints;
     address private _admin;
 
-    IVEVirtual private immutable _token;
+    IVEVirtual private immutable _veVirtualToken;
+    IVirtizen private immutable _virtizenToken;
 
     Checkpoints.Trace208 private _quorumNumeratorHistory;
 
@@ -46,7 +55,8 @@ contract VirtualProtocolDAOV2 is
     }
 
     constructor(
-        address token,
+        address veVirtualToken,
+        address virtizenToken,
         uint48 initialVotingDelay,
         uint32 initialVotingPeriod,
         uint256 initialProposalThreshold,
@@ -61,9 +71,13 @@ contract VirtualProtocolDAOV2 is
         )
     {
         require(admin != address(0), "Invalid admin address");
+        require(veVirtualToken != address(0), "Invalid veVirtualToken address");
+        require(virtizenToken != address(0), "Invalid virtizenToken address");
+
         _totalSupplyCheckpoints.push(0, 0);
         _admin = admin;
-        _token = IVEVirtual(token);
+        _veVirtualToken = IVEVirtual(veVirtualToken);
+        _virtizenToken = IVirtizen(virtizenToken);
         _updateQuorumNumerator(initialQuorumNumerator);
     }
 
@@ -231,12 +245,80 @@ contract VirtualProtocolDAOV2 is
         return super.votingPeriod();
     }
 
+    /**
+     * @notice Get voting power for an account at a specific timepoint
+     * @dev Combines voting power from both veVIRTUAL and Virtizen tokens (1:1 ratio)
+     * @param account The account to get votes for
+     * @param timepoint The timepoint to query votes at
+     * @return The combined voting power from both tokens
+     */
     function _getVotes(
         address account,
         uint256 timepoint,
         bytes memory
     ) internal view override(Governor) returns (uint256) {
-        return _token.balanceOfAt(account, timepoint);
+        // Get votes from veVIRTUAL token
+        uint256 veVirtualVotes = _veVirtualToken.balanceOfAt(
+            account,
+            timepoint
+        );
+
+        // Get votes from Virtizen token
+        uint256 virtizenVotes = _virtizenToken.balanceOfAt(account, timepoint);
+
+        // Return combined voting power (1:1 ratio)
+        return veVirtualVotes + virtizenVotes;
+    }
+
+    /**
+     * @notice Get veVIRTUAL voting power for an account at a specific timepoint
+     * @param account The account to get votes for
+     * @param timepoint The timepoint to query votes at
+     * @return The voting power from veVIRTUAL token
+     */
+    function getVeVirtualVotes(
+        address account,
+        uint256 timepoint
+    ) public view returns (uint256) {
+        return _veVirtualToken.balanceOfAt(account, timepoint);
+    }
+
+    /**
+     * @notice Get Virtizen voting power for an account at a specific timepoint
+     * @param account The account to get votes for
+     * @param timepoint The timepoint to query votes at
+     * @return The voting power from Virtizen token
+     */
+    function getVirtizenVotes(
+        address account,
+        uint256 timepoint
+    ) public view returns (uint256) {
+        return _virtizenToken.balanceOfAt(account, timepoint);
+    }
+
+    /**
+     * @notice Get combined voting power for an account at a specific timepoint
+     * @param account The account to get votes for
+     * @param timepoint The timepoint to query votes at
+     * @return veVirtualVotes The voting power from veVIRTUAL token
+     * @return virtizenVotes The voting power from Virtizen token
+     * @return totalVotes The combined voting power (1:1 ratio)
+     */
+    function getVotesBreakdown(
+        address account,
+        uint256 timepoint
+    )
+        public
+        view
+        returns (
+            uint256 veVirtualVotes,
+            uint256 virtizenVotes,
+            uint256 totalVotes
+        )
+    {
+        veVirtualVotes = _veVirtualToken.balanceOfAt(account, timepoint);
+        virtizenVotes = _virtizenToken.balanceOfAt(account, timepoint);
+        totalVotes = veVirtualVotes + virtizenVotes;
     }
 
     function _validateStateBitmap2(

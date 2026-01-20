@@ -4,12 +4,17 @@ pragma solidity ^0.8.20;
 import "@openzeppelin/contracts/governance/Governor.sol";
 import "@openzeppelin/contracts/governance/extensions/GovernorSettings.sol";
 import "@openzeppelin/contracts/governance/extensions/GovernorStorage.sol";
-import "@openzeppelin/contracts/governance/extensions/GovernorVotes.sol";
 import "@openzeppelin/contracts/governance/extensions/GovernorVotesQuorumFraction.sol";
 import "./GovernorCountingVP.sol";
-import "../token/IVEVirtual.sol";
+import "../token/IVirtizen.sol";
 
-contract VirtualProtocolDAOV2 is
+/**
+ * @title VirtizenDAO
+ * @notice Governance contract for Virtizen token holders
+ * @dev This is a separate governance contract specifically for Virtizen token voting
+ *      Virtizen tokens represent voting power from Trust Fund Tax (0.7% + 0.3%)
+ */
+contract VirtizenDAO is
     Governor,
     GovernorSettings,
     GovernorStorage,
@@ -21,7 +26,7 @@ contract VirtualProtocolDAOV2 is
     Checkpoints.Trace224 private _totalSupplyCheckpoints;
     address private _admin;
 
-    IVEVirtual private immutable _token;
+    IVirtizen private immutable _token;
 
     Checkpoints.Trace208 private _quorumNumeratorHistory;
 
@@ -53,7 +58,7 @@ contract VirtualProtocolDAOV2 is
         uint256 initialQuorumNumerator,
         address admin
     )
-        Governor("VirtualProtocol")
+        Governor("VirtizenDAO")
         GovernorSettings(
             initialVotingDelay,
             initialVotingPeriod,
@@ -63,7 +68,7 @@ contract VirtualProtocolDAOV2 is
         require(admin != address(0), "Invalid admin address");
         _totalSupplyCheckpoints.push(0, 0);
         _admin = admin;
-        _token = IVEVirtual(token);
+        _token = IVirtizen(token);
         _updateQuorumNumerator(initialQuorumNumerator);
     }
 
@@ -231,6 +236,10 @@ contract VirtualProtocolDAOV2 is
         return super.votingPeriod();
     }
 
+    /**
+     * @notice Get voting power for an account at a specific timepoint
+     * @dev This uses Virtizen token's balanceOfAt() function
+     */
     function _getVotes(
         address account,
         uint256 timepoint,

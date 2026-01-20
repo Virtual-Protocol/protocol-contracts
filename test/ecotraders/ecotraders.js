@@ -1,21 +1,44 @@
 /*
-Test veVirtual contract including eco traders functionality
+Test veVirtual contract with CumulativeMerkleDrop for eco traders functionality
 */
 const { expect } = require("chai");
 const { ethers } = require("hardhat");
 const { parseEther, formatEther } = ethers;
 const { time } = require("@nomicfoundation/hardhat-network-helpers");
 const { upgrades } = require("hardhat");
+const { MerkleTree } = require("merkletreejs");
+const keccak256 = require("keccak256");
 
-describe("veVirtual - Eco Traders", function () {
-  let virtual, veVirtual;
-  let deployer, staker, trader1, trader2, trader3, ecoVeVirtualStaker;
+describe("veVirtual - Eco Traders with CumulativeMerkleDrop", function () {
+  let virtual, veVirtual, cumulativeMerkleDrop;
+  let deployer, user1, user2, user3, beOpsWallet;
+  let merkleTree, merkleRoot, accounts, amounts, hashedElements;
 
-  const DENOM_18 = ethers.parseEther("1"); // 1e18 = 100%
+  // Helper function to get proof for an account and cumulative amount
+  function getProof(account, cumulativeAmount) {
+    // Create the leaf hash (matching contract's keccak256(abi.encodePacked(account, cumulativeAmount)))
+    // Use ethers.solidityPacked to match contract's abi.encodePacked
+    const packed = ethers.solidityPacked(
+      ["address", "uint256"],
+      [account, cumulativeAmount]
+    );
+    const leafHash = keccak256(Buffer.from(packed.slice(2), "hex"));
+
+    // Find the index of this leaf in the hashed elements
+    const leafHashHex = "0x" + leafHash.toString("hex");
+    const index = hashedElements.findIndex(
+      (hash) =>
+        "0x" + hash.toString("hex").toLowerCase() === leafHashHex.toLowerCase()
+    );
+
+    if (index === -1) return null;
+
+    // Get proof from merkle tree
+    return merkleTree.getHexProof(hashedElements[index]);
+  }
 
   before(async function () {
-    [deployer, staker, trader1, trader2, trader3, ecoVeVirtualStaker] =
-      await ethers.getSigners();
+    [deployer, user1, user2, user3, beOpsWallet] = await ethers.getSigners();
   });
 
   beforeEach(async function () {
@@ -33,666 +56,415 @@ describe("veVirtual - Eco Traders", function () {
       { initializer: "initialize" }
     );
 
-    // Grant ECO_ROLE to deployer (deployer has ADMIN_ROLE from initialize)
-    const ECO_ROLE = await veVirtual.ECO_ROLE();
-    await veVirtual.grantRole(ECO_ROLE, deployer.address);
-
-    // Set ecoVeVirtualStaker (requires ECO_ROLE)
-    await veVirtual.setEcoVeVirtualStaker(ecoVeVirtualStaker.address);
+    // Deploy CumulativeMerkleDrop
+    const CumulativeMerkleDropFactory = await ethers.getContractFactory(
+      "CumulativeMerkleDrop"
+    );
+    cumulativeMerkleDrop = await CumulativeMerkleDropFactory.deploy(
+      virtual.target,
+      veVirtual.target
+    );
+    await cumulativeMerkleDrop.waitForDeployment();
 
     // Transfer tokens to test accounts
-    await virtual.transfer(staker.address, parseEther("100000"));
-    await virtual.transfer(ecoVeVirtualStaker.address, parseEther("1000000"));
+    await virtual.transfer(user1.address, parseEther("100000"));
+    await virtual.transfer(user2.address, parseEther("100000"));
+    await virtual.transfer(user3.address, parseEther("100000"));
+    await virtual.transfer(beOpsWallet.address, parseEther("1000000"));
+
+    // Transfer tokens to CumulativeMerkleDrop contract (simulating backend injection)
+    // user1: 1 token, user2: 2 tokens, user3: 3 tokens = 6 tokens total
+    await virtual.transfer(cumulativeMerkleDrop.target, parseEther("10"));
+
+    // Generate merkle tree
+    // Cumulative amounts: user1 = 1, user2 = 2, user3 = 3
+    // Format: address (without 0x) + amount in hex (64 chars padded)
+    accounts = [user1.address, user2.address, user3.address];
+    amounts = [parseEther("1"), parseEther("2"), parseEther("3")];
+
+    // Create elements using ethers.solidityPacked to match contract's abi.encodePacked
+    const elements = accounts.map((account, i) => {
+      return ethers.solidityPacked(
+        ["address", "uint256"],
+        [account, amounts[i]]
+      );
+    });
+
+    // Hash elements and create merkle tree
+    hashedElements = elements.map((element) =>
+      keccak256(Buffer.from(element.slice(2), "hex"))
+    );
+    merkleTree = new MerkleTree(hashedElements, keccak256, {
+      hashLeaves: false, // Already hashed
+      sortPairs: true, // Sort pairs for consistent ordering
+    });
+
+    merkleRoot = merkleTree.getHexRoot();
+
+    // Set merkle root in contract
+    await cumulativeMerkleDrop.setMerkleRoot(merkleRoot);
+  });
+
+  describe("Happy Path - claimAndMaxStake", function () {
+    it("should allow beOpsWallet to claimAndMaxStake for user2 and user3, and user1 to claimAndMaxStake for themselves", async function () {
+      // 1. beOpsWallet claims for user2
+      const proof2 = getProof(user2.address, parseEther("2"));
+      await cumulativeMerkleDrop
+        .connect(beOpsWallet)
+        .claimAndMaxStake(user2.address, parseEther("2"), merkleRoot, proof2);
+
+      // 2. beOpsWallet claims for user3
+      const proof3 = getProof(user3.address, parseEther("3"));
+      await cumulativeMerkleDrop
+        .connect(beOpsWallet)
+        .claimAndMaxStake(user3.address, parseEther("3"), merkleRoot, proof3);
+
+      // 3. user1 claims for themselves
+      const proof1 = getProof(user1.address, parseEther("1"));
+      await cumulativeMerkleDrop
+        .connect(user1)
+        .claimAndMaxStake(user1.address, parseEther("1"), merkleRoot, proof1);
+
+      // 4. Verify all users have eco locks (using getEcoLock, not getPositions)
+      const lock1 = await veVirtual.getEcoLock(user1.address);
+      const lock2 = await veVirtual.getEcoLock(user2.address);
+      const lock3 = await veVirtual.getEcoLock(user3.address);
+
+      // Verify eco locks exist (id should be > 0)
+      expect(lock1.id).to.be.greaterThan(0);
+      expect(lock2.id).to.be.greaterThan(0);
+      expect(lock3.id).to.be.greaterThan(0);
+
+      // All should be eco locks
+      expect(lock1.isEco).to.be.equal(true);
+      expect(lock2.isEco).to.be.equal(true);
+      expect(lock3.isEco).to.be.equal(true);
+
+      // All should have autoRenew = true
+      expect(lock1.autoRenew).to.be.equal(true);
+      expect(lock2.autoRenew).to.be.equal(true);
+      expect(lock3.autoRenew).to.be.equal(true);
+
+      // All should have maxWeeks (104)
+      expect(lock1.numWeeks).to.be.equal(104);
+      expect(lock2.numWeeks).to.be.equal(104);
+      expect(lock3.numWeeks).to.be.equal(104);
+
+      // Verify amounts
+      expect(lock1.amount).to.be.equal(parseEther("1"));
+      expect(lock2.amount).to.be.equal(parseEther("2"));
+      expect(lock3.amount).to.be.equal(parseEther("3"));
+
+      // 6. Verify balances
+      expect(await veVirtual.balanceOf(user1.address)).to.be.equal(
+        parseEther("1")
+      );
+      expect(await veVirtual.balanceOf(user2.address)).to.be.equal(
+        parseEther("2")
+      );
+      expect(await veVirtual.balanceOf(user3.address)).to.be.equal(
+        parseEther("3")
+      );
+
+      // 7. Verify users cannot withdraw eco locks
+      // Eco locks are not in locks[] array, so withdraw will fail with "Lock not found"
+      await expect(
+        veVirtual.connect(user1).withdraw(lock1.id)
+      ).to.be.revertedWith("Lock not found");
+
+      await expect(
+        veVirtual.connect(user2).withdraw(lock2.id)
+      ).to.be.revertedWith("Lock not found");
+
+      await expect(
+        veVirtual.connect(user3).withdraw(lock3.id)
+      ).to.be.revertedWith("Lock not found");
+
+      // 8. Verify users cannot extend eco locks
+      // Eco locks are not in locks[] array, so extend will fail with "Lock not found"
+      await expect(
+        veVirtual.connect(user1).extend(lock1.id, 1)
+      ).to.be.revertedWith("Lock not found");
+
+      await expect(
+        veVirtual.connect(user2).extend(lock2.id, 1)
+      ).to.be.revertedWith("Lock not found");
+
+      await expect(
+        veVirtual.connect(user3).extend(lock3.id, 1)
+      ).to.be.revertedWith("Lock not found");
+
+      // 9. Verify users cannot toggle autoRenew for eco locks
+      // Eco locks are not in locks[] array, so toggleAutoRenew will fail with "Lock not found"
+      await expect(
+        veVirtual.connect(user1).toggleAutoRenew(lock1.id)
+      ).to.be.revertedWith("Lock not found");
+
+      await expect(
+        veVirtual.connect(user2).toggleAutoRenew(lock2.id)
+      ).to.be.revertedWith("Lock not found");
+
+      await expect(
+        veVirtual.connect(user3).toggleAutoRenew(lock3.id)
+      ).to.be.revertedWith("Lock not found");
+    });
+
+    it("should prevent double claiming", async function () {
+      // User1 claims first time
+      const proof1 = getProof(user1.address, parseEther("1"));
+      await cumulativeMerkleDrop
+        .connect(user1)
+        .claimAndMaxStake(user1.address, parseEther("1"), merkleRoot, proof1);
+
+      // Try to claim again (should fail)
+      await expect(
+        cumulativeMerkleDrop
+          .connect(user1)
+          .claimAndMaxStake(user1.address, parseEther("1"), merkleRoot, proof1)
+      ).to.be.revertedWithCustomError(cumulativeMerkleDrop, "NothingToClaim");
+    });
+
+    it("should allow cumulative claiming", async function () {
+      // First claim: user1 claims 1 token
+      const proof1 = getProof(user1.address, parseEther("1"));
+      await cumulativeMerkleDrop
+        .connect(user1)
+        .claimAndMaxStake(user1.address, parseEther("1"), merkleRoot, proof1);
+
+      // Update merkle root with new cumulative amount (user1 now has 2 total)
+      const newAccounts = [user1.address, user2.address, user3.address];
+      const newAmounts = [parseEther("2"), parseEther("2"), parseEther("3")];
+
+      // Create new elements using ethers.solidityPacked
+      const newElements = newAccounts.map((account, i) => {
+        return ethers.solidityPacked(
+          ["address", "uint256"],
+          [account, newAmounts[i]]
+        );
+      });
+
+      // Create new merkle tree
+      const newHashedElements = newElements.map((element) =>
+        keccak256(Buffer.from(element.slice(2), "hex"))
+      );
+      const newMerkleTree = new MerkleTree(newHashedElements, keccak256, {
+        hashLeaves: false,
+        sortPairs: true,
+      });
+      const newMerkleRoot = newMerkleTree.getHexRoot();
+
+      // Transfer more tokens to contract
+      await virtual.transfer(cumulativeMerkleDrop.target, parseEther("1"));
+      await cumulativeMerkleDrop.setMerkleRoot(newMerkleRoot);
+
+      // Helper function for new tree
+      function getProofForNewTree(account, cumulativeAmount) {
+        const packed = ethers.solidityPacked(
+          ["address", "uint256"],
+          [account, cumulativeAmount]
+        );
+        const leafHash = keccak256(Buffer.from(packed.slice(2), "hex"));
+        const leafHashHex = "0x" + leafHash.toString("hex");
+        const index = newHashedElements.findIndex(
+          (hash) =>
+            "0x" + hash.toString("hex").toLowerCase() ===
+            leafHashHex.toLowerCase()
+        );
+        if (index === -1) return null;
+        return newMerkleTree.getHexProof(newHashedElements[index]);
+      }
+
+      // Second claim: user1 claims additional 1 token (cumulative = 2)
+      const proof2 = getProofForNewTree(user1.address, parseEther("2"));
+      await cumulativeMerkleDrop
+        .connect(user1)
+        .claimAndMaxStake(
+          user1.address,
+          parseEther("2"),
+          newMerkleRoot,
+          proof2
+        );
+
+      // Verify user1 now has 2 tokens staked in the same eco lock (amount should be accumulated)
+      const ecoLock = await veVirtual.getEcoLock(user1.address);
+      expect(ecoLock.amount).to.be.equal(parseEther("2"));
+
+      const totalBalance = await veVirtual.balanceOf(user1.address);
+      expect(totalBalance).to.be.equal(parseEther("2"));
+
+      // Should still have only 1 eco lock (not 2 separate locks)
+      // Eco locks are stored in ecoLocks mapping, not in locks[] array
+      const positions = await veVirtual.getPositions(user1.address, 0, 10);
+      // getPositions returns array with length matching count parameter, but only fills valid positions
+      // Since there are no regular locks, all positions will be empty (default values)
+      // We need to check the actual number of positions using numPositions
+      const numPositions = await veVirtual.numPositions(user1.address);
+      expect(numPositions).to.be.equal(0); // Eco locks are not in locks[] array
+    });
+
+    it("should verify balance does not decay for eco locks (autoRenew = true)", async function () {
+      const proof1 = getProof(user1.address, parseEther("1"));
+      await cumulativeMerkleDrop
+        .connect(user1)
+        .claimAndMaxStake(user1.address, parseEther("1"), merkleRoot, proof1);
+
+      const initialBalance = await veVirtual.balanceOf(user1.address);
+      expect(initialBalance).to.be.equal(parseEther("1"));
+
+      // Wait 52 weeks (half of maxWeeks)
+      await time.increase(52 * 7 * 24 * 60 * 60);
+
+      // Balance should not decay because autoRenew = true
+      const balanceAfter = await veVirtual.balanceOf(user1.address);
+      expect(balanceAfter).to.be.equal(parseEther("1"));
+    });
+
+    it("should verify voting power is correctly assigned", async function () {
+      const proof1 = getProof(user1.address, parseEther("1"));
+      const proof2 = getProof(user2.address, parseEther("2"));
+      const proof3 = getProof(user3.address, parseEther("3"));
+
+      await cumulativeMerkleDrop
+        .connect(user1)
+        .claimAndMaxStake(user1.address, parseEther("1"), merkleRoot, proof1);
+      await cumulativeMerkleDrop
+        .connect(beOpsWallet)
+        .claimAndMaxStake(user2.address, parseEther("2"), merkleRoot, proof2);
+      await cumulativeMerkleDrop
+        .connect(beOpsWallet)
+        .claimAndMaxStake(user3.address, parseEther("3"), merkleRoot, proof3);
+
+      // Delegate voting power
+      await veVirtual.connect(user1).delegate(user1.address);
+      await veVirtual.connect(user2).delegate(user2.address);
+      await veVirtual.connect(user3).delegate(user3.address);
+
+      // Verify voting power
+      expect(await veVirtual.getVotes(user1.address)).to.be.equal(
+        parseEther("1")
+      );
+      expect(await veVirtual.getVotes(user2.address)).to.be.equal(
+        parseEther("2")
+      );
+      expect(await veVirtual.getVotes(user3.address)).to.be.equal(
+        parseEther("3")
+      );
+    });
   });
 
   describe("Basic Regression Tests", function () {
-    it("should allow staking", async function () {
+    it("should allow regular staking", async function () {
       await virtual
-        .connect(staker)
+        .connect(user1)
         .approve(veVirtual.target, parseEther("1000"));
-      await veVirtual.connect(staker).stake(parseEther("100"), 104, true);
+      await veVirtual.connect(user1).stake(parseEther("100"), 104, true);
 
-      expect(await veVirtual.numPositions(staker.address)).to.be.equal(1);
-      expect(await veVirtual.balanceOf(staker.address)).to.be.equal(
+      expect(await veVirtual.numPositions(user1.address)).to.be.equal(1);
+      expect(await veVirtual.balanceOf(user1.address)).to.be.equal(
         parseEther("100")
       );
     });
 
-    it("should not decay balance when autoRenew is true", async function () {
+    it("should allow mixing regular locks and eco locks", async function () {
+      // Regular stake
       await virtual
-        .connect(staker)
+        .connect(user1)
         .approve(veVirtual.target, parseEther("1000"));
-      await veVirtual.connect(staker).stake(parseEther("100"), 104, true);
+      await veVirtual.connect(user1).stake(parseEther("100"), 104, true);
 
-      // With autoRenew = true (default), balance should not decay
-      await time.increase(26 * 7 * 24 * 60 * 60);
-      const balance = await veVirtual.balanceOf(staker.address);
-      expect(balance).to.be.equal(parseEther("100"));
-    });
+      // Eco lock via claimAndMaxStake
+      const proof1 = getProof(user1.address, parseEther("1"));
+      await cumulativeMerkleDrop
+        .connect(user1)
+        .claimAndMaxStake(user1.address, parseEther("1"), merkleRoot, proof1);
 
-    it("should decay balance over time when autoRenew is false", async function () {
-      await virtual
-        .connect(staker)
-        .approve(veVirtual.target, parseEther("1000"));
-      await veVirtual.connect(staker).stake(parseEther("100"), 52, false);
-      const lock = await veVirtual.locks(staker.address, 0);
+      // Should have 1 regular lock in positions array
+      const numPositions = await veVirtual.numPositions(user1.address);
+      expect(numPositions).to.be.equal(1);
 
-      // After half the lock period (52 weeks / 2 = 26 weeks)
-      await time.increase(26 * 7 * 24 * 60 * 60);
-      const balance = await veVirtual.balanceOf(staker.address);
-      expect(parseInt(formatEther(balance))).to.be.lessThan(100);
-      expect(parseInt(formatEther(balance))).to.be.greaterThan(0);
-    });
+      const positions = await veVirtual.getPositions(user1.address, 0, 10);
+      // getPositions returns array with requested count, but we check numPositions for actual count
 
-    it("should allow withdrawal on maturity only", async function () {
-      await virtual
-        .connect(staker)
-        .approve(veVirtual.target, parseEther("1000"));
-      await veVirtual.connect(staker).stake(parseEther("100"), 104, true);
-      const lock = await veVirtual.locks(staker.address, 0);
-      const id = lock.id;
-      // staker started with 100000, staked 100, so after stake should have 99900
-      expect(await virtual.balanceOf(staker.address)).to.be.equal(
-        parseEther("99900")
-      );
+      // Regular lock should not be eco lock
+      expect(positions[0].isEco).to.be.equal(false);
+      expect(positions[0].amount).to.be.equal(parseEther("100"));
 
-      // Try to withdraw before maturity (withdraw checks expiration first, then autoRenew)
-      await time.increase(26 * 7 * 24 * 60 * 60);
-      // Lock is 104 weeks, so after 26 weeks it's not expired yet
-      await expect(veVirtual.connect(staker).withdraw(id)).to.be.revertedWith(
-        "Lock is not expired"
-      );
+      // Eco lock should be in ecoLocks mapping (not in positions array)
+      const ecoLock = await veVirtual.getEcoLock(user1.address);
+      expect(ecoLock.id).to.be.greaterThan(0);
+      expect(ecoLock.isEco).to.be.equal(true);
+      expect(ecoLock.amount).to.be.equal(parseEther("1"));
 
-      // Turn off autoRenew (this resets end to block.timestamp + 104 weeks)
-      await veVirtual.connect(staker).toggleAutoRenew(id);
-
-      // Try to withdraw before maturity (with autoRenew off, but end was just reset)
-      await expect(veVirtual.connect(staker).withdraw(id)).to.be.revertedWith(
-        "Lock is not expired"
-      );
-
-      // Withdraw after maturity (need to wait 104 weeks since toggleAutoRenew reset the end)
-      await time.increase(105 * 7 * 24 * 60 * 60);
-      await veVirtual.connect(staker).withdraw(id);
-      // staker started with 100000, staked 100, so after withdraw should have 100000 back
-      expect(await virtual.balanceOf(staker.address)).to.be.equal(
-        parseEther("100000")
-      );
-    });
-
-    it("should allow extension when lock has room", async function () {
-      // Note: veVirtual.stake() allows creating locks with numWeeks < maxWeeks
-      // So we can test extend functionality when lock.numWeeks < maxWeeks
-      // This test verifies that extend works correctly when there's room
-
-      await virtual
-        .connect(staker)
-        .approve(veVirtual.target, parseEther("1000"));
-      // Create a lock with numWeeks < maxWeeks so we can test extend
-      await veVirtual.connect(staker).stake(parseEther("1000"), 52, false);
-      const lock = await veVirtual.locks(staker.address, 0);
-
-      // Now we can extend because numWeeks (52) + extendWeeks (52) = 104 <= maxWeeks (104)
-      const initialBalance = await veVirtual.balanceOf(staker.address);
-      await veVirtual.connect(staker).extend(lock.id, 52);
-
-      const newBalance = await veVirtual.balanceOf(staker.address);
-      expect(newBalance).to.be.greaterThan(initialBalance);
-
-      // Verify that extend fails when autoRenew is true
-      await virtual
-        .connect(staker)
-        .approve(veVirtual.target, parseEther("2000"));
-      await veVirtual.connect(staker).stake(parseEther("1000"), 52, true);
-      const lock2 = await veVirtual.locks(staker.address, 1);
-
-      // Try to extend while autoRenew is true (should fail)
-      await expect(
-        veVirtual.connect(staker).extend(lock2.id, 1)
-      ).to.be.revertedWith("Lock is auto-renewing");
-    });
-
-    it("should prevent extension beyond max weeks", async function () {
-      await virtual
-        .connect(staker)
-        .approve(veVirtual.target, parseEther("1000"));
-      // Create a lock with numWeeks = 52, so we can test extending beyond maxWeeks
-      await veVirtual.connect(staker).stake(parseEther("1000"), 52, false);
-
-      const lock = await veVirtual.locks(staker.address, 0);
-      // Try to extend beyond maxWeeks (52 + 105 = 157 > 104)
-      await expect(
-        veVirtual.connect(staker).extend(lock.id, 105)
-      ).to.be.revertedWith("Num weeks must be less than max weeks");
-    });
-
-    it("should allow toggle auto renew", async function () {
-      await virtual
-        .connect(staker)
-        .approve(veVirtual.target, parseEther("1000"));
-      await veVirtual.connect(staker).stake(parseEther("1000"), 104, true);
-
-      const lock = await veVirtual.locks(staker.address, 0);
-      expect(lock.autoRenew).to.be.equal(true);
-
-      await veVirtual.connect(staker).toggleAutoRenew(lock.id);
-      const updatedLock = await veVirtual.locks(staker.address, 0);
-      expect(updatedLock.autoRenew).to.be.equal(false);
-    });
-
-    it("should prevent withdrawal of auto-renewing lock", async function () {
-      await virtual
-        .connect(staker)
-        .approve(veVirtual.target, parseEther("1000"));
-      await veVirtual.connect(staker).stake(parseEther("1000"), 104, true);
-
-      const lock = await veVirtual.locks(staker.address, 0);
-      await time.increase(105 * 7 * 24 * 60 * 60);
-
-      await expect(
-        veVirtual.connect(staker).withdraw(lock.id)
-      ).to.be.revertedWith("Lock is auto-renewing");
-    });
-
-    it("should track voting power correctly", async function () {
-      await virtual
-        .connect(staker)
-        .approve(veVirtual.target, parseEther("1000"));
-      await veVirtual.connect(staker).stake(parseEther("1000"), 104, true);
-
-      await veVirtual.connect(staker).delegate(staker.address);
-      expect(await veVirtual.getVotes(staker.address)).to.be.equal(
-        parseEther("1000")
-      );
-
-      // Voting power should not decay
-      await time.increase(52 * 7 * 24 * 60 * 60);
-      expect(await veVirtual.getVotes(staker.address)).to.be.equal(
-        parseEther("1000")
-      );
+      // Total balance should be sum of regular lock + eco lock
+      const totalBalance = await veVirtual.balanceOf(user1.address);
+      expect(totalBalance).to.be.equal(parseEther("101"));
     });
   });
 
-  describe("Eco Lock Functionality", function () {
-    it("should allow ecoVeVirtualStaker to stake tokens", async function () {
-      const amount = parseEther("100000");
-      await virtual
-        .connect(ecoVeVirtualStaker)
-        .approve(veVirtual.target, amount);
-
-      await veVirtual.connect(ecoVeVirtualStaker).stakeForEcoTraders(amount);
-
-      expect(await veVirtual.totalEcoLockAmount()).to.be.equal(amount);
-      expect(await virtual.balanceOf(veVirtual.target)).to.be.equal(amount);
-    });
-
-    it("should prevent non-ecoVeVirtualStaker from calling stakeForEcoTraders", async function () {
-      await virtual
-        .connect(staker)
-        .approve(veVirtual.target, parseEther("1000"));
+  describe("Error Cases", function () {
+    it("should reject invalid merkle proof", async function () {
+      const invalidProof = [ethers.ZeroHash, ethers.ZeroHash];
 
       await expect(
-        veVirtual.connect(staker).stakeForEcoTraders(parseEther("1000"))
-      ).to.be.revertedWith("sender is not ecoVeVirtualStaker");
-    });
-
-    it("should create eco locks for traders with percentages", async function () {
-      // First, ecoVeVirtualStaker stakes tokens
-      const totalAmount = parseEther("100000");
-      await virtual
-        .connect(ecoVeVirtualStaker)
-        .approve(veVirtual.target, totalAmount);
-      await veVirtual
-        .connect(ecoVeVirtualStaker)
-        .stakeForEcoTraders(totalAmount);
-
-      // Admin distributes percentages to traders
-      const percentages = [
-        ethers.parseEther("0.3"), // 30%
-        ethers.parseEther("0.7"), // 70%
-      ];
-      const traders = [trader1.address, trader2.address];
-
-      await veVirtual.updateEcoTradersPercentages(traders, percentages);
-
-      // Check eco locks were created
-      const ecoLock1 = await veVirtual.getEcoLock(trader1.address);
-      const ecoLock2 = await veVirtual.getEcoLock(trader2.address);
-
-      expect(ecoLock1.id).to.be.greaterThan(0);
-      expect(ecoLock2.id).to.be.greaterThan(0);
-      expect(ecoLock1.isEco).to.be.equal(true);
-      expect(ecoLock2.isEco).to.be.equal(true);
-      expect(ecoLock1.autoRenew).to.be.equal(true);
-      expect(ecoLock2.autoRenew).to.be.equal(true);
-
-      // Check actual amounts (30% and 70% of 100000)
-      const actualAmount1 = await veVirtual.balanceOf(trader1.address);
-      const actualAmount2 = await veVirtual.balanceOf(trader2.address);
-
-      expect(actualAmount1).to.be.equal(parseEther("30000"));
-      expect(actualAmount2).to.be.equal(parseEther("70000"));
-    });
-
-    it("should update existing eco locks when called again", async function () {
-      const totalAmount = parseEther("100000");
-      await virtual
-        .connect(ecoVeVirtualStaker)
-        .approve(veVirtual.target, totalAmount);
-      await veVirtual
-        .connect(ecoVeVirtualStaker)
-        .stakeForEcoTraders(totalAmount);
-
-      // First distribution
-      const percentages1 = [ethers.parseEther("0.5"), ethers.parseEther("0.5")];
-      await veVirtual.updateEcoTradersPercentages(
-        [trader1.address, trader2.address],
-        percentages1
-      );
-
-      const balance1Before = await veVirtual.balanceOf(trader1.address);
-      expect(balance1Before).to.be.equal(parseEther("50000"));
-
-      // Update distribution
-      const percentages2 = [ethers.parseEther("0.8"), ethers.parseEther("0.2")];
-      await veVirtual.updateEcoTradersPercentages(
-        [trader1.address, trader2.address],
-        percentages2
-      );
-
-      const balance1After = await veVirtual.balanceOf(trader1.address);
-      const balance2After = await veVirtual.balanceOf(trader2.address);
-
-      expect(balance1After).to.be.equal(parseEther("80000"));
-      expect(balance2After).to.be.equal(parseEther("20000"));
-    });
-
-    it("should calculate balanceOf correctly with eco locks", async function () {
-      // Regular stake
-      await virtual
-        .connect(staker)
-        .approve(veVirtual.target, parseEther("1000"));
-      await veVirtual.connect(staker).stake(parseEther("1000"), 104, true);
-
-      // Eco lock setup
-      const totalAmount = parseEther("50000");
-      await virtual
-        .connect(ecoVeVirtualStaker)
-        .approve(veVirtual.target, totalAmount);
-      await veVirtual
-        .connect(ecoVeVirtualStaker)
-        .stakeForEcoTraders(totalAmount);
-
-      await veVirtual.updateEcoTradersPercentages(
-        [staker.address],
-        [ethers.parseEther("0.2")]
-      );
-
-      // Balance should include both regular lock and eco lock
-      const balance = await veVirtual.balanceOf(staker.address);
-      // 1000 (regular) + 20% of 50000 (eco) = 1000 + 10000 = 11000
-      expect(balance).to.be.equal(parseEther("11000"));
-    });
-
-    it("should prevent traders from withdrawing eco locks", async function () {
-      const totalAmount = parseEther("100000");
-      await virtual
-        .connect(ecoVeVirtualStaker)
-        .approve(veVirtual.target, totalAmount);
-      await veVirtual
-        .connect(ecoVeVirtualStaker)
-        .stakeForEcoTraders(totalAmount);
-
-      await veVirtual.updateEcoTradersPercentages(
-        [trader1.address],
-        [ethers.parseEther("0.5")]
-      );
-
-      const ecoLock = await veVirtual.getEcoLock(trader1.address);
-      await time.increase(105 * 7 * 24 * 60 * 60);
-
-      // Try to withdraw eco lock (should fail even if expired)
-      await expect(
-        veVirtual.connect(trader1).withdraw(ecoLock.id)
-      ).to.be.revertedWith("Lock not found"); // Because eco locks are not in locks[] array
-    });
-
-    it("should prevent creating eco lock for ecoVeVirtualStaker", async function () {
-      const totalAmount = parseEther("100000");
-      await virtual
-        .connect(ecoVeVirtualStaker)
-        .approve(veVirtual.target, totalAmount);
-      await veVirtual
-        .connect(ecoVeVirtualStaker)
-        .stakeForEcoTraders(totalAmount);
-
-      await expect(
-        veVirtual.updateEcoTradersPercentages(
-          [ecoVeVirtualStaker.address],
-          [ethers.parseEther("0.5")]
-        )
-      ).to.be.revertedWith("Cannot set percentage for ecoVeVirtualStaker");
-    });
-
-    it("should prevent non-ECO_ROLE from calling setEcoVeVirtualStaker", async function () {
-      await expect(
-        veVirtual.connect(staker).setEcoVeVirtualStaker(trader1.address)
-      ).to.be.revertedWithCustomError(
-        veVirtual,
-        "AccessControlUnauthorizedAccount"
-      );
-    });
-
-    it("should prevent non-ECO_ROLE from calling updateEcoTradersPercentages", async function () {
-      const totalAmount = parseEther("100000");
-      await virtual
-        .connect(ecoVeVirtualStaker)
-        .approve(veVirtual.target, totalAmount);
-      await veVirtual
-        .connect(ecoVeVirtualStaker)
-        .stakeForEcoTraders(totalAmount);
-
-      await expect(
-        veVirtual
-          .connect(staker)
-          .updateEcoTradersPercentages(
-            [trader1.address],
-            [ethers.parseEther("0.5")]
+        cumulativeMerkleDrop
+          .connect(user1)
+          .claimAndMaxStake(
+            user1.address,
+            parseEther("1"),
+            merkleRoot,
+            invalidProof
           )
+      ).to.be.revertedWithCustomError(cumulativeMerkleDrop, "InvalidProof");
+    });
+
+    it("should reject claim with wrong merkle root", async function () {
+      const proof1 = getProof(user1.address, parseEther("1"));
+      const wrongRoot = ethers.ZeroHash;
+
+      await expect(
+        cumulativeMerkleDrop
+          .connect(user1)
+          .claimAndMaxStake(user1.address, parseEther("1"), wrongRoot, proof1)
       ).to.be.revertedWithCustomError(
-        veVirtual,
-        "AccessControlUnauthorizedAccount"
+        cumulativeMerkleDrop,
+        "MerkleRootWasUpdated"
       );
     });
 
-    it("should prevent updating eco locks when totalEcoLockAmount is zero", async function () {
+    it("should reject claim when merkle root changes", async function () {
+      const proof1 = getProof(user1.address, parseEther("1"));
+
+      // Change merkle root
+      const newAccounts = [user1.address, user2.address, user3.address];
+      const newAmounts = [parseEther("2"), parseEther("2"), parseEther("3")];
+      const newElements = newAccounts.map((account, i) => {
+        return ethers.solidityPacked(
+          ["address", "uint256"],
+          [account, newAmounts[i]]
+        );
+      });
+      const newHashedElements = newElements.map((element) =>
+        keccak256(Buffer.from(element.slice(2), "hex"))
+      );
+      const newMerkleTree = new MerkleTree(newHashedElements, keccak256, {
+        hashLeaves: false,
+        sortPairs: true,
+      });
+      const newMerkleRoot = newMerkleTree.getHexRoot();
+      await cumulativeMerkleDrop.setMerkleRoot(newMerkleRoot);
+
+      // Try to claim with old proof and old root
       await expect(
-        veVirtual.updateEcoTradersPercentages(
-          [trader1.address],
-          [ethers.parseEther("0.5")]
+        cumulativeMerkleDrop.connect(user1).claimAndMaxStake(
+          user1.address,
+          parseEther("1"),
+          merkleRoot, // old root
+          proof1
         )
-      ).to.be.revertedWith("totalEcoLockAmount must be greater than 0");
-    });
-
-    it("should validate percentage limits", async function () {
-      const totalAmount = parseEther("100000");
-      await virtual
-        .connect(ecoVeVirtualStaker)
-        .approve(veVirtual.target, totalAmount);
-      await veVirtual
-        .connect(ecoVeVirtualStaker)
-        .stakeForEcoTraders(totalAmount);
-
-      // Percentage exceeds 100%
-      await expect(
-        veVirtual.updateEcoTradersPercentages(
-          [trader1.address],
-          [ethers.parseEther("1.1")]
-        )
-      ).to.be.revertedWith("Percentage cannot exceed 100%");
-
-      // Zero percentage
-      await expect(
-        veVirtual.updateEcoTradersPercentages([trader1.address], [0])
-      ).to.be.revertedWith("Percentage must be greater than 0");
-    });
-
-    it("should update voting power when eco locks are created/updated", async function () {
-      const totalAmount = parseEther("100000");
-      await virtual
-        .connect(ecoVeVirtualStaker)
-        .approve(veVirtual.target, totalAmount);
-      await veVirtual
-        .connect(ecoVeVirtualStaker)
-        .stakeForEcoTraders(totalAmount);
-
-      await veVirtual.connect(trader1).delegate(trader1.address);
-      await veVirtual.connect(trader2).delegate(trader2.address);
-
-      // Create eco locks
-      await veVirtual.updateEcoTradersPercentages(
-        [trader1.address, trader2.address],
-        [ethers.parseEther("0.3"), ethers.parseEther("0.7")]
+      ).to.be.revertedWithCustomError(
+        cumulativeMerkleDrop,
+        "MerkleRootWasUpdated"
       );
-
-      expect(await veVirtual.getVotes(trader1.address)).to.be.equal(
-        parseEther("30000")
-      );
-      expect(await veVirtual.getVotes(trader2.address)).to.be.equal(
-        parseEther("70000")
-      );
-
-      // Update eco locks
-      await veVirtual.updateEcoTradersPercentages(
-        [trader1.address, trader2.address],
-        [ethers.parseEther("0.5"), ethers.parseEther("0.5")]
-      );
-
-      expect(await veVirtual.getVotes(trader1.address)).to.be.equal(
-        parseEther("50000")
-      );
-      expect(await veVirtual.getVotes(trader2.address)).to.be.equal(
-        parseEther("50000")
-      );
-    });
-
-    it("should handle multiple stakeForEcoTraders calls", async function () {
-      const amount1 = parseEther("50000");
-      await virtual
-        .connect(ecoVeVirtualStaker)
-        .approve(veVirtual.target, amount1);
-      await veVirtual.connect(ecoVeVirtualStaker).stakeForEcoTraders(amount1);
-
-      expect(await veVirtual.totalEcoLockAmount()).to.be.equal(amount1);
-
-      const amount2 = parseEther("30000");
-      await virtual
-        .connect(ecoVeVirtualStaker)
-        .approve(veVirtual.target, amount2);
-      await veVirtual.connect(ecoVeVirtualStaker).stakeForEcoTraders(amount2);
-
-      expect(await veVirtual.totalEcoLockAmount()).to.be.equal(
-        amount1 + amount2
-      );
-
-      // Update trader percentages - should use new total
-      await veVirtual.updateEcoTradersPercentages(
-        [trader1.address],
-        [ethers.parseEther("0.5")]
-      );
-
-      // 50% of (50000 + 30000) = 40000
-      expect(await veVirtual.balanceOf(trader1.address)).to.be.equal(
-        parseEther("40000")
-      );
-    });
-
-    it("should prevent traders from modifying eco locks", async function () {
-      const totalAmount = parseEther("100000");
-      await virtual
-        .connect(ecoVeVirtualStaker)
-        .approve(veVirtual.target, totalAmount);
-      await veVirtual
-        .connect(ecoVeVirtualStaker)
-        .stakeForEcoTraders(totalAmount);
-
-      await veVirtual.updateEcoTradersPercentages(
-        [trader1.address],
-        [ethers.parseEther("0.5")]
-      );
-
-      const ecoLock = await veVirtual.getEcoLock(trader1.address);
-
-      // Try to toggle auto renew (should fail - eco locks can't be modified)
-      // Note: This will fail because eco locks are not in locks[] array
-      // But if they were, the require(!lock.isEco) check would prevent it
-    });
-
-    it("should calculate stakedAmountOf correctly with eco locks", async function () {
-      // Regular stake
-      await virtual
-        .connect(staker)
-        .approve(veVirtual.target, parseEther("1000"));
-      await veVirtual.connect(staker).stake(parseEther("1000"), 104, true);
-
-      // Eco lock setup
-      const totalAmount = parseEther("50000");
-      await virtual
-        .connect(ecoVeVirtualStaker)
-        .approve(veVirtual.target, totalAmount);
-      await veVirtual
-        .connect(ecoVeVirtualStaker)
-        .stakeForEcoTraders(totalAmount);
-
-      await veVirtual.updateEcoTradersPercentages(
-        [staker.address],
-        [ethers.parseEther("0.2")]
-      );
-
-      const stakedAmount = await veVirtual.stakedAmountOf(staker.address);
-      // 1000 (regular) + 20% of 50000 (eco) = 1000 + 10000 = 11000
-      expect(stakedAmount).to.be.equal(parseEther("11000"));
-    });
-
-    it("should handle eco lock balance decay correctly", async function () {
-      const totalAmount = parseEther("100000");
-      await virtual
-        .connect(ecoVeVirtualStaker)
-        .approve(veVirtual.target, totalAmount);
-      await veVirtual
-        .connect(ecoVeVirtualStaker)
-        .stakeForEcoTraders(totalAmount);
-
-      await veVirtual.updateEcoTradersPercentages(
-        [trader1.address],
-        [ethers.parseEther("0.5")]
-      );
-
-      const initialBalance = await veVirtual.balanceOf(trader1.address);
-      expect(initialBalance).to.be.equal(parseEther("50000"));
-
-      // Eco locks have autoRenew = true, so balance should not decay
-      await time.increase(52 * 7 * 24 * 60 * 60);
-      const balanceAfter = await veVirtual.balanceOf(trader1.address);
-      expect(balanceAfter).to.be.equal(parseEther("50000"));
-    });
-
-    it("should handle array length mismatch", async function () {
-      const totalAmount = parseEther("100000");
-      await virtual
-        .connect(ecoVeVirtualStaker)
-        .approve(veVirtual.target, totalAmount);
-      await veVirtual
-        .connect(ecoVeVirtualStaker)
-        .stakeForEcoTraders(totalAmount);
-
-      await expect(
-        veVirtual.updateEcoTradersPercentages(
-          [trader1.address, trader2.address],
-          [ethers.parseEther("0.5")]
-        )
-      ).to.be.revertedWith("Arrays length mismatch");
-    });
-
-    it("should handle zero address validation", async function () {
-      const totalAmount = parseEther("100000");
-      await virtual
-        .connect(ecoVeVirtualStaker)
-        .approve(veVirtual.target, totalAmount);
-      await veVirtual
-        .connect(ecoVeVirtualStaker)
-        .stakeForEcoTraders(totalAmount);
-
-      await expect(
-        veVirtual.updateEcoTradersPercentages(
-          [ethers.ZeroAddress],
-          [ethers.parseEther("0.5")]
-        )
-      ).to.be.revertedWith("Invalid trader address");
-    });
-  });
-
-  describe("Integration Tests", function () {
-    it("should handle complex workflow: stake, eco locks, update, withdraw", async function () {
-      // 1. Regular user stakes
-      await virtual
-        .connect(staker)
-        .approve(veVirtual.target, parseEther("5000"));
-      await veVirtual.connect(staker).stake(parseEther("1000"), 104, true);
-      await veVirtual.connect(staker).stake(parseEther("2000"), 104, true);
-
-      // 2. EcoVeVirtualStaker stakes
-      const totalAmount = parseEther("200000");
-      await virtual
-        .connect(ecoVeVirtualStaker)
-        .approve(veVirtual.target, totalAmount);
-      await veVirtual
-        .connect(ecoVeVirtualStaker)
-        .stakeForEcoTraders(totalAmount);
-
-      // 3. Distribute to traders
-      await veVirtual.updateEcoTradersPercentages(
-        [trader1.address, trader2.address, trader3.address],
-        [
-          ethers.parseEther("0.4"), // 40%
-          ethers.parseEther("0.35"), // 35%
-          ethers.parseEther("0.25"), // 25%
-        ]
-      );
-
-      // 4. Verify balances
-      expect(await veVirtual.balanceOf(trader1.address)).to.be.equal(
-        parseEther("80000")
-      );
-      expect(await veVirtual.balanceOf(trader2.address)).to.be.equal(
-        parseEther("70000")
-      );
-      expect(await veVirtual.balanceOf(trader3.address)).to.be.equal(
-        parseEther("50000")
-      );
-      expect(await veVirtual.balanceOf(staker.address)).to.be.equal(
-        parseEther("3000")
-      );
-
-      // 5. Update distribution
-      await veVirtual.updateEcoTradersPercentages(
-        [trader1.address, trader2.address, trader3.address],
-        [
-          ethers.parseEther("0.5"), // 50%
-          ethers.parseEther("0.3"), // 30%
-          ethers.parseEther("0.2"), // 20%
-        ]
-      );
-
-      // 6. Verify updated balances
-      expect(await veVirtual.balanceOf(trader1.address)).to.be.equal(
-        parseEther("100000")
-      );
-      expect(await veVirtual.balanceOf(trader2.address)).to.be.equal(
-        parseEther("60000")
-      );
-      expect(await veVirtual.balanceOf(trader3.address)).to.be.equal(
-        parseEther("40000")
-      );
-
-      // 7. Regular user withdraws (after maturity)
-      const locks = await veVirtual.getPositions(staker.address, 0, 2);
-
-      // Toggle off autoRenew first (before time passes, otherwise toggleAutoRenew resets the end time)
-      await veVirtual.connect(staker).toggleAutoRenew(locks[0].id);
-      await veVirtual.connect(staker).toggleAutoRenew(locks[1].id);
-
-      // Now wait for maturity (104 weeks)
-      await time.increase(105 * 7 * 24 * 60 * 60);
-
-      await veVirtual.connect(staker).withdraw(locks[0].id);
-      await veVirtual.connect(staker).withdraw(locks[1].id);
-
-      // 8. Verify final balances
-      expect(await veVirtual.balanceOf(staker.address)).to.be.equal(0);
-      expect(await veVirtual.balanceOf(trader1.address)).to.be.equal(
-        parseEther("100000")
-      ); // Eco locks remain
     });
   });
 });

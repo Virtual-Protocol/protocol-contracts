@@ -46,8 +46,8 @@ contract veVirtual is
     event AutoRenew(address indexed user, uint256 id, bool autoRenew);
 
     event AdminUnlocked(bool adminUnlocked);
-    event StakeForEcoTrader(
-        address indexed trader,
+    event EcoLockUpdated(
+        address indexed user,
         uint256 id,
         uint256 amount,
         uint8 numWeeks
@@ -180,13 +180,6 @@ contract veVirtual is
         _transferVotingUnits(address(0), _msgSender(), amount);
     }
 
-    /// @notice Stake tokens for eco traders (creates an eco lock)
-    /// @dev Creates a lock with autoRenew = true, maxWeeks, and isEco = true
-    ///      Users cannot modify (withdraw, toggleAutoRenew, extend) eco locks
-    ///      Can be called by users themselves or by contracts (e.g., CumulativeMerkleDrop)
-    ///      If user already has an eco lock, updates the amount instead of creating a new lock
-    /// @param account The account to create the eco lock for (use msg.sender for self-staking)
-    /// @param amount The amount of tokens to stake (transferred from caller)
     function stakeEcoLockFor(
         address account,
         uint256 amount
@@ -197,14 +190,7 @@ contract veVirtual is
         // Transfer tokens from caller
         IERC20(baseToken).safeTransferFrom(_msgSender(), address(this), amount);
 
-        _createOrUpdateEcoLock(account, amount);
-        emit StakeForEcoTrader(
-            account,
-            ecoLocks[account].id,
-            amount,
-            maxWeeks
-        );
-        _transferVotingUnits(address(0), account, amount);
+        _increaseEcoLockAmount(account, amount);
     }
 
     function _calcValue(
@@ -340,10 +326,7 @@ contract veVirtual is
         return amount;
     }
 
-    /// @notice Internal function to create or update an eco lock
-    /// @param account The account to create/update eco lock for
-    /// @param amount The percentage for the eco lock (in 1e18 format)
-    function _createOrUpdateEcoLock(address account, uint256 amount) internal {
+    function _increaseEcoLockAmount(address account, uint256 amount) internal {
         Lock storage existingLock = ecoLocks[account];
         if (existingLock.id == 0) {
             // Create new eco lock
@@ -364,19 +347,16 @@ contract veVirtual is
             existingLock.end = block.timestamp + uint256(maxWeeks) * 1 weeks;
         }
 
-        emit StakeForEcoTrader(
+        emit EcoLockUpdated(
             account,
             ecoLocks[account].id,
-            existingLock.amount,
+            ecoLocks[account].amount,
             maxWeeks
         );
         // add new voting units
         _transferVotingUnits(address(0), account, amount);
     }
 
-    /// @notice Get the eco lock for a trader
-    /// @param trader The trader address
-    /// @return lock The eco lock (id will be 0 if no eco lock exists)
     function getEcoLock(address trader) external view returns (Lock memory) {
         return ecoLocks[trader];
     }

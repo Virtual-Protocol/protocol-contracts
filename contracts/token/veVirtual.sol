@@ -356,8 +356,4 @@ contract veVirtual is
         // add new voting units
         _transferVotingUnits(address(0), account, amount);
     }
-
-    function getEcoLock(address trader) external view returns (Lock memory) {
-        return ecoLocks[trader];
-    }
 }

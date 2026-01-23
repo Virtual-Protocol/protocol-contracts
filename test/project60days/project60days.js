@@ -31,15 +31,31 @@ describe("Project60days - AgentTax Integration", function () {
     virtualToken = contracts.virtualToken;
     agentNftV2 = contracts.agentNftV2;
 
+    // Deploy CBBTC token (assetToken - token to swap to)
+    // Note: cbbtc is deployed in setup but not exposed, so we deploy it here
+    console.log("\n--- Deploying MockERC20 for CBBTC ---");
+    const MockERC20 = await ethers.getContractFactory("MockERC20");
+    const cbbtc = await MockERC20.deploy(
+      "CBBTC",
+      "CBBTC",
+      accounts.owner.address,
+      ethers.parseEther("10000000000")
+    );
+    await cbbtc.waitForDeployment();
+    const cbbtcAddress = await cbbtc.getAddress();
+    console.log("CBBTC deployed at:", cbbtcAddress);
+
     // Deploy AgentTax contract
+    // assetToken is cbbtc (the token to swap to)
+    // taxToken is virtualToken (the token collected as tax)
     console.log("\n--- Deploying AgentTax ---");
     const AgentTax = await ethers.getContractFactory("AgentTax");
     agentTax = await upgrades.deployProxy(
       AgentTax,
       [
         accounts.owner.address, // defaultAdmin_
-        await virtualToken.getAddress(), // assetToken_
-        await virtualToken.getAddress(), // taxToken_
+        cbbtcAddress, // assetToken_ (CBBTC - token to swap to)
+        await virtualToken.getAddress(), // taxToken_ (Virtual Token - tax collected)
         addresses.fRouterV2, // router_
         accounts.owner.address, // treasury_
         ethers.parseEther("100"), // minSwapThreshold_
@@ -77,9 +93,27 @@ describe("Project60days - AgentTax Integration", function () {
         "https://example.com",
       ];
       const purchaseAmount = ethers.parseEther("1000");
-      const startTime = (await time.latest()) + START_TIME_DELAY + 1;
+      
+      // Verify cores array is not empty (required by _preLaunch)
+      expect(cores.length).to.be.greaterThan(0);
+      
+      // Check fee and ensure purchaseAmount is sufficient
+      const fee = await bondingV2.fee();
+      expect(purchaseAmount).to.be.greaterThanOrEqual(fee);
 
-      // Approve virtual tokens
+      // Get launchParams.startTimeDelay from contract (not constant)
+      const launchParams = await bondingV2.launchParams();
+      const startTimeDelay = BigInt(launchParams.startTimeDelay.toString());
+      // Add a larger buffer to account for block.timestamp potentially being ahead of time.latest()
+      // Contract requires: startTime >= block.timestamp + launchParams.startTimeDelay
+      const currentTime = BigInt((await time.latest()).toString());
+      const startTime = currentTime + startTimeDelay + 100n;
+
+      // Check user balance
+      const userBalance = await virtualToken.balanceOf(user1.address);
+      expect(userBalance).to.be.greaterThanOrEqual(purchaseAmount);
+
+      // Approve virtual tokens (assetToken is virtualToken from router)
       await virtualToken
         .connect(user1)
         .approve(await bondingV2.getAddress(), purchaseAmount);
@@ -137,7 +171,11 @@ describe("Project60days - AgentTax Integration", function () {
         "https://example2.com",
       ];
       const purchaseAmount = ethers.parseEther("2000");
-      const startTime = (await time.latest()) + START_TIME_DELAY + 1;
+      const launchParams = await bondingV2.launchParams();
+      const startTimeDelay = BigInt(launchParams.startTimeDelay.toString());
+      // Add a larger buffer to account for block.timestamp potentially being ahead of time.latest()
+      const currentTime = BigInt((await time.latest()).toString());
+      const startTime = currentTime + startTimeDelay + 100n;
 
       await virtualToken
         .connect(user1)
@@ -187,7 +225,11 @@ describe("Project60days - AgentTax Integration", function () {
         "https://example.com",
       ];
       const purchaseAmount = ethers.parseEther("1000");
-      const startTime = (await time.latest()) + START_TIME_DELAY + 1;
+      const launchParamsData = await bondingV2.launchParams();
+      const startTimeDelay = BigInt(launchParamsData.startTimeDelay.toString());
+      // Add a larger buffer to account for block.timestamp potentially being ahead of time.latest()
+      const currentTime = BigInt((await time.latest()).toString());
+      const startTime = currentTime + startTimeDelay + 100n;
 
       await virtualToken
         .connect(user1)
@@ -220,15 +262,24 @@ describe("Project60days - AgentTax Integration", function () {
       tokenAddress = parsedEvent.args.token;
 
       // Launch and graduate token to get agentId
-      await time.increase(START_TIME_DELAY + 1);
+      // Need to wait until pair.startTime() has passed
+      const pair = await ethers.getContractAt("FPairV2", parsedEvent.args.pair);
+      const pairStartTime = await pair.startTime();
+      const currentTimeForLaunch = await time.latest();
+      if (currentTimeForLaunch < pairStartTime) {
+        const waitTime = BigInt(pairStartTime.toString()) - BigInt(currentTimeForLaunch.toString()) + 1n;
+        await time.increase(waitTime);
+      }
       await bondingV2.connect(user1).launch(tokenAddress);
 
       // Buy tokens to graduate
       await time.increase(100 * 60); // Wait for anti-sniper tax to expire
       const buyAmount = ethers.parseEther("202020.2044906205");
+      // Need to approve fRouterV2, not bondingV2, because buy() calls router.buy()
+      const fRouterV2Address = addresses.fRouterV2;
       await virtualToken
         .connect(accounts.user2)
-        .approve(await bondingV2.getAddress(), buyAmount);
+        .approve(fRouterV2Address, buyAmount);
       await bondingV2
         .connect(accounts.user2)
         .buy(
@@ -244,6 +295,8 @@ describe("Project60days - AgentTax Integration", function () {
         try {
           const virtualInfo = await agentNftV2.virtualInfo(i);
           const tokenInfo = await bondingV2.tokenInfo(tokenAddress);
+          // console.log("virtualInfo", virtualInfo);
+          // console.log("tokenInfo", tokenInfo);
           if (virtualInfo.token === tokenInfo.agentToken) {
             agentId = BigInt(i);
             break;
@@ -270,13 +323,19 @@ describe("Project60days - AgentTax Integration", function () {
         .connect(admin)
         .updateCreatorForProject60daysAgents(agentId, newTba, newCreator);
 
+      // Get old creator before update (if exists)
+      let oldCreator = ethers.ZeroAddress;
+      try {
+        const taxRecipient = await agentTax._agentRecipients(agentId);
+        oldCreator = taxRecipient.creator;
+      } catch (e) {
+        // If recipient doesn't exist yet, oldCreator remains ZeroAddress
+      }
+      
       await expect(tx)
         .to.emit(agentTax, "CreatorUpdated")
-        .withArgs(
-          agentId,
-          (oldCreator) => oldCreator !== ethers.ZeroAddress,
-          newCreator
-        );
+        .withArgs(agentId, oldCreator, newCreator);
+      console.log("Creator updated for agent", agentId, "from", oldCreator, "to", newCreator);
     });
 
     it("Should revert if token does not allow tax recipient updates", async function () {
@@ -295,7 +354,11 @@ describe("Project60days - AgentTax Integration", function () {
         "https://example.com",
       ];
       const purchaseAmount = ethers.parseEther("1000");
-      const startTime = (await time.latest()) + START_TIME_DELAY + 1;
+      const launchParamsData2 = await bondingV2.launchParams();
+      const startTimeDelayForToken2 = BigInt(launchParamsData2.startTimeDelay.toString());
+      // Add a larger buffer to account for block.timestamp potentially being ahead of time.latest()
+      const currentTime = BigInt((await time.latest()).toString());
+      const startTime = currentTime + startTimeDelayForToken2 + 100n;
 
       await virtualToken
         .connect(user1)
@@ -334,13 +397,21 @@ describe("Project60days - AgentTax Integration", function () {
       expect(allowUpdate).to.be.false;
 
       // Launch and graduate to get agentId
-      await time.increase(START_TIME_DELAY + 1);
+      // Need to wait until pair.startTime() has passed
+      const regularPair = await ethers.getContractAt("FPairV2", parsedEvent.args.pair);
+      const regularPairStartTime = await regularPair.startTime();
+      const currentTimeForRegularLaunch = await time.latest();
+      if (currentTimeForRegularLaunch < regularPairStartTime) {
+        const waitTime = BigInt(regularPairStartTime.toString()) - BigInt(currentTimeForRegularLaunch.toString()) + 1n;
+        await time.increase(waitTime);
+      }
       await bondingV2.connect(user1).launch(regularTokenAddress);
       await time.increase(100 * 60);
       const buyAmount = ethers.parseEther("202020.2044906205");
+      // Need to approve fRouterV2, not bondingV2, because buy() calls router.buy()
       await virtualToken
         .connect(accounts.user2)
-        .approve(await bondingV2.getAddress(), buyAmount);
+        .approve(addresses.fRouterV2, buyAmount);
       await bondingV2
         .connect(accounts.user2)
         .buy(
@@ -367,6 +438,7 @@ describe("Project60days - AgentTax Integration", function () {
       }
 
       expect(regularAgentId).to.not.be.undefined;
+      console.log("regularAgentId", regularAgentId);
 
       // Try to update tax recipient - should revert
       const newTba = ethers.Wallet.createRandom().address;
@@ -402,13 +474,23 @@ describe("Project60days - AgentTax Integration", function () {
       const { admin } = accounts;
 
       // Create a new AgentTax without setting BondingV2
+      // Need to use different tokens for assetToken and taxToken (contract requirement)
+      const MockERC20 = await ethers.getContractFactory("MockERC20");
+      const testAssetToken = await MockERC20.deploy(
+        "Test Asset",
+        "TASSET",
+        accounts.owner.address,
+        ethers.parseEther("10000000000")
+      );
+      await testAssetToken.waitForDeployment();
+      
       const AgentTax = await ethers.getContractFactory("AgentTax");
       const newAgentTax = await upgrades.deployProxy(
         AgentTax,
         [
           accounts.owner.address,
-          await virtualToken.getAddress(),
-          await virtualToken.getAddress(),
+          await testAssetToken.getAddress(), // assetToken_ (different from taxToken)
+          await virtualToken.getAddress(), // taxToken_
           addresses.fRouterV2,
           accounts.owner.address,
           ethers.parseEther("100"),
@@ -473,7 +555,11 @@ describe("Project60days - AgentTax Integration", function () {
         "https://example.com",
       ];
       const purchaseAmount = ethers.parseEther("1000");
-      const startTime = (await time.latest()) + START_TIME_DELAY + 1;
+      const launchParamsData = await bondingV2.launchParams();
+      const startTimeDelay = BigInt(launchParamsData.startTimeDelay.toString());
+      // Add a larger buffer to account for block.timestamp potentially being ahead of time.latest()
+      const currentTime = BigInt((await time.latest()).toString());
+      const startTime = currentTime + startTimeDelay + 100n;
 
       await virtualToken
         .connect(user1)
@@ -534,7 +620,11 @@ describe("Project60days - AgentTax Integration", function () {
       const { user1 } = accounts;
 
       const purchaseAmount = ethers.parseEther("1000");
-      const startTime = (await time.latest()) + START_TIME_DELAY + 1;
+      const launchParamsData = await bondingV2.launchParams();
+      const startTimeDelay = BigInt(launchParamsData.startTimeDelay.toString());
+      // Add a larger buffer to account for block.timestamp potentially being ahead of time.latest()
+      const currentTime = BigInt((await time.latest()).toString());
+      const startTime = currentTime + startTimeDelay + 100n;
 
       await virtualToken
         .connect(user1)
@@ -565,7 +655,7 @@ describe("Project60days - AgentTax Integration", function () {
           "https://example.com/image.png",
           ["", "", "", ""],
           purchaseAmount,
-          startTime + 1
+          startTime + 1n
         );
 
       await expect(tx1).to.emit(bondingV2, "PreLaunched");

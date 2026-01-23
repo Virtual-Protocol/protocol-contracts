@@ -94,6 +94,9 @@ contract BondingV2 is
     // this is for BE to separate with old virtualId from bondingV1, but this field is not used yet
     uint256 public constant VirtualIdBase = 20_000_000_000;
 
+    // Mapping to mark tokens that allow tax recipient updates
+    mapping(address => bool) public allowTaxRecipientUpdate;
+
     event PreLaunched(
         address indexed token,
         address indexed pair,
@@ -202,6 +205,55 @@ contract BondingV2 is
         uint256 purchaseAmount,
         uint256 startTime
     ) public nonReentrant returns (address, address, uint, uint256) {
+        return
+            _preLaunch(
+                _name,
+                _ticker,
+                cores,
+                desc,
+                img,
+                urls,
+                purchaseAmount,
+                startTime,
+                false // allowTaxRecipientUpdate_ defaults to false for backward compatibility
+            );
+    }
+
+    function preLaunchProject60days(
+        string memory _name,
+        string memory _ticker,
+        uint8[] memory cores,
+        string memory desc,
+        string memory img,
+        string[4] memory urls,
+        uint256 purchaseAmount,
+        uint256 startTime
+    ) public nonReentrant returns (address, address, uint, uint256) {
+        return
+            _preLaunch(
+                _name,
+                _ticker,
+                cores,
+                desc,
+                img,
+                urls,
+                purchaseAmount,
+                startTime,
+                true // allowTaxRecipientUpdate_ defaults to true for Project60days
+            );
+    }
+
+    function _preLaunch(
+        string memory _name,
+        string memory _ticker,
+        uint8[] memory cores,
+        string memory desc,
+        string memory img,
+        string[4] memory urls,
+        uint256 purchaseAmount,
+        uint256 startTime,
+        bool allowTaxRecipientUpdate_
+    ) internal returns (address, address, uint, uint256) {
         if (purchaseAmount < fee || cores.length <= 0) {
             revert InvalidInput();
         }
@@ -292,6 +344,10 @@ contract BondingV2 is
         newToken.applicationId = applicationId;
         newToken.initialPurchase = initialPurchase;
         newToken.virtualId = VirtualIdBase + tokenInfos.length;
+        // Mark token if it allows tax recipient updates
+        if (allowTaxRecipientUpdate_) {
+            allowTaxRecipientUpdate[token] = true;
+        }
         newToken.launchExecuted = false;
 
         // Set Data struct fields

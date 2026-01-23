@@ -1,0 +1,637 @@
+const { expect } = require("chai");
+const { ethers, upgrades } = require("hardhat");
+const { time } = require("@nomicfoundation/hardhat-network-helpers");
+const {
+  loadFixture,
+} = require("@nomicfoundation/hardhat-toolbox/network-helpers");
+const { setupNewLaunchpadTest } = require("../launchpadv2/setup");
+const {
+  START_TIME_DELAY,
+  INITIAL_SUPPLY,
+  TEAM_TOKEN_RESERVED_SUPPLY,
+} = require("../launchpadv2/const");
+
+describe("Project60days - AgentTax Integration", function () {
+  let setup;
+  let contracts;
+  let accounts;
+  let addresses;
+  let agentTax;
+  let bondingV2;
+  let virtualToken;
+  let agentNftV2;
+
+  before(async function () {
+    setup = await loadFixture(setupNewLaunchpadTest);
+    contracts = setup.contracts;
+    accounts = setup.accounts;
+    addresses = setup.addresses;
+
+    bondingV2 = contracts.bondingV2;
+    virtualToken = contracts.virtualToken;
+    agentNftV2 = contracts.agentNftV2;
+
+    // Deploy AgentTax contract
+    console.log("\n--- Deploying AgentTax ---");
+    const AgentTax = await ethers.getContractFactory("AgentTax");
+    agentTax = await upgrades.deployProxy(
+      AgentTax,
+      [
+        accounts.owner.address, // defaultAdmin_
+        await virtualToken.getAddress(), // assetToken_
+        await virtualToken.getAddress(), // taxToken_
+        addresses.fRouterV2, // router_
+        accounts.owner.address, // treasury_
+        ethers.parseEther("100"), // minSwapThreshold_
+        ethers.parseEther("10000"), // maxSwapThreshold_
+        await agentNftV2.getAddress(), // nft_
+      ],
+      { initializer: "initialize" }
+    );
+    await agentTax.waitForDeployment();
+    console.log("AgentTax deployed at:", await agentTax.getAddress());
+
+    // Set BondingV2 address in AgentTax
+    await agentTax.setBondingV2(await bondingV2.getAddress());
+    console.log("BondingV2 address set in AgentTax");
+
+    // Grant EXECUTOR_V2_ROLE to accounts.admin for testing
+    const EXECUTOR_V2_ROLE = await agentTax.EXECUTOR_V2_ROLE();
+    await agentTax.grantRole(EXECUTOR_V2_ROLE, accounts.admin.address);
+    console.log("EXECUTOR_V2_ROLE granted to admin");
+  });
+
+  describe("preLaunchProject60days", function () {
+    it("Should create a token with allowTaxRecipientUpdate set to true", async function () {
+      const { user1 } = accounts;
+
+      const tokenName = "Project60days Token";
+      const tokenTicker = "P60";
+      const cores = [0, 1, 2];
+      const description = "Project60days test token";
+      const image = "https://example.com/image.png";
+      const urls = [
+        "https://twitter.com/test",
+        "https://t.me/test",
+        "https://youtube.com/test",
+        "https://example.com",
+      ];
+      const purchaseAmount = ethers.parseEther("1000");
+      const startTime = (await time.latest()) + START_TIME_DELAY + 1;
+
+      // Approve virtual tokens
+      await virtualToken
+        .connect(user1)
+        .approve(await bondingV2.getAddress(), purchaseAmount);
+
+      // Call preLaunchProject60days
+      const tx = await bondingV2
+        .connect(user1)
+        .preLaunchProject60days(
+          tokenName,
+          tokenTicker,
+          cores,
+          description,
+          image,
+          urls,
+          purchaseAmount,
+          startTime
+        );
+
+      const receipt = await tx.wait();
+      const event = receipt.logs.find((log) => {
+        try {
+          const parsed = bondingV2.interface.parseLog(log);
+          return parsed && parsed.name === "PreLaunched";
+        } catch (e) {
+          return false;
+        }
+      });
+
+      expect(event).to.not.be.undefined;
+      const parsedEvent = bondingV2.interface.parseLog(event);
+      const tokenAddress = parsedEvent.args.token;
+
+      // Verify allowTaxRecipientUpdate is set to true
+      const allowUpdate = await bondingV2.allowTaxRecipientUpdate(tokenAddress);
+      expect(allowUpdate).to.be.true;
+
+      // Verify token info
+      const tokenInfo = await bondingV2.tokenInfo(tokenAddress);
+      expect(tokenInfo.token).to.equal(tokenAddress);
+      expect(tokenInfo.creator).to.equal(user1.address);
+    });
+
+    it("Should emit PreLaunched event with correct parameters", async function () {
+      const { user1 } = accounts;
+
+      const tokenName = "Project60days Token 2";
+      const tokenTicker = "P602";
+      const cores = [0, 1];
+      const description = "Project60days test token 2";
+      const image = "https://example.com/image2.png";
+      const urls = [
+        "https://twitter.com/test2",
+        "https://t.me/test2",
+        "https://youtube.com/test2",
+        "https://example2.com",
+      ];
+      const purchaseAmount = ethers.parseEther("2000");
+      const startTime = (await time.latest()) + START_TIME_DELAY + 1;
+
+      await virtualToken
+        .connect(user1)
+        .approve(await bondingV2.getAddress(), purchaseAmount);
+
+      const tx = await bondingV2
+        .connect(user1)
+        .preLaunchProject60days(
+          tokenName,
+          tokenTicker,
+          cores,
+          description,
+          image,
+          urls,
+          purchaseAmount,
+          startTime
+        );
+
+      await expect(tx)
+        .to.emit(bondingV2, "PreLaunched")
+        .withArgs(
+          (token) => token !== ethers.ZeroAddress,
+          (pair) => pair !== ethers.ZeroAddress,
+          (virtualId) => virtualId > 0n,
+          (initialPurchase) => initialPurchase > 0n
+        );
+    });
+  });
+
+  describe("updateCreatorForProject60daysAgents", function () {
+    let tokenAddress;
+    let agentId;
+
+    beforeEach(async function () {
+      const { user1 } = accounts;
+
+      // Create a Project60days token
+      const tokenName = "Test Project60days";
+      const tokenTicker = "TP60";
+      const cores = [0, 1, 2];
+      const description = "Test description";
+      const image = "https://example.com/image.png";
+      const urls = [
+        "https://twitter.com/test",
+        "https://t.me/test",
+        "https://youtube.com/test",
+        "https://example.com",
+      ];
+      const purchaseAmount = ethers.parseEther("1000");
+      const startTime = (await time.latest()) + START_TIME_DELAY + 1;
+
+      await virtualToken
+        .connect(user1)
+        .approve(await bondingV2.getAddress(), purchaseAmount);
+
+      const tx = await bondingV2
+        .connect(user1)
+        .preLaunchProject60days(
+          tokenName,
+          tokenTicker,
+          cores,
+          description,
+          image,
+          urls,
+          purchaseAmount,
+          startTime
+        );
+
+      const receipt = await tx.wait();
+      const event = receipt.logs.find((log) => {
+        try {
+          const parsed = bondingV2.interface.parseLog(log);
+          return parsed && parsed.name === "PreLaunched";
+        } catch (e) {
+          return false;
+        }
+      });
+
+      const parsedEvent = bondingV2.interface.parseLog(event);
+      tokenAddress = parsedEvent.args.token;
+
+      // Launch and graduate token to get agentId
+      await time.increase(START_TIME_DELAY + 1);
+      await bondingV2.connect(user1).launch(tokenAddress);
+
+      // Buy tokens to graduate
+      await time.increase(100 * 60); // Wait for anti-sniper tax to expire
+      const buyAmount = ethers.parseEther("202020.2044906205");
+      await virtualToken
+        .connect(accounts.user2)
+        .approve(await bondingV2.getAddress(), buyAmount);
+      await bondingV2
+        .connect(accounts.user2)
+        .buy(
+          buyAmount,
+          tokenAddress,
+          0,
+          (await time.latest()) + 300
+        );
+
+      // Find agentId from agentNft
+      const nextVirtualId = await agentNftV2.nextVirtualId();
+      for (let i = 1; i < nextVirtualId; i++) {
+        try {
+          const virtualInfo = await agentNftV2.virtualInfo(i);
+          const tokenInfo = await bondingV2.tokenInfo(tokenAddress);
+          if (virtualInfo.token === tokenInfo.agentToken) {
+            agentId = BigInt(i);
+            break;
+          }
+        } catch (e) {
+          continue;
+        }
+      }
+
+      expect(agentId).to.not.be.undefined;
+    });
+
+    it("Should update tax recipient for Project60days agent", async function () {
+      const { admin } = accounts;
+      const newTba = ethers.Wallet.createRandom().address;
+      const newCreator = ethers.Wallet.createRandom().address;
+
+      // Verify token allows tax recipient updates
+      const allowUpdate = await bondingV2.allowTaxRecipientUpdate(tokenAddress);
+      expect(allowUpdate).to.be.true;
+
+      // Update tax recipient
+      const tx = await agentTax
+        .connect(admin)
+        .updateCreatorForProject60daysAgents(agentId, newTba, newCreator);
+
+      await expect(tx)
+        .to.emit(agentTax, "CreatorUpdated")
+        .withArgs(
+          agentId,
+          (oldCreator) => oldCreator !== ethers.ZeroAddress,
+          newCreator
+        );
+    });
+
+    it("Should revert if token does not allow tax recipient updates", async function () {
+      const { user1, admin } = accounts;
+
+      // Create a regular token (not Project60days)
+      const tokenName = "Regular Token";
+      const tokenTicker = "REG";
+      const cores = [0, 1];
+      const description = "Regular token";
+      const image = "https://example.com/image.png";
+      const urls = [
+        "https://twitter.com/test",
+        "https://t.me/test",
+        "https://youtube.com/test",
+        "https://example.com",
+      ];
+      const purchaseAmount = ethers.parseEther("1000");
+      const startTime = (await time.latest()) + START_TIME_DELAY + 1;
+
+      await virtualToken
+        .connect(user1)
+        .approve(await bondingV2.getAddress(), purchaseAmount);
+
+      const tx = await bondingV2
+        .connect(user1)
+        .preLaunch(
+          tokenName,
+          tokenTicker,
+          cores,
+          description,
+          image,
+          urls,
+          purchaseAmount,
+          startTime
+        );
+
+      const receipt = await tx.wait();
+      const event = receipt.logs.find((log) => {
+        try {
+          const parsed = bondingV2.interface.parseLog(log);
+          return parsed && parsed.name === "PreLaunched";
+        } catch (e) {
+          return false;
+        }
+      });
+
+      const parsedEvent = bondingV2.interface.parseLog(event);
+      const regularTokenAddress = parsedEvent.args.token;
+
+      // Verify regular token does NOT allow tax recipient updates
+      const allowUpdate = await bondingV2.allowTaxRecipientUpdate(
+        regularTokenAddress
+      );
+      expect(allowUpdate).to.be.false;
+
+      // Launch and graduate to get agentId
+      await time.increase(START_TIME_DELAY + 1);
+      await bondingV2.connect(user1).launch(regularTokenAddress);
+      await time.increase(100 * 60);
+      const buyAmount = ethers.parseEther("202020.2044906205");
+      await virtualToken
+        .connect(accounts.user2)
+        .approve(await bondingV2.getAddress(), buyAmount);
+      await bondingV2
+        .connect(accounts.user2)
+        .buy(
+          buyAmount,
+          regularTokenAddress,
+          0,
+          (await time.latest()) + 300
+        );
+
+      // Find agentId
+      let regularAgentId;
+      const nextVirtualId = await agentNftV2.nextVirtualId();
+      for (let i = 1; i < nextVirtualId; i++) {
+        try {
+          const virtualInfo = await agentNftV2.virtualInfo(i);
+          const tokenInfo = await bondingV2.tokenInfo(regularTokenAddress);
+          if (virtualInfo.token === tokenInfo.agentToken) {
+            regularAgentId = BigInt(i);
+            break;
+          }
+        } catch (e) {
+          continue;
+        }
+      }
+
+      expect(regularAgentId).to.not.be.undefined;
+
+      // Try to update tax recipient - should revert
+      const newTba = ethers.Wallet.createRandom().address;
+      const newCreator = ethers.Wallet.createRandom().address;
+
+      await expect(
+        agentTax
+          .connect(admin)
+          .updateCreatorForProject60daysAgents(
+            regularAgentId,
+            newTba,
+            newCreator
+          )
+      ).to.be.revertedWith("Token does not allow tax recipient updates");
+    });
+
+    it("Should revert if called without EXECUTOR_V2_ROLE", async function () {
+      const { user1 } = accounts;
+      const newTba = ethers.Wallet.createRandom().address;
+      const newCreator = ethers.Wallet.createRandom().address;
+
+      await expect(
+        agentTax
+          .connect(user1)
+          .updateCreatorForProject60daysAgents(agentId, newTba, newCreator)
+      ).to.be.revertedWithCustomError(
+        agentTax,
+        "AccessControlUnauthorizedAccount"
+      );
+    });
+
+    it("Should revert if BondingV2 is not set", async function () {
+      const { admin } = accounts;
+
+      // Create a new AgentTax without setting BondingV2
+      const AgentTax = await ethers.getContractFactory("AgentTax");
+      const newAgentTax = await upgrades.deployProxy(
+        AgentTax,
+        [
+          accounts.owner.address,
+          await virtualToken.getAddress(),
+          await virtualToken.getAddress(),
+          addresses.fRouterV2,
+          accounts.owner.address,
+          ethers.parseEther("100"),
+          ethers.parseEther("10000"),
+          await agentNftV2.getAddress(),
+        ],
+        { initializer: "initialize" }
+      );
+      await newAgentTax.waitForDeployment();
+
+      const EXECUTOR_V2_ROLE = await newAgentTax.EXECUTOR_V2_ROLE();
+      await newAgentTax.grantRole(EXECUTOR_V2_ROLE, admin.address);
+
+      const newTba = ethers.Wallet.createRandom().address;
+      const newCreator = ethers.Wallet.createRandom().address;
+
+      await expect(
+        newAgentTax
+          .connect(admin)
+          .updateCreatorForProject60daysAgents(agentId, newTba, newCreator)
+      ).to.be.revertedWith("BondingV2 not set");
+    });
+
+    it("Should revert with invalid TBA or creator address", async function () {
+      const { admin } = accounts;
+
+      await expect(
+        agentTax
+          .connect(admin)
+          .updateCreatorForProject60daysAgents(
+            agentId,
+            ethers.ZeroAddress,
+            accounts.user1.address
+          )
+      ).to.be.revertedWith("Invalid TBA");
+
+      await expect(
+        agentTax
+          .connect(admin)
+          .updateCreatorForProject60daysAgents(
+            agentId,
+            accounts.user1.address,
+            ethers.ZeroAddress
+          )
+      ).to.be.revertedWith("Invalid creator");
+    });
+  });
+
+  describe("Regression Tests - preLaunch backward compatibility", function () {
+    it("Should create token with allowTaxRecipientUpdate set to false (backward compatible)", async function () {
+      const { user1 } = accounts;
+
+      const tokenName = "Regular Token";
+      const tokenTicker = "REG";
+      const cores = [0, 1, 2];
+      const description = "Regular token description";
+      const image = "https://example.com/image.png";
+      const urls = [
+        "https://twitter.com/test",
+        "https://t.me/test",
+        "https://youtube.com/test",
+        "https://example.com",
+      ];
+      const purchaseAmount = ethers.parseEther("1000");
+      const startTime = (await time.latest()) + START_TIME_DELAY + 1;
+
+      await virtualToken
+        .connect(user1)
+        .approve(await bondingV2.getAddress(), purchaseAmount);
+
+      const tx = await bondingV2
+        .connect(user1)
+        .preLaunch(
+          tokenName,
+          tokenTicker,
+          cores,
+          description,
+          image,
+          urls,
+          purchaseAmount,
+          startTime
+        );
+
+      const receipt = await tx.wait();
+      const event = receipt.logs.find((log) => {
+        try {
+          const parsed = bondingV2.interface.parseLog(log);
+          return parsed && parsed.name === "PreLaunched";
+        } catch (e) {
+          return false;
+        }
+      });
+
+      expect(event).to.not.be.undefined;
+      const parsedEvent = bondingV2.interface.parseLog(event);
+      const tokenAddress = parsedEvent.args.token;
+
+      // Verify allowTaxRecipientUpdate is set to false (backward compatible)
+      const allowUpdate = await bondingV2.allowTaxRecipientUpdate(tokenAddress);
+      expect(allowUpdate).to.be.false;
+
+      // Verify token info
+      const tokenInfo = await bondingV2.tokenInfo(tokenAddress);
+      expect(tokenInfo.token).to.equal(tokenAddress);
+      expect(tokenInfo.creator).to.equal(user1.address);
+    });
+
+    it("Should maintain same function signature for preLaunch", async function () {
+      // Verify that preLaunch function signature hasn't changed
+      const preLaunchFragment = bondingV2.interface.getFunction("preLaunch");
+      expect(preLaunchFragment.inputs.length).to.equal(8); // 8 parameters
+      expect(preLaunchFragment.inputs[0].name).to.equal("_name");
+      expect(preLaunchFragment.inputs[7].name).to.equal("startTime");
+      // Should NOT have allowTaxRecipientUpdate_ parameter
+      expect(
+        preLaunchFragment.inputs.find(
+          (input) => input.name === "allowTaxRecipientUpdate_"
+        )
+      ).to.be.undefined;
+    });
+
+    it("Should allow both preLaunch and preLaunchProject60days to coexist", async function () {
+      const { user1 } = accounts;
+
+      const purchaseAmount = ethers.parseEther("1000");
+      const startTime = (await time.latest()) + START_TIME_DELAY + 1;
+
+      await virtualToken
+        .connect(user1)
+        .approve(await bondingV2.getAddress(), purchaseAmount * 2n);
+
+      // Create regular token
+      const tx1 = await bondingV2
+        .connect(user1)
+        .preLaunch(
+          "Regular Token",
+          "REG",
+          [0, 1],
+          "Description",
+          "https://example.com/image.png",
+          ["", "", "", ""],
+          purchaseAmount,
+          startTime
+        );
+
+      // Create Project60days token
+      const tx2 = await bondingV2
+        .connect(user1)
+        .preLaunchProject60days(
+          "Project60days Token",
+          "P60",
+          [0, 1],
+          "Description",
+          "https://example.com/image.png",
+          ["", "", "", ""],
+          purchaseAmount,
+          startTime + 1
+        );
+
+      await expect(tx1).to.emit(bondingV2, "PreLaunched");
+      await expect(tx2).to.emit(bondingV2, "PreLaunched");
+
+      const receipt1 = await tx1.wait();
+      const receipt2 = await tx2.wait();
+
+      const event1 = receipt1.logs.find((log) => {
+        try {
+          const parsed = bondingV2.interface.parseLog(log);
+          return parsed && parsed.name === "PreLaunched";
+        } catch (e) {
+          return false;
+        }
+      });
+
+      const event2 = receipt2.logs.find((log) => {
+        try {
+          const parsed = bondingV2.interface.parseLog(log);
+          return parsed && parsed.name === "PreLaunched";
+        } catch (e) {
+          return false;
+        }
+      });
+
+      const parsedEvent1 = bondingV2.interface.parseLog(event1);
+      const parsedEvent2 = bondingV2.interface.parseLog(event2);
+
+      const regularToken = parsedEvent1.args.token;
+      const project60daysToken = parsedEvent2.args.token;
+
+      expect(await bondingV2.allowTaxRecipientUpdate(regularToken)).to.be.false;
+      expect(
+        await bondingV2.allowTaxRecipientUpdate(project60daysToken)
+      ).to.be.true;
+    });
+  });
+
+  describe("setBondingV2", function () {
+    it("Should allow admin to set BondingV2 address", async function () {
+      const { owner } = accounts;
+      const newBondingV2Address = ethers.Wallet.createRandom().address;
+
+      await agentTax.connect(owner).setBondingV2(newBondingV2Address);
+      expect(await agentTax.bondingV2()).to.equal(newBondingV2Address);
+    });
+
+    it("Should revert if non-admin tries to set BondingV2", async function () {
+      const { user1 } = accounts;
+      const newBondingV2Address = ethers.Wallet.createRandom().address;
+
+      await expect(
+        agentTax.connect(user1).setBondingV2(newBondingV2Address)
+      ).to.be.revertedWithCustomError(
+        agentTax,
+        "AccessControlUnauthorizedAccount"
+      );
+    });
+
+    it("Should revert if setting zero address", async function () {
+      const { owner } = accounts;
+
+      await expect(
+        agentTax.connect(owner).setBondingV2(ethers.ZeroAddress)
+      ).to.be.revertedWith("Invalid BondingV2 address");
+    });
+  });
+});

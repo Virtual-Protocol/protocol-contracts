@@ -14,12 +14,12 @@ import { ethers, upgrades } from "hardhat";
  * Note: This uses OpenZeppelin's Transparent Proxy pattern (via Hardhat upgrades plugin)
  */
 
-if (!process.env.ADMIN_PRIVATE_KEY) {
-  throw new Error("ADMIN_PRIVATE_KEY not set in environment");
+if (!process.env.CONTRACT_CONTROLLER_PRIVATE_KEY) {
+  throw new Error("CONTRACT_CONTROLLER_PRIVATE_KEY not set in environment");
 }
 
-const adminSigner = new ethers.Wallet(
-  process.env.ADMIN_PRIVATE_KEY,
+const contractControllerSigner = new ethers.Wallet(
+  process.env.CONTRACT_CONTROLLER_PRIVATE_KEY,
   ethers.provider
 );
 
@@ -32,7 +32,7 @@ const adminSigner = new ethers.Wallet(
 
     console.log("Starting veVirtual upgrade process...");
     console.log("Proxy address:", PROXY_ADDRESS);
-    console.log("Admin signer address:", adminSigner.address);
+    console.log("Contract controller signer address:", contractControllerSigner.address);
     console.log("");
 
     // Get current implementation address
@@ -57,14 +57,14 @@ const adminSigner = new ethers.Wallet(
         const proxyAdmin = ProxyAdmin.attach(proxyAdminAddress);
         const owner = await proxyAdmin.owner();
         console.log("ProxyAdmin Owner:", owner);
-        console.log("Admin Signer Address:", adminSigner.address);
+        console.log("Contract controller Signer Address:", contractControllerSigner.address);
 
-        if (owner.toLowerCase() !== adminSigner.address.toLowerCase()) {
+        if (owner.toLowerCase() !== contractControllerSigner.address.toLowerCase()) {
           console.error(
-            "\n⚠️  WARNING: Admin signer is NOT the ProxyAdmin owner!"
+            "\n⚠️  WARNING: Contract controller signer is NOT the ProxyAdmin owner!"
           );
           console.error("ProxyAdmin Owner:", owner);
-          console.error("Admin Signer:", adminSigner.address);
+          console.error("Contract controller Signer:", contractControllerSigner.address);
           console.error("\nImportant:");
           console.error(
             "ProxyAdmin owner and DEFAULT_ADMIN_ROLE are DIFFERENT:"
@@ -81,12 +81,12 @@ const adminSigner = new ethers.Wallet(
           console.error("\nSolutions:");
           console.error("1. Use ProxyAdmin owner's private key:");
           console.error(
-            `   Set ADMIN_PRIVATE_KEY to the private key of: ${owner}`
+              `   Set CONTRACT_CONTROLLER_PRIVATE_KEY to the private key of: ${owner}`
           );
           console.error("\n2. Transfer ProxyAdmin ownership:");
           console.error(`   ProxyAdmin owner (${owner}) must call:`);
           console.error(
-            `   await proxyAdmin.transferOwnership("${adminSigner.address}")`
+            `   await proxyAdmin.transferOwnership("${contractControllerSigner.address}")`
           );
           console.error("\n3. Continue anyway (may fail):");
           console.error("   Set SKIP_PERMISSION_CHECK=true to attempt upgrade");
@@ -94,7 +94,7 @@ const adminSigner = new ethers.Wallet(
 
           if (process.env.SKIP_PERMISSION_CHECK !== "true") {
             throw new Error(
-              "Admin signer address does not match ProxyAdmin owner. Set SKIP_PERMISSION_CHECK=true to continue anyway."
+              "Contract controller signer address does not match ProxyAdmin owner. Set SKIP_PERMISSION_CHECK=true to continue anyway."
             );
           } else {
             console.warn(
@@ -103,7 +103,7 @@ const adminSigner = new ethers.Wallet(
           }
         } else {
           console.log(
-            "✅ Admin signer matches ProxyAdmin owner - upgrade should succeed"
+            "✅ Contract controller signer matches ProxyAdmin owner - upgrade should succeed"
           );
         }
       } catch (error) {
@@ -126,7 +126,7 @@ const adminSigner = new ethers.Wallet(
 
     await upgrades.upgradeProxy(
       PROXY_ADDRESS,
-      await ethers.getContractFactory("veVirtual", adminSigner),
+      await ethers.getContractFactory("veVirtual", contractControllerSigner),
     );
 
     console.log("✅ veVirtual upgraded successfully!");

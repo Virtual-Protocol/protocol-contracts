@@ -22,7 +22,6 @@ contract veVirtual is
         uint8 numWeeks; // Active duration in weeks. Reset to maxWeeks if autoRenew is true.
         bool autoRenew;
         uint256 id;
-        bool isEco; // If true, this is an eco lock managed by ecoVeVirtualStaker, cannot be withdrawn by user
     }
 
     uint16 public constant DENOM = 10000;
@@ -172,8 +171,7 @@ contract veVirtual is
             end: end,
             numWeeks: numWeeks,
             autoRenew: autoRenew,
-            id: _nextId++,
-            isEco: false
+            id: _nextId++
         });
         locks[_msgSender()].push(lock);
         emit Stake(_msgSender(), lock.id, amount, numWeeks);
@@ -222,7 +220,7 @@ contract veVirtual is
         address account = _msgSender();
         uint256 index = _indexOf(account, id);
         Lock memory lock = locks[account][index];
-        require(!lock.isEco, "Cannot withdraw eco lock"); // redundant check since eco locks are not in locks[] array
+        require(id != ecoLocks[account].id, "Cannot withdraw eco lock"); // redundant check since eco locks are not in locks[] array
         require(
             block.timestamp >= lock.end || adminUnlocked,
             "Lock is not expired"
@@ -247,7 +245,7 @@ contract veVirtual is
         uint256 index = _indexOf(account, id);
 
         Lock storage lock = locks[account][index];
-        require(!lock.isEco, "Cannot modify eco lock"); // redundant check since eco locks are not in locks[] array
+        require(id != ecoLocks[account].id, "Cannot modify eco lock"); // redundant check since eco locks are not in locks[] array
         lock.autoRenew = !lock.autoRenew;
         lock.numWeeks = maxWeeks;
         lock.start = block.timestamp;
@@ -260,7 +258,7 @@ contract veVirtual is
         address account = _msgSender();
         uint256 index = _indexOf(account, id);
         Lock storage lock = locks[account][index];
-        require(!lock.isEco, "Cannot modify eco lock"); // redundant check since eco locks are not in locks[] array
+        require(id != ecoLocks[account].id, "Cannot modify eco lock"); // redundant check since eco locks are not in locks[] array
         require(lock.autoRenew == false, "Lock is auto-renewing");
         require(block.timestamp < lock.end, "Lock is expired");
         require(
@@ -336,8 +334,7 @@ contract veVirtual is
                 end: block.timestamp + uint256(maxWeeks) * 1 weeks,
                 numWeeks: maxWeeks,
                 autoRenew: true,
-                id: _nextId++,
-                isEco: true
+                id: _nextId++
             });
             ecoLocks[account] = newLock;
         } else {

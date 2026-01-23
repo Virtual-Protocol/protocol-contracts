@@ -125,20 +125,15 @@ describe("veVirtual - Eco Traders with CumulativeMerkleDrop", function () {
         .connect(user1)
         .claimAndMaxStake(user1.address, parseEther("1"), merkleRoot, proof1);
 
-      // 4. Verify all users have eco locks (using getEcoLock, not getPositions)
-      const lock1 = await veVirtual.getEcoLock(user1.address);
-      const lock2 = await veVirtual.getEcoLock(user2.address);
-      const lock3 = await veVirtual.getEcoLock(user3.address);
+      // 4. Verify all users have eco locks (using ecoLocks mapping, not getPositions)
+      const lock1 = await veVirtual.ecoLocks(user1.address);
+      const lock2 = await veVirtual.ecoLocks(user2.address);
+      const lock3 = await veVirtual.ecoLocks(user3.address);
 
       // Verify eco locks exist (id should be > 0)
       expect(lock1.id).to.be.greaterThan(0);
       expect(lock2.id).to.be.greaterThan(0);
       expect(lock3.id).to.be.greaterThan(0);
-
-      // All should be eco locks
-      expect(lock1.isEco).to.be.equal(true);
-      expect(lock2.isEco).to.be.equal(true);
-      expect(lock3.isEco).to.be.equal(true);
 
       // All should have autoRenew = true
       expect(lock1.autoRenew).to.be.equal(true);
@@ -286,7 +281,7 @@ describe("veVirtual - Eco Traders with CumulativeMerkleDrop", function () {
         );
 
       // Verify user1 now has 2 tokens staked in the same eco lock (amount should be accumulated)
-      const ecoLock = await veVirtual.getEcoLock(user1.address);
+      const ecoLock = await veVirtual.ecoLocks(user1.address);
       expect(ecoLock.amount).to.be.equal(parseEther("2"));
 
       const totalBalance = await veVirtual.balanceOf(user1.address);
@@ -385,14 +380,12 @@ describe("veVirtual - Eco Traders with CumulativeMerkleDrop", function () {
       const positions = await veVirtual.getPositions(user1.address, 0, 10);
       // getPositions returns array with requested count, but we check numPositions for actual count
 
-      // Regular lock should not be eco lock
-      expect(positions[0].isEco).to.be.equal(false);
+      // Regular lock should be in positions array
       expect(positions[0].amount).to.be.equal(parseEther("100"));
 
       // Eco lock should be in ecoLocks mapping (not in positions array)
-      const ecoLock = await veVirtual.getEcoLock(user1.address);
+      const ecoLock = await veVirtual.ecoLocks(user1.address);
       expect(ecoLock.id).to.be.greaterThan(0);
-      expect(ecoLock.isEco).to.be.equal(true);
       expect(ecoLock.amount).to.be.equal(parseEther("1"));
 
       // Total balance should be sum of regular lock + eco lock

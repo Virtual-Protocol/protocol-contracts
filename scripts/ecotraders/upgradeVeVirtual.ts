@@ -123,25 +123,10 @@ const adminSigner = new ethers.Wallet(
 
     // Upgrade the proxy
     console.log("Upgrading veVirtual proxy...");
-    console.log(
-      "⚠️  Using unsafeSkipStorageCheck to allow struct definition changes (isEco field added)"
-    );
-    console.log("   This is safe because:");
-    console.log("   1. isEco is added at the end of the Lock struct as a bool");
-    console.log(
-      "   2. bool type only takes 1 byte and won't affect existing field positions"
-    );
-    console.log("   3. Existing locks will have isEco = false (default value)");
-    console.log(
-      "   4. ecoLocks uses a separate mapping, so locks[] array is not affected"
-    );
 
     await upgrades.upgradeProxy(
       PROXY_ADDRESS,
       await ethers.getContractFactory("veVirtual", adminSigner),
-      {
-        unsafeSkipStorageCheck: true,
-      }
     );
 
     console.log("✅ veVirtual upgraded successfully!");

@@ -78,7 +78,7 @@ describe("Project60days - AgentTax Integration", function () {
   });
 
   describe("preLaunchProject60days", function () {
-    it("Should create a token with allowTaxRecipientUpdate set to true", async function () {
+    it("Should create a token with isProject60days set to true", async function () {
       const { user1 } = accounts;
 
       const tokenName = "Project60days Token";
@@ -146,9 +146,9 @@ describe("Project60days - AgentTax Integration", function () {
       const parsedEvent = bondingV2.interface.parseLog(event);
       const tokenAddress = parsedEvent.args.token;
 
-      // Verify allowTaxRecipientUpdate is set to true
-      const allowUpdate = await bondingV2.allowTaxRecipientUpdate(tokenAddress);
-      expect(allowUpdate).to.be.true;
+      // Verify isProject60days is set to true
+      const isProject60days = await bondingV2.isProject60days(tokenAddress);
+      expect(isProject60days).to.be.true;
 
       // Verify token info
       const tokenInfo = await bondingV2.tokenInfo(tokenAddress);
@@ -315,8 +315,8 @@ describe("Project60days - AgentTax Integration", function () {
       const newCreator = ethers.Wallet.createRandom().address;
 
       // Verify token allows tax recipient updates
-      const allowUpdate = await bondingV2.allowTaxRecipientUpdate(tokenAddress);
-      expect(allowUpdate).to.be.true;
+      const isProject60days = await bondingV2.isProject60days(tokenAddress);
+      expect(isProject60days).to.be.true;
 
       // Update tax recipient
       const tx = await agentTax
@@ -391,10 +391,10 @@ describe("Project60days - AgentTax Integration", function () {
       const regularTokenAddress = parsedEvent.args.token;
 
       // Verify regular token does NOT allow tax recipient updates
-      const allowUpdate = await bondingV2.allowTaxRecipientUpdate(
+      const isProject60days = await bondingV2.isProject60days(
         regularTokenAddress
       );
-      expect(allowUpdate).to.be.false;
+      expect(isProject60days).to.be.false;
 
       // Launch and graduate to get agentId
       // Need to wait until pair.startTime() has passed
@@ -452,7 +452,7 @@ describe("Project60days - AgentTax Integration", function () {
             newTba,
             newCreator
           )
-      ).to.be.revertedWith("Token does not allow tax recipient updates");
+      ).to.be.revertedWith("Token is not a Project60days token");
     });
 
     it("Should revert if called without EXECUTOR_V2_ROLE", async function () {
@@ -540,7 +540,7 @@ describe("Project60days - AgentTax Integration", function () {
   });
 
   describe("Regression Tests - preLaunch backward compatibility", function () {
-    it("Should create token with allowTaxRecipientUpdate set to false (backward compatible)", async function () {
+    it("Should create token with isProject60days set to false (backward compatible)", async function () {
       const { user1 } = accounts;
 
       const tokenName = "Regular Token";
@@ -592,9 +592,9 @@ describe("Project60days - AgentTax Integration", function () {
       const parsedEvent = bondingV2.interface.parseLog(event);
       const tokenAddress = parsedEvent.args.token;
 
-      // Verify allowTaxRecipientUpdate is set to false (backward compatible)
-      const allowUpdate = await bondingV2.allowTaxRecipientUpdate(tokenAddress);
-      expect(allowUpdate).to.be.false;
+      // Verify isProject60days is set to false (backward compatible)
+      const isProject60days = await bondingV2.isProject60days(tokenAddress);
+      expect(isProject60days).to.be.false;
 
       // Verify token info
       const tokenInfo = await bondingV2.tokenInfo(tokenAddress);
@@ -611,7 +611,7 @@ describe("Project60days - AgentTax Integration", function () {
       // Should NOT have allowTaxRecipientUpdate_ parameter
       expect(
         preLaunchFragment.inputs.find(
-          (input) => input.name === "allowTaxRecipientUpdate_"
+          (input) => input.name === "isProject60days_"
         )
       ).to.be.undefined;
     });
@@ -688,9 +688,9 @@ describe("Project60days - AgentTax Integration", function () {
       const regularToken = parsedEvent1.args.token;
       const project60daysToken = parsedEvent2.args.token;
 
-      expect(await bondingV2.allowTaxRecipientUpdate(regularToken)).to.be.false;
+      expect(await bondingV2.isProject60days(regularToken)).to.be.false;
       expect(
-        await bondingV2.allowTaxRecipientUpdate(project60daysToken)
+        await bondingV2.isProject60days(project60daysToken)
       ).to.be.true;
     });
   });

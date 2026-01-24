@@ -94,8 +94,8 @@ contract BondingV2 is
     // this is for BE to separate with old virtualId from bondingV1, but this field is not used yet
     uint256 public constant VirtualIdBase = 20_000_000_000;
 
-    // Mapping to mark tokens that allow tax recipient updates
-    mapping(address => bool) public allowTaxRecipientUpdate;
+    // Mapping to mark Project60days tokens (affects tax recipient updates and liquidity drain permissions)
+    mapping(address => bool) public isProject60days;
 
     event PreLaunched(
         address indexed token,
@@ -215,7 +215,7 @@ contract BondingV2 is
                 urls,
                 purchaseAmount,
                 startTime,
-                false // allowTaxRecipientUpdate_ defaults to false for backward compatibility
+                false // isProject60days_ defaults to false for backward compatibility
             );
     }
 
@@ -239,7 +239,7 @@ contract BondingV2 is
                 urls,
                 purchaseAmount,
                 startTime,
-                true // allowTaxRecipientUpdate_ defaults to true for Project60days
+                true // isProject60days_ defaults to true for Project60days
             );
     }
 
@@ -252,7 +252,7 @@ contract BondingV2 is
         string[4] memory urls,
         uint256 purchaseAmount,
         uint256 startTime,
-        bool allowTaxRecipientUpdate_
+        bool isProject60days_
     ) internal returns (address, address, uint, uint256) {
         if (purchaseAmount < fee || cores.length <= 0) {
             revert InvalidInput();
@@ -276,15 +276,16 @@ contract BondingV2 is
             .createNewAgentTokenAndApplication(
                 _name, // without "fun " prefix
                 _ticker,
-                abi.encode( // tokenSupplyParams
-                        initialSupply,
-                        0, // lpSupply, will mint to agentTokenAddress
-                        initialSupply, // vaultSupply, will mint to vault
-                        initialSupply,
-                        initialSupply,
-                        0,
-                        address(this) // vault, is the bonding contract itself
-                    ),
+                abi.encode(
+                    // tokenSupplyParams
+                    initialSupply,
+                    0, // lpSupply, will mint to agentTokenAddress
+                    initialSupply, // vaultSupply, will mint to vault
+                    initialSupply,
+                    initialSupply,
+                    0,
+                    address(this) // vault, is the bonding contract itself
+                ),
                 cores,
                 _deployParams.tbaSalt,
                 _deployParams.tbaImplementation,
@@ -344,9 +345,9 @@ contract BondingV2 is
         newToken.applicationId = applicationId;
         newToken.initialPurchase = initialPurchase;
         newToken.virtualId = VirtualIdBase + tokenInfos.length;
-        // Mark token if it allows tax recipient updates
-        if (allowTaxRecipientUpdate_) {
-            allowTaxRecipientUpdate[token] = true;
+        // Mark token as Project60days token (affects tax recipient updates and liquidity drain permissions)
+        if (isProject60days_) {
+            isProject60days[token] = true;
         }
         newToken.launchExecuted = false;
 

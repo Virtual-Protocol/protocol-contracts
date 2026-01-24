@@ -371,10 +371,10 @@ contract AgentTax is Initializable, AccessControlUpgradeable {
         address token = info.token;
         require(token != address(0), "Token not found");
 
-        // Check if this token allows tax recipient updates
+        // Check if this is a Project60days token
         require(
-            bondingV2.allowTaxRecipientUpdate(token),
-            "Token does not allow tax recipient updates"
+            bondingV2.isProject60days(token),
+            "Token is not a Project60days token"
         );
 
         require(tba != address(0), "Invalid TBA");

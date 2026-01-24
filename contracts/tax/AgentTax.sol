@@ -38,7 +38,6 @@ contract AgentTax is Initializable, AccessControlUpgradeable {
     uint256 public minSwapThreshold;
     uint256 public maxSwapThreshold;
     IAgentNft public agentNft;
-    BondingV2 public bondingV2;
 
     event SwapThresholdUpdated(
         uint256 oldMinThreshold,
@@ -86,6 +85,7 @@ contract AgentTax is Initializable, AccessControlUpgradeable {
     );
 
     ITBABonus public tbaBonus;
+    BondingV2 public bondingV2;
 
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() {

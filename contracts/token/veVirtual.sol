@@ -342,6 +342,7 @@ contract veVirtual is
             existingLock.amount += amount;
             existingLock.start = block.timestamp;
             existingLock.end = block.timestamp + uint256(maxWeeks) * 1 weeks;
+            existingLock.numWeeks = maxWeeks;
         }
 
         emit EcoLockUpdated(

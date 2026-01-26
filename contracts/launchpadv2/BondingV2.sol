@@ -96,6 +96,7 @@ contract BondingV2 is
 
     // Mapping to mark Project60days tokens (affects tax recipient updates and liquidity drain permissions)
     mapping(address => bool) public isProject60days;
+    uint256 public project60daysLaunchFee;
 
     event PreLaunched(
         address indexed token,
@@ -187,6 +188,12 @@ contract BondingV2 is
         _feeTo = newFeeTo;
     }
 
+    function setProject60daysLaunchFee(
+        uint256 newProject60daysLaunchFee
+    ) public onlyOwner {
+        project60daysLaunchFee = newProject60daysLaunchFee;
+    }
+
     function setDeployParams(DeployParams memory params) public onlyOwner {
         _deployParams = params;
     }
@@ -254,7 +261,8 @@ contract BondingV2 is
         uint256 startTime,
         bool isProject60days_
     ) internal returns (address, address, uint, uint256) {
-        if (purchaseAmount < fee || cores.length <= 0) {
+        uint256 launchFee = isProject60days_ ? project60daysLaunchFee : fee;
+        if (purchaseAmount < launchFee || cores.length <= 0) {
             revert InvalidInput();
         }
         // startTime must be at least startTimeDelay in the future
@@ -264,8 +272,8 @@ contract BondingV2 is
 
         address assetToken = router.assetToken();
 
-        uint256 initialPurchase = (purchaseAmount - fee);
-        IERC20(assetToken).safeTransferFrom(msg.sender, _feeTo, fee);
+        uint256 initialPurchase = (purchaseAmount - launchFee);
+        IERC20(assetToken).safeTransferFrom(msg.sender, _feeTo, launchFee);
         IERC20(assetToken).safeTransferFrom(
             msg.sender,
             address(this),

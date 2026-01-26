@@ -695,6 +695,244 @@ describe("Project60days - AgentTax Integration", function () {
     });
   });
 
+  describe("Project60days Launch Fee", function () {
+    it("Should use project60daysLaunchFee for Project60days tokens", async function () {
+      const { owner, user1 } = accounts;
+      
+      // Set a different fee for Project60days
+      const project60daysFee = ethers.parseEther("2000"); // 2000 tokens
+      await bondingV2.connect(owner).setProject60daysLaunchFee(project60daysFee);
+      
+      // Verify fee is set
+      const setFee = await bondingV2.project60daysLaunchFee();
+      expect(setFee).to.equal(project60daysFee);
+      
+      // Get regular fee for comparison
+      const regularFee = await bondingV2.fee();
+      expect(regularFee).to.not.equal(project60daysFee);
+      
+      const tokenName = "Project60days Fee Test";
+      const tokenTicker = "P60F";
+      const cores = [0, 1, 2];
+      const description = "Test fee";
+      const image = "https://example.com/image.png";
+      const urls = ["", "", "", ""];
+      const purchaseAmount = ethers.parseEther("5000"); // Enough to cover both fees
+      
+      // Get launchParams.startTimeDelay from contract
+      const launchParams = await bondingV2.launchParams();
+      const startTimeDelay = BigInt(launchParams.startTimeDelay.toString());
+      const currentTime = BigInt((await time.latest()).toString());
+      const startTime = currentTime + startTimeDelay + 100n;
+      
+      // Check feeTo balance before
+      const feeTo = await bondingV2.owner();
+      const feeToBalanceBefore = await virtualToken.balanceOf(feeTo);
+      
+      // Approve tokens
+      await virtualToken
+        .connect(user1)
+        .approve(await bondingV2.getAddress(), purchaseAmount);
+      
+      // Launch Project60days token
+      const tx = await bondingV2
+        .connect(user1)
+        .preLaunchProject60days(
+          tokenName,
+          tokenTicker,
+          cores,
+          description,
+          image,
+          urls,
+          purchaseAmount,
+          startTime
+        );
+      
+      await tx.wait();
+      
+      // Verify feeTo received project60daysLaunchFee, not regular fee
+      const feeToBalanceAfter = await virtualToken.balanceOf(feeTo);
+      const feeReceived = feeToBalanceAfter - feeToBalanceBefore;
+      expect(feeReceived).to.equal(project60daysFee);
+      expect(feeReceived).to.not.equal(regularFee);
+    });
+    
+    it("Should use regular fee for non-Project60days tokens", async function () {
+      const { owner, user1 } = accounts;
+      
+      // Set project60daysLaunchFee
+      const project60daysFee = ethers.parseEther("2000");
+      await bondingV2.connect(owner).setProject60daysLaunchFee(project60daysFee);
+      
+      // Get regular fee
+      const regularFee = await bondingV2.fee();
+      
+      const tokenName = "Regular Token Fee Test";
+      const tokenTicker = "REG";
+      const cores = [0, 1, 2];
+      const description = "Test fee";
+      const image = "https://example.com/image.png";
+      const urls = ["", "", "", ""];
+      const purchaseAmount = ethers.parseEther("5000");
+      
+      // Get launchParams.startTimeDelay from contract
+      const launchParams = await bondingV2.launchParams();
+      const startTimeDelay = BigInt(launchParams.startTimeDelay.toString());
+      const currentTime = BigInt((await time.latest()).toString());
+      const startTime = currentTime + startTimeDelay + 100n;
+      
+      // Check feeTo balance before
+      const feeTo = await bondingV2.owner();
+      const feeToBalanceBefore = await virtualToken.balanceOf(feeTo);
+      
+      // Approve tokens
+      await virtualToken
+        .connect(user1)
+        .approve(await bondingV2.getAddress(), purchaseAmount);
+      
+      // Launch regular token
+      const tx = await bondingV2
+        .connect(user1)
+        .preLaunch(
+          tokenName,
+          tokenTicker,
+          cores,
+          description,
+          image,
+          urls,
+          purchaseAmount,
+          startTime
+        );
+      
+      await tx.wait();
+      
+      // Verify feeTo received regular fee, not project60daysLaunchFee
+      const feeToBalanceAfter = await virtualToken.balanceOf(feeTo);
+      const feeReceived = feeToBalanceAfter - feeToBalanceBefore;
+      expect(feeReceived).to.equal(regularFee);
+      expect(feeReceived).to.not.equal(project60daysFee);
+    });
+    
+    it("Should revert if purchaseAmount is less than project60daysLaunchFee", async function () {
+      const { owner, user1 } = accounts;
+      
+      // Set a high fee for Project60days
+      const project60daysFee = ethers.parseEther("5000");
+      await bondingV2.connect(owner).setProject60daysLaunchFee(project60daysFee);
+      
+      const tokenName = "Project60days Insufficient Fee";
+      const tokenTicker = "P60IF";
+      const cores = [0, 1, 2];
+      const description = "Test";
+      const image = "https://example.com/image.png";
+      const urls = ["", "", "", ""];
+      const purchaseAmount = ethers.parseEther("1000"); // Less than fee
+      
+      // Get launchParams.startTimeDelay from contract
+      const launchParams = await bondingV2.launchParams();
+      const startTimeDelay = BigInt(launchParams.startTimeDelay.toString());
+      const currentTime = BigInt((await time.latest()).toString());
+      const startTime = currentTime + startTimeDelay + 100n;
+      
+      // Approve tokens
+      await virtualToken
+        .connect(user1)
+        .approve(await bondingV2.getAddress(), purchaseAmount);
+      
+      // Should revert with InvalidInput
+      await expect(
+        bondingV2
+          .connect(user1)
+          .preLaunchProject60days(
+            tokenName,
+            tokenTicker,
+            cores,
+            description,
+            image,
+            urls,
+            purchaseAmount,
+            startTime
+          )
+      ).to.be.revertedWithCustomError(bondingV2, "InvalidInput");
+    });
+    
+    it("Should allow owner to set project60daysLaunchFee", async function () {
+      const { owner } = accounts;
+      
+      const newFee = ethers.parseEther("3000");
+      await bondingV2.connect(owner).setProject60daysLaunchFee(newFee);
+      
+      const setFee = await bondingV2.project60daysLaunchFee();
+      expect(setFee).to.equal(newFee);
+    });
+    
+    it("Should revert if non-owner tries to set project60daysLaunchFee", async function () {
+      const { user1 } = accounts;
+      
+      const newFee = ethers.parseEther("3000");
+      await expect(
+        bondingV2.connect(user1).setProject60daysLaunchFee(newFee)
+      ).to.be.revertedWithCustomError(
+        bondingV2,
+        "OwnableUnauthorizedAccount"
+      );
+    });
+    
+    it("Should handle zero project60daysLaunchFee (allows free launch)", async function () {
+      const { owner, user1 } = accounts;
+      
+      // Set fee to 0
+      await bondingV2.connect(owner).setProject60daysLaunchFee(0);
+      
+      const tokenName = "Free Project60days";
+      const tokenTicker = "FREE";
+      const cores = [0, 1, 2];
+      const description = "Test";
+      const image = "https://example.com/image.png";
+      const urls = ["", "", "", ""];
+      const purchaseAmount = ethers.parseEther("100"); // Small amount, but >= 0
+      
+      // Get launchParams.startTimeDelay from contract
+      const launchParams = await bondingV2.launchParams();
+      const startTimeDelay = BigInt(launchParams.startTimeDelay.toString());
+      const currentTime = BigInt((await time.latest()).toString());
+      const startTime = currentTime + startTimeDelay + 100n;
+      
+      // Approve tokens
+      await virtualToken
+        .connect(user1)
+        .approve(await bondingV2.getAddress(), purchaseAmount);
+      
+      // Should succeed with zero fee
+      const tx = await bondingV2
+        .connect(user1)
+        .preLaunchProject60days(
+          tokenName,
+          tokenTicker,
+          cores,
+          description,
+          image,
+          urls,
+          purchaseAmount,
+          startTime
+        );
+      
+      await tx.wait();
+      
+      // Verify token was created
+      const receipt = await tx.wait();
+      const event = receipt.logs.find((log) => {
+        try {
+          const parsed = bondingV2.interface.parseLog(log);
+          return parsed && parsed.name === "PreLaunched";
+        } catch (e) {
+          return false;
+        }
+      });
+      expect(event).to.not.be.undefined;
+    });
+  });
+
   describe("setBondingV2", function () {
     it("Should allow admin to set BondingV2 address", async function () {
       const { owner } = accounts;

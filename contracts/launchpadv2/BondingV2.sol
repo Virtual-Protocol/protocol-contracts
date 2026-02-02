@@ -94,6 +94,10 @@ contract BondingV2 is
     // this is for BE to separate with old virtualId from bondingV1, but this field is not used yet
     uint256 public constant VirtualIdBase = 20_000_000_000;
 
+    // Mapping to mark Project60days tokens (affects tax recipient updates and liquidity drain permissions)
+    mapping(address => bool) public isProject60days;
+    uint256 public project60daysLaunchFee;
+
     event PreLaunched(
         address indexed token,
         address indexed pair,
@@ -184,6 +188,12 @@ contract BondingV2 is
         _feeTo = newFeeTo;
     }
 
+    function setProject60daysLaunchFee(
+        uint256 newProject60daysLaunchFee
+    ) public onlyOwner {
+        project60daysLaunchFee = newProject60daysLaunchFee;
+    }
+
     function setDeployParams(DeployParams memory params) public onlyOwner {
         _deployParams = params;
     }
@@ -202,7 +212,57 @@ contract BondingV2 is
         uint256 purchaseAmount,
         uint256 startTime
     ) public nonReentrant returns (address, address, uint, uint256) {
-        if (purchaseAmount < fee || cores.length <= 0) {
+        return
+            _preLaunch(
+                _name,
+                _ticker,
+                cores,
+                desc,
+                img,
+                urls,
+                purchaseAmount,
+                startTime,
+                false // isProject60days_ defaults to false for backward compatibility
+            );
+    }
+
+    function preLaunchProject60days(
+        string memory _name,
+        string memory _ticker,
+        uint8[] memory cores,
+        string memory desc,
+        string memory img,
+        string[4] memory urls,
+        uint256 purchaseAmount,
+        uint256 startTime
+    ) public nonReentrant returns (address, address, uint, uint256) {
+        return
+            _preLaunch(
+                _name,
+                _ticker,
+                cores,
+                desc,
+                img,
+                urls,
+                purchaseAmount,
+                startTime,
+                true // isProject60days_ defaults to true for Project60days
+            );
+    }
+
+    function _preLaunch(
+        string memory _name,
+        string memory _ticker,
+        uint8[] memory cores,
+        string memory desc,
+        string memory img,
+        string[4] memory urls,
+        uint256 purchaseAmount,
+        uint256 startTime,
+        bool isProject60days_
+    ) internal returns (address, address, uint, uint256) {
+        uint256 launchFee = isProject60days_ ? project60daysLaunchFee : fee;
+        if (purchaseAmount < launchFee || cores.length <= 0) {
             revert InvalidInput();
         }
         // startTime must be at least startTimeDelay in the future
@@ -212,8 +272,8 @@ contract BondingV2 is
 
         address assetToken = router.assetToken();
 
-        uint256 initialPurchase = (purchaseAmount - fee);
-        IERC20(assetToken).safeTransferFrom(msg.sender, _feeTo, fee);
+        uint256 initialPurchase = (purchaseAmount - launchFee);
+        IERC20(assetToken).safeTransferFrom(msg.sender, _feeTo, launchFee);
         IERC20(assetToken).safeTransferFrom(
             msg.sender,
             address(this),
@@ -224,15 +284,16 @@ contract BondingV2 is
             .createNewAgentTokenAndApplication(
                 _name, // without "fun " prefix
                 _ticker,
-                abi.encode( // tokenSupplyParams
-                        initialSupply,
-                        0, // lpSupply, will mint to agentTokenAddress
-                        initialSupply, // vaultSupply, will mint to vault
-                        initialSupply,
-                        initialSupply,
-                        0,
-                        address(this) // vault, is the bonding contract itself
-                    ),
+                abi.encode(
+                    // tokenSupplyParams
+                    initialSupply,
+                    0, // lpSupply, will mint to agentTokenAddress
+                    initialSupply, // vaultSupply, will mint to vault
+                    initialSupply,
+                    initialSupply,
+                    0,
+                    address(this) // vault, is the bonding contract itself
+                ),
                 cores,
                 _deployParams.tbaSalt,
                 _deployParams.tbaImplementation,
@@ -292,6 +353,10 @@ contract BondingV2 is
         newToken.applicationId = applicationId;
         newToken.initialPurchase = initialPurchase;
         newToken.virtualId = VirtualIdBase + tokenInfos.length;
+        // Mark token as Project60days token (affects tax recipient updates and liquidity drain permissions)
+        if (isProject60days_) {
+            isProject60days[token] = true;
+        }
         newToken.launchExecuted = false;
 
         // Set Data struct fields

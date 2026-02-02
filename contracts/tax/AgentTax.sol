@@ -9,6 +9,7 @@ import "@openzeppelin/contracts/utils/math/Math.sol";
 import "../pool/IRouter.sol";
 import "../virtualPersona/IAgentNft.sol";
 import "./ITBABonus.sol";
+import "../launchpadv2/BondingV2.sol";
 
 contract AgentTax is Initializable, AccessControlUpgradeable {
     using SafeERC20 for IERC20;
@@ -84,6 +85,7 @@ contract AgentTax is Initializable, AccessControlUpgradeable {
     );
 
     ITBABonus public tbaBonus;
+    BondingV2 public bondingV2;
 
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() {
@@ -337,9 +339,60 @@ contract AgentTax is Initializable, AccessControlUpgradeable {
         require(creator != address(0), "Invalid creator");
 
         TaxRecipient storage recipient = _agentRecipients[agentId];
+
+        if (recipient.tba == address(0)) {
+            IAgentNft.VirtualInfo memory info = agentNft.virtualInfo(agentId);
+            recipient.tba = info.tba;
+            recipient.creator = info.founder;
+        }
+        
+        address oldCreator = recipient.creator;
         recipient.tba = tba;
         recipient.creator = creator;
-        emit CreatorUpdated(agentId, tba, creator);
+        emit CreatorUpdated(agentId, oldCreator, creator);
+    }
+
+    /**
+     * @notice Set BondingV2 contract address
+     * @param bondingV2_ The address of the BondingV2 contract
+     */
+    function setBondingV2(address bondingV2_) public onlyRole(ADMIN_ROLE) {
+        require(bondingV2_ != address(0), "Invalid BondingV2 address");
+        bondingV2 = BondingV2(bondingV2_);
+    }
+
+    /**
+     * @notice Update tax recipient for new feature agents launched via BondingV2
+     * @param agentId The agentId (virtualId) of the agent
+     * @param tba The Token Bound Address for the agent
+     * @param creator The creator address that will receive tax rewards
+     */
+    function updateCreatorForProject60daysAgents(
+        uint256 agentId,
+        address tba,
+        address creator
+    ) public onlyRole(EXECUTOR_V2_ROLE) {
+        require(address(bondingV2) != address(0), "BondingV2 not set");
+
+        // Get token address from agentId
+        IAgentNft.VirtualInfo memory info = agentNft.virtualInfo(agentId);
+        address token = info.token;
+        require(token != address(0), "Token not found");
+
+        // Check if this is a Project60days token
+        require(
+            bondingV2.isProject60days(token),
+            "Token is not a Project60days token"
+        );
+
+        require(tba != address(0), "Invalid TBA");
+        require(creator != address(0), "Invalid creator");
+
+        TaxRecipient storage recipient = _agentRecipients[agentId];
+        address oldCreator = recipient.creator;
+        recipient.tba = tba;
+        recipient.creator = creator;
+        emit CreatorUpdated(agentId, oldCreator, creator);
     }
 
     function dcaSell(
@@ -365,7 +418,7 @@ contract AgentTax is Initializable, AccessControlUpgradeable {
             if (amountToSwap > maxOverride) {
                 amountToSwap = maxOverride;
             }
-            
+
             uint256 minOutput = (amountToSwap * minConversionRate) / rateDenom;
             _swapForAsset(agentId, minOutput, maxOverride);
         }

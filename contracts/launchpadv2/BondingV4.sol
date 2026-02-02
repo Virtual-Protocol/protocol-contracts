@@ -94,6 +94,10 @@ contract BondingV4 is
     // this is for BE to separate with old virtualId from bondingV1, but this field is not used yet
     uint256 public constant VirtualIdBase = 40_000_000_000;
 
+    // Mapping to mark ProjectXLaunch tokens (affects tax recipient updates and liquidity drain permissions)
+    mapping(address => bool) public isProjectXLaunch;
+    uint256 public projectXLaunchFee;
+
     event PreLaunched(
         address indexed token,
         address indexed pair,
@@ -192,6 +196,12 @@ contract BondingV4 is
         launchParams = params;
     }
 
+    function setProjectXLaunchFee(
+        uint256 newProjectXLaunchFee
+    ) public onlyOwner {
+        projectXLaunchFee = newProjectXLaunchFee;
+    }
+
     function preLaunch(
         string memory _name,
         string memory _ticker,
@@ -202,7 +212,57 @@ contract BondingV4 is
         uint256 purchaseAmount,
         uint256 startTime
     ) public nonReentrant returns (address, address, uint, uint256) {
-        if (purchaseAmount < fee || cores.length <= 0) {
+        return
+            _preLaunch(
+                _name,
+                _ticker,
+                cores,
+                desc,
+                img,
+                urls,
+                purchaseAmount,
+                startTime,
+                false // isProjectXLaunch_ defaults to false for backward compatibility
+            );
+    }
+
+    function preLaunchProjectXLaunch(
+        string memory _name,
+        string memory _ticker,
+        uint8[] memory cores,
+        string memory desc,
+        string memory img,
+        string[4] memory urls,
+        uint256 purchaseAmount,
+        uint256 startTime
+    ) public nonReentrant returns (address, address, uint, uint256) {
+        return
+            _preLaunch(
+                _name,
+                _ticker,
+                cores,
+                desc,
+                img,
+                urls,
+                purchaseAmount,
+                startTime,
+                true // isProjectXLaunch_ defaults to true for ProjectXLaunch
+            );
+    }
+
+    function _preLaunch(
+        string memory _name,
+        string memory _ticker,
+        uint8[] memory cores,
+        string memory desc,
+        string memory img,
+        string[4] memory urls,
+        uint256 purchaseAmount,
+        uint256 startTime,
+        bool isProjectXLaunch_
+    ) internal returns (address, address, uint, uint256) {
+        uint256 launchFee = isProjectXLaunch_ ? projectXLaunchFee : fee;
+        if (purchaseAmount < launchFee || cores.length <= 0) {
             revert InvalidInput();
         }
         // startTime must be at least startTimeDelay in the future
@@ -212,8 +272,8 @@ contract BondingV4 is
 
         address assetToken = router.assetToken();
 
-        uint256 initialPurchase = (purchaseAmount - fee);
-        IERC20(assetToken).safeTransferFrom(msg.sender, _feeTo, fee);
+        uint256 initialPurchase = (purchaseAmount - launchFee);
+        IERC20(assetToken).safeTransferFrom(msg.sender, _feeTo, launchFee);
         IERC20(assetToken).safeTransferFrom(
             msg.sender,
             address(this),
@@ -224,15 +284,16 @@ contract BondingV4 is
             .createNewAgentTokenAndApplication(
                 _name, // without "fun " prefix
                 _ticker,
-                abi.encode( // tokenSupplyParams
-                        initialSupply,
-                        0, // lpSupply, will mint to agentTokenAddress
-                        initialSupply, // vaultSupply, will mint to vault
-                        initialSupply,
-                        initialSupply,
-                        0,
-                        address(this) // vault, is the bonding contract itself
-                    ),
+                abi.encode(
+                    // tokenSupplyParams
+                    initialSupply,
+                    0, // lpSupply, will mint to agentTokenAddress
+                    initialSupply, // vaultSupply, will mint to vault
+                    initialSupply,
+                    initialSupply,
+                    0,
+                    address(this) // vault, is the bonding contract itself
+                ),
                 cores,
                 _deployParams.tbaSalt,
                 _deployParams.tbaImplementation,
@@ -292,6 +353,10 @@ contract BondingV4 is
         newToken.applicationId = applicationId;
         newToken.initialPurchase = initialPurchase;
         newToken.virtualId = VirtualIdBase + tokenInfos.length;
+        // Mark token as ProjectXLaunch token (affects tax recipient updates and liquidity drain permissions)
+        if (isProjectXLaunch_) {
+            isProjectXLaunch[token] = true;
+        }
         newToken.launchExecuted = false;
 
         // Set Data struct fields

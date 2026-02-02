@@ -10,6 +10,7 @@ import "../pool/IRouter.sol";
 import "../virtualPersona/IAgentNft.sol";
 import "./ITBABonus.sol";
 import "../launchpadv2/BondingV2.sol";
+import "../launchpadv2/BondingV4.sol";
 
 contract AgentTax is Initializable, AccessControlUpgradeable {
     using SafeERC20 for IERC20;
@@ -86,6 +87,7 @@ contract AgentTax is Initializable, AccessControlUpgradeable {
 
     ITBABonus public tbaBonus;
     BondingV2 public bondingV2;
+    BondingV4 public bondingV4;
 
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() {
@@ -345,7 +347,7 @@ contract AgentTax is Initializable, AccessControlUpgradeable {
             recipient.tba = info.tba;
             recipient.creator = info.founder;
         }
-        
+
         address oldCreator = recipient.creator;
         recipient.tba = tba;
         recipient.creator = creator;
@@ -383,6 +385,49 @@ contract AgentTax is Initializable, AccessControlUpgradeable {
         require(
             bondingV2.isProject60days(token),
             "Token is not a Project60days token"
+        );
+
+        require(tba != address(0), "Invalid TBA");
+        require(creator != address(0), "Invalid creator");
+
+        TaxRecipient storage recipient = _agentRecipients[agentId];
+        address oldCreator = recipient.creator;
+        recipient.tba = tba;
+        recipient.creator = creator;
+        emit CreatorUpdated(agentId, oldCreator, creator);
+    }
+
+    /**
+     * @notice Set BondingV4 contract address
+     * @param bondingV4_ The address of the BondingV4 contract
+     */
+    function setBondingV4(address bondingV4_) public onlyRole(ADMIN_ROLE) {
+        require(bondingV4_ != address(0), "Invalid BondingV4 address");
+        bondingV4 = BondingV4(bondingV4_);
+    }
+
+    /**
+     * @notice Update tax recipient for new feature agents launched via BondingV4
+     * @param agentId The agentId (virtualId) of the agent
+     * @param tba The Token Bound Address for the agent
+     * @param creator The creator address that will receive tax rewards
+     */
+    function updateCreatorForProjectXLaunchAgents(
+        uint256 agentId,
+        address tba,
+        address creator
+    ) public onlyRole(EXECUTOR_V2_ROLE) {
+        require(address(bondingV4) != address(0), "BondingV4 not set");
+
+        // Get token address from agentId
+        IAgentNft.VirtualInfo memory info = agentNft.virtualInfo(agentId);
+        address token = info.token;
+        require(token != address(0), "Token not found");
+
+        // Check if this is a ProjectXLaunch token
+        require(
+            bondingV4.isProjectXLaunch(token),
+            "Token is not a ProjectXLaunch token"
         );
 
         require(tba != address(0), "Invalid TBA");

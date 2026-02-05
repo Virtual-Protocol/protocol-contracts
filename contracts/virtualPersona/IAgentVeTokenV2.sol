@@ -32,7 +32,16 @@ interface IAgentVeTokenV2 is IAgentVeToken {
         uint256 timepoint
     ) external view returns (uint256);
 
-    function removeLpLiquidity(address uniswapRouter, uint256 veTokenAmount, address recipient, uint256 amountAMin, uint256 amountBMin, uint256 deadline) external;
+    function removeLpLiquidity(
+        address uniswapRouter,
+        uint256 veTokenAmount,
+        address recipient,
+        uint256 amountAMin,
+        uint256 amountBMin,
+        uint256 deadline
+    ) external;
 
     function assetToken() external view returns (address);
+
+    function founder() external view returns (address);
 }

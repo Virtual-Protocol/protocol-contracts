@@ -1031,4 +1031,291 @@ describe("ProjectXLaunch - AgentTax Integration", function () {
       ).to.be.revertedWith("Invalid BondingV4 address");
     });
   });
+
+  describe("X_LAUNCH Anti-Sniper Tax", function () {
+    let fRouterV2;
+    let fFactoryV2;
+
+    before(async function () {
+      fRouterV2 = contracts.fRouterV2;
+      fFactoryV2 = contracts.fFactoryV2;
+
+      // Set BondingV4 in FRouterV2 for X_LAUNCH tax calculation
+      await fRouterV2.setBondingV4(await bondingV4.getAddress());
+      console.log("BondingV4 set in FRouterV2");
+    });
+
+    it("Should have setBondingV4 function in FRouterV2", async function () {
+      const bondingV4Address = await fRouterV2.bondingV4();
+      expect(bondingV4Address).to.equal(await bondingV4.getAddress());
+    });
+
+    it("Should reduce anti-sniper tax by 1% per SECOND for X_LAUNCH token", async function () {
+      const { user1, user2 } = accounts;
+
+      // Create ProjectXLaunch token
+      const tokenName = "X_LAUNCH Tax Test";
+      const tokenTicker = "XLTT";
+      const cores = [0, 1, 2];
+      const description = "Test anti-sniper tax";
+      const image = "https://example.com/image.png";
+      const urls = ["", "", "", ""];
+      const purchaseAmount = ethers.parseEther("1000");
+
+      const launchParams = await bondingV4.launchParams();
+      const startTimeDelay = BigInt(launchParams.startTimeDelay.toString());
+      const currentTime = BigInt((await time.latest()).toString());
+      const startTime = currentTime + startTimeDelay + 100n;
+
+      await virtualToken
+        .connect(user1)
+        .approve(await bondingV4.getAddress(), purchaseAmount);
+
+      const tx = await bondingV4
+        .connect(user1)
+        .preLaunchProjectXLaunch(
+          tokenName,
+          tokenTicker,
+          cores,
+          description,
+          image,
+          urls,
+          purchaseAmount,
+          startTime
+        );
+
+      const receipt = await tx.wait();
+      const event = receipt.logs.find((log) => {
+        try {
+          const parsed = bondingV4.interface.parseLog(log);
+          return parsed && parsed.name === "PreLaunched";
+        } catch (e) {
+          return false;
+        }
+      });
+
+      const parsedEvent = bondingV4.interface.parseLog(event);
+      const tokenAddress = parsedEvent.args.token;
+      const pairAddress = parsedEvent.args.pair;
+
+      // Verify it's X_LAUNCH
+      expect(await bondingV4.isProjectXLaunch(tokenAddress)).to.be.true;
+
+      // Wait for start time and launch
+      const pair = await ethers.getContractAt("FPairV2", pairAddress);
+      const pairStartTime = await pair.startTime();
+      const currentTimeForLaunch = await time.latest();
+      if (currentTimeForLaunch < pairStartTime) {
+        const waitTime = BigInt(pairStartTime.toString()) - BigInt(currentTimeForLaunch.toString()) + 1n;
+        await time.increase(waitTime);
+      }
+      await bondingV4.connect(user1).launch(tokenAddress);
+
+      // Now check anti-sniper tax at different time intervals
+      // At t=0 (just launched), tax should be ~99%
+      const hasAntiSniperTaxAtStart = await fRouterV2.hasAntiSniperTax(pairAddress);
+      expect(hasAntiSniperTaxAtStart).to.be.true;
+
+      // Wait 50 seconds - tax should be around 49% (99 - 50)
+      await time.increase(50);
+      const hasAntiSniperTaxAt50s = await fRouterV2.hasAntiSniperTax(pairAddress);
+      expect(hasAntiSniperTaxAt50s).to.be.true;
+
+      // Wait another 50 seconds (total 100s) - tax should be 0% (99 - 100 = negative, clamped to 0)
+      await time.increase(50);
+      const hasAntiSniperTaxAt100s = await fRouterV2.hasAntiSniperTax(pairAddress);
+      expect(hasAntiSniperTaxAt100s).to.be.false; // Tax should be 0 after 99 seconds
+
+      console.log("X_LAUNCH token anti-sniper tax reduced to 0% in ~100 seconds");
+    });
+
+    it("Should reduce anti-sniper tax by 1% per MINUTE for regular token", async function () {
+      const { user1 } = accounts;
+
+      // Create regular token (NOT X_LAUNCH)
+      const tokenName = "Regular Tax Test";
+      const tokenTicker = "RTT";
+      const cores = [0, 1, 2];
+      const description = "Test anti-sniper tax";
+      const image = "https://example.com/image.png";
+      const urls = ["", "", "", ""];
+      const purchaseAmount = ethers.parseEther("1000");
+
+      const launchParams = await bondingV4.launchParams();
+      const startTimeDelay = BigInt(launchParams.startTimeDelay.toString());
+      const currentTime = BigInt((await time.latest()).toString());
+      const startTime = currentTime + startTimeDelay + 100n;
+
+      await virtualToken
+        .connect(user1)
+        .approve(await bondingV4.getAddress(), purchaseAmount);
+
+      const tx = await bondingV4
+        .connect(user1)
+        .preLaunch(
+          tokenName,
+          tokenTicker,
+          cores,
+          description,
+          image,
+          urls,
+          purchaseAmount,
+          startTime
+        );
+
+      const receipt = await tx.wait();
+      const event = receipt.logs.find((log) => {
+        try {
+          const parsed = bondingV4.interface.parseLog(log);
+          return parsed && parsed.name === "PreLaunched";
+        } catch (e) {
+          return false;
+        }
+      });
+
+      const parsedEvent = bondingV4.interface.parseLog(event);
+      const tokenAddress = parsedEvent.args.token;
+      const pairAddress = parsedEvent.args.pair;
+
+      // Verify it's NOT X_LAUNCH
+      expect(await bondingV4.isProjectXLaunch(tokenAddress)).to.be.false;
+
+      // Wait for start time and launch
+      const pair = await ethers.getContractAt("FPairV2", pairAddress);
+      const pairStartTime = await pair.startTime();
+      const currentTimeForLaunch = await time.latest();
+      if (currentTimeForLaunch < pairStartTime) {
+        const waitTime = BigInt(pairStartTime.toString()) - BigInt(currentTimeForLaunch.toString()) + 1n;
+        await time.increase(waitTime);
+      }
+      await bondingV4.connect(user1).launch(tokenAddress);
+
+      // At t=0 (just launched), tax should be ~99%
+      const hasAntiSniperTaxAtStart = await fRouterV2.hasAntiSniperTax(pairAddress);
+      expect(hasAntiSniperTaxAtStart).to.be.true;
+
+      // Wait 100 seconds - for regular token, this is only ~1 minute, tax should still be ~98%
+      await time.increase(100);
+      const hasAntiSniperTaxAt100s = await fRouterV2.hasAntiSniperTax(pairAddress);
+      expect(hasAntiSniperTaxAt100s).to.be.true; // Still has tax after 100 seconds
+
+      // Wait 99 minutes total (99 * 60 = 5940 seconds) - tax should be 0%
+      await time.increase(99 * 60 - 100); // Subtract the 100 seconds already waited
+      const hasAntiSniperTaxAt99min = await fRouterV2.hasAntiSniperTax(pairAddress);
+      expect(hasAntiSniperTaxAt99min).to.be.false; // Tax should be 0 after 99 minutes
+
+      console.log("Regular token anti-sniper tax reduced to 0% in ~99 minutes");
+    });
+
+    it("Should have different tax durations between X_LAUNCH and regular tokens", async function () {
+      const { user1 } = accounts;
+
+      // Create both tokens at similar times
+      const purchaseAmount = ethers.parseEther("1000");
+      const launchParams = await bondingV4.launchParams();
+      const startTimeDelay = BigInt(launchParams.startTimeDelay.toString());
+      const currentTime = BigInt((await time.latest()).toString());
+      const startTime = currentTime + startTimeDelay + 100n;
+
+      await virtualToken
+        .connect(user1)
+        .approve(await bondingV4.getAddress(), purchaseAmount * 2n);
+
+      // Create X_LAUNCH token
+      const tx1 = await bondingV4
+        .connect(user1)
+        .preLaunchProjectXLaunch(
+          "X_LAUNCH Compare",
+          "XLC",
+          [0, 1],
+          "Test",
+          "https://example.com/image.png",
+          ["", "", "", ""],
+          purchaseAmount,
+          startTime
+        );
+      const receipt1 = await tx1.wait();
+      const event1 = receipt1.logs.find((log) => {
+        try {
+          return bondingV4.interface.parseLog(log)?.name === "PreLaunched";
+        } catch (e) {
+          return false;
+        }
+      });
+      const xLaunchPairAddress = bondingV4.interface.parseLog(event1).args.pair;
+      const xLaunchTokenAddress = bondingV4.interface.parseLog(event1).args.token;
+
+      // Create regular token
+      const tx2 = await bondingV4
+        .connect(user1)
+        .preLaunch(
+          "Regular Compare",
+          "RC",
+          [0, 1],
+          "Test",
+          "https://example.com/image.png",
+          ["", "", "", ""],
+          purchaseAmount,
+          startTime + 1n
+        );
+      const receipt2 = await tx2.wait();
+      const event2 = receipt2.logs.find((log) => {
+        try {
+          return bondingV4.interface.parseLog(log)?.name === "PreLaunched";
+        } catch (e) {
+          return false;
+        }
+      });
+      const regularPairAddress = bondingV4.interface.parseLog(event2).args.pair;
+      const regularTokenAddress = bondingV4.interface.parseLog(event2).args.token;
+
+      // Wait for start time and launch both
+      const xLaunchPair = await ethers.getContractAt("FPairV2", xLaunchPairAddress);
+      const regularPair = await ethers.getContractAt("FPairV2", regularPairAddress);
+      
+      const maxStartTime = Math.max(
+        Number(await xLaunchPair.startTime()),
+        Number(await regularPair.startTime())
+      );
+      const currentTimeForLaunch = await time.latest();
+      if (currentTimeForLaunch < maxStartTime) {
+        await time.increase(maxStartTime - currentTimeForLaunch + 1);
+      }
+
+      await bondingV4.connect(user1).launch(xLaunchTokenAddress);
+      await bondingV4.connect(user1).launch(regularTokenAddress);
+
+      // Both should have anti-sniper tax at start
+      expect(await fRouterV2.hasAntiSniperTax(xLaunchPairAddress)).to.be.true;
+      expect(await fRouterV2.hasAntiSniperTax(regularPairAddress)).to.be.true;
+
+      // After 100 seconds: X_LAUNCH should have no tax, regular should still have tax
+      await time.increase(100);
+      
+      const xLaunchHasTaxAfter100s = await fRouterV2.hasAntiSniperTax(xLaunchPairAddress);
+      const regularHasTaxAfter100s = await fRouterV2.hasAntiSniperTax(regularPairAddress);
+      
+      expect(xLaunchHasTaxAfter100s).to.be.false; // X_LAUNCH: 99s to 0%
+      expect(regularHasTaxAfter100s).to.be.true;  // Regular: still has ~97% tax
+      
+      console.log("After 100 seconds:");
+      console.log("  X_LAUNCH has anti-sniper tax:", xLaunchHasTaxAfter100s);
+      console.log("  Regular has anti-sniper tax:", regularHasTaxAfter100s);
+    });
+
+    it("Should revert setBondingV4 with zero address in FRouterV2", async function () {
+      await expect(
+        fRouterV2.setBondingV4(ethers.ZeroAddress)
+      ).to.be.revertedWith("Zero address not allowed");
+    });
+
+    it("Should revert setBondingV4 without ADMIN_ROLE", async function () {
+      const { user1 } = accounts;
+      const randomAddress = ethers.Wallet.createRandom().address;
+
+      await expect(
+        fRouterV2.connect(user1).setBondingV4(randomAddress)
+      ).to.be.revertedWithCustomError(fRouterV2, "AccessControlUnauthorizedAccount");
+    });
+  });
 });

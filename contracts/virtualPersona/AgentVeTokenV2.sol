@@ -61,6 +61,7 @@ contract AgentVeTokenV2 is
      * @dev {onlyOwnerOrFactory}
      *
      * Throws if called by any account other than the owner, factory or pool.
+     * owner has not been set yet, _factory = agentFactoryV6
      */
     modifier onlyOwnerOrFactory() {
         if (owner() != _msgSender() && address(_factory) != _msgSender()) {

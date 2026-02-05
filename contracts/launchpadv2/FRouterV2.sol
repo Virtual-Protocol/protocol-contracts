@@ -36,6 +36,20 @@ contract FRouterV2 is
     address public antiSniperTaxManager; // deprecated
     IBondingV2ForRouter public bondingV2;
 
+    event PrivatePoolDrained(
+        address indexed token,
+        address indexed recipient,
+        uint256 assetAmount,
+        uint256 tokenAmount
+    );
+
+    event UniV2PoolDrained(
+        address indexed token,
+        address indexed veToken,
+        address indexed recipient,
+        uint256 veTokenAmount
+    );
+
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() {
         _disableInitializers();
@@ -317,20 +331,6 @@ contract FRouterV2 is
     }
 
     // ==================== Liquidity Drain Functions ====================
-
-    event PrivatePoolDrained(
-        address indexed token,
-        address indexed recipient,
-        uint256 assetAmount,
-        uint256 tokenAmount
-    );
-
-    event UniV2PoolDrained(
-        address indexed token,
-        address indexed veToken,
-        address indexed recipient,
-        uint256 veTokenAmount
-    );
 
     /**
      * @dev Drain all assets and tokens from a private pool (FPairV2)

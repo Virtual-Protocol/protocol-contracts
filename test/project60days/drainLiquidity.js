@@ -147,6 +147,71 @@ describe("Project60days - Drain Liquidity", function () {
       expect(recipientAssetBalance).to.equal(initialAssetBalance);
     });
 
+    it("Should sync reserves correctly after draining private pool", async function () {
+      const { admin } = accounts;
+      const recipient = ethers.Wallet.createRandom().address;
+
+      const pair = await ethers.getContractAt("FPairV2", pairAddress);
+
+      // Get initial state
+      const [initialReserve0, initialReserve1] = await pair.getReserves();
+      const initialAssetBalance = await pair.assetBalance();
+      const initialTokenBalance = await pair.balance();
+
+      console.log("Before drain:");
+      console.log("  reserve0 (tokenA):", ethers.formatEther(initialReserve0));
+      console.log("  reserve1 (tokenB/asset - virtual):", ethers.formatEther(initialReserve1));
+      console.log("  balance() (tokenA - actual):", ethers.formatEther(initialTokenBalance));
+      console.log("  assetBalance() (tokenB - actual):", ethers.formatEther(initialAssetBalance));
+
+      expect(initialReserve0).to.be.gt(0);
+      expect(initialReserve1).to.be.gt(0);
+
+      // Drain the pool - should emit Sync events
+      const tx = await fRouterV2
+        .connect(admin)
+        .drainPrivatePool(tokenAddress, recipient);
+
+      // Verify Sync events were emitted
+      await expect(tx).to.emit(pair, "Sync");
+
+      // Get final state
+      const [finalReserve0, finalReserve1] = await pair.getReserves();
+      const finalAssetBalance = await pair.assetBalance();
+      const finalTokenBalance = await pair.balance();
+
+      console.log("After drain:");
+      console.log("  reserve0 (tokenA):", ethers.formatEther(finalReserve0));
+      console.log("  reserve1 (tokenB/asset):", ethers.formatEther(finalReserve1));
+      console.log("  balance() (tokenA):", ethers.formatEther(finalTokenBalance));
+      console.log("  assetBalance() (tokenB):", ethers.formatEther(finalAssetBalance));
+
+      // Verify actual balances are 0 (all drained)
+      expect(finalAssetBalance).to.equal(0);
+      expect(finalTokenBalance).to.equal(0);
+
+      // Verify reserves are reduced by the transferred amounts
+      // reserve0: reduced by initialTokenBalance (clamped to 0 if underflow)
+      const expectedReserve0 = initialReserve0 > initialTokenBalance 
+        ? initialReserve0 - initialTokenBalance 
+        : 0n;
+      expect(finalReserve0).to.equal(expectedReserve0);
+
+      // reserve1: reduced by initialAssetBalance
+      // Note: reserve1 may be virtual liquidity, so it may not be 0
+      const expectedReserve1 = initialReserve1 > initialAssetBalance 
+        ? initialReserve1 - initialAssetBalance 
+        : 0n;
+      expect(finalReserve1).to.equal(expectedReserve1);
+
+      // Verify k is updated
+      const kLast = await pair.kLast();
+      expect(kLast).to.equal(finalReserve0 * finalReserve1);
+
+      console.log("✅ Reserves synced correctly: reduced by transferred amounts");
+    });
+
+
     it("Should revert buy and sell after private pool is drained", async function () {
       const { admin, user2, beOpsWallet } = accounts;
       // Use beOpsWallet as recipient (a real signer) so we can transfer tokens later

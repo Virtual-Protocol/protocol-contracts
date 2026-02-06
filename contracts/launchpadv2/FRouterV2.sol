@@ -369,6 +369,12 @@ contract FRouterV2 is
             pair.transferTo(recipient, tokenAmount);
         }
 
+        // Sync reserves after drain to maintain state consistency
+        // Use try-catch for backward compatibility with old FPairV2 contracts
+        try pair.syncAfterDrain(assetAmount, tokenAmount) {} catch {
+            // Old FPairV2 contracts don't have syncAfterDrain - drain still works,
+            // but reserves won't be synced (only affects getReserves() view function)
+        }
         emit PrivatePoolDrained(
             tokenAddress,
             recipient,

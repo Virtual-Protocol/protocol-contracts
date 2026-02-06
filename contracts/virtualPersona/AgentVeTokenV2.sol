@@ -162,7 +162,7 @@ contract AgentVeTokenV2 is
 
     /**
      * @dev Removes liquidity from Uniswap V2 pair and burns corresponding staked LP tokens
-     * Only callable by admin, BYPASSES matureAt for draining rugged Project60days
+     * Only callable by admin, draining rugged Project60days (intentionally BYPASSES matureAt)
      *
      * @param uniswapRouter The address of the Uniswap V2 router
      * @param veTokenAmount The amount of veToken (underlying lpToken) to remove liquidity for

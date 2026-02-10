@@ -189,10 +189,10 @@ describe("ProjectXLaunch - AgentTax Integration", function () {
         .connect(user1)
         .approve(await bondingV4.getAddress(), purchaseAmount);
 
-      // Call preLaunchProjectXLaunch
+      // Call preLaunch with X_LAUNCH mode
       const tx = await bondingV4
         .connect(user1)
-        .preLaunchProjectXLaunch(
+        .preLaunch(
           tokenName,
           tokenTicker,
           cores,
@@ -200,7 +200,8 @@ describe("ProjectXLaunch - AgentTax Integration", function () {
           image,
           urls,
           purchaseAmount,
-          startTime
+          startTime,
+          1 // LAUNCH_MODE_X_LAUNCH
         );
 
       const receipt = await tx.wait();
@@ -254,7 +255,7 @@ describe("ProjectXLaunch - AgentTax Integration", function () {
 
       const tx = await bondingV4
         .connect(user1)
-        .preLaunchProjectXLaunch(
+        .preLaunch(
           tokenName,
           tokenTicker,
           cores,
@@ -262,7 +263,8 @@ describe("ProjectXLaunch - AgentTax Integration", function () {
           image,
           urls,
           purchaseAmount,
-          startTime
+          startTime,
+          1 // LAUNCH_MODE_X_LAUNCH
         );
 
       await expect(tx)
@@ -308,7 +310,7 @@ describe("ProjectXLaunch - AgentTax Integration", function () {
 
       const tx = await bondingV4
         .connect(user1)
-        .preLaunchProjectXLaunch(
+        .preLaunch(
           tokenName,
           tokenTicker,
           cores,
@@ -316,7 +318,8 @@ describe("ProjectXLaunch - AgentTax Integration", function () {
           image,
           urls,
           purchaseAmount,
-          startTime
+          startTime,
+          1 // LAUNCH_MODE_X_LAUNCH
         );
 
       const receipt = await tx.wait();
@@ -432,7 +435,8 @@ describe("ProjectXLaunch - AgentTax Integration", function () {
           image,
           urls,
           purchaseAmount,
-          startTime
+          startTime,
+          0 // LAUNCH_MODE_NORMAL
         );
 
       const receipt = await tx.wait();
@@ -619,7 +623,8 @@ describe("ProjectXLaunch - AgentTax Integration", function () {
           image,
           urls,
           purchaseAmount,
-          startTime
+          startTime,
+          0 // LAUNCH_MODE_NORMAL
         );
 
       const receipt = await tx.wait();
@@ -646,21 +651,16 @@ describe("ProjectXLaunch - AgentTax Integration", function () {
       expect(tokenInfo.creator).to.equal(user1.address);
     });
 
-    it("Should maintain same function signature for preLaunch", async function () {
-      // Verify that preLaunch function signature hasn't changed
+    it("Should have correct function signature for preLaunch with launchMode", async function () {
+      // Verify preLaunch function signature
       const preLaunchFragment = bondingV4.interface.getFunction("preLaunch");
-      expect(preLaunchFragment.inputs.length).to.equal(8); // 8 parameters
+      expect(preLaunchFragment.inputs.length).to.equal(9); // 9 parameters (8 + launchMode_)
       expect(preLaunchFragment.inputs[0].name).to.equal("_name");
       expect(preLaunchFragment.inputs[7].name).to.equal("startTime");
-      // Should NOT have isProjectXLaunch_ parameter
-      expect(
-        preLaunchFragment.inputs.find(
-          (input) => input.name === "isProjectXLaunch_"
-        )
-      ).to.be.undefined;
+      expect(preLaunchFragment.inputs[8].name).to.equal("launchMode_");
     });
 
-    it("Should allow both preLaunch and preLaunchProjectXLaunch to coexist", async function () {
+    it("Should allow both NORMAL and X_LAUNCH modes to coexist", async function () {
       const { user1 } = accounts;
 
       const purchaseAmount = ethers.parseEther("1000");
@@ -674,7 +674,7 @@ describe("ProjectXLaunch - AgentTax Integration", function () {
         .connect(user1)
         .approve(await bondingV4.getAddress(), purchaseAmount * 2n);
 
-      // Create regular token
+      // Create regular token (NORMAL mode)
       const tx1 = await bondingV4
         .connect(user1)
         .preLaunch(
@@ -685,13 +685,14 @@ describe("ProjectXLaunch - AgentTax Integration", function () {
           "https://example.com/image.png",
           ["", "", "", ""],
           purchaseAmount,
-          startTime
+          startTime,
+          0 // LAUNCH_MODE_NORMAL
         );
 
-      // Create ProjectXLaunch token
+      // Create X_LAUNCH token
       const tx2 = await bondingV4
         .connect(user1)
-        .preLaunchProjectXLaunch(
+        .preLaunch(
           "ProjectXLaunch Token",
           "PXL",
           [0, 1],
@@ -699,7 +700,8 @@ describe("ProjectXLaunch - AgentTax Integration", function () {
           "https://example.com/image.png",
           ["", "", "", ""],
           purchaseAmount,
-          startTime + 1n
+          startTime + 1n,
+          1 // LAUNCH_MODE_X_LAUNCH
         );
 
       await expect(tx1).to.emit(bondingV4, "PreLaunched");
@@ -776,10 +778,10 @@ describe("ProjectXLaunch - AgentTax Integration", function () {
         .connect(user1)
         .approve(await bondingV4.getAddress(), purchaseAmount);
       
-      // Launch ProjectXLaunch token
+      // Launch X_LAUNCH token
       const tx = await bondingV4
         .connect(user1)
-        .preLaunchProjectXLaunch(
+        .preLaunch(
           tokenName,
           tokenTicker,
           cores,
@@ -787,7 +789,8 @@ describe("ProjectXLaunch - AgentTax Integration", function () {
           image,
           urls,
           purchaseAmount,
-          startTime
+          startTime,
+          1 // LAUNCH_MODE_X_LAUNCH
         );
       
       await tx.wait();
@@ -832,7 +835,7 @@ describe("ProjectXLaunch - AgentTax Integration", function () {
         .connect(user1)
         .approve(await bondingV4.getAddress(), purchaseAmount);
       
-      // Launch regular token
+      // Launch regular token (NORMAL mode)
       const tx = await bondingV4
         .connect(user1)
         .preLaunch(
@@ -843,7 +846,8 @@ describe("ProjectXLaunch - AgentTax Integration", function () {
           image,
           urls,
           purchaseAmount,
-          startTime
+          startTime,
+          0 // LAUNCH_MODE_NORMAL
         );
       
       await tx.wait();
@@ -885,7 +889,7 @@ describe("ProjectXLaunch - AgentTax Integration", function () {
       await expect(
         bondingV4
           .connect(user1)
-          .preLaunchProjectXLaunch(
+          .preLaunch(
             tokenName,
             tokenTicker,
             cores,
@@ -893,7 +897,8 @@ describe("ProjectXLaunch - AgentTax Integration", function () {
             image,
             urls,
             purchaseAmount,
-            startTime
+            startTime,
+            1 // LAUNCH_MODE_X_LAUNCH
           )
       ).to.be.revertedWithCustomError(bondingV4, "InvalidInput");
     });
@@ -948,7 +953,7 @@ describe("ProjectXLaunch - AgentTax Integration", function () {
       // Should succeed with zero fee
       const tx = await bondingV4
         .connect(user1)
-        .preLaunchProjectXLaunch(
+        .preLaunch(
           tokenName,
           tokenTicker,
           cores,
@@ -956,7 +961,8 @@ describe("ProjectXLaunch - AgentTax Integration", function () {
           image,
           urls,
           purchaseAmount,
-          startTime
+          startTime,
+          1 // LAUNCH_MODE_X_LAUNCH
         );
       
       await tx.wait();
@@ -1003,7 +1009,7 @@ describe("ProjectXLaunch - AgentTax Integration", function () {
 
       const tx = await bondingV4
         .connect(user1)
-        .preLaunchAcpSkill(
+        .preLaunch(
           tokenName,
           tokenTicker,
           cores,
@@ -1011,7 +1017,8 @@ describe("ProjectXLaunch - AgentTax Integration", function () {
           image,
           urls,
           purchaseAmount,
-          startTime
+          startTime,
+          2 // LAUNCH_MODE_ACP_SKILL
         );
 
       const receipt = await tx.wait();
@@ -1076,7 +1083,7 @@ describe("ProjectXLaunch - AgentTax Integration", function () {
 
       const tx = await bondingV4
         .connect(user1)
-        .preLaunchAcpSkill(
+        .preLaunch(
           tokenName,
           tokenTicker,
           cores,
@@ -1084,7 +1091,8 @@ describe("ProjectXLaunch - AgentTax Integration", function () {
           image,
           urls,
           purchaseAmount,
-          startTime
+          startTime,
+          2 // LAUNCH_MODE_ACP_SKILL
         );
 
       await tx.wait();
@@ -1143,7 +1151,7 @@ describe("ProjectXLaunch - AgentTax Integration", function () {
 
       const tx = await bondingV4
         .connect(user1)
-        .preLaunchAcpSkill(
+        .preLaunch(
           tokenName,
           tokenTicker,
           cores,
@@ -1151,7 +1159,8 @@ describe("ProjectXLaunch - AgentTax Integration", function () {
           image,
           urls,
           purchaseAmount,
-          startTime
+          startTime,
+          2 // LAUNCH_MODE_ACP_SKILL
         );
 
       const receipt = await tx.wait();
@@ -1239,13 +1248,14 @@ describe("ProjectXLaunch - AgentTax Integration", function () {
           "https://example.com/image.png",
           ["", "", "", ""],
           purchaseAmount,
-          startTime
+          startTime,
+          0 // LAUNCH_MODE_NORMAL
         );
 
       // Create X_LAUNCH token
       const tx2 = await bondingV4
         .connect(user1)
-        .preLaunchProjectXLaunch(
+        .preLaunch(
           "X_LAUNCH Token",
           "XL",
           [0, 1],
@@ -1253,13 +1263,14 @@ describe("ProjectXLaunch - AgentTax Integration", function () {
           "https://example.com/image.png",
           ["", "", "", ""],
           purchaseAmount,
-          startTime + 1n
+          startTime + 1n,
+          1 // LAUNCH_MODE_X_LAUNCH
         );
 
       // Create ACP_SKILL token
       const tx3 = await bondingV4
         .connect(user1)
-        .preLaunchAcpSkill(
+        .preLaunch(
           "ACP_SKILL Token",
           "ACP",
           [0, 1],
@@ -1267,7 +1278,8 @@ describe("ProjectXLaunch - AgentTax Integration", function () {
           "https://example.com/image.png",
           ["", "", "", ""],
           purchaseAmount,
-          startTime + 2n
+          startTime + 2n,
+          2 // LAUNCH_MODE_ACP_SKILL
         );
 
       const receipt1 = await tx1.wait();
@@ -1383,7 +1395,7 @@ describe("ProjectXLaunch - AgentTax Integration", function () {
 
       const tx = await bondingV4
         .connect(user1)
-        .preLaunchProjectXLaunch(
+        .preLaunch(
           tokenName,
           tokenTicker,
           cores,
@@ -1391,7 +1403,8 @@ describe("ProjectXLaunch - AgentTax Integration", function () {
           image,
           urls,
           purchaseAmount,
-          startTime
+          startTime,
+          1 // LAUNCH_MODE_X_LAUNCH
         );
 
       const receipt = await tx.wait();
@@ -1470,7 +1483,8 @@ describe("ProjectXLaunch - AgentTax Integration", function () {
           image,
           urls,
           purchaseAmount,
-          startTime
+          startTime,
+          0 // LAUNCH_MODE_NORMAL
         );
 
       const receipt = await tx.wait();
@@ -1534,7 +1548,7 @@ describe("ProjectXLaunch - AgentTax Integration", function () {
       // Create X_LAUNCH token
       const tx1 = await bondingV4
         .connect(user1)
-        .preLaunchProjectXLaunch(
+        .preLaunch(
           "X_LAUNCH Compare",
           "XLC",
           [0, 1],
@@ -1542,7 +1556,8 @@ describe("ProjectXLaunch - AgentTax Integration", function () {
           "https://example.com/image.png",
           ["", "", "", ""],
           purchaseAmount,
-          startTime
+          startTime,
+          1 // LAUNCH_MODE_X_LAUNCH
         );
       const receipt1 = await tx1.wait();
       const event1 = receipt1.logs.find((log) => {
@@ -1566,7 +1581,8 @@ describe("ProjectXLaunch - AgentTax Integration", function () {
           "https://example.com/image.png",
           ["", "", "", ""],
           purchaseAmount,
-          startTime + 1n
+          startTime + 1n,
+          0 // LAUNCH_MODE_NORMAL
         );
       const receipt2 = await tx2.wait();
       const event2 = receipt2.logs.find((log) => {

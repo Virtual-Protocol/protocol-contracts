@@ -234,81 +234,9 @@ contract BondingV4 is
         string memory img,
         string[4] memory urls,
         uint256 purchaseAmount,
-        uint256 startTime
-    ) public nonReentrant returns (address, address, uint, uint256) {
-        return
-            _preLaunch(
-                _name,
-                _ticker,
-                cores,
-                desc,
-                img,
-                urls,
-                purchaseAmount,
-                startTime,
-                LAUNCH_MODE_NORMAL
-            );
-    }
-
-    function preLaunchProjectXLaunch(
-        string memory _name,
-        string memory _ticker,
-        uint8[] memory cores,
-        string memory desc,
-        string memory img,
-        string[4] memory urls,
-        uint256 purchaseAmount,
-        uint256 startTime
-    ) public nonReentrant returns (address, address, uint, uint256) {
-        return
-            _preLaunch(
-                _name,
-                _ticker,
-                cores,
-                desc,
-                img,
-                urls,
-                purchaseAmount,
-                startTime,
-                LAUNCH_MODE_X_LAUNCH
-            );
-    }
-
-    function preLaunchAcpSkill(
-        string memory _name,
-        string memory _ticker,
-        uint8[] memory cores,
-        string memory desc,
-        string memory img,
-        string[4] memory urls,
-        uint256 purchaseAmount,
-        uint256 startTime
-    ) public nonReentrant returns (address, address, uint, uint256) {
-        return
-            _preLaunch(
-                _name,
-                _ticker,
-                cores,
-                desc,
-                img,
-                urls,
-                purchaseAmount,
-                startTime,
-                LAUNCH_MODE_ACP_SKILL
-            );
-    }
-
-    function _preLaunch(
-        string memory _name,
-        string memory _ticker,
-        uint8[] memory cores,
-        string memory desc,
-        string memory img,
-        string[4] memory urls,
-        uint256 purchaseAmount,
         uint256 startTime,
         uint8 launchMode_
-    ) internal returns (address, address, uint, uint256) {
+    ) public nonReentrant returns (address, address, uint, uint256) {
         uint256 launchFee = _getLaunchFee(launchMode_);
         if (purchaseAmount < launchFee || cores.length <= 0) {
             revert InvalidInput();

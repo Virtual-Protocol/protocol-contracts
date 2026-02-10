@@ -78,9 +78,6 @@ module.exports = {
     ],
   },
   networks: {
-    hardhat: {
-      allowUnlimitedContractSize: true,
-    },
     sepolia: {
       url: "https://sepolia.drpc.org",
       accounts: [process.env.PRIVATE_KEY],

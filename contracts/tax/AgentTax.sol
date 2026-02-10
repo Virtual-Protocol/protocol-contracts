@@ -9,8 +9,17 @@ import "@openzeppelin/contracts/utils/math/Math.sol";
 import "../pool/IRouter.sol";
 import "../virtualPersona/IAgentNft.sol";
 import "./ITBABonus.sol";
-import "../launchpadv2/BondingV2.sol";
-import "../launchpadv2/BondingV4.sol";
+
+// Minimal interface for BondingV2 to check if token is Project60days
+interface IBondingV2ForTax {
+    function isProject60days(address token) external view returns (bool);
+}
+
+// Minimal interface for BondingV4 to check if token is X_LAUNCH or ACP_SKILL
+interface IBondingV4ForTax {
+    function isProjectXLaunch(address token) external view returns (bool);
+    function isAcpSkillLaunch(address token) external view returns (bool);
+}
 
 contract AgentTax is Initializable, AccessControlUpgradeable {
     using SafeERC20 for IERC20;
@@ -86,8 +95,8 @@ contract AgentTax is Initializable, AccessControlUpgradeable {
     );
 
     ITBABonus public tbaBonus;
-    BondingV2 public bondingV2;
-    BondingV4 public bondingV4;
+    IBondingV2ForTax public bondingV2;
+    IBondingV4ForTax public bondingV4;
 
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() {
@@ -360,7 +369,7 @@ contract AgentTax is Initializable, AccessControlUpgradeable {
      */
     function setBondingV2(address bondingV2_) public onlyRole(ADMIN_ROLE) {
         require(bondingV2_ != address(0), "Invalid BondingV2 address");
-        bondingV2 = BondingV2(bondingV2_);
+        bondingV2 = IBondingV2ForTax(bondingV2_);
     }
 
     /**
@@ -403,11 +412,11 @@ contract AgentTax is Initializable, AccessControlUpgradeable {
      */
     function setBondingV4(address bondingV4_) public onlyRole(ADMIN_ROLE) {
         require(bondingV4_ != address(0), "Invalid BondingV4 address");
-        bondingV4 = BondingV4(bondingV4_);
+        bondingV4 = IBondingV4ForTax(bondingV4_);
     }
 
     /**
-     * @notice Update tax recipient for new feature agents launched via BondingV4
+     * @notice Update tax recipient for special launch mode agents (X_LAUNCH or ACP_SKILL) via BondingV4
      * @param agentId The agentId (virtualId) of the agent
      * @param tba The Token Bound Address for the agent
      * @param creator The creator address that will receive tax rewards
@@ -424,10 +433,11 @@ contract AgentTax is Initializable, AccessControlUpgradeable {
         address token = info.token;
         require(token != address(0), "Token not found");
 
-        // Check if this is a ProjectXLaunch token
+        // Check if this is a special launch mode token (X_LAUNCH or ACP_SKILL)
         require(
-            bondingV4.isProjectXLaunch(token),
-            "Token is not a ProjectXLaunch token"
+            bondingV4.isProjectXLaunch(token) ||
+                bondingV4.isAcpSkillLaunch(token),
+            "Token is not X_LAUNCH or ACP_SKILL"
         );
 
         require(tba != address(0), "Invalid TBA");

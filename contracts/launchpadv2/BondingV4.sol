@@ -98,6 +98,15 @@ contract BondingV4 is
     mapping(address => bool) public isProjectXLaunch;
     uint256 public projectXLaunchFee;
 
+    // New: Mapping to mark AcpSkillLaunch tokens (same permissions as ProjectXLaunch)
+    mapping(address => bool) public isAcpSkillLaunch;
+    uint256 public acpSkillLaunchFee;
+
+    // Launch mode constants for internal use
+    uint8 internal constant LAUNCH_MODE_NORMAL = 0;
+    uint8 internal constant LAUNCH_MODE_X_LAUNCH = 1;
+    uint8 internal constant LAUNCH_MODE_ACP_SKILL = 2;
+
     event PreLaunched(
         address indexed token,
         address indexed pair,
@@ -202,6 +211,21 @@ contract BondingV4 is
         projectXLaunchFee = newProjectXLaunchFee;
     }
 
+    function setAcpSkillLaunchFee(
+        uint256 newAcpSkillLaunchFee
+    ) public onlyOwner {
+        acpSkillLaunchFee = newAcpSkillLaunchFee;
+    }
+
+    function _getLaunchFee(uint8 launchMode_) internal view returns (uint256) {
+        if (launchMode_ == LAUNCH_MODE_X_LAUNCH) {
+            return projectXLaunchFee;
+        } else if (launchMode_ == LAUNCH_MODE_ACP_SKILL) {
+            return acpSkillLaunchFee;
+        }
+        return fee;
+    }
+
     function preLaunch(
         string memory _name,
         string memory _ticker,
@@ -222,7 +246,7 @@ contract BondingV4 is
                 urls,
                 purchaseAmount,
                 startTime,
-                false // isProjectXLaunch_ defaults to false for backward compatibility
+                LAUNCH_MODE_NORMAL
             );
     }
 
@@ -246,7 +270,31 @@ contract BondingV4 is
                 urls,
                 purchaseAmount,
                 startTime,
-                true // isProjectXLaunch_ defaults to true for ProjectXLaunch
+                LAUNCH_MODE_X_LAUNCH
+            );
+    }
+
+    function preLaunchAcpSkill(
+        string memory _name,
+        string memory _ticker,
+        uint8[] memory cores,
+        string memory desc,
+        string memory img,
+        string[4] memory urls,
+        uint256 purchaseAmount,
+        uint256 startTime
+    ) public nonReentrant returns (address, address, uint, uint256) {
+        return
+            _preLaunch(
+                _name,
+                _ticker,
+                cores,
+                desc,
+                img,
+                urls,
+                purchaseAmount,
+                startTime,
+                LAUNCH_MODE_ACP_SKILL
             );
     }
 
@@ -259,9 +307,9 @@ contract BondingV4 is
         string[4] memory urls,
         uint256 purchaseAmount,
         uint256 startTime,
-        bool isProjectXLaunch_
+        uint8 launchMode_
     ) internal returns (address, address, uint, uint256) {
-        uint256 launchFee = isProjectXLaunch_ ? projectXLaunchFee : fee;
+        uint256 launchFee = _getLaunchFee(launchMode_);
         if (purchaseAmount < launchFee || cores.length <= 0) {
             revert InvalidInput();
         }
@@ -353,9 +401,11 @@ contract BondingV4 is
         newToken.applicationId = applicationId;
         newToken.initialPurchase = initialPurchase;
         newToken.virtualId = VirtualIdBase + tokenInfos.length;
-        // Mark token as ProjectXLaunch token (affects tax recipient updates and liquidity drain permissions)
-        if (isProjectXLaunch_) {
+        // Store launch mode for token (affects tax recipient updates and liquidity drain permissions)
+        if (launchMode_ == LAUNCH_MODE_X_LAUNCH) {
             isProjectXLaunch[token] = true;
+        } else if (launchMode_ == LAUNCH_MODE_ACP_SKILL) {
+            isAcpSkillLaunch[token] = true;
         }
         newToken.launchExecuted = false;
 

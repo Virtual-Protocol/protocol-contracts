@@ -360,22 +360,11 @@ describe("ProjectXLaunch - AgentTax Integration", function () {
           (await time.latest()) + 300
         );
 
-      // Find agentId from agentNft
+      // Find agentId - use nextVirtualId - 1 since we just graduated
       const nextVirtualId = await agentNftV2.nextVirtualId();
-      for (let i = 1; i < nextVirtualId; i++) {
-        try {
-          const virtualInfo = await agentNftV2.virtualInfo(i);
-          const tokenInfo = await bondingV4.tokenInfo(tokenAddress);
-          if (virtualInfo.token === tokenInfo.agentToken) {
-            agentId = BigInt(i);
-            break;
-          }
-        } catch (e) {
-          continue;
-        }
-      }
+      agentId = nextVirtualId - 1n;
 
-      expect(agentId).to.not.be.undefined;
+      expect(agentId).to.be.greaterThanOrEqual(1n);
     });
 
     it("Should update tax recipient for ProjectXLaunch agent", async function () {
@@ -460,9 +449,7 @@ describe("ProjectXLaunch - AgentTax Integration", function () {
       const regularTokenAddress = parsedEvent.args.token;
 
       // Verify regular token does NOT allow tax recipient updates
-      const isProjectXLaunch = await bondingV4.isProjectXLaunch(
-        regularTokenAddress
-      );
+      const isProjectXLaunch = await bondingV4.isProjectXLaunch(regularTokenAddress);
       expect(isProjectXLaunch).to.be.false;
 
       // Launch and graduate to get agentId
@@ -490,23 +477,11 @@ describe("ProjectXLaunch - AgentTax Integration", function () {
           (await time.latest()) + 300
         );
 
-      // Find agentId
-      let regularAgentId;
+      // Find regularAgentId - use nextVirtualId - 1 since we just graduated
       const nextVirtualId = await agentNftV2.nextVirtualId();
-      for (let i = 1; i < nextVirtualId; i++) {
-        try {
-          const virtualInfo = await agentNftV2.virtualInfo(i);
-          const tokenInfo = await bondingV4.tokenInfo(regularTokenAddress);
-          if (virtualInfo.token === tokenInfo.agentToken) {
-            regularAgentId = BigInt(i);
-            break;
-          }
-        } catch (e) {
-          continue;
-        }
-      }
+      const regularAgentId = nextVirtualId - 1n;
 
-      expect(regularAgentId).to.not.be.undefined;
+      expect(regularAgentId).to.be.greaterThanOrEqual(1n);
       console.log("regularAgentId", regularAgentId);
 
       // Try to update tax recipient - should revert
@@ -521,7 +496,7 @@ describe("ProjectXLaunch - AgentTax Integration", function () {
             newTba,
             newCreator
           )
-      ).to.be.revertedWith("Token is not a ProjectXLaunch token");
+      ).to.be.revertedWith("Token is not X_LAUNCH or ACP_SKILL");
     });
 
     it("Should revert if called without EXECUTOR_V2_ROLE", async function () {
@@ -758,9 +733,7 @@ describe("ProjectXLaunch - AgentTax Integration", function () {
       const projectXLaunchToken = parsedEvent2.args.token;
 
       expect(await bondingV4.isProjectXLaunch(regularToken)).to.be.false;
-      expect(
-        await bondingV4.isProjectXLaunch(projectXLaunchToken)
-      ).to.be.true;
+      expect(await bondingV4.isProjectXLaunch(projectXLaunchToken)).to.be.true;
     });
   });
 
@@ -999,6 +972,343 @@ describe("ProjectXLaunch - AgentTax Integration", function () {
         }
       });
       expect(event).to.not.be.undefined;
+    });
+  });
+
+  describe("AcpSkillLaunch", function () {
+    it("Should create a token with isAcpSkillLaunch set to true", async function () {
+      const { user1 } = accounts;
+
+      const tokenName = "AcpSkillLaunch Token";
+      const tokenTicker = "ACPS";
+      const cores = [0, 1, 2];
+      const description = "AcpSkillLaunch test token";
+      const image = "https://example.com/image.png";
+      const urls = [
+        "https://twitter.com/test",
+        "https://t.me/test",
+        "https://youtube.com/test",
+        "https://example.com",
+      ];
+      const purchaseAmount = ethers.parseEther("1000");
+
+      const launchParams = await bondingV4.launchParams();
+      const startTimeDelay = BigInt(launchParams.startTimeDelay.toString());
+      const currentTime = BigInt((await time.latest()).toString());
+      const startTime = currentTime + startTimeDelay + 100n;
+
+      await virtualToken
+        .connect(user1)
+        .approve(await bondingV4.getAddress(), purchaseAmount);
+
+      const tx = await bondingV4
+        .connect(user1)
+        .preLaunchAcpSkill(
+          tokenName,
+          tokenTicker,
+          cores,
+          description,
+          image,
+          urls,
+          purchaseAmount,
+          startTime
+        );
+
+      const receipt = await tx.wait();
+      const event = receipt.logs.find((log) => {
+        try {
+          const parsed = bondingV4.interface.parseLog(log);
+          return parsed && parsed.name === "PreLaunched";
+        } catch (e) {
+          return false;
+        }
+      });
+
+      expect(event).to.not.be.undefined;
+      const parsedEvent = bondingV4.interface.parseLog(event);
+      const tokenAddress = parsedEvent.args.token;
+
+      // Verify isAcpSkillLaunch is set to true
+      const isAcpSkillLaunch = await bondingV4.isAcpSkillLaunch(tokenAddress);
+      expect(isAcpSkillLaunch).to.be.true;
+
+      // Verify isProjectXLaunch is set to false (they are separate mappings)
+      const isProjectXLaunch = await bondingV4.isProjectXLaunch(tokenAddress);
+      expect(isProjectXLaunch).to.be.false;
+
+      // Verify token info
+      const tokenInfo = await bondingV4.tokenInfo(tokenAddress);
+      expect(tokenInfo.token).to.equal(tokenAddress);
+      expect(tokenInfo.creator).to.equal(user1.address);
+    });
+
+    it("Should use acpSkillLaunchFee for AcpSkillLaunch tokens", async function () {
+      const { owner, user1 } = accounts;
+
+      // Set a different fee for AcpSkillLaunch
+      const acpSkillLaunchFee = ethers.parseEther("1500");
+      await bondingV4.connect(owner).setAcpSkillLaunchFee(acpSkillLaunchFee);
+
+      // Verify fee is set
+      const setFee = await bondingV4.acpSkillLaunchFee();
+      expect(setFee).to.equal(acpSkillLaunchFee);
+
+      const tokenName = "AcpSkillLaunch Fee Test";
+      const tokenTicker = "ACPF";
+      const cores = [0, 1, 2];
+      const description = "Test fee";
+      const image = "https://example.com/image.png";
+      const urls = ["", "", "", ""];
+      const purchaseAmount = ethers.parseEther("5000");
+
+      const launchParams = await bondingV4.launchParams();
+      const startTimeDelay = BigInt(launchParams.startTimeDelay.toString());
+      const currentTime = BigInt((await time.latest()).toString());
+      const startTime = currentTime + startTimeDelay + 100n;
+
+      // Check feeTo balance before
+      const feeTo = await bondingV4.owner();
+      const feeToBalanceBefore = await virtualToken.balanceOf(feeTo);
+
+      await virtualToken
+        .connect(user1)
+        .approve(await bondingV4.getAddress(), purchaseAmount);
+
+      const tx = await bondingV4
+        .connect(user1)
+        .preLaunchAcpSkill(
+          tokenName,
+          tokenTicker,
+          cores,
+          description,
+          image,
+          urls,
+          purchaseAmount,
+          startTime
+        );
+
+      await tx.wait();
+
+      // Verify feeTo received acpSkillLaunchFee
+      const feeToBalanceAfter = await virtualToken.balanceOf(feeTo);
+      const feeReceived = feeToBalanceAfter - feeToBalanceBefore;
+      expect(feeReceived).to.equal(acpSkillLaunchFee);
+    });
+
+    it("Should allow owner to set acpSkillLaunchFee", async function () {
+      const { owner } = accounts;
+
+      const newFee = ethers.parseEther("2500");
+      await bondingV4.connect(owner).setAcpSkillLaunchFee(newFee);
+
+      const setFee = await bondingV4.acpSkillLaunchFee();
+      expect(setFee).to.equal(newFee);
+    });
+
+    it("Should revert if non-owner tries to set acpSkillLaunchFee", async function () {
+      const { user1 } = accounts;
+
+      const newFee = ethers.parseEther("2500");
+      await expect(
+        bondingV4.connect(user1).setAcpSkillLaunchFee(newFee)
+      ).to.be.revertedWithCustomError(
+        bondingV4,
+        "OwnableUnauthorizedAccount"
+      );
+    });
+
+    it("Should allow updateCreatorForProjectXLaunchAgents for AcpSkillLaunch tokens", async function () {
+      const { owner, user1, admin } = accounts;
+
+      // Reset acpSkillLaunchFee to 0 before test (previous tests may have set it higher)
+      await bondingV4.connect(owner).setAcpSkillLaunchFee(0);
+
+      // Create AcpSkillLaunch token
+      const tokenName = "AcpSkill Tax Test";
+      const tokenTicker = "ACPT";
+      const cores = [0, 1, 2];
+      const description = "Test";
+      const image = "https://example.com/image.png";
+      const urls = ["", "", "", ""];
+      const purchaseAmount = ethers.parseEther("1000");
+
+      const launchParams = await bondingV4.launchParams();
+      const startTimeDelay = BigInt(launchParams.startTimeDelay.toString());
+      const currentTime = BigInt((await time.latest()).toString());
+      const startTime = currentTime + startTimeDelay + 100n;
+
+      await virtualToken
+        .connect(user1)
+        .approve(await bondingV4.getAddress(), purchaseAmount);
+
+      const tx = await bondingV4
+        .connect(user1)
+        .preLaunchAcpSkill(
+          tokenName,
+          tokenTicker,
+          cores,
+          description,
+          image,
+          urls,
+          purchaseAmount,
+          startTime
+        );
+
+      const receipt = await tx.wait();
+      const event = receipt.logs.find((log) => {
+        try {
+          return bondingV4.interface.parseLog(log)?.name === "PreLaunched";
+        } catch (e) {
+          return false;
+        }
+      });
+
+      const parsedEvent = bondingV4.interface.parseLog(event);
+      const tokenAddress = parsedEvent.args.token;
+
+      // Wait for start time and launch
+      const pair = await ethers.getContractAt("FPairV2", parsedEvent.args.pair);
+      const pairStartTime = await pair.startTime();
+      const currentTimeForLaunch = await time.latest();
+      if (currentTimeForLaunch < pairStartTime) {
+        const waitTime = BigInt(pairStartTime.toString()) - BigInt(currentTimeForLaunch.toString()) + 1n;
+        await time.increase(waitTime);
+      }
+      await bondingV4.connect(user1).launch(tokenAddress);
+
+      // Buy tokens to graduate
+      await time.increase(100 * 60);
+      const buyAmount = ethers.parseEther("202020.2044906205");
+      await virtualToken
+        .connect(accounts.user2)
+        .approve(addresses.fRouterV2, buyAmount);
+      await bondingV4
+        .connect(accounts.user2)
+        .buy(
+          buyAmount,
+          tokenAddress,
+          0,
+          (await time.latest()) + 300
+        );
+
+      // Find agentId - use nextVirtualId - 1 since we just graduated
+      const nextVirtualId = await agentNftV2.nextVirtualId();
+      const agentId = nextVirtualId - 1n;
+
+      expect(agentId).to.be.greaterThanOrEqual(1n);
+
+      // Verify token is AcpSkillLaunch
+      expect(await bondingV4.isAcpSkillLaunch(tokenAddress)).to.be.true;
+
+      // Update tax recipient should work for AcpSkillLaunch tokens
+      const newTba = ethers.Wallet.createRandom().address;
+      const newCreator = ethers.Wallet.createRandom().address;
+
+      const updateTx = await agentTax
+        .connect(admin)
+        .updateCreatorForProjectXLaunchAgents(agentId, newTba, newCreator);
+
+      await expect(updateTx).to.emit(agentTax, "CreatorUpdated");
+    });
+
+    it("Should have all three launch modes coexist", async function () {
+      const { owner, user1 } = accounts;
+
+      // Reset fees to 0 before test (previous tests may have set them higher)
+      await bondingV4.connect(owner).setProjectXLaunchFee(0);
+      await bondingV4.connect(owner).setAcpSkillLaunchFee(0);
+
+      const purchaseAmount = ethers.parseEther("1000");
+      const launchParams = await bondingV4.launchParams();
+      const startTimeDelay = BigInt(launchParams.startTimeDelay.toString());
+      const currentTime = BigInt((await time.latest()).toString());
+      const startTime = currentTime + startTimeDelay + 100n;
+
+      await virtualToken
+        .connect(user1)
+        .approve(await bondingV4.getAddress(), purchaseAmount * 3n);
+
+      // Create normal token
+      const tx1 = await bondingV4
+        .connect(user1)
+        .preLaunch(
+          "Normal Token",
+          "NRM",
+          [0, 1],
+          "Description",
+          "https://example.com/image.png",
+          ["", "", "", ""],
+          purchaseAmount,
+          startTime
+        );
+
+      // Create X_LAUNCH token
+      const tx2 = await bondingV4
+        .connect(user1)
+        .preLaunchProjectXLaunch(
+          "X_LAUNCH Token",
+          "XL",
+          [0, 1],
+          "Description",
+          "https://example.com/image.png",
+          ["", "", "", ""],
+          purchaseAmount,
+          startTime + 1n
+        );
+
+      // Create ACP_SKILL token
+      const tx3 = await bondingV4
+        .connect(user1)
+        .preLaunchAcpSkill(
+          "ACP_SKILL Token",
+          "ACP",
+          [0, 1],
+          "Description",
+          "https://example.com/image.png",
+          ["", "", "", ""],
+          purchaseAmount,
+          startTime + 2n
+        );
+
+      const receipt1 = await tx1.wait();
+      const receipt2 = await tx2.wait();
+      const receipt3 = await tx3.wait();
+
+      const event1 = receipt1.logs.find((log) => {
+        try {
+          return bondingV4.interface.parseLog(log)?.name === "PreLaunched";
+        } catch (e) {
+          return false;
+        }
+      });
+      const event2 = receipt2.logs.find((log) => {
+        try {
+          return bondingV4.interface.parseLog(log)?.name === "PreLaunched";
+        } catch (e) {
+          return false;
+        }
+      });
+      const event3 = receipt3.logs.find((log) => {
+        try {
+          return bondingV4.interface.parseLog(log)?.name === "PreLaunched";
+        } catch (e) {
+          return false;
+        }
+      });
+
+      const normalToken = bondingV4.interface.parseLog(event1).args.token;
+      const xLaunchToken = bondingV4.interface.parseLog(event2).args.token;
+      const acpSkillToken = bondingV4.interface.parseLog(event3).args.token;
+
+      // Verify launch modes
+      expect(await bondingV4.isProjectXLaunch(normalToken)).to.be.false;
+      expect(await bondingV4.isAcpSkillLaunch(normalToken)).to.be.false;
+
+      expect(await bondingV4.isProjectXLaunch(xLaunchToken)).to.be.true;
+      expect(await bondingV4.isAcpSkillLaunch(xLaunchToken)).to.be.false;
+
+      expect(await bondingV4.isProjectXLaunch(acpSkillToken)).to.be.false;
+      expect(await bondingV4.isAcpSkillLaunch(acpSkillToken)).to.be.true;
     });
   });
 

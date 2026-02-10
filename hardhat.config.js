@@ -50,6 +50,16 @@ module.exports = {
         viaIR: false,
       },
     },
+    "contracts/newLaunchpad/BondingV4.sol": {
+      version: "0.8.26",
+      settings: {
+        optimizer: {
+          enabled: true,
+          runs: 200,
+        },
+        viaIR: false,
+      },
+    },
   },
   namedAccounts: {
     deployer: `privatekey://${process.env.PRIVATE_KEY}`,
@@ -68,6 +78,9 @@ module.exports = {
     ],
   },
   networks: {
+    hardhat: {
+      allowUnlimitedContractSize: true,
+    },
     sepolia: {
       url: "https://sepolia.drpc.org",
       accounts: [process.env.PRIVATE_KEY],

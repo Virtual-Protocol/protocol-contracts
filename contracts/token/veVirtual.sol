@@ -45,7 +45,14 @@ contract veVirtual is
     event AutoRenew(address indexed user, uint256 id, bool autoRenew);
 
     event AdminUnlocked(bool adminUnlocked);
+    event EcoLockUpdated(
+        address indexed user,
+        uint256 id,
+        uint256 amount,
+        uint8 numWeeks
+    );
     bool public adminUnlocked;
+    mapping(address => Lock) public ecoLocks; // Separate mapping for eco locks (one per trader)
 
     function initialize(
         address baseToken_,
@@ -98,6 +105,7 @@ contract veVirtual is
         for (uint i = 0; i < locks[account].length; i++) {
             balance += _balanceOfLockAt(locks[account][i], timestamp);
         }
+        balance += _balanceOfLockAt(ecoLocks[account], timestamp);
         return balance;
     }
 
@@ -170,6 +178,19 @@ contract veVirtual is
         _transferVotingUnits(address(0), _msgSender(), amount);
     }
 
+    function stakeEcoLockFor(
+        address account,
+        uint256 amount
+    ) external nonReentrant {
+        require(amount > 0, "Amount must be greater than 0");
+        require(account != address(0), "Invalid account");
+
+        // Transfer tokens from caller
+        IERC20(baseToken).safeTransferFrom(_msgSender(), address(this), amount);
+
+        _increaseEcoLockAmount(account, amount);
+    }
+
     function _calcValue(
         uint256 amount,
         uint8 numWeeks
@@ -199,6 +220,7 @@ contract veVirtual is
         address account = _msgSender();
         uint256 index = _indexOf(account, id);
         Lock memory lock = locks[account][index];
+        require(id != ecoLocks[account].id, "Cannot withdraw eco lock"); // redundant check since eco locks are not in locks[] array
         require(
             block.timestamp >= lock.end || adminUnlocked,
             "Lock is not expired"
@@ -223,6 +245,7 @@ contract veVirtual is
         uint256 index = _indexOf(account, id);
 
         Lock storage lock = locks[account][index];
+        require(id != ecoLocks[account].id, "Cannot modify eco lock"); // redundant check since eco locks are not in locks[] array
         lock.autoRenew = !lock.autoRenew;
         lock.numWeeks = maxWeeks;
         lock.start = block.timestamp;
@@ -235,6 +258,7 @@ contract veVirtual is
         address account = _msgSender();
         uint256 index = _indexOf(account, id);
         Lock storage lock = locks[account][index];
+        require(id != ecoLocks[account].id, "Cannot modify eco lock"); // redundant check since eco locks are not in locks[] array
         require(lock.autoRenew == false, "Lock is auto-renewing");
         require(block.timestamp < lock.end, "Lock is expired");
         require(
@@ -296,6 +320,38 @@ contract veVirtual is
         for (uint i = 0; i < locks[account].length; i++) {
             amount += locks[account][i].amount;
         }
+        amount += ecoLocks[account].amount;
         return amount;
+    }
+
+    function _increaseEcoLockAmount(address account, uint256 amount) internal {
+        Lock storage existingLock = ecoLocks[account];
+        if (existingLock.id == 0) {
+            // Create new eco lock
+            Lock memory newLock = Lock({
+                amount: amount,
+                start: block.timestamp,
+                end: block.timestamp + uint256(maxWeeks) * 1 weeks,
+                numWeeks: maxWeeks,
+                autoRenew: true,
+                id: _nextId++
+            });
+            ecoLocks[account] = newLock;
+        } else {
+            // Update existing eco lock
+            existingLock.amount += amount;
+            existingLock.start = block.timestamp;
+            existingLock.end = block.timestamp + uint256(maxWeeks) * 1 weeks;
+            existingLock.numWeeks = maxWeeks;
+        }
+
+        emit EcoLockUpdated(
+            account,
+            ecoLocks[account].id,
+            ecoLocks[account].amount,
+            maxWeeks
+        );
+        // add new voting units
+        _transferVotingUnits(address(0), account, amount);
     }
 }

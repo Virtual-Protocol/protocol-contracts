@@ -40,7 +40,7 @@ module.exports = {
         viaIR: false,
       },
     },
-    "contracts/newLaunchpad/BondingV2.sol": {
+    "contracts/launchpadv2/BondingV2.sol": {
       version: "0.8.26",
       settings: {
         optimizer: {
@@ -50,7 +50,7 @@ module.exports = {
         viaIR: false,
       },
     },
-    "contracts/newLaunchpad/BondingV4.sol": {
+    "contracts/launchpadv2/BondingV4.sol": {
       version: "0.8.26",
       settings: {
         optimizer: {

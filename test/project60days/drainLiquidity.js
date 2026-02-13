@@ -335,7 +335,7 @@ describe("Project60days - Drain Liquidity", function () {
       // Try to drain - should revert
       await expect(
         fRouterV2.connect(admin).drainPrivatePool(regularTokenAddress, recipient)
-      ).to.be.revertedWith("agentToken does not allow liquidity drain");
+      ).to.be.revertedWith("Token does not allow liquidity drain");
     });
 
     it("Should revert if called without EXECUTOR_ROLE", async function () {

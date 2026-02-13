@@ -933,6 +933,229 @@ describe("Project60days - AgentTax Integration", function () {
     });
   });
 
+  describe("Drain and Graduation Protection", function () {
+    it("Should prevent buy with zero output after pool drain", async function () {
+      const { owner, user1, user2 } = accounts;
+      const fRouterV2 = contracts.fRouterV2;
+
+      // Grant EXECUTOR_ROLE to owner for drainPrivatePool
+      const EXECUTOR_ROLE = await fRouterV2.EXECUTOR_ROLE();
+      await fRouterV2.grantRole(EXECUTOR_ROLE, owner.address);
+
+      // Set BondingV2 in FRouterV2 (required for drainPrivatePool)
+      await fRouterV2.setBondingV2(await bondingV2.getAddress());
+
+      // Reset project60daysLaunchFee to 0 for this test
+      await bondingV2.connect(owner).setProject60daysLaunchFee(0);
+
+      // Create a Project60days token
+      const tokenName = "Drain Test Token";
+      const tokenTicker = "DTT";
+      const cores = [0, 1, 2];
+      const description = "Test drain protection";
+      const image = "https://example.com/image.png";
+      const urls = ["", "", "", ""];
+      const purchaseAmount = ethers.parseEther("1000");
+
+      const launchParams = await bondingV2.launchParams();
+      const startTimeDelay = BigInt(launchParams.startTimeDelay.toString());
+      const currentTime = BigInt((await time.latest()).toString());
+      const startTime = currentTime + startTimeDelay + 100n;
+
+      await virtualToken
+        .connect(user1)
+        .approve(await bondingV2.getAddress(), purchaseAmount);
+
+      const tx = await bondingV2
+        .connect(user1)
+        .preLaunchProject60days(
+          tokenName,
+          tokenTicker,
+          cores,
+          description,
+          image,
+          urls,
+          purchaseAmount,
+          startTime
+        );
+
+      const receipt = await tx.wait();
+      const event = receipt.logs.find((log) => {
+        try {
+          return bondingV2.interface.parseLog(log)?.name === "PreLaunched";
+        } catch (e) {
+          return false;
+        }
+      });
+
+      const parsedEvent = bondingV2.interface.parseLog(event);
+      const tokenAddress = parsedEvent.args.token;
+      const pairAddress = parsedEvent.args.pair;
+
+      // Verify it's a Project60days token
+      expect(await bondingV2.isProject60days(tokenAddress)).to.be.true;
+
+      // Wait for start time and launch
+      const pair = await ethers.getContractAt("FPairV2", pairAddress);
+      const pairStartTime = await pair.startTime();
+      const currentTimeForLaunch = await time.latest();
+      if (currentTimeForLaunch < pairStartTime) {
+        const waitTime = BigInt(pairStartTime.toString()) - BigInt(currentTimeForLaunch.toString()) + 1n;
+        await time.increase(waitTime);
+      }
+      await bondingV2.connect(user1).launch(tokenAddress);
+
+      // Wait for anti-sniper tax to expire
+      await time.increase(100 * 60);
+
+      // Check reserves before drain
+      const [reserve0Before, reserve1Before] = await pair.getReserves();
+      console.log("Reserves before drain:", reserve0Before.toString(), reserve1Before.toString());
+
+      // Drain the private pool (owner has EXECUTOR_ROLE)
+      const recipient = accounts.admin.address;
+      await fRouterV2.connect(owner).drainPrivatePool(tokenAddress, recipient);
+
+      // Check reserves after drain
+      const [reserve0After, reserve1After] = await pair.getReserves();
+      console.log("Reserves after drain:", reserve0After.toString(), reserve1After.toString());
+
+      // Check k value
+      const kAfterDrain = await pair.kLast();
+      console.log("k after drain:", kAfterDrain.toString());
+
+      // Now try to buy with amountOutMin = 0
+      // This should revert because amount0Out will be 0 (k = 0)
+      const buyAmount = ethers.parseEther("1000");
+      await virtualToken
+        .connect(user2)
+        .approve(addresses.fRouterV2, buyAmount);
+
+      // Should revert with SlippageTooHigh because amount0Out == 0
+      await expect(
+        bondingV2.connect(user2).buy(
+          buyAmount,
+          tokenAddress,
+          0, // amountOutMin = 0, but should still fail because amount0Out == 0
+          (await time.latest()) + 300
+        )
+      ).to.be.revertedWithCustomError(bondingV2, "SlippageTooHigh");
+
+      console.log("✓ Buy with zero output correctly reverted after pool drain");
+    });
+
+    it("Should prevent forced graduation after pool drain", async function () {
+      const { owner, user1, user2 } = accounts;
+      const fRouterV2 = contracts.fRouterV2;
+
+      // Grant EXECUTOR_ROLE to owner for drainPrivatePool (may already be granted)
+      const EXECUTOR_ROLE = await fRouterV2.EXECUTOR_ROLE();
+      const hasRole = await fRouterV2.hasRole(EXECUTOR_ROLE, owner.address);
+      if (!hasRole) {
+        await fRouterV2.grantRole(EXECUTOR_ROLE, owner.address);
+      }
+
+      // Set BondingV2 in FRouterV2 (may already be set from previous test)
+      const currentBondingV2 = await fRouterV2.bondingV2();
+      if (currentBondingV2 === ethers.ZeroAddress) {
+        await fRouterV2.setBondingV2(await bondingV2.getAddress());
+      }
+
+      // Reset project60daysLaunchFee to 0 for this test
+      await bondingV2.connect(owner).setProject60daysLaunchFee(0);
+
+      // Create a Project60days token
+      const tokenName = "Graduation Test Token";
+      const tokenTicker = "GTT";
+      const cores = [0, 1, 2];
+      const description = "Test graduation protection";
+      const image = "https://example.com/image.png";
+      const urls = ["", "", "", ""];
+      const purchaseAmount = ethers.parseEther("1000");
+
+      const launchParams = await bondingV2.launchParams();
+      const startTimeDelay = BigInt(launchParams.startTimeDelay.toString());
+      const currentTime = BigInt((await time.latest()).toString());
+      const startTime = currentTime + startTimeDelay + 100n;
+
+      await virtualToken
+        .connect(user1)
+        .approve(await bondingV2.getAddress(), purchaseAmount);
+
+      const tx = await bondingV2
+        .connect(user1)
+        .preLaunchProject60days(
+          tokenName,
+          tokenTicker,
+          cores,
+          description,
+          image,
+          urls,
+          purchaseAmount,
+          startTime
+        );
+
+      const receipt = await tx.wait();
+      const event = receipt.logs.find((log) => {
+        try {
+          return bondingV2.interface.parseLog(log)?.name === "PreLaunched";
+        } catch (e) {
+          return false;
+        }
+      });
+
+      const parsedEvent = bondingV2.interface.parseLog(event);
+      const tokenAddress = parsedEvent.args.token;
+      const pairAddress = parsedEvent.args.pair;
+
+      // Wait for start time and launch
+      const pair = await ethers.getContractAt("FPairV2", pairAddress);
+      const pairStartTime = await pair.startTime();
+      const currentTimeForLaunch = await time.latest();
+      if (currentTimeForLaunch < pairStartTime) {
+        const waitTime = BigInt(pairStartTime.toString()) - BigInt(currentTimeForLaunch.toString()) + 1n;
+        await time.increase(waitTime);
+      }
+      await bondingV2.connect(user1).launch(tokenAddress);
+
+      // Wait for anti-sniper tax to expire (important for graduation trigger)
+      await time.increase(100 * 60);
+
+      // Drain the private pool (owner has EXECUTOR_ROLE)
+      const recipient = accounts.admin.address;
+      await fRouterV2.connect(owner).drainPrivatePool(tokenAddress, recipient);
+
+      // Verify token is still trading (not graduated yet)
+      const tokenInfoBefore = await bondingV2.tokenInfo(tokenAddress);
+      expect(tokenInfoBefore.trading).to.be.true;
+      expect(tokenInfoBefore.tradingOnUniswap).to.be.false;
+
+      // Attacker tries to force graduation by buying with amountOutMin = 0
+      // Before fix: This would succeed with amount0Out = 0, triggering graduation
+      // After fix: This should revert because amount0Out == 0
+      const attackAmount = ethers.parseEther("100");
+      await virtualToken
+        .connect(user2)
+        .approve(addresses.fRouterV2, attackAmount);
+
+      await expect(
+        bondingV2.connect(user2).buy(
+          attackAmount,
+          tokenAddress,
+          0,
+          (await time.latest()) + 300
+        )
+      ).to.be.revertedWithCustomError(bondingV2, "SlippageTooHigh");
+
+      // Verify token is still NOT graduated
+      const tokenInfoAfter = await bondingV2.tokenInfo(tokenAddress);
+      expect(tokenInfoAfter.trading).to.be.true;
+      expect(tokenInfoAfter.tradingOnUniswap).to.be.false;
+
+      console.log("✓ Forced graduation correctly prevented after pool drain");
+    });
+  });
+
   describe("setBondingV2", function () {
     it("Should allow admin to set BondingV2 address", async function () {
       const { owner } = accounts;

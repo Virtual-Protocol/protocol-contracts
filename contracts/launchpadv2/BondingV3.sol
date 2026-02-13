@@ -452,7 +452,7 @@ contract BondingV3 is
             msg.sender
         );
 
-        if (amount1Out < amountOutMin) {
+        if (amount1Out == 0 || amount1Out < amountOutMin) {
             revert SlippageTooHigh();
         }
 
@@ -493,7 +493,7 @@ contract BondingV3 is
             isInitialPurchase
         );
 
-        if (amount0Out < amountOutMin) {
+        if (amount0Out == 0 || amount0Out < amountOutMin) {
             revert SlippageTooHigh();
         }
 

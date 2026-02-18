@@ -102,6 +102,12 @@ contract BondingV4 is
     mapping(address => bool) public isAcpSkillLaunch;
     uint256 public acpSkillLaunchFee;
 
+    // Mapping to control who can launch with ACP_SKILL mode
+    mapping(address => bool) public isAcpSkillLauncher;
+
+    // Mapping to control who can launch with X_LAUNCH mode
+    mapping(address => bool) public isXLauncher;
+
     // Launch mode constants for internal use
     uint8 internal constant LAUNCH_MODE_NORMAL = 0;
     uint8 internal constant LAUNCH_MODE_X_LAUNCH = 1;
@@ -132,6 +138,7 @@ contract BondingV4 is
     error InvalidTokenStatus();
     error InvalidInput();
     error SlippageTooHigh();
+    error UnauthorizedLauncher();
 
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() {
@@ -217,6 +224,17 @@ contract BondingV4 is
         acpSkillLaunchFee = newAcpSkillLaunchFee;
     }
 
+    function setAcpSkillLauncher(
+        address launcher,
+        bool allowed
+    ) public onlyOwner {
+        isAcpSkillLauncher[launcher] = allowed;
+    }
+
+    function setXLauncher(address launcher, bool allowed) public onlyOwner {
+        isXLauncher[launcher] = allowed;
+    }
+
     function _getLaunchFee(uint8 launchMode_) internal view returns (uint256) {
         if (launchMode_ == LAUNCH_MODE_X_LAUNCH) {
             return projectXLaunchFee;
@@ -237,6 +255,17 @@ contract BondingV4 is
         uint256 startTime,
         uint8 launchMode_
     ) public nonReentrant returns (address, address, uint, uint256) {
+        // X_LAUNCH and ACP_SKILL launch modes require authorized launcher
+        if (launchMode_ == LAUNCH_MODE_X_LAUNCH && !isXLauncher[msg.sender]) {
+            revert UnauthorizedLauncher();
+        }
+        if (
+            launchMode_ == LAUNCH_MODE_ACP_SKILL &&
+            !isAcpSkillLauncher[msg.sender]
+        ) {
+            revert UnauthorizedLauncher();
+        }
+
         uint256 launchFee = _getLaunchFee(launchMode_);
         if (purchaseAmount < launchFee || cores.length <= 0) {
             revert InvalidInput();

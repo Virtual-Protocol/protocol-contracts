@@ -146,6 +146,10 @@ describe("ProjectXLaunch - AgentTax Integration", function () {
     const EXECUTOR_V2_ROLE = await agentTax.EXECUTOR_V2_ROLE();
     await agentTax.grantRole(EXECUTOR_V2_ROLE, accounts.admin.address);
     console.log("EXECUTOR_V2_ROLE granted to admin");
+
+    // Authorize user1 as XLauncher for X_LAUNCH mode tests
+    await bondingV4.setXLauncher(accounts.user1.address, true);
+    console.log("user1 authorized as XLauncher");
   });
 
   describe("preLaunchProjectXLaunch", function () {
@@ -275,6 +279,73 @@ describe("ProjectXLaunch - AgentTax Integration", function () {
           (virtualId) => virtualId > 0n,
           (initialPurchase) => initialPurchase > 0n
         );
+    });
+
+    it("Should revert if non-authorized launcher tries to launch X_LAUNCH mode", async function () {
+      const { owner, user2 } = accounts;
+
+      // Ensure user2 is NOT an authorized XLauncher
+      await bondingV4.connect(owner).setXLauncher(user2.address, false);
+
+      const tokenName = "Unauthorized X_LAUNCH";
+      const tokenTicker = "UXL";
+      const cores = [0, 1, 2];
+      const description = "Test unauthorized";
+      const image = "https://example.com/image.png";
+      const urls = ["", "", "", ""];
+      const purchaseAmount = ethers.parseEther("1000");
+
+      const launchParams = await bondingV4.launchParams();
+      const startTimeDelay = BigInt(launchParams.startTimeDelay.toString());
+      const currentTime = BigInt((await time.latest()).toString());
+      const startTime = currentTime + startTimeDelay + 100n;
+
+      await virtualToken
+        .connect(user2)
+        .approve(await bondingV4.getAddress(), purchaseAmount);
+
+      // user2 is NOT authorized, should revert
+      await expect(
+        bondingV4
+          .connect(user2)
+          .preLaunch(
+            tokenName,
+            tokenTicker,
+            cores,
+            description,
+            image,
+            urls,
+            purchaseAmount,
+            startTime,
+            1 // LAUNCH_MODE_X_LAUNCH
+          )
+      ).to.be.revertedWithCustomError(bondingV4, "UnauthorizedLauncher");
+    });
+
+    it("Should allow owner to set and revoke XLauncher", async function () {
+      const { owner, user2 } = accounts;
+
+      // Initially user2 should not be authorized (we revoked in before)
+      expect(await bondingV4.isXLauncher(user2.address)).to.be.false;
+
+      // Authorize user2
+      await bondingV4.connect(owner).setXLauncher(user2.address, true);
+      expect(await bondingV4.isXLauncher(user2.address)).to.be.true;
+
+      // Revoke authorization
+      await bondingV4.connect(owner).setXLauncher(user2.address, false);
+      expect(await bondingV4.isXLauncher(user2.address)).to.be.false;
+    });
+
+    it("Should revert if non-owner tries to set XLauncher", async function () {
+      const { user1, user2 } = accounts;
+
+      await expect(
+        bondingV4.connect(user1).setXLauncher(user2.address, true)
+      ).to.be.revertedWithCustomError(
+        bondingV4,
+        "OwnableUnauthorizedAccount"
+      );
     });
   });
 
@@ -982,8 +1053,19 @@ describe("ProjectXLaunch - AgentTax Integration", function () {
   });
 
   describe("AcpSkillLaunch", function () {
+    // Reset AcpSkillLauncher state before each test to ensure clean state
+    beforeEach(async function () {
+      const { owner, user1, user2 } = accounts;
+      // Revoke all launcher permissions to start fresh
+      await bondingV4.connect(owner).setAcpSkillLauncher(user1.address, false);
+      await bondingV4.connect(owner).setAcpSkillLauncher(user2.address, false);
+    });
+
     it("Should create a token with isAcpSkillLaunch set to true", async function () {
-      const { user1 } = accounts;
+      const { owner, user1 } = accounts;
+
+      // Authorize user1 as AcpSkillLauncher
+      await bondingV4.connect(owner).setAcpSkillLauncher(user1.address, true);
 
       const tokenName = "AcpSkillLaunch Token";
       const tokenTicker = "ACPS";
@@ -1051,6 +1133,9 @@ describe("ProjectXLaunch - AgentTax Integration", function () {
 
     it("Should use acpSkillLaunchFee for AcpSkillLaunch tokens", async function () {
       const { owner, user1 } = accounts;
+
+      // Authorize user1 as AcpSkillLauncher
+      await bondingV4.connect(owner).setAcpSkillLauncher(user1.address, true);
 
       // Set a different fee for AcpSkillLaunch
       const acpSkillLaunchFee = ethers.parseEther("1500");
@@ -1127,6 +1212,9 @@ describe("ProjectXLaunch - AgentTax Integration", function () {
 
     it("Should allow updateCreatorForProjectXLaunchAgents for AcpSkillLaunch tokens", async function () {
       const { owner, user1, admin } = accounts;
+
+      // Authorize user1 as AcpSkillLauncher
+      await bondingV4.connect(owner).setAcpSkillLauncher(user1.address, true);
 
       // Reset acpSkillLaunchFee to 0 before test (previous tests may have set it higher)
       await bondingV4.connect(owner).setAcpSkillLaunchFee(0);
@@ -1220,8 +1308,135 @@ describe("ProjectXLaunch - AgentTax Integration", function () {
       await expect(updateTx).to.emit(agentTax, "CreatorUpdated");
     });
 
+    it("Should revert if non-authorized launcher tries to launch ACP_SKILL mode", async function () {
+      const { user1 } = accounts;
+
+      // user1 is NOT authorized (beforeEach already revoked all permissions)
+      const tokenName = "Unauthorized AcpSkill";
+      const tokenTicker = "UACP";
+      const cores = [0, 1, 2];
+      const description = "Test unauthorized";
+      const image = "https://example.com/image.png";
+      const urls = ["", "", "", ""];
+      const purchaseAmount = ethers.parseEther("1000");
+
+      const launchParams = await bondingV4.launchParams();
+      const startTimeDelay = BigInt(launchParams.startTimeDelay.toString());
+      const currentTime = BigInt((await time.latest()).toString());
+      const startTime = currentTime + startTimeDelay + 100n;
+
+      await virtualToken
+        .connect(user1)
+        .approve(await bondingV4.getAddress(), purchaseAmount);
+
+      // user1 is NOT an authorized AcpSkillLauncher, should revert
+      await expect(
+        bondingV4
+          .connect(user1)
+          .preLaunch(
+            tokenName,
+            tokenTicker,
+            cores,
+            description,
+            image,
+            urls,
+            purchaseAmount,
+            startTime,
+            2 // LAUNCH_MODE_ACP_SKILL
+          )
+      ).to.be.revertedWithCustomError(bondingV4, "UnauthorizedLauncher");
+    });
+
+    it("Should allow authorized launcher to launch ACP_SKILL mode", async function () {
+      const { owner, user1 } = accounts;
+
+      // Authorize user1 as AcpSkillLauncher
+      await bondingV4.connect(owner).setAcpSkillLauncher(user1.address, true);
+
+      // Verify authorization
+      expect(await bondingV4.isAcpSkillLauncher(user1.address)).to.be.true;
+
+      const tokenName = "Authorized AcpSkill";
+      const tokenTicker = "AACP";
+      const cores = [0, 1, 2];
+      const description = "Test authorized";
+      const image = "https://example.com/image.png";
+      const urls = ["", "", "", ""];
+      const purchaseAmount = ethers.parseEther("1000");
+
+      const launchParams = await bondingV4.launchParams();
+      const startTimeDelay = BigInt(launchParams.startTimeDelay.toString());
+      const currentTime = BigInt((await time.latest()).toString());
+      const startTime = currentTime + startTimeDelay + 100n;
+
+      await virtualToken
+        .connect(user1)
+        .approve(await bondingV4.getAddress(), purchaseAmount);
+
+      // user1 is now authorized, should succeed
+      const tx = await bondingV4
+        .connect(user1)
+        .preLaunch(
+          tokenName,
+          tokenTicker,
+          cores,
+          description,
+          image,
+          urls,
+          purchaseAmount,
+          startTime,
+          2 // LAUNCH_MODE_ACP_SKILL
+        );
+
+      await expect(tx).to.emit(bondingV4, "PreLaunched");
+
+      const receipt = await tx.wait();
+      const event = receipt.logs.find((log) => {
+        try {
+          return bondingV4.interface.parseLog(log)?.name === "PreLaunched";
+        } catch (e) {
+          return false;
+        }
+      });
+
+      const parsedEvent = bondingV4.interface.parseLog(event);
+      const tokenAddress = parsedEvent.args.token;
+
+      // Verify token is AcpSkillLaunch
+      expect(await bondingV4.isAcpSkillLaunch(tokenAddress)).to.be.true;
+    });
+
+    it("Should allow owner to set and revoke AcpSkillLauncher", async function () {
+      const { owner, user2 } = accounts;
+
+      // Initially user2 should not be authorized
+      expect(await bondingV4.isAcpSkillLauncher(user2.address)).to.be.false;
+
+      // Authorize user2
+      await bondingV4.connect(owner).setAcpSkillLauncher(user2.address, true);
+      expect(await bondingV4.isAcpSkillLauncher(user2.address)).to.be.true;
+
+      // Revoke authorization
+      await bondingV4.connect(owner).setAcpSkillLauncher(user2.address, false);
+      expect(await bondingV4.isAcpSkillLauncher(user2.address)).to.be.false;
+    });
+
+    it("Should revert if non-owner tries to set AcpSkillLauncher", async function () {
+      const { user1, user2 } = accounts;
+
+      await expect(
+        bondingV4.connect(user1).setAcpSkillLauncher(user2.address, true)
+      ).to.be.revertedWithCustomError(
+        bondingV4,
+        "OwnableUnauthorizedAccount"
+      );
+    });
+
     it("Should have all three launch modes coexist", async function () {
       const { owner, user1 } = accounts;
+
+      // Authorize user1 for ACP_SKILL launch
+      await bondingV4.connect(owner).setAcpSkillLauncher(user1.address, true);
 
       // Reset fees to 0 before test (previous tests may have set them higher)
       await bondingV4.connect(owner).setProjectXLaunchFee(0);

@@ -307,6 +307,7 @@ contract FRouterV2 is
         }
 
         // X_LAUNCH: 1% per second (99 seconds to 0%)
+        // ACP_SKILL: 1% per minute (99 minutes to 0%)
         // Regular: 1% per minute (99 minutes to 0%)
         uint256 taxReduction = isXLaunch ? timeElapsed : (timeElapsed / 60);
 

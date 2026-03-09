@@ -16,6 +16,17 @@ interface IBondingV4ForRouter {
     function isProjectXLaunch(address token) external view returns (bool);
 }
 
+// Minimal interface for BondingV5 to get anti-sniper tax type
+interface IBondingV5ForRouter {
+    function tokenAntiSniperType(address token) external view returns (uint8);
+}
+
+// Minimal interface for BondingConfig to get anti-sniper duration
+interface IBondingConfigForRouter {
+    function getAntiSniperDuration(uint8 antiSniperType_) external pure returns (uint256);
+    function ANTI_SNIPER_NONE() external pure returns (uint8);
+}
+
 contract FRouterV2 is
     Initializable,
     AccessControlUpgradeable,
@@ -33,6 +44,10 @@ contract FRouterV2 is
 
     // BondingV4 reference for checking X_LAUNCH tokens
     IBondingV4ForRouter public bondingV4;
+
+    // BondingV5 reference for checking anti-sniper tax type
+    IBondingV5ForRouter public bondingV5;
+    IBondingConfigForRouter public bondingConfig;
 
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() {
@@ -244,6 +259,18 @@ contract FRouterV2 is
         bondingV4 = IBondingV4ForRouter(bondingV4_);
     }
 
+    /**
+     * @dev Set the BondingV5 and BondingConfig contract addresses for anti-sniper tax type checks
+     * @param bondingV5_ The address of the BondingV5 contract
+     * @param bondingConfig_ The address of the BondingConfig contract
+     */
+    function setBondingV5(address bondingV5_, address bondingConfig_) public onlyRole(ADMIN_ROLE) {
+        require(bondingV5_ != address(0), "Zero address not allowed");
+        require(bondingConfig_ != address(0), "Zero address not allowed");
+        bondingV5 = IBondingV5ForRouter(bondingV5_);
+        bondingConfig = IBondingConfigForRouter(bondingConfig_);
+    }
+
     function resetTime(
         address tokenAddress,
         uint256 newStartTime
@@ -257,8 +284,9 @@ contract FRouterV2 is
 
     /**
      * @dev Calculate anti-sniper tax based on time elapsed since pair start
-     * For regular tokens: Tax starts at 99% and decreases by 1% per minute to 0% over 99 minutes
-     * For X_LAUNCH tokens: Tax starts at 99% and decreases by 1% per second to 0% over 99 seconds
+     * BondingV5 tokens: Use configurable anti-sniper types (NONE=0s, 60S=60s, 98M=98min)
+     * BondingV4 X_LAUNCH tokens: Tax decreases from 99% to 0% over 99 seconds
+     * Legacy tokens: Tax decreases from 99% to 0% over 99 minutes
      * @param pairAddress The address of the pair
      * @return taxPercentage Tax in percentage (1 = 1%)
      */
@@ -270,28 +298,78 @@ contract FRouterV2 is
         // Get token address directly from pair (tokenA is the agent token)
         address tokenAddress = pair.tokenA();
 
-        uint256 finalTaxStartTime = pair.startTime();
-        // Try to get taxStartTime safely for backward compatibility
-        uint256 taxStartTime = 0;
-        try pair.taxStartTime() returns (uint256 _taxStartTime) {
-            taxStartTime = _taxStartTime;
-        } catch {
-            // Old pair contract doesn't have taxStartTime function
-            // Use startTime for backward compatibility
-            taxStartTime = 0;
-        }
-        if (taxStartTime > 0) {
-            finalTaxStartTime = taxStartTime; // use taxStartTime if it's set (for new pairs)
-        }
-
         uint256 startTax = factory.antiSniperBuyTaxStartValue(); // 99%
 
+        // Check if this is a BondingV5 token with configurable anti-sniper type
+        if (address(bondingV5) != address(0) && address(bondingConfig) != address(0)) {
+            (bool found, uint256 tax) = _calculateBondingV5AntiSniperTax(tokenAddress, pair, startTax);
+            if (found) {
+                return tax;
+            }
+        }
+
+        // Legacy logic for BondingV4 and older tokens
+        return _calculateLegacyAntiSniperTax(tokenAddress, pair, startTax);
+    }
+
+    /**
+     * @dev Calculate anti-sniper tax for BondingV5 tokens
+     * @return found Whether the token was found in BondingV5
+     * @return tax The calculated tax (0-99)
+     */
+    function _calculateBondingV5AntiSniperTax(
+        address tokenAddress,
+        IFPairV2 pair,
+        uint256 startTax
+    ) private view returns (bool found, uint256 tax) {
+        try bondingV5.tokenAntiSniperType(tokenAddress) returns (uint8 antiSniperType) {
+            // Get the duration for this anti-sniper type
+            uint256 duration = bondingConfig.getAntiSniperDuration(antiSniperType);
+            
+            // ANTI_SNIPER_NONE: no tax at all
+            if (duration == 0) {
+                return (true, 0);
+            }
+            
+            // Get tax start time
+            uint256 taxStartTime = _getTaxStartTime(pair);
+            
+            // If trading hasn't started yet, use maximum tax
+            if (block.timestamp < taxStartTime) {
+                return (true, startTax);
+            }
+            
+            uint256 timeElapsed = block.timestamp - taxStartTime;
+            
+            // If time elapsed exceeds duration, no tax
+            if (timeElapsed >= duration) {
+                return (true, 0);
+            }
+            
+            // Linear decrease: tax = startTax * (duration - timeElapsed) / duration
+            return (true, (startTax * (duration - timeElapsed)) / duration);
+        } catch {
+            // Token not in BondingV5
+            return (false, 0);
+        }
+    }
+
+    /**
+     * @dev Calculate anti-sniper tax for legacy tokens (BondingV4 and older)
+     */
+    function _calculateLegacyAntiSniperTax(
+        address tokenAddress,
+        IFPairV2 pair,
+        uint256 startTax
+    ) private view returns (uint256) {
+        uint256 taxStartTime = _getTaxStartTime(pair);
+
         // If trading hasn't started yet, use maximum tax
-        if (block.timestamp < finalTaxStartTime) {
+        if (block.timestamp < taxStartTime) {
             return startTax;
         }
 
-        uint256 timeElapsed = block.timestamp - finalTaxStartTime;
+        uint256 timeElapsed = block.timestamp - taxStartTime;
 
         // Check if this is an X_LAUNCH token (shorter anti-sniper period)
         bool isXLaunch = false;
@@ -316,6 +394,25 @@ contract FRouterV2 is
             return 0;
         }
         return startTax - taxReduction;
+    }
+
+    /**
+     * @dev Get the effective tax start time for a pair
+     * @param pair The pair contract
+     * @return The tax start time (taxStartTime if set, otherwise startTime)
+     */
+    function _getTaxStartTime(IFPairV2 pair) private view returns (uint256) {
+        uint256 finalTaxStartTime = pair.startTime();
+        // Try to get taxStartTime safely for backward compatibility
+        try pair.taxStartTime() returns (uint256 _taxStartTime) {
+            if (_taxStartTime > 0) {
+                finalTaxStartTime = _taxStartTime; // use taxStartTime if it's set (for new pairs)
+            }
+        } catch {
+            // Old pair contract doesn't have taxStartTime function
+            // Use startTime for backward compatibility
+        }
+        return finalTaxStartTime;
     }
 
     function hasAntiSniperTax(address pairAddress) public view returns (bool) {

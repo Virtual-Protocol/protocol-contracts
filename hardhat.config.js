@@ -82,6 +82,10 @@ module.exports = {
       url: "https://sepolia.drpc.org",
       accounts: [process.env.PRIVATE_KEY],
     },
+    eth_sepolia: {
+      url: "https://sepolia.drpc.org",
+      accounts: [process.env.PRIVATE_KEY],
+    },
     base: {
       url:
         process.env.BASE_RPC_URL ||

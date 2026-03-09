@@ -111,6 +111,10 @@ const { ethers, upgrades } = require("hardhat");
     if (!uniswapV2Factory) {
       throw new Error("UNISWAP_V2_FACTORY not set in environment");
     }
+    const uniswapV2Router = process.env.UNISWAP_V2_ROUTER;
+    if (!uniswapV2Router) {
+      throw new Error("UNISWAP_V2_ROUTER not set in environment");
+    }
     const agentNftV2 = process.env.AGENT_NFT_V2;
     if (!agentNftV2) {
       throw new Error("AGENT_NFT_V2 not set in environment");
@@ -583,22 +587,31 @@ const { ethers, upgrades } = require("hardhat");
     await tx17.wait();
     console.log("Revoked DEFAULT_ADMIN_ROLE of FRouterV2 from Deployer:", await deployer.getAddress());
 
-    // finally, need admin_private_key to do this
     // 24. Grant MINTER_ROLE of agentNftV2 to agentFactoryV6
+    // Need admin signer because only admin has DEFAULT_ADMIN_ROLE on AgentNftV2
     console.log(
       "\n--- Granting MINTER_ROLE of agentNftV2 to agentFactoryV6 ---"
     );
-    const agentNftV2Contract = await ethers.getContractAt(
-      "AgentNftV2",
-      agentNftV2,
-      process.env.deployer
-    );
-    const tx6_1 = await agentNftV2Contract.grantRole(
-      await agentNftV2Contract.MINTER_ROLE(),
-      agentFactoryV6Address
-    );
-    await tx6_1.wait();
-    console.log("MINTER_ROLE of agentNftV2 granted to agentFactoryV6");
+    if (!process.env.ADMIN_PRIVATE_KEY) {
+      console.log("⚠️  ADMIN_PRIVATE_KEY not set - skipping MINTER_ROLE grant");
+      console.log("⚠️  Admin needs to manually grant MINTER_ROLE of AgentNftV2 to AgentFactoryV6:", agentFactoryV6Address);
+    } else {
+      const adminSigner = new ethers.Wallet(
+        process.env.ADMIN_PRIVATE_KEY,
+        ethers.provider
+      );
+      const agentNftV2Contract = await ethers.getContractAt(
+        "AgentNftV2",
+        agentNftV2,
+        adminSigner
+      );
+      const tx6_1 = await agentNftV2Contract.grantRole(
+        await agentNftV2Contract.MINTER_ROLE(),
+        agentFactoryV6Address
+      );
+      await tx6_1.wait();
+      console.log("✅ MINTER_ROLE of agentNftV2 granted to agentFactoryV6");
+    }
 
     // 24. Print deployment summary
     console.log("\n=== NewLaunchpad Deployment Summary ===");

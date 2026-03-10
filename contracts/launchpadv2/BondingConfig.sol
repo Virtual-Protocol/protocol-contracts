@@ -37,39 +37,6 @@ contract BondingConfig is Initializable, OwnableUpgradeable {
     // returns individual fields, not the whole struct as memory
     ScheduledLaunchParams internal _scheduledLaunchParams;
 
-    function scheduledLaunchParams()
-        external
-        view
-        returns (ScheduledLaunchParams memory)
-    {
-        return _scheduledLaunchParams;
-    }
-
-    /**
-     * @notice Calculate total launch fee based on launch type and ACF requirement
-     * @dev Fee structure:
-     *      - Immediate launch, no ACF: 0
-     *      - Immediate launch, with ACF: acfFee
-     *      - Scheduled launch, no ACF: normalLaunchFee
-     *      - Scheduled launch, with ACF: normalLaunchFee + acfFee
-     * @param isScheduledLaunch_ Whether this is a scheduled launch
-     * @param needAcf_ Whether ACF operations are needed
-     * @return totalFee The total fee to charge
-     */
-    function calculateLaunchFee(
-        bool isScheduledLaunch_,
-        bool needAcf_
-    ) external view returns (uint256) {
-        uint256 totalFee = 0;
-        if (isScheduledLaunch_) {
-            totalFee += _scheduledLaunchParams.normalLaunchFee;
-        }
-        if (needAcf_) {
-            totalFee += _scheduledLaunchParams.acfFee;
-        }
-        return totalFee;
-    }
-
     // Global wallet to receive reserved tokens (airdrop + ACF)
     address public teamTokenReservedWallet;
 
@@ -142,10 +109,6 @@ contract BondingConfig is Initializable, OwnableUpgradeable {
     // Note: Using internal + view function because Solidity auto-getter for structs
     // returns individual fields, not the whole struct as memory
     DeployParams internal _deployParams;
-
-    function deployParams() external view returns (DeployParams memory) {
-        return _deployParams;
-    }
 
     // Common parameters
     uint256 public initialSupply;
@@ -358,5 +321,42 @@ contract BondingConfig is Initializable, OwnableUpgradeable {
             return 5880; // 98 minutes = 98 * 60 = 5880 seconds
         }
         revert InvalidAntiSniperType();
+    }
+
+    function scheduledLaunchParams()
+        external
+        view
+        returns (ScheduledLaunchParams memory)
+    {
+        return _scheduledLaunchParams;
+    }
+
+    function deployParams() external view returns (DeployParams memory) {
+        return _deployParams;
+    }
+
+    /**
+     * @notice Calculate total launch fee based on launch type and ACF requirement
+     * @dev Fee structure:
+     *      - Immediate launch, no ACF: 0
+     *      - Immediate launch, with ACF: acfFee
+     *      - Scheduled launch, no ACF: normalLaunchFee
+     *      - Scheduled launch, with ACF: normalLaunchFee + acfFee
+     * @param isScheduledLaunch_ Whether this is a scheduled launch
+     * @param needAcf_ Whether ACF operations are needed
+     * @return totalFee The total fee to charge
+     */
+    function calculateLaunchFee(
+        bool isScheduledLaunch_,
+        bool needAcf_
+    ) external view returns (uint256) {
+        uint256 totalFee = 0;
+        if (isScheduledLaunch_) {
+            totalFee += _scheduledLaunchParams.normalLaunchFee;
+        }
+        if (needAcf_) {
+            totalFee += _scheduledLaunchParams.acfFee;
+        }
+        return totalFee;
     }
 }

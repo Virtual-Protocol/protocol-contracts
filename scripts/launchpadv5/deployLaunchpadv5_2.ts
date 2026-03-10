@@ -1,4 +1,5 @@
 import { parseEther } from "ethers";
+import { verifyContract } from "./utils";
 const { ethers, upgrades } = require("hardhat");
 
 // Environment variables are loaded via hardhat.config.js
@@ -157,6 +158,9 @@ const { ethers, upgrades } = require("hardhat");
         "AgentTokenV2 implementation deployed at:",
         agentTokenV2ImplAddress
       );
+
+      // Verify AgentTokenV2 implementation
+      await verifyContract(agentTokenV2ImplAddress);
     } else {
       agentTokenV2ImplAddress = agentTokenV2Impl;
       console.log(
@@ -181,6 +185,9 @@ const { ethers, upgrades } = require("hardhat");
         "AgentVeTokenV2 implementation deployed at:",
         agentVeTokenV2ImplAddress
       );
+
+      // Verify AgentVeTokenV2 implementation
+      await verifyContract(agentVeTokenV2ImplAddress);
     } else {
       agentVeTokenV2ImplAddress = agentVeTokenV2Impl;
       console.log(
@@ -202,6 +209,9 @@ const { ethers, upgrades } = require("hardhat");
       agentDAOImplAddress = await agentDAO.getAddress();
       deployedContracts.AgentDAOImpl = agentDAOImplAddress;
       console.log("AgentDAO implementation deployed at:", agentDAOImplAddress);
+
+      // Verify AgentDAO implementation
+      await verifyContract(agentDAOImplAddress);
     } else {
       agentDAOImplAddress = agentDAOImpl;
       console.log(
@@ -253,37 +263,43 @@ const { ethers, upgrades } = require("hardhat");
     deployedContracts.AgentFactoryV6 = agentFactoryV6Address;
     console.log("AgentFactoryV6 deployed at:", agentFactoryV6Address);
 
+    // Verify AgentFactoryV6 proxy
+    await verifyContract(agentFactoryV6Address);
+
     // ============================================
     // 8. Configure AgentFactoryV6
     // ============================================
     console.log("\n--- Configuring AgentFactoryV6 ---");
 
     // Grant DEFAULT_ADMIN_ROLE to deployer temporarily
-    await agentFactoryV6.grantRole(
+    const txGrantAdmin = await agentFactoryV6.grantRole(
       await agentFactoryV6.DEFAULT_ADMIN_ROLE(),
       deployerAddress
     );
+    await txGrantAdmin.wait();
     console.log("DEFAULT_ADMIN_ROLE granted to deployer temporarily");
 
     // Set params
-    await agentFactoryV6.setParams(
+    const txSetParams = await agentFactoryV6.setParams(
       agentFactoryV6MaturityDuration, // maturity duration (from env)
       uniswapV2RouterAddress,
       admin, // defaultDelegatee
       admin // tokenAdmin
     );
+    await txSetParams.wait();
     console.log(
       "setParams() called for AgentFactoryV6 with maturityDuration:",
       agentFactoryV6MaturityDuration
     );
 
     // Set token params (Sentient phase tax configuration)
-    await agentFactoryV6.setTokenParams(
+    const txSetTokenParams = await agentFactoryV6.setTokenParams(
       sentientBuyTax, // projectBuyTaxBasisPoints
       sentientSellTax, // projectSellTaxBasisPoints
       taxSwapThresholdBasisPoints, // taxSwapThresholdBasisPoints (from env)
       agentTokenTaxManager // projectTaxRecipient (fee address)
     );
+    await txSetTokenParams.wait();
     console.log("setTokenParams() called for AgentFactoryV6:", {
       sentientBuyTax,
       sentientSellTax,
@@ -292,15 +308,17 @@ const { ethers, upgrades } = require("hardhat");
     });
 
     // Grant DEFAULT_ADMIN_ROLE to admin
-    await agentFactoryV6.grantRole(
+    const txGrantAdminToAdmin = await agentFactoryV6.grantRole(
       await agentFactoryV6.DEFAULT_ADMIN_ROLE(),
       admin
     );
+    await txGrantAdminToAdmin.wait();
     console.log("DEFAULT_ADMIN_ROLE granted to admin:", admin);
 
     // Grant REMOVE_LIQUIDITY_ROLE to admin
     const removeLiqRole = await agentFactoryV6.REMOVE_LIQUIDITY_ROLE();
-    await agentFactoryV6.grantRole(removeLiqRole, admin);
+    const txGrantRemoveLiq = await agentFactoryV6.grantRole(removeLiqRole, admin);
+    await txGrantRemoveLiq.wait();
     console.log("REMOVE_LIQUIDITY_ROLE granted to admin:", admin);
 
     // ============================================

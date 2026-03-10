@@ -21,6 +21,13 @@ interface IBondingV4ForTax {
     function isAcpSkillLaunch(address token) external view returns (bool);
 }
 
+// Minimal interface for BondingV5 (combines V2 and V4 functionality)
+interface IBondingV5ForTax {
+    function isProject60days(address token) external view returns (bool);
+    function isProjectXLaunch(address token) external view returns (bool);
+    function isAcpSkillLaunch(address token) external view returns (bool);
+}
+
 contract AgentTax is Initializable, AccessControlUpgradeable {
     using SafeERC20 for IERC20;
     struct TaxHistory {
@@ -86,7 +93,7 @@ contract AgentTax is Initializable, AccessControlUpgradeable {
     );
 
     mapping(uint256 agentId => TaxRecipient) private _agentRecipients;
-    uint16 public creatorFeeRate;
+    uint16 public creatorFeeRate; // actually this variable is not used
 
     event CreatorUpdated(
         uint256 agentId,
@@ -94,9 +101,10 @@ contract AgentTax is Initializable, AccessControlUpgradeable {
         address newCreator
     );
 
-    ITBABonus public tbaBonus;
+    ITBABonus public tbaBonus; // deprecated
     IBondingV2ForTax public bondingV2;
     IBondingV4ForTax public bondingV4;
+    IBondingV5ForTax public bondingV5;
 
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() {
@@ -131,8 +139,8 @@ contract AgentTax is Initializable, AccessControlUpgradeable {
         IERC20(taxToken).forceApprove(router_, type(uint256).max);
         agentNft = IAgentNft(nft_);
 
-        feeRate = 100;
-        creatorFeeRate = 3000;
+        feeRate = 3000; // set init value, so no need to call updateSwapParams after deployment
+        creatorFeeRate = 7000; // set init value, so no need to call updateSwapParams after deployment
 
         emit SwapParamsUpdated2(
             address(0),
@@ -296,13 +304,6 @@ contract AgentTax is Initializable, AccessControlUpgradeable {
                     taxRecipient.creator,
                     creatorFee
                 );
-                if (address(tbaBonus) != address(0)) {
-                    tbaBonus.distributeBonus(
-                        agentId,
-                        taxRecipient.creator,
-                        creatorFee
-                    );
-                }
             }
 
             if (feeAmount > 0) {
@@ -373,7 +374,7 @@ contract AgentTax is Initializable, AccessControlUpgradeable {
     }
 
     /**
-     * @notice Update tax recipient for new feature agents launched via BondingV2
+     * @notice Update tax recipient for new feature agents launched via BondingV2 or BondingV5
      * @param agentId The agentId (virtualId) of the agent
      * @param tba The Token Bound Address for the agent
      * @param creator The creator address that will receive tax rewards
@@ -383,18 +384,21 @@ contract AgentTax is Initializable, AccessControlUpgradeable {
         address tba,
         address creator
     ) public onlyRole(EXECUTOR_V2_ROLE) {
-        require(address(bondingV2) != address(0), "BondingV2 not set");
-
         // Get token address from agentId
         IAgentNft.VirtualInfo memory info = agentNft.virtualInfo(agentId);
         address token = info.token;
         require(token != address(0), "Token not found");
 
-        // Check if this is a Project60days token
-        require(
-            bondingV2.isProject60days(token),
-            "Token is not a Project60days token"
-        );
+        // Check if this is a Project60days token from any of BondingV2, BondingV4, or BondingV5
+        // Once true, stays true (using OR logic to prevent overwriting)
+        bool isProject60days = false;
+        if (address(bondingV5) != address(0)) {
+            isProject60days = isProject60days || bondingV5.isProject60days(token);
+        }
+        if (address(bondingV2) != address(0)) {
+            isProject60days = isProject60days || bondingV2.isProject60days(token);
+        }
+        require(isProject60days, "Token is not a Project60days token");
 
         require(tba != address(0), "Invalid TBA");
         require(creator != address(0), "Invalid creator");
@@ -416,7 +420,16 @@ contract AgentTax is Initializable, AccessControlUpgradeable {
     }
 
     /**
-     * @notice Update tax recipient for special launch mode agents (X_LAUNCH or ACP_SKILL) via BondingV4
+     * @notice Set BondingV5 contract address (combines V2 and V4 functionality)
+     * @param bondingV5_ The address of the BondingV5 contract
+     */
+    function setBondingV5(address bondingV5_) public onlyRole(ADMIN_ROLE) {
+        require(bondingV5_ != address(0), "Invalid BondingV5 address");
+        bondingV5 = IBondingV5ForTax(bondingV5_);
+    }
+
+    /**
+     * @notice Update tax recipient for special launch mode agents (X_LAUNCH or ACP_SKILL) via BondingV4 or BondingV5
      * @param agentId The agentId (virtualId) of the agent
      * @param tba The Token Bound Address for the agent
      * @param creator The creator address that will receive tax rewards
@@ -426,19 +439,21 @@ contract AgentTax is Initializable, AccessControlUpgradeable {
         address tba,
         address creator
     ) public onlyRole(EXECUTOR_V2_ROLE) {
-        require(address(bondingV4) != address(0), "BondingV4 not set");
-
         // Get token address from agentId
         IAgentNft.VirtualInfo memory info = agentNft.virtualInfo(agentId);
         address token = info.token;
         require(token != address(0), "Token not found");
 
-        // Check if this is a special launch mode token (X_LAUNCH or ACP_SKILL)
-        require(
-            bondingV4.isProjectXLaunch(token) ||
-                bondingV4.isAcpSkillLaunch(token),
-            "Token is not X_LAUNCH or ACP_SKILL"
-        );
+        // Check if this is a special launch mode token (X_LAUNCH or ACP_SKILL) from any of BondingV4 or BondingV5
+        // Once true, stays true (using OR logic to prevent overwriting)
+        bool isSpecialMode = false;
+        if (address(bondingV5) != address(0)) {
+            isSpecialMode = isSpecialMode || bondingV5.isProjectXLaunch(token) || bondingV5.isAcpSkillLaunch(token);
+        }
+        if (address(bondingV4) != address(0)) {
+            isSpecialMode = isSpecialMode || bondingV4.isProjectXLaunch(token) || bondingV4.isAcpSkillLaunch(token);
+        }
+        require(isSpecialMode, "Token is not X_LAUNCH or ACP_SKILL");
 
         require(tba != address(0), "Invalid TBA");
         require(creator != address(0), "Invalid creator");
@@ -477,9 +492,5 @@ contract AgentTax is Initializable, AccessControlUpgradeable {
             uint256 minOutput = (amountToSwap * minConversionRate) / rateDenom;
             _swapForAsset(agentId, minOutput, maxOverride);
         }
-    }
-
-    function updateTbaBonus(address tbaBonus_) public onlyRole(ADMIN_ROLE) {
-        tbaBonus = ITBABonus(tbaBonus_);
     }
 }

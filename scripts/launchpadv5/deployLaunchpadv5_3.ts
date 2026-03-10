@@ -1,4 +1,5 @@
 import { parseEther } from "ethers";
+import { verifyContract } from "./utils";
 const { ethers, upgrades } = require("hardhat");
 
 // Environment variables are loaded via hardhat.config.js
@@ -151,6 +152,9 @@ const { ethers, upgrades } = require("hardhat");
     const bondingConfigAddress = await bondingConfig.getAddress();
     console.log("BondingConfig deployed at:", bondingConfigAddress);
 
+    // Verify BondingConfig proxy
+    await verifyContract(bondingConfigAddress);
+
     // Set X Launchers
     const xLauncherAddresses = process.env.X_LAUNCHER_ADDRESSES;
     if (xLauncherAddresses) {
@@ -197,6 +201,9 @@ const { ethers, upgrades } = require("hardhat");
     const bondingV5Address = await bondingV5.getAddress();
     console.log("BondingV5 deployed at:", bondingV5Address);
 
+    // Verify BondingV5 proxy
+    await verifyContract(bondingV5Address);
+
     // ============================================
     // 3. Transfer Ownership
     // ============================================
@@ -218,6 +225,10 @@ const { ethers, upgrades } = require("hardhat");
     console.log("\n--- Granting necessary roles (using admin wallet) ---");
 
     const adminPrivateKey = process.env.ADMIN_PRIVATE_KEY;
+    const agentTaxAddress = process.env.AGENT_TOKEN_TAX_MANAGER;
+    if (!agentTaxAddress) {
+      throw new Error("AGENT_TOKEN_TAX_MANAGER not set in environment");
+    }
     if (!adminPrivateKey) {
       console.log("\n" + "=".repeat(80));
       console.log("⚠️  ADMIN_PRIVATE_KEY not set - Manual role grants required!");
@@ -227,6 +238,7 @@ const { ethers, upgrades } = require("hardhat");
       console.log(`2. FRouterV2.setBondingV5(${bondingV5Address}, ${bondingConfigAddress})`);
       console.log(`3. FRouterV2.grantRole(EXECUTOR_ROLE, ${bondingV5Address})`);
       console.log(`4. AgentFactoryV6.grantRole(BONDING_ROLE, ${bondingV5Address})`);
+      console.log(`5. AgentTax.setBondingV5(${bondingV5Address})`);
       console.log("=".repeat(80));
       throw new Error("ADMIN_PRIVATE_KEY not set - Manual role grants required!");
     } else {
@@ -259,6 +271,19 @@ const { ethers, upgrades } = require("hardhat");
       const bondingRole = await agentFactoryV6.BONDING_ROLE();
       await (await agentFactoryV6.grantRole(bondingRole, bondingV5Address)).wait();
       console.log("✅ Granted BONDING_ROLE of AgentFactoryV6 to BondingV5");
+
+      // 3.5 Set BondingV5 in AgentTax (optional - only if AGENT_TAX_ADDRESS is set)
+      const agentTaxAddress = process.env.AGENT_TAX_ADDRESS;
+      if (agentTaxAddress) {
+        console.log("\n--- Setting BondingV5 in AgentTax ---");
+        const agentTax = await ethers.getContractAt("AgentTax", agentTaxAddress, adminSigner);
+        await (await agentTax.setBondingV5(bondingV5Address)).wait();
+        console.log("✅ Set BondingV5 in AgentTax:", bondingV5Address);
+      } else {
+        console.log("\n⚠️  AGENT_TAX_ADDRESS not set - skipping AgentTax.setBondingV5()");
+        console.log("   If you have AgentTax deployed, run manually:");
+        console.log(`   agentTax.setBondingV5(${bondingV5Address})`);
+      }
 
       console.log("\n✅ All role grants completed!");
     }

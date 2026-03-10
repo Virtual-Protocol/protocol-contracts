@@ -861,16 +861,16 @@ describe("BondingV5", function () {
   });
 
   // ============================================
-  // PEGASUS_X_LAUNCH Mode Tests
+  // LAUNCH_MODE_X_LAUNCH (Special Mode) Tests
   // ============================================
-  describe("PEGASUS_X_LAUNCH Mode", function () {
+  describe("LAUNCH_MODE_X_LAUNCH (Special Mode)", function () {
     before(async function () {
       const { bondingConfig } = contracts;
       const { owner, user1 } = accounts;
 
-      // Authorize user1 as XLauncher
+      // Authorize user1 as XLauncher for X_LAUNCH mode
       await bondingConfig.connect(owner).setXLauncher(user1.address, true);
-      console.log("user1 authorized as XLauncher for PEGASUS_X_LAUNCH");
+      console.log("user1 authorized as XLauncher for LAUNCH_MODE_X_LAUNCH");
     });
 
     it("Should create a token with isProjectXLaunch returning true", async function () {
@@ -881,7 +881,7 @@ describe("BondingV5", function () {
 
       await virtualToken.connect(user1).approve(addresses.bondingV5, purchaseAmount);
 
-      // Pegasus modes require immediate launch (startTime within 24h)
+      // Special modes require immediate launch (startTime within 24h)
       const startTime = (await time.latest()) + 100;
       const tx = await bondingV5
         .connect(user1)
@@ -895,10 +895,10 @@ describe("BondingV5", function () {
           purchaseAmount,
           startTime,
           LAUNCH_MODE_X_LAUNCH,
-          0,                      // airdropPercent must be 0 for Pegasus
-          false,                  // needAcf must be false for Pegasus
-          ANTI_SNIPER_NONE,       // antiSniperTaxType must be NONE for Pegasus
-          false                   // isProject60days must be false for Pegasus
+          0,                      // airdropPercent must be 0 for special modes
+          false,                  // needAcf must be false for special modes
+          ANTI_SNIPER_NONE,       // antiSniperTaxType must be NONE for special modes
+          false                   // isProject60days must be false for special modes
         );
 
       const receipt = await tx.wait();
@@ -957,7 +957,7 @@ describe("BondingV5", function () {
       ).to.be.revertedWithCustomError(bondingV5, "UnauthorizedLauncher");
     });
 
-    it("Should revert if Pegasus mode uses invalid params", async function () {
+    it("Should revert if X_LAUNCH mode uses invalid params", async function () {
       const { user1 } = accounts;
       const { bondingV5, virtualToken } = contracts;
 
@@ -966,7 +966,7 @@ describe("BondingV5", function () {
 
       const startTime = (await time.latest()) + 100;
 
-      // Should revert with non-zero airdropPercent (even if within maxAirdropPercent)
+      // Should revert with non-zero airdropPercent (special modes require 0)
       await expect(
         bondingV5.connect(user1).preLaunch(
           "Invalid X Launch",
@@ -988,16 +988,16 @@ describe("BondingV5", function () {
   });
 
   // ============================================
-  // PEGASUS_ACP_SKILL Mode Tests
+  // LAUNCH_MODE_ACP_SKILL (Special Mode) Tests
   // ============================================
-  describe("PEGASUS_ACP_SKILL Mode", function () {
+  describe("LAUNCH_MODE_ACP_SKILL (Special Mode)", function () {
     before(async function () {
       const { bondingConfig } = contracts;
       const { owner, user1 } = accounts;
 
-      // Authorize user1 as AcpSkillLauncher
+      // Authorize user1 as AcpSkillLauncher for ACP_SKILL mode
       await bondingConfig.connect(owner).setAcpSkillLauncher(user1.address, true);
-      console.log("user1 authorized as AcpSkillLauncher for PEGASUS_ACP_SKILL");
+      console.log("user1 authorized as AcpSkillLauncher for LAUNCH_MODE_ACP_SKILL");
     });
 
     it("Should create a token with isAcpSkillLaunch returning true", async function () {
@@ -1634,9 +1634,9 @@ describe("BondingV5", function () {
   });
 
   // ============================================
-  // Pegasus Mode Strict Validation Tests
+  // Special Mode Strict Validation Tests (X_LAUNCH and ACP_SKILL)
   // ============================================
-  describe("Pegasus Mode Strict Validation", function () {
+  describe("Special Mode Strict Validation (X_LAUNCH and ACP_SKILL)", function () {
     before(async function () {
       const { bondingConfig } = contracts;
       const { owner, user1 } = accounts;
@@ -1645,7 +1645,7 @@ describe("BondingV5", function () {
       await bondingConfig.connect(owner).setAcpSkillLauncher(user1.address, true);
     });
 
-    it("Should revert Pegasus X_LAUNCH with non-zero airdropPercent", async function () {
+    it("Should revert X_LAUNCH with non-zero airdropPercent", async function () {
       const { user1 } = accounts;
       const { bondingV5, virtualToken } = contracts;
 
@@ -1656,7 +1656,7 @@ describe("BondingV5", function () {
 
       await expect(
         bondingV5.connect(user1).preLaunch(
-          "Invalid Pegasus", "INV", [0, 1], "Description",
+          "Invalid X_LAUNCH", "INV", [0, 1], "Description",
           "https://example.com/image.png", ["", "", "", ""],
           purchaseAmount, startTime,
           LAUNCH_MODE_X_LAUNCH, 5, false, ANTI_SNIPER_NONE, false
@@ -1664,7 +1664,7 @@ describe("BondingV5", function () {
       ).to.be.revertedWithCustomError(bondingV5, "InvalidSpecialLaunchParams");
     });
 
-    it("Should revert Pegasus X_LAUNCH with needAcf = true", async function () {
+    it("Should revert X_LAUNCH with needAcf = true", async function () {
       const { user1 } = accounts;
       const { bondingV5, virtualToken } = contracts;
 
@@ -1675,7 +1675,7 @@ describe("BondingV5", function () {
 
       await expect(
         bondingV5.connect(user1).preLaunch(
-          "Invalid Pegasus ACF", "INVA", [0, 1], "Description",
+          "Invalid X_LAUNCH ACF", "INVA", [0, 1], "Description",
           "https://example.com/image.png", ["", "", "", ""],
           purchaseAmount, startTime,
           LAUNCH_MODE_X_LAUNCH, 0, true, ANTI_SNIPER_NONE, false
@@ -1683,7 +1683,7 @@ describe("BondingV5", function () {
       ).to.be.revertedWithCustomError(bondingV5, "InvalidSpecialLaunchParams");
     });
 
-    it("Should revert Pegasus X_LAUNCH with non-NONE anti-sniper type", async function () {
+    it("Should revert X_LAUNCH with non-NONE anti-sniper type", async function () {
       const { user1 } = accounts;
       const { bondingV5, virtualToken } = contracts;
 
@@ -1694,7 +1694,7 @@ describe("BondingV5", function () {
 
       await expect(
         bondingV5.connect(user1).preLaunch(
-          "Invalid Pegasus AS", "INAS", [0, 1], "Description",
+          "Invalid X_LAUNCH AS", "INAS", [0, 1], "Description",
           "https://example.com/image.png", ["", "", "", ""],
           purchaseAmount, startTime,
           LAUNCH_MODE_X_LAUNCH, 0, false, ANTI_SNIPER_60S, false
@@ -1702,7 +1702,7 @@ describe("BondingV5", function () {
       ).to.be.revertedWithCustomError(bondingV5, "InvalidSpecialLaunchParams");
     });
 
-    it("Should revert Pegasus X_LAUNCH with isProject60days = true", async function () {
+    it("Should revert X_LAUNCH with isProject60days = true", async function () {
       const { user1 } = accounts;
       const { bondingV5, virtualToken } = contracts;
 
@@ -1713,7 +1713,7 @@ describe("BondingV5", function () {
 
       await expect(
         bondingV5.connect(user1).preLaunch(
-          "Invalid Pegasus 60D", "IN60", [0, 1], "Description",
+          "Invalid X_LAUNCH 60D", "IN60", [0, 1], "Description",
           "https://example.com/image.png", ["", "", "", ""],
           purchaseAmount, startTime,
           LAUNCH_MODE_X_LAUNCH, 0, false, ANTI_SNIPER_NONE, true
@@ -1721,7 +1721,7 @@ describe("BondingV5", function () {
       ).to.be.revertedWithCustomError(bondingV5, "InvalidSpecialLaunchParams");
     });
 
-    it("Should revert Pegasus X_LAUNCH with scheduled launch (not immediate)", async function () {
+    it("Should revert X_LAUNCH with scheduled launch (not immediate)", async function () {
       const { user1 } = accounts;
       const { bondingV5, virtualToken } = contracts;
 
@@ -1733,7 +1733,7 @@ describe("BondingV5", function () {
 
       await expect(
         bondingV5.connect(user1).preLaunch(
-          "Scheduled Pegasus", "SCHP", [0, 1], "Description",
+          "Scheduled X_LAUNCH", "SCHP", [0, 1], "Description",
           "https://example.com/image.png", ["", "", "", ""],
           purchaseAmount, startTime,
           LAUNCH_MODE_X_LAUNCH, 0, false, ANTI_SNIPER_NONE, false
@@ -1741,7 +1741,7 @@ describe("BondingV5", function () {
       ).to.be.revertedWithCustomError(bondingV5, "InvalidSpecialLaunchParams");
     });
 
-    it("Should revert Pegasus ACP_SKILL with any invalid param combination", async function () {
+    it("Should revert ACP_SKILL with non-zero airdropPercent", async function () {
       const { user1 } = accounts;
       const { bondingV5, virtualToken } = contracts;
 
@@ -1750,13 +1750,89 @@ describe("BondingV5", function () {
 
       const startTime = (await time.latest()) + 100;
 
-      // Test all invalid params for ACP_SKILL
       await expect(
         bondingV5.connect(user1).preLaunch(
-          "Invalid ACP", "IACP", [0, 1], "Description",
+          "Invalid ACP_SKILL", "IACP", [0, 1], "Description",
           "https://example.com/image.png", ["", "", "", ""],
           purchaseAmount, startTime,
           LAUNCH_MODE_ACP_SKILL, 5, false, ANTI_SNIPER_NONE, false
+        )
+      ).to.be.revertedWithCustomError(bondingV5, "InvalidSpecialLaunchParams");
+    });
+
+    it("Should revert ACP_SKILL with needAcf = true", async function () {
+      const { user1 } = accounts;
+      const { bondingV5, virtualToken } = contracts;
+
+      const purchaseAmount = ethers.parseEther("1000");
+      await virtualToken.connect(user1).approve(addresses.bondingV5, purchaseAmount);
+
+      const startTime = (await time.latest()) + 100;
+
+      await expect(
+        bondingV5.connect(user1).preLaunch(
+          "Invalid ACP_SKILL ACF", "IACF", [0, 1], "Description",
+          "https://example.com/image.png", ["", "", "", ""],
+          purchaseAmount, startTime,
+          LAUNCH_MODE_ACP_SKILL, 0, true, ANTI_SNIPER_NONE, false
+        )
+      ).to.be.revertedWithCustomError(bondingV5, "InvalidSpecialLaunchParams");
+    });
+
+    it("Should revert ACP_SKILL with non-NONE anti-sniper type", async function () {
+      const { user1 } = accounts;
+      const { bondingV5, virtualToken } = contracts;
+
+      const purchaseAmount = ethers.parseEther("1000");
+      await virtualToken.connect(user1).approve(addresses.bondingV5, purchaseAmount);
+
+      const startTime = (await time.latest()) + 100;
+
+      await expect(
+        bondingV5.connect(user1).preLaunch(
+          "Invalid ACP_SKILL AS", "IAAS", [0, 1], "Description",
+          "https://example.com/image.png", ["", "", "", ""],
+          purchaseAmount, startTime,
+          LAUNCH_MODE_ACP_SKILL, 0, false, ANTI_SNIPER_98M, false
+        )
+      ).to.be.revertedWithCustomError(bondingV5, "InvalidSpecialLaunchParams");
+    });
+
+    it("Should revert ACP_SKILL with isProject60days = true", async function () {
+      const { user1 } = accounts;
+      const { bondingV5, virtualToken } = contracts;
+
+      const purchaseAmount = ethers.parseEther("1000");
+      await virtualToken.connect(user1).approve(addresses.bondingV5, purchaseAmount);
+
+      const startTime = (await time.latest()) + 100;
+
+      await expect(
+        bondingV5.connect(user1).preLaunch(
+          "Invalid ACP_SKILL 60D", "IA60", [0, 1], "Description",
+          "https://example.com/image.png", ["", "", "", ""],
+          purchaseAmount, startTime,
+          LAUNCH_MODE_ACP_SKILL, 0, false, ANTI_SNIPER_NONE, true
+        )
+      ).to.be.revertedWithCustomError(bondingV5, "InvalidSpecialLaunchParams");
+    });
+
+    it("Should revert ACP_SKILL with scheduled launch (not immediate)", async function () {
+      const { user1 } = accounts;
+      const { bondingV5, virtualToken } = contracts;
+
+      const purchaseAmount = ethers.parseEther("1000");
+      await virtualToken.connect(user1).approve(addresses.bondingV5, purchaseAmount);
+
+      // Scheduled launch (startTime >= now + 24h)
+      const startTime = (await time.latest()) + START_TIME_DELAY + 1;
+
+      await expect(
+        bondingV5.connect(user1).preLaunch(
+          "Scheduled ACP_SKILL", "SACP", [0, 1], "Description",
+          "https://example.com/image.png", ["", "", "", ""],
+          purchaseAmount, startTime,
+          LAUNCH_MODE_ACP_SKILL, 0, false, ANTI_SNIPER_NONE, false
         )
       ).to.be.revertedWithCustomError(bondingV5, "InvalidSpecialLaunchParams");
     });
@@ -2269,6 +2345,527 @@ describe("BondingV5", function () {
       expect(launchParams.needAcf).to.equal(false);
       expect(launchParams.antiSniperTaxType).to.equal(ANTI_SNIPER_98M);
       expect(launchParams.isProject60days).to.equal(true);
+    });
+  });
+
+  // ============================================
+  // cancelLaunch Tests
+  // ============================================
+  describe("cancelLaunch", function () {
+    let tokenAddress;
+    let pairAddress;
+
+    beforeEach(async function () {
+      const { user1 } = accounts;
+      const { bondingV5, virtualToken } = contracts;
+
+      const purchaseAmount = ethers.parseEther("1000");
+      await virtualToken.connect(user1).approve(addresses.bondingV5, purchaseAmount);
+
+      const startTime = (await time.latest()) + START_TIME_DELAY + 1;
+      const tx = await bondingV5
+        .connect(user1)
+        .preLaunch(
+          "Cancel Test Token",
+          "CTT",
+          [0, 1, 2],
+          "Test token for cancel",
+          "https://example.com/image.png",
+          ["", "", "", ""],
+          purchaseAmount,
+          startTime,
+          LAUNCH_MODE_NORMAL,
+          0,
+          false,
+          ANTI_SNIPER_60S,
+          false
+        );
+
+      const receipt = await tx.wait();
+      const event = receipt.logs.find((log) => {
+        try {
+          const parsed = bondingV5.interface.parseLog(log);
+          return parsed.name === "PreLaunched";
+        } catch (e) {
+          return false;
+        }
+      });
+
+      const parsedEvent = bondingV5.interface.parseLog(event);
+      tokenAddress = parsedEvent.args.token;
+      pairAddress = parsedEvent.args.pair;
+    });
+
+    it("Should allow creator to cancel launch before launch() is called", async function () {
+      const { user1 } = accounts;
+      const { bondingV5, virtualToken } = contracts;
+
+      const balanceBefore = await virtualToken.balanceOf(user1.address);
+
+      const tx = await bondingV5.connect(user1).cancelLaunch(tokenAddress);
+      const receipt = await tx.wait();
+
+      // Verify CancelledLaunch event
+      const event = receipt.logs.find((log) => {
+        try {
+          const parsed = bondingV5.interface.parseLog(log);
+          return parsed.name === "CancelledLaunch";
+        } catch (e) {
+          return false;
+        }
+      });
+      expect(event).to.not.be.undefined;
+
+      // Verify initialPurchase is returned to creator
+      const balanceAfter = await virtualToken.balanceOf(user1.address);
+      expect(balanceAfter).to.be.greaterThan(balanceBefore);
+
+      // Verify token status is updated
+      const tokenInfo = await bondingV5.tokenInfo(tokenAddress);
+      expect(tokenInfo.launchExecuted).to.be.true;
+      expect(tokenInfo.initialPurchase).to.equal(0);
+    });
+
+    it("Should revert if non-creator tries to cancel", async function () {
+      const { user2 } = accounts;
+      const { bondingV5 } = contracts;
+
+      await expect(
+        bondingV5.connect(user2).cancelLaunch(tokenAddress)
+      ).to.be.revertedWithCustomError(bondingV5, "InvalidInput");
+    });
+
+    it("Should revert if trying to cancel after launch() is called", async function () {
+      const { user1 } = accounts;
+      const { bondingV5 } = contracts;
+
+      // Wait and launch first
+      await time.increase(START_TIME_DELAY + 1);
+      await bondingV5.launch(tokenAddress);
+
+      // Then try to cancel
+      await expect(
+        bondingV5.connect(user1).cancelLaunch(tokenAddress)
+      ).to.be.revertedWithCustomError(bondingV5, "InvalidTokenStatus");
+    });
+
+    it("Should revert if trying to cancel twice", async function () {
+      const { user1 } = accounts;
+      const { bondingV5 } = contracts;
+
+      // First cancel
+      await bondingV5.connect(user1).cancelLaunch(tokenAddress);
+
+      // Second cancel should fail
+      await expect(
+        bondingV5.connect(user1).cancelLaunch(tokenAddress)
+      ).to.be.revertedWithCustomError(bondingV5, "InvalidTokenStatus");
+    });
+
+    it("Should revert when cancelling non-existent token", async function () {
+      const { user1 } = accounts;
+      const { bondingV5 } = contracts;
+
+      await expect(
+        bondingV5.connect(user1).cancelLaunch(ethers.ZeroAddress)
+      ).to.be.revertedWithCustomError(bondingV5, "InvalidInput");
+    });
+  });
+
+  // ============================================
+  // BondingV5 Admin Functions Tests
+  // ============================================
+  describe("BondingV5 Admin Functions", function () {
+    it("Should allow owner to update BondingConfig", async function () {
+      const { owner } = accounts;
+      const { bondingV5, bondingConfig } = contracts;
+
+      // Deploy a new BondingConfig for testing
+      const BondingConfig = await ethers.getContractFactory("BondingConfig");
+      const newBondingConfig = await upgrades.deployProxy(
+        BondingConfig,
+        [
+          INITIAL_SUPPLY,
+          owner.address,
+          owner.address,
+          MAX_AIRDROP_PERCENT,
+          { startTimeDelay: START_TIME_DELAY, normalLaunchFee: NORMAL_LAUNCH_FEE, acfFee: ACF_FEE },
+          { tbaSalt: TBA_SALT, tbaImplementation: TBA_IMPLEMENTATION, daoVotingPeriod: DAO_VOTING_PERIOD, daoThreshold: DAO_THRESHOLD },
+          { fakeInitialVirtualLiq: FAKE_INITIAL_VIRTUAL_LIQ, targetRealVirtual: TARGET_REAL_VIRTUAL },
+        ],
+        { initializer: "initialize" }
+      );
+      await newBondingConfig.waitForDeployment();
+
+      // Update BondingConfig
+      await bondingV5.connect(owner).setBondingConfig(await newBondingConfig.getAddress());
+
+      // Verify the update
+      expect(await bondingV5.bondingConfig()).to.equal(await newBondingConfig.getAddress());
+
+      // Reset to original
+      await bondingV5.connect(owner).setBondingConfig(await bondingConfig.getAddress());
+    });
+
+    it("Should revert if non-owner tries to update BondingConfig", async function () {
+      const { user1 } = accounts;
+      const { bondingV5 } = contracts;
+
+      await expect(
+        bondingV5.connect(user1).setBondingConfig(ethers.ZeroAddress)
+      ).to.be.revertedWithCustomError(bondingV5, "OwnableUnauthorizedAccount");
+    });
+  });
+
+  // ============================================
+  // View Functions Tests
+  // ============================================
+  describe("View Functions", function () {
+    let tokenAddress;
+
+    beforeEach(async function () {
+      const { user1 } = accounts;
+      const { bondingV5, virtualToken } = contracts;
+
+      const purchaseAmount = ethers.parseEther("1000");
+      await virtualToken.connect(user1).approve(addresses.bondingV5, purchaseAmount);
+
+      const startTime = (await time.latest()) + START_TIME_DELAY + 1;
+      const tx = await bondingV5
+        .connect(user1)
+        .preLaunch(
+          "View Test Token",
+          "VTT",
+          [0, 1, 2],
+          "Test token for view functions",
+          "https://example.com/image.png",
+          ["", "", "", ""],
+          purchaseAmount,
+          startTime,
+          LAUNCH_MODE_NORMAL,
+          3,
+          true,
+          ANTI_SNIPER_98M,
+          true
+        );
+
+      const receipt = await tx.wait();
+      const event = receipt.logs.find((log) => {
+        try {
+          const parsed = bondingV5.interface.parseLog(log);
+          return parsed.name === "PreLaunched";
+        } catch (e) {
+          return false;
+        }
+      });
+
+      tokenAddress = bondingV5.interface.parseLog(event).args.token;
+    });
+
+    it("Should return correct isProject60days value", async function () {
+      const { bondingV5 } = contracts;
+      expect(await bondingV5.isProject60days(tokenAddress)).to.be.true;
+    });
+
+    it("Should return correct isProjectXLaunch value (false for NORMAL mode)", async function () {
+      const { bondingV5 } = contracts;
+      expect(await bondingV5.isProjectXLaunch(tokenAddress)).to.be.false;
+    });
+
+    it("Should return correct isAcpSkillLaunch value (false for NORMAL mode)", async function () {
+      const { bondingV5 } = contracts;
+      expect(await bondingV5.isAcpSkillLaunch(tokenAddress)).to.be.false;
+    });
+
+    it("Should return correct tokenAntiSniperType value", async function () {
+      const { bondingV5 } = contracts;
+      expect(await bondingV5.tokenAntiSniperType(tokenAddress)).to.equal(ANTI_SNIPER_98M);
+    });
+
+    it("Should revert tokenAntiSniperType for non-BondingV5 token", async function () {
+      const { bondingV5 } = contracts;
+
+      // Use a random address that doesn't exist as a token
+      const randomAddress = ethers.Wallet.createRandom().address;
+      
+      await expect(
+        bondingV5.tokenAntiSniperType(randomAddress)
+      ).to.be.revertedWithCustomError(bondingV5, "InvalidTokenStatus");
+    });
+
+    it("Should return correct tokenGradThreshold value", async function () {
+      const { bondingV5 } = contracts;
+      const gradThreshold = await bondingV5.tokenGradThreshold(tokenAddress);
+      expect(gradThreshold).to.be.greaterThan(0);
+    });
+
+    it("Should return correct tokenInfo values", async function () {
+      const { user1 } = accounts;
+      const { bondingV5 } = contracts;
+
+      const tokenInfo = await bondingV5.tokenInfo(tokenAddress);
+      
+      expect(tokenInfo.creator).to.equal(user1.address);
+      expect(tokenInfo.token).to.equal(tokenAddress);
+      expect(tokenInfo.pair).to.not.equal(ethers.ZeroAddress);
+      expect(tokenInfo.trading).to.be.true;
+      expect(tokenInfo.tradingOnUniswap).to.be.false;
+      expect(tokenInfo.launchExecuted).to.be.false;
+    });
+
+    it("Should return correct tokenLaunchParams values", async function () {
+      const { bondingV5 } = contracts;
+
+      const launchParams = await bondingV5.tokenLaunchParams(tokenAddress);
+      
+      expect(launchParams.launchMode).to.equal(LAUNCH_MODE_NORMAL);
+      expect(launchParams.airdropPercent).to.equal(3);
+      expect(launchParams.needAcf).to.be.true;
+      expect(launchParams.antiSniperTaxType).to.equal(ANTI_SNIPER_98M);
+      expect(launchParams.isProject60days).to.be.true;
+    });
+  });
+
+  // ============================================
+  // BondingConfig Additional Tests
+  // ============================================
+  describe("BondingConfig Additional Functions", function () {
+    it("Should correctly calculate bonding curve supply for various scenarios", async function () {
+      const { bondingConfig } = contracts;
+
+      const initialSupply = BigInt(INITIAL_SUPPLY);
+
+      // 0% airdrop, no ACF: 100% bonding curve
+      const supply100 = await bondingConfig.calculateBondingCurveSupply(0, false);
+      expect(supply100).to.equal(initialSupply);
+
+      // 5% airdrop, no ACF: 95% bonding curve
+      const supply95 = await bondingConfig.calculateBondingCurveSupply(5, false);
+      expect(supply95).to.equal((initialSupply * 95n) / 100n);
+
+      // 0% airdrop, with ACF: 50% bonding curve
+      const supply50 = await bondingConfig.calculateBondingCurveSupply(0, true);
+      expect(supply50).to.equal((initialSupply * 50n) / 100n);
+
+      // 4% airdrop, with ACF: 46% bonding curve
+      const supply46 = await bondingConfig.calculateBondingCurveSupply(4, true);
+      expect(supply46).to.equal((initialSupply * 46n) / 100n);
+    });
+
+    it("Should correctly identify special modes", async function () {
+      const { bondingConfig } = contracts;
+
+      expect(await bondingConfig.isSpecialMode(LAUNCH_MODE_NORMAL)).to.be.false;
+      expect(await bondingConfig.isSpecialMode(LAUNCH_MODE_X_LAUNCH)).to.be.true;
+      expect(await bondingConfig.isSpecialMode(LAUNCH_MODE_ACP_SKILL)).to.be.true;
+    });
+
+    it("Should return correct fakeInitialVirtualLiq", async function () {
+      const { bondingConfig } = contracts;
+      expect(await bondingConfig.getFakeInitialVirtualLiq()).to.equal(FAKE_INITIAL_VIRTUAL_LIQ);
+    });
+
+    it("Should return correct targetRealVirtual", async function () {
+      const { bondingConfig } = contracts;
+      expect(await bondingConfig.getTargetRealVirtual()).to.equal(TARGET_REAL_VIRTUAL);
+    });
+
+    it("Should correctly calculate launch fee for different scenarios", async function () {
+      const { bondingConfig } = contracts;
+
+      // Immediate launch, no ACF: 0
+      expect(await bondingConfig.calculateLaunchFee(false, false)).to.equal(0);
+
+      // Immediate launch, with ACF: acfFee
+      expect(await bondingConfig.calculateLaunchFee(false, true)).to.equal(ACF_FEE);
+
+      // Scheduled launch, no ACF: normalLaunchFee
+      expect(await bondingConfig.calculateLaunchFee(true, false)).to.equal(NORMAL_LAUNCH_FEE);
+
+      // Scheduled launch, with ACF: normalLaunchFee + acfFee
+      expect(await bondingConfig.calculateLaunchFee(true, true)).to.equal(NORMAL_LAUNCH_FEE + ACF_FEE);
+    });
+
+    it("Should allow owner to set deploy params", async function () {
+      const { owner } = accounts;
+      const { bondingConfig } = contracts;
+
+      const newDeployParams = {
+        tbaSalt: ethers.keccak256(ethers.toUtf8Bytes("new_salt")),
+        tbaImplementation: ethers.Wallet.createRandom().address,
+        daoVotingPeriod: 7200,
+        daoThreshold: ethers.parseEther("200"),
+      };
+
+      await bondingConfig.connect(owner).setDeployParams(newDeployParams);
+
+      const deployParams = await bondingConfig.deployParams();
+      expect(deployParams.tbaSalt).to.equal(newDeployParams.tbaSalt);
+      expect(deployParams.tbaImplementation).to.equal(newDeployParams.tbaImplementation);
+      expect(deployParams.daoVotingPeriod).to.equal(newDeployParams.daoVotingPeriod);
+      expect(deployParams.daoThreshold).to.equal(newDeployParams.daoThreshold);
+
+      // Reset to original
+      await bondingConfig.connect(owner).setDeployParams({
+        tbaSalt: TBA_SALT,
+        tbaImplementation: TBA_IMPLEMENTATION,
+        daoVotingPeriod: DAO_VOTING_PERIOD,
+        daoThreshold: DAO_THRESHOLD,
+      });
+    });
+
+    it("Should allow owner to set common params", async function () {
+      const { owner } = accounts;
+      const { bondingConfig } = contracts;
+
+      const newSupply = ethers.parseUnits("2000000000", 0); // 2B base units
+      const newFeeTo = ethers.Wallet.createRandom().address;
+
+      await bondingConfig.connect(owner).setCommonParams(newSupply, newFeeTo);
+
+      expect(await bondingConfig.initialSupply()).to.equal(newSupply);
+      expect(await bondingConfig.feeTo()).to.equal(newFeeTo);
+
+      // Reset to original
+      await bondingConfig.connect(owner).setCommonParams(INITIAL_SUPPLY, owner.address);
+    });
+
+    it("Should allow owner to set team token reserved wallet", async function () {
+      const { owner, user2 } = accounts;
+      const { bondingConfig } = contracts;
+
+      const originalWallet = await bondingConfig.teamTokenReservedWallet();
+
+      await bondingConfig.connect(owner).setTeamTokenReservedWallet(user2.address);
+      expect(await bondingConfig.teamTokenReservedWallet()).to.equal(user2.address);
+
+      // Reset to original
+      await bondingConfig.connect(owner).setTeamTokenReservedWallet(originalWallet);
+    });
+  });
+
+  // ============================================
+  // Fee Collection Tests
+  // ============================================
+  describe("Fee Collection", function () {
+    it("Should collect correct fee for scheduled launch with ACF", async function () {
+      const { user1, owner } = accounts;
+      const { bondingV5, virtualToken } = contracts;
+
+      const purchaseAmount = ethers.parseEther("1000");
+      await virtualToken.connect(user1).approve(addresses.bondingV5, purchaseAmount);
+
+      const feeToBalanceBefore = await virtualToken.balanceOf(owner.address);
+
+      // Scheduled launch with ACF
+      const startTime = (await time.latest()) + START_TIME_DELAY + 1;
+      await bondingV5.connect(user1).preLaunch(
+        "Fee Test Token", "FTT", [0, 1], "Description",
+        "https://example.com/image.png", ["", "", "", ""],
+        purchaseAmount, startTime,
+        LAUNCH_MODE_NORMAL, 0, true, ANTI_SNIPER_60S, false
+      );
+
+      const feeToBalanceAfter = await virtualToken.balanceOf(owner.address);
+      const feeCollected = feeToBalanceAfter - feeToBalanceBefore;
+
+      // Expected fee: normalLaunchFee + acfFee
+      expect(feeCollected).to.equal(NORMAL_LAUNCH_FEE + ACF_FEE);
+    });
+
+    it("Should not collect fee for immediate launch without ACF", async function () {
+      const { user1, owner } = accounts;
+      const { bondingV5, virtualToken } = contracts;
+
+      const purchaseAmount = ethers.parseEther("1000");
+      await virtualToken.connect(user1).approve(addresses.bondingV5, purchaseAmount);
+
+      const feeToBalanceBefore = await virtualToken.balanceOf(owner.address);
+
+      // Immediate launch without ACF
+      const startTime = (await time.latest()) + 100;
+      await bondingV5.connect(user1).preLaunch(
+        "No Fee Token", "NFT", [0, 1], "Description",
+        "https://example.com/image.png", ["", "", "", ""],
+        purchaseAmount, startTime,
+        LAUNCH_MODE_NORMAL, 0, false, ANTI_SNIPER_60S, false
+      );
+
+      const feeToBalanceAfter = await virtualToken.balanceOf(owner.address);
+      const feeCollected = feeToBalanceAfter - feeToBalanceBefore;
+
+      expect(feeCollected).to.equal(0);
+    });
+  });
+
+  // ============================================
+  // Token Reserved Transfer Tests
+  // ============================================
+  describe("Token Reserved Transfer", function () {
+    it("Should transfer reserved tokens to teamTokenReservedWallet", async function () {
+      const { user1, beOpsWallet } = accounts;
+      const { bondingV5, virtualToken } = contracts;
+
+      const purchaseAmount = ethers.parseEther("1000");
+      await virtualToken.connect(user1).approve(addresses.bondingV5, purchaseAmount);
+
+      const reservedWalletBalanceBefore = await ethers.provider.getBalance(beOpsWallet.address);
+
+      // Create token with 5% airdrop (should transfer 5% to reserved wallet)
+      const startTime = (await time.latest()) + START_TIME_DELAY + 1;
+      const tx = await bondingV5.connect(user1).preLaunch(
+        "Reserved Test Token", "RTT", [0, 1], "Description",
+        "https://example.com/image.png", ["", "", "", ""],
+        purchaseAmount, startTime,
+        LAUNCH_MODE_NORMAL, 5, false, ANTI_SNIPER_60S, false
+      );
+
+      const receipt = await tx.wait();
+      const event = receipt.logs.find((log) => {
+        try { return bondingV5.interface.parseLog(log)?.name === "PreLaunched"; }
+        catch (e) { return false; }
+      });
+      const tokenAddress = bondingV5.interface.parseLog(event).args.token;
+
+      // Check that reserved tokens were transferred to teamTokenReservedWallet
+      const actualTokenContract = await ethers.getContractAt("AgentTokenV2", tokenAddress);
+      const reservedWalletTokenBalance = await actualTokenContract.balanceOf(beOpsWallet.address);
+      
+      // 5% of 1B = 50M tokens (with 18 decimals)
+      const expectedReserved = ethers.parseEther("50000000");
+      expect(reservedWalletTokenBalance).to.equal(expectedReserved);
+    });
+
+    it("Should transfer 50% + airdrop tokens when needAcf is true", async function () {
+      const { user1, beOpsWallet } = accounts;
+      const { bondingV5, virtualToken } = contracts;
+
+      const purchaseAmount = ethers.parseEther("1000");
+      await virtualToken.connect(user1).approve(addresses.bondingV5, purchaseAmount);
+
+      // Create token with 4% airdrop and needAcf = true (54% total reserved)
+      const startTime = (await time.latest()) + START_TIME_DELAY + 1;
+      const tx = await bondingV5.connect(user1).preLaunch(
+        "ACF Reserved Test", "ART", [0, 1], "Description",
+        "https://example.com/image.png", ["", "", "", ""],
+        purchaseAmount, startTime,
+        LAUNCH_MODE_NORMAL, 4, true, ANTI_SNIPER_60S, false
+      );
+
+      const receipt = await tx.wait();
+      const event = receipt.logs.find((log) => {
+        try { return bondingV5.interface.parseLog(log)?.name === "PreLaunched"; }
+        catch (e) { return false; }
+      });
+      const tokenAddress = bondingV5.interface.parseLog(event).args.token;
+
+      // Check reserved tokens (54% = 4% airdrop + 50% ACF)
+      const actualTokenContract = await ethers.getContractAt("AgentTokenV2", tokenAddress);
+      const reservedWalletTokenBalance = await actualTokenContract.balanceOf(beOpsWallet.address);
+      
+      // 54% of 1B = 540M tokens (with 18 decimals)
+      const expectedReserved = ethers.parseEther("540000000");
+      expect(reservedWalletTokenBalance).to.equal(expectedReserved);
     });
   });
 });

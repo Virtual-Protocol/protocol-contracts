@@ -78,12 +78,16 @@ module.exports = {
     ],
   },
   networks: {
+    eth_mainnet: {
+      url: process.env.ETH_MAINNET_RPC_URL || "https://eth.drpc.org",
+      accounts: [process.env.PRIVATE_KEY],
+    },
     sepolia: {
-      url: "https://sepolia.drpc.org",
+      url: process.env.SEPOLIA_RPC_URL || "https://sepolia.drpc.org",
       accounts: [process.env.PRIVATE_KEY],
     },
     eth_sepolia: {
-      url: "https://sepolia.drpc.org",
+      url: process.env.ETH_SEPOLIA_RPC_URL || "https://sepolia.drpc.org",
       accounts: [process.env.PRIVATE_KEY],
     },
     base: {

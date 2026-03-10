@@ -134,14 +134,14 @@ contract BondingV5 is
     }
 
     function preLaunch(
-        string memory _name,
-        string memory _ticker,
-        uint8[] memory cores,
-        string memory desc,
-        string memory img,
-        string[4] memory urls,
-        uint256 purchaseAmount,
-        uint256 startTime,
+        string memory name_,
+        string memory ticker_,
+        uint8[] memory cores_,
+        string memory desc_,
+        string memory img_,
+        string[4] memory urls_,
+        uint256 purchaseAmount_,
+        uint256 startTime_,
         uint8 launchMode_,
         uint8 airdropPercent_,
         bool needAcf_,
@@ -157,7 +157,7 @@ contract BondingV5 is
             revert InvalidAntiSniperType();
         }
 
-        if (cores.length <= 0) {
+        if (cores_.length <= 0) {
             revert InvalidInput();
         }
 
@@ -166,7 +166,7 @@ contract BondingV5 is
         // Scheduled launch: startTime >= now + scheduledLaunchStartTimeDelay
         BondingConfig.ScheduledLaunchParams memory scheduledParams = bondingConfig.scheduledLaunchParams();
         uint256 scheduledThreshold = block.timestamp + scheduledParams.startTimeDelay;
-        bool isScheduledLaunch = startTime >= scheduledThreshold;
+        bool isScheduledLaunch = startTime_ >= scheduledThreshold;
 
         // Validate launch mode, authorization, and mode-specific requirements
         _validateLaunchMode(
@@ -179,16 +179,16 @@ contract BondingV5 is
         );
 
         uint256 actualStartTime;
-        uint256 startTimeDelay;
+        uint256 actualStartTimeDelay;
         
         if (isScheduledLaunch) {
             // Scheduled launch: use provided startTime
-            actualStartTime = startTime;
-            startTimeDelay = scheduledParams.startTimeDelay;
+            actualStartTime = startTime_;
+            actualStartTimeDelay = scheduledParams.startTimeDelay;
         } else {
             // Immediate launch: start immediately
             actualStartTime = block.timestamp;
-            startTimeDelay = 0;
+            actualStartTimeDelay = 0;
         }
 
         // Calculate launch fee based on launch type and ACF requirement
@@ -199,13 +199,13 @@ contract BondingV5 is
         // - Scheduled launch, with ACF: normalLaunchFee + acfFee
         uint256 launchFee = bondingConfig.calculateLaunchFee(isScheduledLaunch, needAcf_);
 
-        if (purchaseAmount < launchFee) {
+        if (purchaseAmount_ < launchFee) {
             revert InvalidInput();
         }
 
         address assetToken = router.assetToken();
 
-        uint256 initialPurchase = (purchaseAmount - launchFee);
+        uint256 initialPurchase = (purchaseAmount_ - launchFee);
         if (launchFee > 0) {
             IERC20(assetToken).safeTransferFrom(msg.sender, bondingConfig.feeTo(), launchFee);
         }
@@ -215,28 +215,28 @@ contract BondingV5 is
             initialPurchase
         );
 
-        uint256 _initialSupply = bondingConfig.initialSupply();
-        BondingConfig.DeployParams memory _deployParams = bondingConfig.deployParams();
+        uint256 configInitialSupply = bondingConfig.initialSupply();
+        BondingConfig.DeployParams memory deployParams = bondingConfig.deployParams();
         
         (address token, uint256 applicationId) = agentFactory
             .createNewAgentTokenAndApplication(
-                _name, // without "fun " prefix
-                _ticker,
+                name_, // without "fun " prefix
+                ticker_,
                 abi.encode(
                     // tokenSupplyParams
-                    _initialSupply,
+                    configInitialSupply,
                     0, // lpSupply, will mint to agentTokenAddress
-                    _initialSupply, // vaultSupply, will mint to vault
-                    _initialSupply,
-                    _initialSupply,
+                    configInitialSupply, // vaultSupply, will mint to vault
+                    configInitialSupply,
+                    configInitialSupply,
                     0,
                     address(this) // vault, is the bonding contract itself
                 ),
-                cores,
-                _deployParams.tbaSalt,
-                _deployParams.tbaImplementation,
-                _deployParams.daoVotingPeriod,
-                _deployParams.daoThreshold,
+                cores_,
+                deployParams.tbaSalt,
+                deployParams.tbaImplementation,
+                deployParams.daoVotingPeriod,
+                deployParams.daoThreshold,
                 0, // applicationThreshold_
                 msg.sender // token creator
             );
@@ -249,13 +249,13 @@ contract BondingV5 is
         // Calculate bonding curve supply in wei (base supply was validated at the beginning)
         uint256 bondingCurveSupply = bondingCurveSupplyBase * (10 ** IAgentTokenV2(token).decimals());
         // Calculate total reserved supply for transfer
-        uint256 totalReservedSupply = _initialSupply - bondingCurveSupplyBase;
+        uint256 totalReservedSupply = configInitialSupply - bondingCurveSupplyBase;
 
-        address _pair = factory.createPair(
+        address pair = factory.createPair(
             token,
             assetToken,
             actualStartTime,
-            startTimeDelay
+            actualStartTimeDelay
         );
 
         require(_approval(address(router), token, bondingCurveSupply));
@@ -285,14 +285,14 @@ contract BondingV5 is
         newToken.creator = msg.sender;
         newToken.token = token;
         newToken.agentToken = address(0);
-        newToken.pair = _pair;
-        newToken.description = desc;
-        newToken.cores = cores;
-        newToken.image = img;
-        newToken.twitter = urls[0];
-        newToken.telegram = urls[1];
-        newToken.youtube = urls[2];
-        newToken.website = urls[3];
+        newToken.pair = pair;
+        newToken.description = desc_;
+        newToken.cores = cores_;
+        newToken.image = img_;
+        newToken.twitter = urls_[0];
+        newToken.telegram = urls_[1];
+        newToken.youtube = urls_[2];
+        newToken.website = urls_[3];
         newToken.trading = true;
         newToken.tradingOnUniswap = false;
         newToken.applicationId = applicationId;
@@ -311,9 +311,9 @@ contract BondingV5 is
 
         // Set Data struct fields
         newToken.data.token = token;
-        newToken.data.name = _name;
-        newToken.data._name = _name;
-        newToken.data.ticker = _ticker;
+        newToken.data.name = name_;
+        newToken.data._name = name_;
+        newToken.data.ticker = ticker_;
         newToken.data.supply = bondingCurveSupply;
         newToken.data.price = price;
         newToken.data.marketCap = liquidity;
@@ -325,61 +325,61 @@ contract BondingV5 is
 
         emit PreLaunched(
             token,
-            _pair,
+            pair,
             tokenInfo[token].virtualId,
             initialPurchase,
             tokenLaunchParams[token]
         );
 
-        return (token, _pair, tokenInfo[token].virtualId, initialPurchase);
+        return (token, pair, tokenInfo[token].virtualId, initialPurchase);
     }
 
-    function cancelLaunch(address _tokenAddress) public {
-        BondingConfig.Token storage _token = tokenInfo[_tokenAddress];
+    function cancelLaunch(address tokenAddress_) public {
+        BondingConfig.Token storage tokenRef = tokenInfo[tokenAddress_];
 
         // Validate that the token exists and was properly prelaunched
-        if (_token.token == address(0) || _token.pair == address(0)) {
+        if (tokenRef.token == address(0) || tokenRef.pair == address(0)) {
             revert InvalidInput();
         }
 
-        if (msg.sender != _token.creator) {
+        if (msg.sender != tokenRef.creator) {
             revert InvalidInput();
         }
 
         // Validate that the token has not been launched (or cancelled)
-        if (_token.launchExecuted) {
+        if (tokenRef.launchExecuted) {
             revert InvalidTokenStatus();
         }
 
-        if (_token.initialPurchase > 0) {
+        if (tokenRef.initialPurchase > 0) {
             IERC20(router.assetToken()).safeTransfer(
-                _token.creator,
-                _token.initialPurchase
+                tokenRef.creator,
+                tokenRef.initialPurchase
             );
         }
 
-        _token.initialPurchase = 0; // prevent duplicate transfer initialPurchase back to the creator
-        _token.launchExecuted = true; // pretend it has been launched (cancelled) and prevent duplicate launch
+        tokenRef.initialPurchase = 0; // prevent duplicate transfer initialPurchase back to the creator
+        tokenRef.launchExecuted = true; // pretend it has been launched (cancelled) and prevent duplicate launch
 
         emit CancelledLaunch(
-            _tokenAddress,
-            _token.pair,
-            tokenInfo[_tokenAddress].virtualId,
-            _token.initialPurchase
+            tokenAddress_,
+            tokenRef.pair,
+            tokenInfo[tokenAddress_].virtualId,
+            tokenRef.initialPurchase
         );
     }
 
     function launch(
-        address _tokenAddress
+        address tokenAddress_
     ) public nonReentrant returns (address, address, uint, uint256) {
-        BondingConfig.Token storage _token = tokenInfo[_tokenAddress];
+        BondingConfig.Token storage tokenRef = tokenInfo[tokenAddress_];
 
         // Validate that the token exists and was properly prelaunched
-        if (_token.token == address(0) || _token.pair == address(0)) {
+        if (tokenRef.token == address(0) || tokenRef.pair == address(0)) {
             revert InvalidInput();
         }
 
-        if (_token.launchExecuted) {
+        if (tokenRef.launchExecuted) {
             revert InvalidTokenStatus();
         }
 
@@ -387,13 +387,13 @@ contract BondingV5 is
         // while swaps remain blocked (since enabling depends solely on time),
         // resulting in an inconsistent "launched but not tradable" state, also the 550M is go to teamTokenReservedWallet
         // so we need to check the start time of the pair
-        IFPairV2 pair = IFPairV2(_token.pair);
-        if (block.timestamp < pair.startTime()) {
+        IFPairV2 pairContract = IFPairV2(tokenRef.pair);
+        if (block.timestamp < pairContract.startTime()) {
             revert InvalidInput();
         }
 
         // Set tax start time to current block timestamp for proper anti-sniper tax calculation
-        router.setTaxStartTime(_token.pair, block.timestamp);
+        router.setTaxStartTime(tokenRef.pair, block.timestamp);
 
         // Make initial purchase for creator
         // bondingContract will transfer initialPurchase $Virtual to pairAddress
@@ -401,7 +401,7 @@ contract BondingV5 is
         // bondingContract then will transfer all the amountsOut $agentToken to teamTokenReservedWallet
         // in the BE, teamTokenReservedWallet will split it out for the initialBuy and 550M
         uint256 amountOut = 0;
-        uint256 initialPurchase = _token.initialPurchase;
+        uint256 initialPurchase = tokenRef.initialPurchase;
         if (initialPurchase > 0) {
             IERC20(router.assetToken()).forceApprove(
                 address(router),
@@ -410,172 +410,172 @@ contract BondingV5 is
             amountOut = _buy(
                 address(this),
                 initialPurchase, // will raise error if initialPurchase <= 0
-                _tokenAddress,
+                tokenAddress_,
                 0,
                 block.timestamp + 300,
                 true // isInitialPurchase = true for creator's purchase
             );
             // creator's initialBoughtToken need to go to teamTokenReservedWallet for locking, not to creator
-            IERC20(_tokenAddress).safeTransfer(
+            IERC20(tokenAddress_).safeTransfer(
                 bondingConfig.teamTokenReservedWallet(),
                 amountOut
             );
 
             // update initialPurchase and launchExecuted to prevent duplicate purchase
-            _token.initialPurchase = 0;
+            tokenRef.initialPurchase = 0;
         }
 
         emit Launched(
-            _tokenAddress,
-            _token.pair,
-            tokenInfo[_tokenAddress].virtualId,
+            tokenAddress_,
+            tokenRef.pair,
+            tokenInfo[tokenAddress_].virtualId,
             initialPurchase,
             amountOut,
-            tokenLaunchParams[_tokenAddress]
+            tokenLaunchParams[tokenAddress_]
         );
-        _token.launchExecuted = true;
+        tokenRef.launchExecuted = true;
 
         return (
-            _tokenAddress,
-            _token.pair,
-            tokenInfo[_tokenAddress].virtualId,
+            tokenAddress_,
+            tokenRef.pair,
+            tokenInfo[tokenAddress_].virtualId,
             initialPurchase
         );
     }
 
     function sell(
-        uint256 amountIn,
-        address tokenAddress,
-        uint256 amountOutMin,
-        uint256 deadline
+        uint256 amountIn_,
+        address tokenAddress_,
+        uint256 amountOutMin_,
+        uint256 deadline_
     ) public returns (bool) {
         // this alrealy prevented it's a not-exists token
-        if (!tokenInfo[tokenAddress].trading) {
+        if (!tokenInfo[tokenAddress_].trading) {
             revert InvalidTokenStatus();
         }
 
         // this is to prevent sell before launch
-        if (!tokenInfo[tokenAddress].launchExecuted) {
+        if (!tokenInfo[tokenAddress_].launchExecuted) {
             revert InvalidTokenStatus();
         }
 
-        if (block.timestamp > deadline) {
+        if (block.timestamp > deadline_) {
             revert InvalidInput();
         }
 
         (uint256 amount0In, uint256 amount1Out) = router.sell(
-            amountIn,
-            tokenAddress,
+            amountIn_,
+            tokenAddress_,
             msg.sender
         );
 
-        if (amount1Out < amountOutMin) {
+        if (amount1Out < amountOutMin_) {
             revert SlippageTooHigh();
         }
 
         uint256 duration = block.timestamp -
-            tokenInfo[tokenAddress].data.lastUpdated;
+            tokenInfo[tokenAddress_].data.lastUpdated;
 
         if (duration > 86400) {
-            tokenInfo[tokenAddress].data.lastUpdated = block.timestamp;
+            tokenInfo[tokenAddress_].data.lastUpdated = block.timestamp;
         }
 
         return true;
     }
 
     function _buy(
-        address buyer,
-        uint256 amountIn,
-        address tokenAddress,
-        uint256 amountOutMin,
-        uint256 deadline,
-        bool isInitialPurchase
+        address buyer_,
+        uint256 amountIn_,
+        address tokenAddress_,
+        uint256 amountOutMin_,
+        uint256 deadline_,
+        bool isInitialPurchase_
     ) internal returns (uint256) {
-        if (block.timestamp > deadline) {
+        if (block.timestamp > deadline_) {
             revert InvalidInput();
         }
         address pairAddress = factory.getPair(
-            tokenAddress,
+            tokenAddress_,
             router.assetToken()
         );
 
-        IFPairV2 pair = IFPairV2(pairAddress);
+        IFPairV2 pairContract = IFPairV2(pairAddress);
 
-        (uint256 reserveA, uint256 reserveB) = pair.getReserves();
+        (uint256 reserveA, uint256 reserveB) = pairContract.getReserves();
 
         (uint256 amount1In, uint256 amount0Out) = router.buy(
-            amountIn,
-            tokenAddress,
-            buyer,
-            isInitialPurchase
+            amountIn_,
+            tokenAddress_,
+            buyer_,
+            isInitialPurchase_
         );
 
-        if (amount0Out < amountOutMin) {
+        if (amount0Out < amountOutMin_) {
             revert SlippageTooHigh();
         }
 
         uint256 newReserveA = reserveA - amount0Out;
         uint256 duration = block.timestamp -
-            tokenInfo[tokenAddress].data.lastUpdated;
+            tokenInfo[tokenAddress_].data.lastUpdated;
 
         if (duration > 86400) {
-            tokenInfo[tokenAddress].data.lastUpdated = block.timestamp;
+            tokenInfo[tokenAddress_].data.lastUpdated = block.timestamp;
         }
 
         // Get per-token gradThreshold (calculated during preLaunch based on airdropPercent and needAcf)
-        uint256 gradThreshold = tokenGradThreshold[tokenAddress];
+        uint256 gradThreshold = tokenGradThreshold[tokenAddress_];
 
         if (
             newReserveA <= gradThreshold &&
             !router.hasAntiSniperTax(pairAddress) &&
-            tokenInfo[tokenAddress].trading
+            tokenInfo[tokenAddress_].trading
         ) {
-            _openTradingOnUniswap(tokenAddress);
+            _openTradingOnUniswap(tokenAddress_);
         }
 
         return amount0Out;
     }
 
     function buy(
-        uint256 amountIn,
-        address tokenAddress,
-        uint256 amountOutMin,
-        uint256 deadline
+        uint256 amountIn_,
+        address tokenAddress_,
+        uint256 amountOutMin_,
+        uint256 deadline_
     ) public payable returns (bool) {
         // this alrealy prevented it's a not-exists token
-        if (!tokenInfo[tokenAddress].trading) {
+        if (!tokenInfo[tokenAddress_].trading) {
             revert InvalidTokenStatus();
         }
 
         // this is to prevent sell before launch
-        if (!tokenInfo[tokenAddress].launchExecuted) {
+        if (!tokenInfo[tokenAddress_].launchExecuted) {
             revert InvalidTokenStatus();
         }
 
-        _buy(msg.sender, amountIn, tokenAddress, amountOutMin, deadline, false);
+        _buy(msg.sender, amountIn_, tokenAddress_, amountOutMin_, deadline_, false);
 
         return true;
     }
 
-    function _openTradingOnUniswap(address tokenAddress) private {
-        BondingConfig.Token storage _token = tokenInfo[tokenAddress];
+    function _openTradingOnUniswap(address tokenAddress_) private {
+        BondingConfig.Token storage tokenRef = tokenInfo[tokenAddress_];
 
-        if (_token.tradingOnUniswap || !_token.trading) {
+        if (tokenRef.tradingOnUniswap || !tokenRef.trading) {
             revert InvalidTokenStatus();
         }
 
         // Transfer asset tokens to bonding contract
         address pairAddress = factory.getPair(
-            tokenAddress,
+            tokenAddress_,
             router.assetToken()
         );
 
-        IFPairV2 pair = IFPairV2(pairAddress);
+        IFPairV2 pairContract = IFPairV2(pairAddress);
 
-        uint256 assetBalance = pair.assetBalance();
-        uint256 tokenBalance = pair.balance();
+        uint256 assetBalance = pairContract.assetBalance();
+        uint256 tokenBalance = pairContract.balance();
 
-        router.graduate(tokenAddress);
+        router.graduate(tokenAddress_);
 
         // previously initFromBondingCurve has two parts:
         //      1. transfer applicationThreshold_ assetToken from bondingContract to agentFactoryV3Contract
@@ -587,33 +587,33 @@ contract BondingV5 is
         );
         agentFactory
             .updateApplicationThresholdWithApplicationId(
-                _token.applicationId,
+                tokenRef.applicationId,
                 assetBalance
             );
 
         // remove blacklist address after graduation, cuz executeBondingCurveApplicationSalt we will transfer all left agentTokens to the uniswapV2Pair
         agentFactory.removeBlacklistAddress(
-            tokenAddress,
-            IAgentTokenV2(tokenAddress).liquidityPools()[0]
+            tokenAddress_,
+            IAgentTokenV2(tokenAddress_).liquidityPools()[0]
         );
 
         // previously executeBondingCurveApplicationSalt will create agentToken and do two parts:
         //      1. (lpSupply = all left $preToken in prePairAddress) $agentToken mint to agentTokenAddress
         //      2. (vaultSupply = 1B - lpSupply) $agentToken mint to prePairAddress
         // now only need to transfer (all left agentTokens) $agentTokens from agentFactoryV6Address to agentTokenAddress
-        IERC20(tokenAddress).safeTransfer(tokenAddress, tokenBalance);
-        require(_token.applicationId != 0, "ApplicationId not found");
+        IERC20(tokenAddress_).safeTransfer(tokenAddress_, tokenBalance);
+        require(tokenRef.applicationId != 0, "ApplicationId not found");
         address agentToken = agentFactory
             .executeBondingCurveApplicationSalt(
-                _token.applicationId,
-                _token.data.supply / 1 ether, // totalSupply
+                tokenRef.applicationId,
+                tokenRef.data.supply / 1 ether, // totalSupply
                 tokenBalance / 1 ether, // lpSupply
                 pairAddress, // vault
                 keccak256(
-                    abi.encodePacked(msg.sender, block.timestamp, tokenAddress)
+                    abi.encodePacked(msg.sender, block.timestamp, tokenAddress_)
                 )
             );
-        _token.agentToken = agentToken;
+        tokenRef.agentToken = agentToken;
 
         // this is not needed, previously need to do this because of
         //     1. (vaultSupply = 1B - lpSupply) $agentToken will mint to prePairAddress
@@ -625,39 +625,39 @@ contract BondingV5 is
         //     IERC20(agentToken).balanceOf(pairAddress)
         // );
 
-        emit Graduated(tokenAddress, agentToken);
-        _token.trading = false;
-        _token.tradingOnUniswap = true;
+        emit Graduated(tokenAddress_, agentToken);
+        tokenRef.trading = false;
+        tokenRef.tradingOnUniswap = true;
     }
 
     // View functions to check token launch type (affects tax recipient updates and liquidity drain permissions)
-    function isProject60days(address token) external view returns (bool) {
-        return tokenLaunchParams[token].isProject60days;
+    function isProject60days(address token_) external view returns (bool) {
+        return tokenLaunchParams[token_].isProject60days;
     }
 
-    function isProjectXLaunch(address token) external view returns (bool) {
-        return tokenLaunchParams[token].launchMode == bondingConfig.LAUNCH_MODE_X_LAUNCH();
+    function isProjectXLaunch(address token_) external view returns (bool) {
+        return tokenLaunchParams[token_].launchMode == bondingConfig.LAUNCH_MODE_X_LAUNCH();
     }
 
-    function isAcpSkillLaunch(address token) external view returns (bool) {
-        return tokenLaunchParams[token].launchMode == bondingConfig.LAUNCH_MODE_ACP_SKILL();
+    function isAcpSkillLaunch(address token_) external view returns (bool) {
+        return tokenLaunchParams[token_].launchMode == bondingConfig.LAUNCH_MODE_ACP_SKILL();
     }
 
     // View function for FRouterV2 to get anti-sniper tax type
     // Reverts if token was not created by BondingV5, allowing FRouterV2 to fallback to legacy logic
-    function tokenAntiSniperType(address token) external view returns (uint8) {
-        if (tokenInfo[token].creator == address(0)) {
+    function tokenAntiSniperType(address token_) external view returns (uint8) {
+        if (tokenInfo[token_].creator == address(0)) {
             revert InvalidTokenStatus();
         }
-        return tokenLaunchParams[token].antiSniperTaxType;
+        return tokenLaunchParams[token_].antiSniperTaxType;
     }
 
     function _approval(
-        address _spender,
-        address _token,
-        uint256 amount
+        address spender_,
+        address token_,
+        uint256 amount_
     ) internal returns (bool) {
-        IERC20(_token).forceApprove(_spender, amount);
+        IERC20(token_).forceApprove(spender_, amount_);
 
         return true;
     }

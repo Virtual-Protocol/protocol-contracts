@@ -1,4 +1,5 @@
 import { parseEther } from "ethers";
+import { verifyContract } from "./utils";
 const { ethers, upgrades } = require("hardhat");
 
 // Environment variables are loaded via hardhat.config.js
@@ -114,6 +115,9 @@ const { ethers, upgrades } = require("hardhat");
       fFactoryV2Address = await fFactoryV2.getAddress();
       deployedContracts.FFactoryV2 = fFactoryV2Address;
       console.log("FFactoryV2 deployed at:", fFactoryV2Address);
+
+      // Verify FFactoryV2 proxy
+      await verifyContract(fFactoryV2Address);
     }
 
     // ============================================
@@ -143,6 +147,9 @@ const { ethers, upgrades } = require("hardhat");
       fRouterV2Address = await fRouterV2.getAddress();
       deployedContracts.FRouterV2 = fRouterV2Address;
       console.log("FRouterV2 deployed at:", fRouterV2Address);
+
+      // Verify FRouterV2 proxy
+      await verifyContract(fRouterV2Address);
     }
 
     // If both contracts were reused, skip configuration
@@ -163,18 +170,22 @@ const { ethers, upgrades } = require("hardhat");
       const defaultAdminRole = await fFactoryV2.DEFAULT_ADMIN_ROLE();
 
       // Grant ADMIN_ROLE to deployer temporarily
-      await fFactoryV2.grantRole(adminRole, deployerAddress);
+      const tx1 = await fFactoryV2.grantRole(adminRole, deployerAddress);
+      await tx1.wait();
       console.log("ADMIN_ROLE granted to deployer temporarily");
 
       // Set Router
-      await fFactoryV2.setRouter(fRouterV2Address);
+      const tx2 = await fFactoryV2.setRouter(fRouterV2Address);
+      await tx2.wait();
       console.log("Router set in FFactoryV2");
 
       // Grant roles to admin
-      await fFactoryV2.grantRole(adminRole, admin);
+      const tx3 = await fFactoryV2.grantRole(adminRole, admin);
+      await tx3.wait();
       console.log("ADMIN_ROLE granted to admin:", admin);
 
-      await fFactoryV2.grantRole(defaultAdminRole, admin);
+      const tx4 = await fFactoryV2.grantRole(defaultAdminRole, admin);
+      await tx4.wait();
       console.log("DEFAULT_ADMIN_ROLE granted to admin:", admin);
     }
 
@@ -185,16 +196,19 @@ const { ethers, upgrades } = require("hardhat");
       console.log("\n--- Configuring FRouterV2 ---");
 
       // Grant ADMIN_ROLE to admin (needed for setBondingV5)
-      await fRouterV2.grantRole(await fRouterV2.ADMIN_ROLE(), admin);
+      const tx5 = await fRouterV2.grantRole(await fRouterV2.ADMIN_ROLE(), admin);
+      await tx5.wait();
       console.log("ADMIN_ROLE granted to admin on FRouterV2");
 
       // Grant DEFAULT_ADMIN_ROLE to admin
-      await fRouterV2.grantRole(await fRouterV2.DEFAULT_ADMIN_ROLE(), admin);
+      const tx6 = await fRouterV2.grantRole(await fRouterV2.DEFAULT_ADMIN_ROLE(), admin);
+      await tx6.wait();
       console.log("DEFAULT_ADMIN_ROLE granted to admin on FRouterV2");
 
       // Grant EXECUTOR_ROLE to BE_OPS_WALLET (for resetTime)
       const executorRole = await fRouterV2.EXECUTOR_ROLE();
-      await fRouterV2.grantRole(executorRole, beOpsWallet);
+      const tx7 = await fRouterV2.grantRole(executorRole, beOpsWallet);
+      await tx7.wait();
       console.log("EXECUTOR_ROLE granted to BE_OPS_WALLET:", beOpsWallet);
     }
 

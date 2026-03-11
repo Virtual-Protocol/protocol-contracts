@@ -86,9 +86,9 @@ const { ethers, upgrades } = require("hardhat");
     if (!targetRealVirtual) {
       throw new Error("TARGET_REAL_VIRTUAL not set in environment");
     }
-    const agentTaxAddress = process.env.AGENT_TOKEN_TAX_MANAGER;
+    const agentTaxAddress = process.env.AGENT_TAX_CONTRACT_ADDRESS;
     if (!agentTaxAddress) {
-      throw new Error("AGENT_TOKEN_TAX_MANAGER not set in environment");
+      throw new Error("AGENT_TAX_CONTRACT_ADDRESS not set in environment");
     }
 
     const maxAirdropPercent = process.env.MAX_AIRDROP_PERCENT;

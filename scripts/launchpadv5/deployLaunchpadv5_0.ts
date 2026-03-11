@@ -6,7 +6,7 @@ const { ethers, upgrades } = require("hardhat");
 /**
  * Deploy prerequisites for FFactoryV2:
  * - AgentNftV2 (optional, if not already deployed)
- * - AgentTax (AGENT_TOKEN_TAX_MANAGER / FFactoryV2_TAX_VAULT)
+ * - AgentTax (AGENT_TAX_CONTRACT_ADDRESS / FFactoryV2_TAX_VAULT)
  * 
  * Run this script before deployLaunchpadv5_1.ts
  */
@@ -151,13 +151,13 @@ const { ethers, upgrades } = require("hardhat");
     }
 
     // ============================================
-    // 2. Deploy AgentTax (AGENT_TOKEN_TAX_MANAGER)
+    // 2. Deploy AgentTax (AGENT_TAX_CONTRACT_ADDRESS)
     // ============================================
-    const existingAgentTax = process.env.AGENT_TOKEN_TAX_MANAGER;
+    const existingAgentTax = process.env.AGENT_TAX_CONTRACT_ADDRESS;
     let agentTaxAddress: string;
 
     if (!existingAgentTax) {
-      console.log("\n--- Deploying AgentTax (AGENT_TOKEN_TAX_MANAGER) ---");
+      console.log("\n--- Deploying AgentTax (AGENT_TAX_CONTRACT_ADDRESS) ---");
       const AgentTax = await ethers.getContractFactory("AgentTax");
       const agentTax = await upgrades.deployProxy(
         AgentTax,
@@ -179,7 +179,7 @@ const { ethers, upgrades } = require("hardhat");
       await agentTax.waitForDeployment();
       agentTaxAddress = await agentTax.getAddress();
       console.log("AgentTax deployed at:", agentTaxAddress);
-      deployedContracts["AGENT_TOKEN_TAX_MANAGER"] = agentTaxAddress;
+      deployedContracts["AGENT_TAX_CONTRACT_ADDRESS"] = agentTaxAddress;
 
       // Grant EXECUTOR_V2_ROLE to BE_TAX_OPS_WALLETS (for updateCreator functions)
       const executorV2Role = await agentTax.EXECUTOR_V2_ROLE();
@@ -203,7 +203,7 @@ const { ethers, upgrades } = require("hardhat");
       console.log("\n--- Using existing AgentTax ---");
       console.log("AgentTax address:", existingAgentTax);
       agentTaxAddress = existingAgentTax;
-      reusedContracts["AGENT_TOKEN_TAX_MANAGER"] = existingAgentTax;
+      reusedContracts["AGENT_TAX_CONTRACT_ADDRESS"] = existingAgentTax;
     }
 
     // ============================================
@@ -230,7 +230,7 @@ const { ethers, upgrades } = require("hardhat");
     console.log("\n--- Environment Variables for .env file ---");
     console.log("# Prerequisites for FFactoryV2:");
     console.log(`AGENT_NFT_V2_ADDRESS=${agentNftV2Address}`);
-    console.log(`AGENT_TOKEN_TAX_MANAGER=${agentTaxAddress}`);
+    console.log(`AGENT_TAX_CONTRACT_ADDRESS=${agentTaxAddress}`);
     console.log(`FFactoryV2_TAX_VAULT=${agentTaxAddress}`);
 
     console.log("\n--- Manual Steps Required (by admin) ---");

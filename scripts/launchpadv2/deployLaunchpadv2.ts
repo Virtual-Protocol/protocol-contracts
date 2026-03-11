@@ -156,9 +156,9 @@ const { ethers, upgrades } = require("hardhat");
 
 
     const agentTokenTaxManager =
-      process.env.AGENT_TOKEN_TAX_MANAGER;
+      process.env.AGENT_TAX_CONTRACT_ADDRESS;
     if (!agentTokenTaxManager) {
-      throw new Error("AGENT_TOKEN_TAX_MANAGER not set in environment");
+      throw new Error("AGENT_TAX_CONTRACT_ADDRESS not set in environment");
     }
 
     console.log("Deployment arguments loaded:", {

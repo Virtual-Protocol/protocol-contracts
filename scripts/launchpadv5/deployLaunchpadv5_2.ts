@@ -69,9 +69,9 @@ const { ethers, upgrades } = require("hardhat");
     if (!sentientSellTax) {
       throw new Error("SENTIENT_SELL_TAX not set in environment");
     }
-    const agentTokenTaxManager = process.env.AGENT_TOKEN_TAX_MANAGER;
-    if (!agentTokenTaxManager) {
-      throw new Error("AGENT_TOKEN_TAX_MANAGER not set in environment");
+    const agentTaxContractAddress = process.env.AGENT_TAX_CONTRACT_ADDRESS;
+    if (!agentTaxContractAddress) {
+      throw new Error("AGENT_TAX_CONTRACT_ADDRESS not set in environment");
     }
 
     // REQUIRED: AgentNftV2 must be deployed first (in deployLaunchpadv5_0.ts)
@@ -127,7 +127,7 @@ const { ethers, upgrades } = require("hardhat");
       fRouterV2Address,
       sentientBuyTax,
       sentientSellTax,
-      agentTokenTaxManager,
+      agentTaxContractAddress,
       agentTokenV2Impl: agentTokenV2Impl || "(will deploy)",
       agentVeTokenV2Impl: agentVeTokenV2Impl || "(will deploy)",
       agentDAOImpl: agentDAOImpl || "(will deploy)",
@@ -299,14 +299,14 @@ const { ethers, upgrades } = require("hardhat");
       sentientBuyTax,
       sentientSellTax,
       taxSwapThresholdBasisPoints,
-      agentTokenTaxManager
+      agentTaxContractAddress
     );
     await txSetTokenParams.wait();
     console.log("AgentFactoryV6.setTokenParams() called:", {
       buyTax: sentientBuyTax,
       sellTax: sentientSellTax,
       taxSwapThreshold: taxSwapThresholdBasisPoints,
-      taxRecipient: agentTokenTaxManager,
+      taxRecipient: agentTaxContractAddress,
     });
 
     // Grant DEFAULT_ADMIN_ROLE of AgentFactoryV6 to admin
@@ -340,29 +340,11 @@ const { ethers, upgrades } = require("hardhat");
       agentNftV2Address
     );
 
-    // Check if deployer has admin role to grant MINTER_ROLE
-    const defaultAdminRole = await agentNftV2Contract.DEFAULT_ADMIN_ROLE();
-    const hasAdminRole = await agentNftV2Contract.hasRole(defaultAdminRole, deployerAddress);
-    
-    if (hasAdminRole) {
-      // Grant MINTER_ROLE to AgentFactoryV6
-      const minterRole = await agentNftV2Contract.MINTER_ROLE();
-      const tx = await agentNftV2Contract.grantRole(minterRole, agentFactoryV6Address);
-      await tx.wait();
-      console.log("MINTER_ROLE of AgentNftV2 granted to AgentFactoryV6:", agentFactoryV6Address);
-    } else {
-      console.log(
-        "\n⚠️  Deployer doesn't have DEFAULT_ADMIN_ROLE on AgentNftV2"
-      );
-      console.log("   Admin needs to grant MINTER_ROLE manually:");
-      console.log(
-        `   AgentNftV2.grantRole(MINTER_ROLE, ${agentFactoryV6Address})`
-      );
-      throw new Error("Deployer doesn't have DEFAULT_ADMIN_ROLE on AgentNftV2, need manually do");
-    }
-
-    // NOTE: Deployer roles are NOT revoked here
-    // Run deployRevokeRoles.ts after all deployments are complete
+    // Grant MINTER_ROLE to AgentFactoryV6
+    const minterRole = await agentNftV2Contract.MINTER_ROLE();
+    const tx = await agentNftV2Contract.grantRole(minterRole, agentFactoryV6Address);
+    await tx.wait();
+    console.log("MINTER_ROLE of AgentNftV2 granted to AgentFactoryV6:", agentFactoryV6Address);
 
     // ============================================
     // 10. Print Deployment Summary
@@ -390,13 +372,6 @@ const { ethers, upgrades } = require("hardhat");
     console.log("\n--- Newly Deployed Contracts ---");
     for (const [name, address] of Object.entries(deployedContracts)) {
       console.log(`- ${name}: ${address}`);
-    }
-
-    console.log("\n--- Manual Steps Required (by admin) ---");
-    if (!hasAdminRole) {
-      console.log(
-        `- Grant MINTER_ROLE on AgentNftV2 to AgentFactoryV6: ${agentFactoryV6Address}`
-      );
     }
 
     console.log("\n--- Deployment Order ---");

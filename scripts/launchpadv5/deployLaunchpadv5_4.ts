@@ -179,12 +179,10 @@ const { ethers } = require("hardhat");
     console.log(`- BondingV5: ${process.env.BONDING_V5_ADDRESS}`);
     console.log(`- Virtual Token: ${process.env.VIRTUAL_TOKEN_ADDRESS}`);
     console.log(`- AgentTokenV2: ${process.env.AGENT_TOKEN_V2_IMPLEMENTATION}`);
-    console.log(
-      `- AgentVeTokenV2: ${process.env.AGENT_VE_TOKEN_V2_IMPLEMENTATION}`
-    );
+    console.log(`- AgentVeTokenV2: ${process.env.AGENT_VE_TOKEN_V2_IMPLEMENTATION}`);
     console.log(`- AgentDAOImpl: ${process.env.AGENT_DAO_IMPLEMENTATION}`);
     console.log(`- AgentNftV2: ${process.env.AGENT_NFT_V2_ADDRESS}`);
-    console.log(`- AgentTaxManager: ${process.env.AGENT_TOKEN_TAX_MANAGER}`);
+    console.log(`- AgentTaxContract: ${process.env.AGENT_TAX_CONTRACT_ADDRESS}`);
   } catch (e) {
     console.error("Role revocation failed:", e);
     throw e;

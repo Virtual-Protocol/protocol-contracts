@@ -4,7 +4,7 @@ const { ethers, upgrades } = require("hardhat");
 (async () => {
   try {
     console.log("\n=== Prerequisites Deployment Starting ===");
-    console.log("This script deploys: AgentDAO, AgentNftV2, AgentTax (AGENT_TOKEN_TAX_MANAGER)");
+    console.log("This script deploys: AgentDAO, AgentNftV2, AgentTax (AGENT_TAX_CONTRACT_ADDRESS)");
 
     // Basic check for .env variables
     const deployerAddress = process.env.DEPLOYER;
@@ -93,11 +93,11 @@ const { ethers, upgrades } = require("hardhat");
     // MINTER_ROLE will be granted to AgentFactoryV6 in the main deployment script
 
     // ============================================
-    // 3. Deploy AgentTax (AGENT_TOKEN_TAX_MANAGER)
+    // 3. Deploy AgentTax (AGENT_TAX_CONTRACT_ADDRESS)
     // ============================================
     const agentNftV2Address = process.env.AGENT_NFT_V2;
     
-    console.log("\n--- Deploying AgentTax (AGENT_TOKEN_TAX_MANAGER) ---");
+    console.log("\n--- Deploying AgentTax (AGENT_TAX_CONTRACT_ADDRESS) ---");
     const AgentTax = await ethers.getContractFactory("AgentTax");
     const agentTax = await upgrades.deployProxy(
       AgentTax,
@@ -129,12 +129,12 @@ const { ethers, upgrades } = require("hardhat");
     console.log("Copy the following addresses to your .env file:\n");
     // console.log(`AGENT_DAO=${agentDAOAddress}`);
     console.log(`AGENT_NFT_V2=${agentNftV2Address}`);
-    console.log(`AGENT_TOKEN_TAX_MANAGER=${agentTaxAddress}`);
+    console.log(`AGENT_TAX_CONTRACT_ADDRESS=${agentTaxAddress}`);
 
     console.log("\n--- Full Summary ---");
     // console.log("- AgentDAO (implementation):", agentDAOAddress);
     console.log("- AgentNftV2 (proxy):", agentNftV2Address);
-    console.log("- AgentTax (AGENT_TOKEN_TAX_MANAGER):", agentTaxAddress);
+    console.log("- AgentTax (AGENT_TAX_CONTRACT_ADDRESS):", agentTaxAddress);
 
     console.log("\n--- Manual Steps Required (by admin) ---");
     console.log("AgentNftV2: MINTER_ROLE will be granted to AgentFactoryV6 in main deployment script");

@@ -373,7 +373,7 @@ Key test scenarios:
 
 **Usage:**
 ```bash
-npx hardhat run scripts/launchpadv5/e2e_test.ts --network base_sepolia
+npx hardhat run scripts/launchpadv5/e2e_test.ts --network <network>
 ```
 
 ### 8.2 deploy_agent_tax_swap.ts
@@ -390,7 +390,7 @@ npx hardhat run scripts/launchpadv5/e2e_test.ts --network base_sepolia
 
 **Usage:**
 ```bash
-npx hardhat run scripts/launchpadv5/deploy_agent_tax_swap.ts --network eth_sepolia
+npx hardhat run scripts/launchpadv5/deploy_agent_tax_swap.ts --network <network>
 ```
 
 ### 8.3 handle_agent_tax.ts

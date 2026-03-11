@@ -30,9 +30,9 @@ async function main() {
   /**
    * agentTaxAddress: The deployed AgentTax contract address
    */
-  const agentTaxAddress = process.env.AGENT_TOKEN_TAX_MANAGER;
+  const agentTaxAddress = process.env.AGENT_TAX_CONTRACT_ADDRESS;
   if (!agentTaxAddress) {
-    throw new Error("AGENT_TOKEN_TAX_MANAGER not set in environment");
+    throw new Error("AGENT_TAX_CONTRACT_ADDRESS not set in environment");
   }
 
   /**

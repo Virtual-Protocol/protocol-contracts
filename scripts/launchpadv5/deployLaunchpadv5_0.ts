@@ -121,14 +121,26 @@ const { ethers, upgrades } = require("hardhat");
       );
       await agentNftV2.waitForDeployment();
       agentNftV2Address = await agentNftV2.getAddress();
-      console.log("AgentNftV2 (proxy) deployed at:", agentNftV2Address);
+      console.log("AgentNftV2 deployed at:", agentNftV2Address);
       deployedContracts["AGENT_NFT_V2_ADDRESS"] = agentNftV2Address!;
 
       // Grant DEFAULT_ADMIN_ROLE to admin as well
       const defaultAdminRole = await agentNftV2.DEFAULT_ADMIN_ROLE();
       const tx = await agentNftV2.grantRole(defaultAdminRole, admin);
       await tx.wait();
-      console.log("DEFAULT_ADMIN_ROLE granted to admin:", admin);
+      console.log("DEFAULT_ADMIN_ROLE of AgentNftV2 granted to admin:", admin);
+
+      // Grant ADMIN_ROLE to admin as well
+      // because agentVeTokenV2.setMatureAt() needs agentNftV2.adminRole
+      const adminRole = await agentNftV2.ADMIN_ROLE();
+      const tx2 = await agentNftV2.grantRole(adminRole, admin);
+      await tx2.wait();
+      console.log("ADMIN_ROLE of AgentNftV2 granted to admin:", admin);
+
+      const validatorAdminRole = await agentNftV2.VALIDATOR_ADMIN_ROLE();
+      const tx3 = await agentNftV2.grantRole(validatorAdminRole, admin);
+      await tx3.wait();
+      console.log("VALIDATOR_ADMIN_ROLE of AgentNftV2 granted to admin:", admin);
 
       // Verify AgentNftV2 proxy
       await verifyContract(agentNftV2Address!);
@@ -169,20 +181,20 @@ const { ethers, upgrades } = require("hardhat");
       console.log("AgentTax deployed at:", agentTaxAddress);
       deployedContracts["AGENT_TOKEN_TAX_MANAGER"] = agentTaxAddress;
 
-      // Grant EXECUTOR_V2_ROLE to all BE_TAX_OPS_WALLETS
+      // Grant EXECUTOR_V2_ROLE to BE_TAX_OPS_WALLETS (for updateCreator functions)
       const executorV2Role = await agentTax.EXECUTOR_V2_ROLE();
       for (const wallet of beTaxOpsWalletList) {
         const grantTx = await agentTax.grantRole(executorV2Role, wallet);
         await grantTx.wait();
-        console.log("EXECUTOR_V2_ROLE granted to:", wallet);
+        console.log("EXECUTOR_V2_ROLE of AgentTax granted to:", wallet);
       }
 
-      // Grant EXECUTOR_ROLE to all BE_HANDLE_AGENT_TAXES_WALLETS
+      // Grant EXECUTOR_ROLE to BE_HANDLE_AGENT_TAXES_WALLETS (for handleAgentTaxes)
       const executorRole = await agentTax.EXECUTOR_ROLE();
       for (const wallet of beHandleAgentTaxesWalletList) {
         const grantTx = await agentTax.grantRole(executorRole, wallet);
         await grantTx.wait();
-        console.log("EXECUTOR_ROLE granted to:", wallet);
+        console.log("EXECUTOR_ROLE of AgentTax granted to:", wallet);
       }
 
       // Verify AgentTax proxy

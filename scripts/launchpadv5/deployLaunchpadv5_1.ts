@@ -169,24 +169,24 @@ const { ethers, upgrades } = require("hardhat");
       const adminRole = await fFactoryV2.ADMIN_ROLE();
       const defaultAdminRole = await fFactoryV2.DEFAULT_ADMIN_ROLE();
 
-      // Grant ADMIN_ROLE to deployer temporarily
+      // Grant ADMIN_ROLE to deployer temporarily (needed for setRouter)
       const tx1 = await fFactoryV2.grantRole(adminRole, deployerAddress);
       await tx1.wait();
-      console.log("ADMIN_ROLE granted to deployer temporarily");
+      console.log("ADMIN_ROLE of FFactoryV2 granted to deployer (temporary)");
 
       // Set Router
       const tx2 = await fFactoryV2.setRouter(fRouterV2Address);
       await tx2.wait();
-      console.log("Router set in FFactoryV2");
+      console.log("FFactoryV2.setRouter() called with:", fRouterV2Address);
 
       // Grant roles to admin
       const tx3 = await fFactoryV2.grantRole(adminRole, admin);
       await tx3.wait();
-      console.log("ADMIN_ROLE granted to admin:", admin);
+      console.log("ADMIN_ROLE of FFactoryV2 granted to admin:", admin);
 
       const tx4 = await fFactoryV2.grantRole(defaultAdminRole, admin);
       await tx4.wait();
-      console.log("DEFAULT_ADMIN_ROLE granted to admin:", admin);
+      console.log("DEFAULT_ADMIN_ROLE of FFactoryV2 granted to admin:", admin);
     }
 
     // ============================================
@@ -198,18 +198,18 @@ const { ethers, upgrades } = require("hardhat");
       // Grant ADMIN_ROLE to admin (needed for setBondingV5)
       const tx5 = await fRouterV2.grantRole(await fRouterV2.ADMIN_ROLE(), admin);
       await tx5.wait();
-      console.log("ADMIN_ROLE granted to admin on FRouterV2");
+      console.log("ADMIN_ROLE of FRouterV2 granted to admin:", admin);
 
       // Grant DEFAULT_ADMIN_ROLE to admin
       const tx6 = await fRouterV2.grantRole(await fRouterV2.DEFAULT_ADMIN_ROLE(), admin);
       await tx6.wait();
-      console.log("DEFAULT_ADMIN_ROLE granted to admin on FRouterV2");
+      console.log("DEFAULT_ADMIN_ROLE of FRouterV2 granted to admin:", admin);
 
       // Grant EXECUTOR_ROLE to BE_OPS_WALLET (for resetTime)
       const executorRole = await fRouterV2.EXECUTOR_ROLE();
       const tx7 = await fRouterV2.grantRole(executorRole, beOpsWallet);
       await tx7.wait();
-      console.log("EXECUTOR_ROLE granted to BE_OPS_WALLET:", beOpsWallet);
+      console.log("EXECUTOR_ROLE of FRouterV2 granted to BE_OPS_WALLET:", beOpsWallet);
     }
 
     // NOTE: Deployer roles are NOT revoked here

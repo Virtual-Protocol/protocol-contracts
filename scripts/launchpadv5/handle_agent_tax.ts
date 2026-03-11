@@ -28,11 +28,10 @@ async function main() {
   // ============================================
 
   /**
-   * AGENT_TAX_ADDRESS: The deployed AgentTax contract address
-   * Where to get: From your deployment output or .env file (e.g., AGENT_TAX_ADDRESS)
+   * agentTaxAddress: The deployed AgentTax contract address
    */
-  const AGENT_TAX_ADDRESS = process.env.AGENT_TOKEN_TAX_MANAGER;
-  if (!AGENT_TAX_ADDRESS) {
+  const agentTaxAddress = process.env.AGENT_TOKEN_TAX_MANAGER;
+  if (!agentTaxAddress) {
     throw new Error("AGENT_TOKEN_TAX_MANAGER not set in environment");
   }
 
@@ -100,8 +99,8 @@ async function main() {
   console.log("Signer address:", signer.address);
 
   // Connect to AgentTax contract
-  const agentTax = new ethers.Contract(AGENT_TAX_ADDRESS, AGENT_TAX_ABI, signer);
-  console.log("AgentTax address:", AGENT_TAX_ADDRESS);
+  const agentTax = new ethers.Contract(agentTaxAddress, AGENT_TAX_ABI, signer);
+  console.log("Connected to AgentTax contract at:", agentTaxAddress);
 
   // Check if signer has EXECUTOR_ROLE
   const executorRole = await agentTax.EXECUTOR_ROLE();

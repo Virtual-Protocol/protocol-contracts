@@ -39,148 +39,111 @@ const { ethers } = require("hardhat");
     if (!agentFactoryV6Address) {
       throw new Error("AGENT_FACTORY_V6_ADDRESS not set in environment");
     }
-
-    // AgentNftV2 is optional (only if newly deployed in deployPrerequisites_2.ts)
     const agentNftV2Address = process.env.AGENT_NFT_V2_ADDRESS;
+    if (!agentNftV2Address) {
+      throw new Error("AGENT_NFT_V2_ADDRESS not set in environment");
+    }
 
     console.log("\nContract addresses:", {
-      fFactoryV2Address,
-      fRouterV2Address,
-      agentFactoryV6Address,
-      agentNftV2Address: agentNftV2Address || "(not set - skipping)",
+      fFactoryV2Address: fFactoryV2Address,
+      fRouterV2Address: fRouterV2Address,
+      agentFactoryV6Address: agentFactoryV6Address,
+      agentNftV2Address: agentNftV2Address,
     });
 
     // ============================================
     // Get contract instances
     // ============================================
-    const fFactoryV2 = await ethers.getContractAt(
-      "FFactoryV2",
-      fFactoryV2Address
-    );
+    const fFactoryV2 = await ethers.getContractAt("FFactoryV2", fFactoryV2Address);
     const fRouterV2 = await ethers.getContractAt("FRouterV2", fRouterV2Address);
-    const agentFactoryV6 = await ethers.getContractAt(
-      "AgentFactoryV6",
-      agentFactoryV6Address
-    );
+    const agentFactoryV6 = await ethers.getContractAt("AgentFactoryV6", agentFactoryV6Address);
 
     // ============================================
     // Revoke FFactoryV2 deployer roles
     // ============================================
-    console.log("\n--- Revoking FFactoryV2 deployer roles ---");
+    console.log("\n--- Revoking deployer roles from FFactoryV2 ---");
 
     const fFactoryAdminRole = await fFactoryV2.ADMIN_ROLE();
     const fFactoryDefaultAdminRole = await fFactoryV2.DEFAULT_ADMIN_ROLE();
 
-    // Check if deployer has ADMIN_ROLE
     if (await fFactoryV2.hasRole(fFactoryAdminRole, deployerAddress)) {
-      await (
-        await fFactoryV2.revokeRole(fFactoryAdminRole, deployerAddress)
-      ).wait();
-      console.log("✅ Revoked ADMIN_ROLE of FFactoryV2 from deployer");
+      await (await fFactoryV2.revokeRole(fFactoryAdminRole, deployerAddress)).wait();
+      console.log("✅ ADMIN_ROLE of FFactoryV2 revoked from deployer:", deployerAddress);
     } else {
-      console.log(
-        "⏭️  Deployer doesn't have ADMIN_ROLE on FFactoryV2 (already revoked)"
-      );
+      console.log("⏭️  Deployer has no ADMIN_ROLE on FFactoryV2 (skip)");
     }
 
-    // Check if deployer has DEFAULT_ADMIN_ROLE
     if (await fFactoryV2.hasRole(fFactoryDefaultAdminRole, deployerAddress)) {
-      await (
-        await fFactoryV2.revokeRole(fFactoryDefaultAdminRole, deployerAddress)
-      ).wait();
-      console.log("✅ Revoked DEFAULT_ADMIN_ROLE of FFactoryV2 from deployer");
+      await (await fFactoryV2.revokeRole(fFactoryDefaultAdminRole, deployerAddress)).wait();
+      console.log("✅ DEFAULT_ADMIN_ROLE of FFactoryV2 revoked from deployer:", deployerAddress);
     } else {
-      console.log(
-        "⏭️  Deployer doesn't have DEFAULT_ADMIN_ROLE on FFactoryV2 (already revoked)"
-      );
+      console.log("⏭️  Deployer has no DEFAULT_ADMIN_ROLE on FFactoryV2 (skip)");
     }
 
     // ============================================
     // Revoke FRouterV2 deployer roles
     // ============================================
-    console.log("\n--- Revoking FRouterV2 deployer roles ---");
+    console.log("\n--- Revoking deployer roles from FRouterV2 ---");
 
     const fRouterAdminRole = await fRouterV2.ADMIN_ROLE();
     const fRouterDefaultAdminRole = await fRouterV2.DEFAULT_ADMIN_ROLE();
 
-    // Check if deployer has ADMIN_ROLE
     if (await fRouterV2.hasRole(fRouterAdminRole, deployerAddress)) {
-      await (
-        await fRouterV2.revokeRole(fRouterAdminRole, deployerAddress)
-      ).wait();
-      console.log("✅ Revoked ADMIN_ROLE of FRouterV2 from deployer");
+      await (await fRouterV2.revokeRole(fRouterAdminRole, deployerAddress)).wait();
+      console.log("✅ ADMIN_ROLE of FRouterV2 revoked from deployer:", deployerAddress);
     } else {
-      console.log(
-        "⏭️  Deployer doesn't have ADMIN_ROLE on FRouterV2 (already revoked)"
-      );
+      console.log("⏭️  Deployer has no ADMIN_ROLE on FRouterV2 (skip)");
     }
 
-    // Check if deployer has DEFAULT_ADMIN_ROLE
     if (await fRouterV2.hasRole(fRouterDefaultAdminRole, deployerAddress)) {
-      await (
-        await fRouterV2.revokeRole(fRouterDefaultAdminRole, deployerAddress)
-      ).wait();
-      console.log("✅ Revoked DEFAULT_ADMIN_ROLE of FRouterV2 from deployer");
+      await (await fRouterV2.revokeRole(fRouterDefaultAdminRole, deployerAddress)).wait();
+      console.log("✅ DEFAULT_ADMIN_ROLE of FRouterV2 revoked from deployer:", deployerAddress);
     } else {
-      console.log(
-        "⏭️  Deployer doesn't have DEFAULT_ADMIN_ROLE on FRouterV2 (already revoked)"
-      );
+      console.log("⏭️  Deployer has no DEFAULT_ADMIN_ROLE on FRouterV2 (skip)");
     }
 
     // ============================================
     // Revoke AgentFactoryV6 deployer roles
     // ============================================
-    console.log("\n--- Revoking AgentFactoryV6 deployer roles ---");
+    console.log("\n--- Revoking deployer roles from AgentFactoryV6 ---");
 
-    const agentFactoryDefaultAdminRole =
-      await agentFactoryV6.DEFAULT_ADMIN_ROLE();
+    const agentFactoryDefaultAdminRole = await agentFactoryV6.DEFAULT_ADMIN_ROLE();
 
-    // Check if deployer has DEFAULT_ADMIN_ROLE
-    if (
-      await agentFactoryV6.hasRole(
-        agentFactoryDefaultAdminRole,
-        deployerAddress
-      )
-    ) {
-      await (
-        await agentFactoryV6.revokeRole(
-          agentFactoryDefaultAdminRole,
-          deployerAddress
-        )
-      ).wait();
-      console.log(
-        "✅ Revoked DEFAULT_ADMIN_ROLE of AgentFactoryV6 from deployer"
-      );
+    if (await agentFactoryV6.hasRole(agentFactoryDefaultAdminRole, deployerAddress)) {
+      await (await agentFactoryV6.revokeRole(agentFactoryDefaultAdminRole, deployerAddress)).wait();
+      console.log("✅ DEFAULT_ADMIN_ROLE of AgentFactoryV6 revoked from deployer:", deployerAddress);
     } else {
-      console.log(
-        "⏭️  Deployer doesn't have DEFAULT_ADMIN_ROLE on AgentFactoryV6 (already revoked)"
-      );
+      console.log("⏭️  Deployer has no DEFAULT_ADMIN_ROLE on AgentFactoryV6 (skip)");
     }
 
     // ============================================
-    // Revoke AgentNftV2 deployer roles (if applicable)
+    // Revoke AgentNftV2 deployer roles
     // ============================================
-    if (agentNftV2Address) {
-      console.log("\n--- Revoking AgentNftV2 deployer roles ---");
-      const agentNftV2 = await ethers.getContractAt(
-        "AgentNftV2",
-        agentNftV2Address
-      );
-      const agentNftDefaultAdminRole = await agentNftV2.DEFAULT_ADMIN_ROLE();
+    console.log("\n--- Revoking deployer roles from AgentNftV2 ---");
+    const agentNftV2 = await ethers.getContractAt("AgentNftV2", agentNftV2Address);
 
-      // Check if deployer has DEFAULT_ADMIN_ROLE
-      if (await agentNftV2.hasRole(agentNftDefaultAdminRole, deployerAddress)) {
-        await (
-          await agentNftV2.revokeRole(agentNftDefaultAdminRole, deployerAddress)
-        ).wait();
-        console.log(
-          "✅ Revoked DEFAULT_ADMIN_ROLE of AgentNftV2 from deployer"
-        );
-      } else {
-        console.log(
-          "⏭️  Deployer doesn't have DEFAULT_ADMIN_ROLE on AgentNftV2 (already revoked)"
-        );
-      }
+    const agentNftDefaultAdminRole = await agentNftV2.DEFAULT_ADMIN_ROLE();
+    if (await agentNftV2.hasRole(agentNftDefaultAdminRole, deployerAddress)) {
+      await (await agentNftV2.revokeRole(agentNftDefaultAdminRole, deployerAddress)).wait();
+      console.log("✅ DEFAULT_ADMIN_ROLE of AgentNftV2 revoked from deployer:", deployerAddress);
+    } else {
+      console.log("⏭️  Deployer has no DEFAULT_ADMIN_ROLE on AgentNftV2 (skip)");
+    }
+
+    const agentNftAdminRole = await agentNftV2.ADMIN_ROLE();
+    if (await agentNftV2.hasRole(agentNftAdminRole, deployerAddress)) {
+      await (await agentNftV2.revokeRole(agentNftAdminRole, deployerAddress)).wait();
+      console.log("✅ ADMIN_ROLE of AgentNftV2 revoked from deployer:", deployerAddress);
+    } else {
+      console.log("⏭️  Deployer has no ADMIN_ROLE on AgentNftV2 (skip)");
+    }
+
+    const agentNftValidatorAdminRole = await agentNftV2.VALIDATOR_ADMIN_ROLE();
+    if (await agentNftV2.hasRole(agentNftValidatorAdminRole, deployerAddress)) {
+      await (await agentNftV2.revokeRole(agentNftValidatorAdminRole, deployerAddress)).wait();
+      console.log("✅ VALIDATOR_ADMIN_ROLE of AgentNftV2 revoked from deployer:", deployerAddress);
+    } else {
+      console.log("⏭️  Deployer has no VALIDATOR_ADMIN_ROLE on AgentNftV2 (skip)");
     }
 
     // ============================================
@@ -199,11 +162,10 @@ const { ethers } = require("hardhat");
     console.log("\n✅ Security hardening complete!");
 
     console.log("\n--- Deployment Order ---");
+    console.log("0. ✅ deployLaunchpadv5_0.ts (AgentNftV2, AgentTax) - DONE");
     console.log("1. ✅ deployLaunchpadv5_1.ts (FFactoryV2, FRouterV2) - DONE");
     console.log("2. ✅ deployLaunchpadv5_2.ts (AgentFactoryV6) - DONE");
-    console.log(
-      "3. ✅ deployLaunchpadv5_3.ts (BondingConfig, BondingV5) - DONE"
-    );
+    console.log("3. ✅ deployLaunchpadv5_3.ts (BondingConfig, BondingV5) - DONE");
     console.log("4. ✅ deployLaunchpadv5_4.ts (Revoke deployer roles) - DONE");
 
     console.log("\n" + "=".repeat(60));
@@ -217,7 +179,9 @@ const { ethers } = require("hardhat");
     console.log(`- BondingV5: ${process.env.BONDING_V5_ADDRESS}`);
     console.log(`- Virtual Token: ${process.env.VIRTUAL_TOKEN_ADDRESS}`);
     console.log(`- AgentTokenV2: ${process.env.AGENT_TOKEN_V2_IMPLEMENTATION}`);
-    console.log(`- AgentVeTokenV2: ${process.env.AGENT_VE_TOKEN_V2_IMPLEMENTATION}`);
+    console.log(
+      `- AgentVeTokenV2: ${process.env.AGENT_VE_TOKEN_V2_IMPLEMENTATION}`
+    );
     console.log(`- AgentDAOImpl: ${process.env.AGENT_DAO_IMPLEMENTATION}`);
     console.log(`- AgentNftV2: ${process.env.AGENT_NFT_V2_ADDRESS}`);
     console.log(`- AgentTaxManager: ${process.env.AGENT_TOKEN_TAX_MANAGER}`);

@@ -86,7 +86,15 @@ const { ethers, upgrades } = require("hardhat");
     if (!targetRealVirtual) {
       throw new Error("TARGET_REAL_VIRTUAL not set in environment");
     }
-    const maxAirdropPercent = process.env.MAX_AIRDROP_PERCENT || "5";
+    const agentTaxAddress = process.env.AGENT_TOKEN_TAX_MANAGER;
+    if (!agentTaxAddress) {
+      throw new Error("AGENT_TOKEN_TAX_MANAGER not set in environment");
+    }
+
+    const maxAirdropPercent = process.env.MAX_AIRDROP_PERCENT;
+    if (!maxAirdropPercent) {
+      throw new Error("MAX_AIRDROP_PERCENT not set in environment");
+    }
 
     console.log("\nDeployment arguments loaded:", {
       contractController,
@@ -155,27 +163,27 @@ const { ethers, upgrades } = require("hardhat");
     // Verify BondingConfig proxy
     await verifyContract(bondingConfigAddress);
 
-    // Set X Launchers
+    // Set X Launchers (authorized addresses for LAUNCH_MODE_X_LAUNCH)
     const xLauncherAddresses = process.env.X_LAUNCHER_ADDRESSES;
     if (xLauncherAddresses) {
       const addresses = xLauncherAddresses.split(",").map((addr) => addr.trim()).filter((addr) => addr);
-      console.log("\n--- Setting X Launchers ---");
+      console.log("\n--- Setting X Launchers in BondingConfig ---");
       for (const addr of addresses) {
         const tx = await bondingConfig.setXLauncher(addr, true);
         await tx.wait();
-        console.log(`Set X Launcher: ${addr}`);
+        console.log("BondingConfig.setXLauncher(true):", addr);
       }
     }
 
-    // Set ACP Skill Launchers
+    // Set ACP Skill Launchers (authorized addresses for LAUNCH_MODE_ACP_SKILL)
     const acpSkillLauncherAddresses = process.env.ACP_SKILL_LAUNCHER_ADDRESSES;
     if (acpSkillLauncherAddresses) {
       const addresses = acpSkillLauncherAddresses.split(",").map((addr) => addr.trim()).filter((addr) => addr);
-      console.log("\n--- Setting ACP Skill Launchers ---");
+      console.log("\n--- Setting ACP Skill Launchers in BondingConfig ---");
       for (const addr of addresses) {
         const tx = await bondingConfig.setAcpSkillLauncher(addr, true);
         await tx.wait();
-        console.log(`Set ACP Skill Launcher: ${addr}`);
+        console.log("BondingConfig.setAcpSkillLauncher(true):", addr);
       }
     }
 
@@ -207,86 +215,52 @@ const { ethers, upgrades } = require("hardhat");
     // ============================================
     // 3. Transfer Ownership
     // ============================================
-    console.log("\n--- Transferring ownership to CONTRACT_CONTROLLER ---");
+    console.log("\n--- Transferring ownership ---");
 
     const tx5 = await bondingV5.transferOwnership(contractController);
     await tx5.wait();
-    console.log("BondingV5 ownership transferred to CONTRACT_CONTROLLER");
+    console.log("BondingV5 ownership transferred to CONTRACT_CONTROLLER:", contractController);
 
     const tx6 = await bondingConfig.transferOwnership(contractController);
     await tx6.wait();
-    console.log("BondingConfig ownership transferred to CONTRACT_CONTROLLER");
+    console.log("BondingConfig ownership transferred to CONTRACT_CONTROLLER:", contractController);
 
     // ============================================
-    // 4. Grant Roles and Configure Contracts (using admin wallet)
+    // 4. Grant Roles and Configure Contracts
     // ============================================
-    // These contracts were deployed in previous scripts, so deployer no longer has admin roles
-    // We need to use ADMIN_PRIVATE_KEY to grant roles
-    console.log("\n--- Granting necessary roles (using admin wallet) ---");
+    // Deployer still has admin roles from previous scripts (_0, _1, _2)
+    // Roles will be revoked in _4.ts
+    console.log("\n--- Granting roles and configuring contracts ---");
 
-    const adminPrivateKey = process.env.ADMIN_PRIVATE_KEY;
-    const agentTaxAddress = process.env.AGENT_TOKEN_TAX_MANAGER;
-    if (!agentTaxAddress) {
-      throw new Error("AGENT_TOKEN_TAX_MANAGER not set in environment");
-    }
-    if (!adminPrivateKey) {
-      console.log("\n" + "=".repeat(80));
-      console.log("⚠️  ADMIN_PRIVATE_KEY not set - Manual role grants required!");
-      console.log("⚠️  The following operations must be done manually by admin:");
-      console.log("=".repeat(80));
-      console.log(`1. FFactoryV2.grantRole(CREATOR_ROLE, ${bondingV5Address})`);
-      console.log(`2. FRouterV2.setBondingV5(${bondingV5Address}, ${bondingConfigAddress})`);
-      console.log(`3. FRouterV2.grantRole(EXECUTOR_ROLE, ${bondingV5Address})`);
-      console.log(`4. AgentFactoryV6.grantRole(BONDING_ROLE, ${bondingV5Address})`);
-      console.log(`5. AgentTax.setBondingV5(${bondingV5Address})`);
-      console.log("=".repeat(80));
-      throw new Error("ADMIN_PRIVATE_KEY not set - Manual role grants required!");
-    } else {
-      const adminSigner = new ethers.Wallet(adminPrivateKey, ethers.provider);
-      console.log("Using admin signer:", await adminSigner.getAddress());
+    const fFactoryV2 = await ethers.getContractAt("FFactoryV2", fFactoryV2Address);
+    const fRouterV2 = await ethers.getContractAt("FRouterV2", fRouterV2Address);
+    const agentFactoryV6 = await ethers.getContractAt("AgentFactoryV6", agentFactoryV6Address);
+    const agentTax = await ethers.getContractAt("AgentTax", agentTaxAddress);
 
-      const fFactoryV2 = await ethers.getContractAt("FFactoryV2", fFactoryV2Address, adminSigner);
-      const fRouterV2 = await ethers.getContractAt("FRouterV2", fRouterV2Address, adminSigner);
-      const agentFactoryV6 = await ethers.getContractAt("AgentFactoryV6", agentFactoryV6Address, adminSigner);
+    // Grant CREATOR_ROLE of FFactoryV2 to BondingV5
+    const creatorRole = await fFactoryV2.CREATOR_ROLE();
+    await (await fFactoryV2.grantRole(creatorRole, bondingV5Address)).wait();
+    console.log("✅ CREATOR_ROLE of FFactoryV2 granted to BondingV5:", bondingV5Address);
 
-      // 3.1 Grant CREATOR_ROLE of FFactoryV2 to BondingV5
-      console.log("\n--- Granting CREATOR_ROLE of FFactoryV2 to BondingV5 ---");
-      const creatorRole = await fFactoryV2.CREATOR_ROLE();
-      await (await fFactoryV2.grantRole(creatorRole, bondingV5Address)).wait();
-      console.log("✅ Granted CREATOR_ROLE of FFactoryV2 to BondingV5");
+    // Set BondingV5 and BondingConfig in FRouterV2
+    await (await fRouterV2.setBondingV5(bondingV5Address, bondingConfigAddress)).wait();
+    console.log("✅ FRouterV2.setBondingV5() called:", { bondingV5: bondingV5Address, bondingConfig: bondingConfigAddress });
 
-      // 3.2 Set BondingV5 and BondingConfig in FRouterV2
-      console.log("\n--- Setting BondingV5 in FRouterV2 ---");
-      await (await fRouterV2.setBondingV5(bondingV5Address, bondingConfigAddress)).wait();
-      console.log("✅ Set BondingV5 and BondingConfig in FRouterV2");
+    // Grant EXECUTOR_ROLE of FRouterV2 to BondingV5
+    const executorRole = await fRouterV2.EXECUTOR_ROLE();
+    await (await fRouterV2.grantRole(executorRole, bondingV5Address)).wait();
+    console.log("✅ EXECUTOR_ROLE of FRouterV2 granted to BondingV5:", bondingV5Address);
 
-      // 3.3 Grant EXECUTOR_ROLE of FRouterV2 to BondingV5
-      console.log("\n--- Granting EXECUTOR_ROLE of FRouterV2 to BondingV5 ---");
-      const executorRole = await fRouterV2.EXECUTOR_ROLE();
-      await (await fRouterV2.grantRole(executorRole, bondingV5Address)).wait();
-      console.log("✅ Granted EXECUTOR_ROLE of FRouterV2 to BondingV5");
+    // Grant BONDING_ROLE of AgentFactoryV6 to BondingV5
+    const bondingRole = await agentFactoryV6.BONDING_ROLE();
+    await (await agentFactoryV6.grantRole(bondingRole, bondingV5Address)).wait();
+    console.log("✅ BONDING_ROLE of AgentFactoryV6 granted to BondingV5:", bondingV5Address);
 
-      // 3.4 Grant BONDING_ROLE of AgentFactoryV6 to BondingV5
-      console.log("\n--- Granting BONDING_ROLE of AgentFactoryV6 to BondingV5 ---");
-      const bondingRole = await agentFactoryV6.BONDING_ROLE();
-      await (await agentFactoryV6.grantRole(bondingRole, bondingV5Address)).wait();
-      console.log("✅ Granted BONDING_ROLE of AgentFactoryV6 to BondingV5");
+    // Set BondingV5 in AgentTax
+    await (await agentTax.setBondingV5(bondingV5Address)).wait();
+    console.log("✅ AgentTax.setBondingV5() called:", bondingV5Address);
 
-      // 3.5 Set BondingV5 in AgentTax (optional - only if AGENT_TAX_ADDRESS is set)
-      const agentTaxAddress = process.env.AGENT_TAX_ADDRESS;
-      if (agentTaxAddress) {
-        console.log("\n--- Setting BondingV5 in AgentTax ---");
-        const agentTax = await ethers.getContractAt("AgentTax", agentTaxAddress, adminSigner);
-        await (await agentTax.setBondingV5(bondingV5Address)).wait();
-        console.log("✅ Set BondingV5 in AgentTax:", bondingV5Address);
-      } else {
-        console.log("\n⚠️  AGENT_TAX_ADDRESS not set - skipping AgentTax.setBondingV5()");
-        console.log("   If you have AgentTax deployed, run manually:");
-        console.log(`   agentTax.setBondingV5(${bondingV5Address})`);
-      }
-
-      console.log("\n✅ All role grants completed!");
-    }
+    console.log("\n✅ All role grants and configurations completed!");
 
     // ============================================
     // 5. Print Deployment Summary
@@ -324,10 +298,11 @@ const { ethers, upgrades } = require("hardhat");
     console.log("- LAUNCH_MODE_ACP_SKILL (2): Requires isAcpSkillLauncher authorization");
 
     console.log("\n--- Deployment Order ---");
+    console.log("0. ✅ deployLaunchpadv5_0.ts (AgentNftV2, AgentTax) - DONE");
     console.log("1. ✅ deployLaunchpadv5_1.ts (FFactoryV2, FRouterV2) - DONE");
     console.log("2. ✅ deployLaunchpadv5_2.ts (AgentFactoryV6) - DONE");
     console.log("3. ✅ deployLaunchpadv5_3.ts (BondingConfig, BondingV5) - DONE");
-    console.log("4. ⏳ deployLaunchpadv5_4.ts (Revoke deployer roles) - DONE");
+    console.log("4. ⏳ deployLaunchpadv5_4.ts (Revoke deployer roles)");
 
     console.log("\n" + "=".repeat(60));
 

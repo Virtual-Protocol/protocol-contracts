@@ -271,55 +271,64 @@ const { ethers, upgrades } = require("hardhat");
     // ============================================
     console.log("\n--- Configuring AgentFactoryV6 ---");
 
-    // Grant DEFAULT_ADMIN_ROLE to deployer temporarily
+    // Grant DEFAULT_ADMIN_ROLE to deployer temporarily (needed for setParams/setTokenParams)
     const txGrantAdmin = await agentFactoryV6.grantRole(
       await agentFactoryV6.DEFAULT_ADMIN_ROLE(),
       deployerAddress
     );
     await txGrantAdmin.wait();
-    console.log("DEFAULT_ADMIN_ROLE granted to deployer temporarily");
+    console.log("DEFAULT_ADMIN_ROLE of AgentFactoryV6 granted to deployer (temporary)");
 
     // Set params
     const txSetParams = await agentFactoryV6.setParams(
-      agentFactoryV6MaturityDuration, // maturity duration (from env)
+      agentFactoryV6MaturityDuration,
       uniswapV2RouterAddress,
       admin, // defaultDelegatee
       admin // tokenAdmin
     );
     await txSetParams.wait();
-    console.log(
-      "setParams() called for AgentFactoryV6 with maturityDuration:",
-      agentFactoryV6MaturityDuration
-    );
+    console.log("AgentFactoryV6.setParams() called:", {
+      maturityDuration: agentFactoryV6MaturityDuration,
+      uniswapRouter: uniswapV2RouterAddress,
+      defaultDelegatee: admin,
+      tokenAdmin: admin,
+    });
 
     // Set token params (Sentient phase tax configuration)
     const txSetTokenParams = await agentFactoryV6.setTokenParams(
-      sentientBuyTax, // projectBuyTaxBasisPoints
-      sentientSellTax, // projectSellTaxBasisPoints
-      taxSwapThresholdBasisPoints, // taxSwapThresholdBasisPoints (from env)
-      agentTokenTaxManager // projectTaxRecipient (fee address)
-    );
-    await txSetTokenParams.wait();
-    console.log("setTokenParams() called for AgentFactoryV6:", {
       sentientBuyTax,
       sentientSellTax,
       taxSwapThresholdBasisPoints,
-      agentTokenTaxManager,
+      agentTokenTaxManager
+    );
+    await txSetTokenParams.wait();
+    console.log("AgentFactoryV6.setTokenParams() called:", {
+      buyTax: sentientBuyTax,
+      sellTax: sentientSellTax,
+      taxSwapThreshold: taxSwapThresholdBasisPoints,
+      taxRecipient: agentTokenTaxManager,
     });
 
-    // Grant DEFAULT_ADMIN_ROLE to admin
+    // Grant DEFAULT_ADMIN_ROLE of AgentFactoryV6 to admin
+    const agentFactoryV6DefaultAdminRole = await agentFactoryV6.DEFAULT_ADMIN_ROLE();
     const txGrantAdminToAdmin = await agentFactoryV6.grantRole(
-      await agentFactoryV6.DEFAULT_ADMIN_ROLE(),
+      agentFactoryV6DefaultAdminRole,
       admin
     );
     await txGrantAdminToAdmin.wait();
-    console.log("DEFAULT_ADMIN_ROLE granted to admin:", admin);
+    console.log("DEFAULT_ADMIN_ROLE of AgentFactoryV6 granted to admin:", admin);
 
-    // Grant REMOVE_LIQUIDITY_ROLE to admin
-    const removeLiqRole = await agentFactoryV6.REMOVE_LIQUIDITY_ROLE();
-    const txGrantRemoveLiq = await agentFactoryV6.grantRole(removeLiqRole, admin);
+    // Grant REMOVE_LIQUIDITY_ROLE of AgentFactoryV6 to admin
+    const agentFactoryV6RemoveLiqRole = await agentFactoryV6.REMOVE_LIQUIDITY_ROLE();
+    const txGrantRemoveLiq = await agentFactoryV6.grantRole(agentFactoryV6RemoveLiqRole, admin);
     await txGrantRemoveLiq.wait();
-    console.log("REMOVE_LIQUIDITY_ROLE granted to admin:", admin);
+    console.log("REMOVE_LIQUIDITY_ROLE of AgentFactoryV6 granted to admin:", admin);
+
+    // Grant WITHDRAW_ROLE of AgentFactoryV6 to admin
+    const agentFactoryV6WithdrawRole = await agentFactoryV6.WITHDRAW_ROLE();
+    const txGrantWithdraw = await agentFactoryV6.grantRole(agentFactoryV6WithdrawRole, admin);
+    await txGrantWithdraw.wait();
+    console.log("WITHDRAW_ROLE of AgentFactoryV6 granted to admin:", admin);
 
     // ============================================
     // 9. Grant MINTER_ROLE on AgentNftV2 to AgentFactoryV6
@@ -340,7 +349,7 @@ const { ethers, upgrades } = require("hardhat");
       const minterRole = await agentNftV2Contract.MINTER_ROLE();
       const tx = await agentNftV2Contract.grantRole(minterRole, agentFactoryV6Address);
       await tx.wait();
-      console.log("MINTER_ROLE granted to AgentFactoryV6:", agentFactoryV6Address);
+      console.log("MINTER_ROLE of AgentNftV2 granted to AgentFactoryV6:", agentFactoryV6Address);
     } else {
       console.log(
         "\n⚠️  Deployer doesn't have DEFAULT_ADMIN_ROLE on AgentNftV2"

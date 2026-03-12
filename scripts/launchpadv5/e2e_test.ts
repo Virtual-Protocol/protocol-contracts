@@ -98,7 +98,7 @@ async function main() {
   console.log("=".repeat(80));
 
   // Check BondingConfig parameters
-  const scheduledLaunchParams = await bondingConfig.scheduledLaunchParams();
+  const scheduledLaunchParams = await bondingConfig.getScheduledLaunchParams();
   const bondingCurveParams = await bondingConfig.bondingCurveParams();
   const reserveSupplyParams = await bondingConfig.reserveSupplyParams();
   const initialSupply = await bondingConfig.initialSupply();

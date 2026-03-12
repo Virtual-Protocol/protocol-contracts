@@ -1108,7 +1108,7 @@ describe("BondingV5", function () {
 
       await bondingConfig.connect(owner).setScheduledLaunchParams(newParams);
 
-      const params = await bondingConfig.scheduledLaunchParams();
+      const params = await bondingConfig.getScheduledLaunchParams();
       expect(params.normalLaunchFee).to.equal(newParams.normalLaunchFee);
       expect(params.acfFee).to.equal(newParams.acfFee);
 
@@ -2707,7 +2707,7 @@ describe("BondingV5", function () {
 
       await bondingConfig.connect(owner).setDeployParams(newDeployParams);
 
-      const deployParams = await bondingConfig.deployParams();
+      const deployParams = await bondingConfig.getDeployParams();
       expect(deployParams.tbaSalt).to.equal(newDeployParams.tbaSalt);
       expect(deployParams.tbaImplementation).to.equal(newDeployParams.tbaImplementation);
       expect(deployParams.daoVotingPeriod).to.equal(newDeployParams.daoVotingPeriod);

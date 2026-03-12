@@ -37,9 +37,8 @@ contract BondingConfig is Initializable, OwnableUpgradeable {
         uint256 normalLaunchFee; // Fee for scheduled launches / marketing (e.g., 100 VIRTUAL)
         uint256 acfFee; // Extra fee when needAcf = true (e.g., 10 VIRTUAL on base, 150 VIRTUAL on eth)
     }
-    // Note: Using internal + view function because Solidity auto-getter for structs
-    // returns individual fields, not the whole struct as memory
-    ScheduledLaunchParams internal _scheduledLaunchParams;
+    // public for Etherscan visibility; use getScheduledLaunchParams() for memory struct
+    ScheduledLaunchParams public scheduledLaunchParams;
 
     // Global wallet to receive reserved tokens (airdrop + ACF)
     address public teamTokenReservedWallet;
@@ -107,9 +106,8 @@ contract BondingConfig is Initializable, OwnableUpgradeable {
         uint32 daoVotingPeriod;
         uint256 daoThreshold;
     }
-    // Note: Using internal + view function because Solidity auto-getter for structs
-    // returns individual fields, not the whole struct as memory
-    DeployParams internal _deployParams;
+    // public for Etherscan visibility; use getDeployParams() for memory struct
+    DeployParams public deployParams;
 
     // Common parameters
     uint256 public initialSupply;
@@ -145,8 +143,8 @@ contract BondingConfig is Initializable, OwnableUpgradeable {
         feeTo = feeTo_;
         teamTokenReservedWallet = teamTokenReservedWallet_;
         reserveSupplyParams = reserveSupplyParams_;
-        _scheduledLaunchParams = scheduledLaunchParams_;
-        _deployParams = deployParams_;
+        scheduledLaunchParams = scheduledLaunchParams_;
+        deployParams = deployParams_;
         bondingCurveParams = bondingCurveParams_;
     }
 
@@ -155,7 +153,7 @@ contract BondingConfig is Initializable, OwnableUpgradeable {
      * @param params_ The deploy parameters
      */
     function setDeployParams(DeployParams memory params_) external onlyOwner {
-        _deployParams = params_;
+        deployParams = params_;
         emit DeployParamsUpdated(params_);
     }
 
@@ -242,7 +240,7 @@ contract BondingConfig is Initializable, OwnableUpgradeable {
     function setScheduledLaunchParams(
         ScheduledLaunchParams memory params_
     ) external onlyOwner {
-        _scheduledLaunchParams = params_;
+        scheduledLaunchParams = params_;
     }
 
     /**
@@ -332,16 +330,22 @@ contract BondingConfig is Initializable, OwnableUpgradeable {
         revert InvalidAntiSniperType();
     }
 
-    function scheduledLaunchParams()
+    /**
+     * @notice Get scheduled launch params as memory struct (for contract calls)
+     */
+    function getScheduledLaunchParams()
         external
         view
         returns (ScheduledLaunchParams memory)
     {
-        return _scheduledLaunchParams;
+        return scheduledLaunchParams;
     }
 
-    function deployParams() external view returns (DeployParams memory) {
-        return _deployParams;
+    /**
+     * @notice Get deploy params as memory struct (for contract calls)
+     */
+    function getDeployParams() external view returns (DeployParams memory) {
+        return deployParams;
     }
 
     /**
@@ -361,10 +365,10 @@ contract BondingConfig is Initializable, OwnableUpgradeable {
     ) external view returns (uint256) {
         uint256 totalFee = 0;
         if (isScheduledLaunch_) {
-            totalFee += _scheduledLaunchParams.normalLaunchFee;
+            totalFee += scheduledLaunchParams.normalLaunchFee;
         }
         if (needAcf_) {
-            totalFee += _scheduledLaunchParams.acfFee;
+            totalFee += scheduledLaunchParams.acfFee;
         }
         return totalFee;
     }

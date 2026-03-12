@@ -164,7 +164,7 @@ contract BondingV5 is
         // Determine if this is an immediate launch or scheduled launch
         // Immediate launch: startTime < now + scheduledLaunchStartTimeDelay
         // Scheduled launch: startTime >= now + scheduledLaunchStartTimeDelay
-        BondingConfig.ScheduledLaunchParams memory scheduledParams = bondingConfig.scheduledLaunchParams();
+        BondingConfig.ScheduledLaunchParams memory scheduledParams = bondingConfig.getScheduledLaunchParams();
         uint256 scheduledThreshold = block.timestamp + scheduledParams.startTimeDelay;
         bool isScheduledLaunch = startTime_ >= scheduledThreshold;
 
@@ -216,7 +216,7 @@ contract BondingV5 is
         );
 
         uint256 configInitialSupply = bondingConfig.initialSupply();
-        BondingConfig.DeployParams memory deployParams = bondingConfig.deployParams();
+        BondingConfig.DeployParams memory configDeployParams = bondingConfig.getDeployParams();
         
         (address token, uint256 applicationId) = agentFactory
             .createNewAgentTokenAndApplication(
@@ -233,10 +233,10 @@ contract BondingV5 is
                     address(this) // vault, is the bonding contract itself
                 ),
                 cores_,
-                deployParams.tbaSalt,
-                deployParams.tbaImplementation,
-                deployParams.daoVotingPeriod,
-                deployParams.daoThreshold,
+                configDeployParams.tbaSalt,
+                configDeployParams.tbaImplementation,
+                configDeployParams.daoVotingPeriod,
+                configDeployParams.daoThreshold,
                 0, // applicationThreshold_
                 msg.sender // token creator
             );

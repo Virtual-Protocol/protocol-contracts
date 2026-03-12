@@ -38,8 +38,10 @@ const LAUNCH_MODE_NORMAL = 0;
 const LAUNCH_MODE_X_LAUNCH = 1;
 const LAUNCH_MODE_ACP_SKILL = 2;
 
-// Max airdrop percent
-const MAX_AIRDROP_PERCENT = 5;
+// Reserve supply parameters (in bips, 1 bip = 0.01%, e.g., 500 = 5.00%)
+const MAX_AIRDROP_BIPS = 500;
+const MAX_TOTAL_RESERVED_BIPS = 5500; // At least 45% must remain in bonding curve
+const ACF_RESERVED_BIPS = 5000; // ACF operations reserve 50%
 
 // Anti-sniper tax type constants
 const ANTI_SNIPER_NONE = 0;
@@ -252,6 +254,12 @@ async function setupBondingV5Test() {
     console.log("\n--- Deploying BondingConfig ---");
     const BondingConfig = await ethers.getContractFactory("BondingConfig");
     
+    const reserveSupplyParams = {
+      maxAirdropBips: MAX_AIRDROP_BIPS,
+      maxTotalReservedBips: MAX_TOTAL_RESERVED_BIPS,
+      acfReservedBips: ACF_RESERVED_BIPS,
+    };
+
     const scheduledLaunchParams = {
       startTimeDelay: START_TIME_DELAY,
       normalLaunchFee: NORMAL_LAUNCH_FEE,
@@ -276,7 +284,7 @@ async function setupBondingV5Test() {
         INITIAL_SUPPLY,
         owner.address,              // feeTo
         beOpsWallet.address,        // teamTokenReservedWallet
-        MAX_AIRDROP_PERCENT,        // maxAirdropPercent
+        reserveSupplyParams,        // reserveSupplyParams
         scheduledLaunchParams,
         deployParams,
         bondingCurveParams,
@@ -495,7 +503,7 @@ describe("BondingV5", function () {
           purchaseAmount,
           startTime,
           LAUNCH_MODE_NORMAL,     // launchMode_
-          0,                      // airdropPercent_
+          0,                      // airdropBips_
           false,                  // needAcf_
           ANTI_SNIPER_60S,        // antiSniperTaxType_
           false                   // isProject60days_
@@ -528,7 +536,7 @@ describe("BondingV5", function () {
       // Verify tokenLaunchParams is stored correctly
       const launchParams = await bondingV5.tokenLaunchParams(tokenAddress);
       expect(launchParams.launchMode).to.equal(LAUNCH_MODE_NORMAL);
-      expect(launchParams.airdropPercent).to.equal(0);
+      expect(launchParams.airdropBips).to.equal(0);
       expect(launchParams.needAcf).to.be.false;
       expect(launchParams.antiSniperTaxType).to.equal(ANTI_SNIPER_60S);
       expect(launchParams.isProject60days).to.be.false;
@@ -895,7 +903,7 @@ describe("BondingV5", function () {
           purchaseAmount,
           startTime,
           LAUNCH_MODE_X_LAUNCH,
-          0,                      // airdropPercent must be 0 for special modes
+          0,                      // airdropBips must be 0 for special modes
           false,                  // needAcf must be false for special modes
           ANTI_SNIPER_NONE,       // antiSniperTaxType must be NONE for special modes
           false                   // isProject60days must be false for special modes
@@ -966,7 +974,7 @@ describe("BondingV5", function () {
 
       const startTime = (await time.latest()) + 100;
 
-      // Should revert with non-zero airdropPercent (special modes require 0)
+      // Should revert with non-zero airdropBips (special modes require 0)
       await expect(
         bondingV5.connect(user1).preLaunch(
           "Invalid X Launch",
@@ -978,7 +986,7 @@ describe("BondingV5", function () {
           purchaseAmount,
           startTime,
           LAUNCH_MODE_X_LAUNCH,
-          5,                      // airdropPercent = 5 (within maxAirdropPercent but special modes require 0)
+          500,                    // airdropBips = 500 (5.00%, within maxAirdropBips but special modes require 0)
           false,
           ANTI_SNIPER_NONE,
           false
@@ -1237,7 +1245,7 @@ describe("BondingV5", function () {
   // ============================================
   describe("Configurable Options Permutations", function () {
     
-    describe("airdropPercent Variations", function () {
+    describe("airdropBips Variations", function () {
       it("Should create token with 0% airdrop", async function () {
         const { user1 } = accounts;
         const { bondingV5, virtualToken } = contracts;
@@ -1261,7 +1269,7 @@ describe("BondingV5", function () {
         const tokenAddress = bondingV5.interface.parseLog(event).args.token;
         
         const launchParams = await bondingV5.tokenLaunchParams(tokenAddress);
-        expect(launchParams.airdropPercent).to.equal(0);
+        expect(launchParams.airdropBips).to.equal(0);
       });
 
       it("Should create token with max airdrop (5%)", async function () {
@@ -1276,7 +1284,7 @@ describe("BondingV5", function () {
           "Max Airdrop Token", "T5", [0, 1], "Description",
           "https://example.com/image.png", ["", "", "", ""],
           purchaseAmount, startTime,
-          LAUNCH_MODE_NORMAL, 5, false, ANTI_SNIPER_60S, false  // MAX_AIRDROP_PERCENT = 5
+          LAUNCH_MODE_NORMAL, 500, false, ANTI_SNIPER_60S, false  // MAX_AIRDROP_BIPS = 500 (5.00%)
         );
 
         const receipt = await tx.wait();
@@ -1287,7 +1295,7 @@ describe("BondingV5", function () {
         const tokenAddress = bondingV5.interface.parseLog(event).args.token;
         
         const launchParams = await bondingV5.tokenLaunchParams(tokenAddress);
-        expect(launchParams.airdropPercent).to.equal(5);
+        expect(launchParams.airdropBips).to.equal(500);
       });
 
       it("Should create token with 3% airdrop", async function () {
@@ -1302,7 +1310,7 @@ describe("BondingV5", function () {
           "3% Airdrop Token", "T3", [0, 1], "Description",
           "https://example.com/image.png", ["", "", "", ""],
           purchaseAmount, startTime,
-          LAUNCH_MODE_NORMAL, 3, false, ANTI_SNIPER_60S, false
+          LAUNCH_MODE_NORMAL, 300, false, ANTI_SNIPER_60S, false  // 300 = 3.00%
         );
 
         const receipt = await tx.wait();
@@ -1313,10 +1321,10 @@ describe("BondingV5", function () {
         const tokenAddress = bondingV5.interface.parseLog(event).args.token;
         
         const launchParams = await bondingV5.tokenLaunchParams(tokenAddress);
-        expect(launchParams.airdropPercent).to.equal(3);
+        expect(launchParams.airdropBips).to.equal(300);
       });
 
-      it("Should revert with airdropPercent exceeding MAX_AIRDROP_PERCENT (6% > 5%)", async function () {
+      it("Should revert with airdropBips exceeding MAX_AIRDROP_BIPS (6% > 5%)", async function () {
         const { user1 } = accounts;
         const { bondingV5, virtualToken, bondingConfig } = contracts;
 
@@ -1330,9 +1338,9 @@ describe("BondingV5", function () {
             "Exceed Airdrop", "EXC", [0, 1], "Description",
             "https://example.com/image.png", ["", "", "", ""],
             purchaseAmount, startTime,
-            LAUNCH_MODE_NORMAL, 6, false, ANTI_SNIPER_60S, false  // 6% > MAX_AIRDROP_PERCENT (5%)
+            LAUNCH_MODE_NORMAL, 600, false, ANTI_SNIPER_60S, false  // 600 (6.00%) > MAX_AIRDROP_BIPS (500 = 5.00%)
           )
-        ).to.be.revertedWithCustomError(bondingConfig, "AirdropPercentExceedsMax");
+        ).to.be.revertedWithCustomError(bondingConfig, "AirdropBipsExceedsMax");
       });
     });
 
@@ -1403,7 +1411,7 @@ describe("BondingV5", function () {
         expect(feeToBalanceAfter).to.equal(feeToBalanceBefore);
       });
 
-      it("Should revert if needAcf = true and airdropPercent causes total to exceed limit", async function () {
+      it("Should revert if needAcf = true and airdropBips causes total to exceed limit", async function () {
         const { user1 } = accounts;
         const { bondingV5, virtualToken, bondingConfig } = contracts;
 
@@ -1412,18 +1420,18 @@ describe("BondingV5", function () {
 
         const startTime = (await time.latest()) + START_TIME_DELAY + 1;
 
-        // needAcf = true adds 50% reserve, so total = 5 + 50 = 55 >= MAX_TOTAL_RESERVED_PERCENT (55)
+        // needAcf = true adds 5000 (50%) reserve, so total = 500 + 5000 = 5500 >= MAX_TOTAL_RESERVED_BIPS (5500)
         await expect(
           bondingV5.connect(user1).preLaunch(
             "ACF Exceed", "ACFE", [0, 1], "Description",
             "https://example.com/image.png", ["", "", "", ""],
             purchaseAmount, startTime,
-            LAUNCH_MODE_NORMAL, 5, true, ANTI_SNIPER_60S, false
+            LAUNCH_MODE_NORMAL, 500, true, ANTI_SNIPER_60S, false  // 500 (5.00%) + 5000 (50%) = 5500 (55%)
           )
-        ).to.be.revertedWithCustomError(bondingConfig, "InvalidReservePercent");
+        ).to.be.revertedWithCustomError(bondingConfig, "InvalidReserveBips");
       });
 
-      it("Should allow needAcf = true with airdropPercent = 5 (total 55%)", async function () {
+      it("Should allow needAcf = true with airdropBips = 400 (total 54%)", async function () {
         const { user1 } = accounts;
         const { bondingV5, virtualToken } = contracts;
 
@@ -1432,12 +1440,12 @@ describe("BondingV5", function () {
 
         const startTime = (await time.latest()) + START_TIME_DELAY + 1;
         
-        // needAcf = true adds 50% reserve, so total = 4 + 50 = 54 < 55 OK
+        // needAcf = true adds 5000 (50%) reserve, so total = 400 + 5000 = 5400 < 5500 OK
         const tx = await bondingV5.connect(user1).preLaunch(
           "ACF With Airdrop", "ACFA", [0, 1], "Description",
           "https://example.com/image.png", ["", "", "", ""],
           purchaseAmount, startTime,
-          LAUNCH_MODE_NORMAL, 4, true, ANTI_SNIPER_60S, false
+          LAUNCH_MODE_NORMAL, 400, true, ANTI_SNIPER_60S, false  // 400 (4.00%) + 5000 (50%) = 5400 (54%)
         );
 
         const receipt = await tx.wait();
@@ -1645,7 +1653,7 @@ describe("BondingV5", function () {
       await bondingConfig.connect(owner).setAcpSkillLauncher(user1.address, true);
     });
 
-    it("Should revert X_LAUNCH with non-zero airdropPercent", async function () {
+    it("Should revert X_LAUNCH with non-zero airdropBips", async function () {
       const { user1 } = accounts;
       const { bondingV5, virtualToken } = contracts;
 
@@ -1741,7 +1749,7 @@ describe("BondingV5", function () {
       ).to.be.revertedWithCustomError(bondingV5, "InvalidSpecialLaunchParams");
     });
 
-    it("Should revert ACP_SKILL with non-zero airdropPercent", async function () {
+    it("Should revert ACP_SKILL with non-zero airdropBips", async function () {
       const { user1 } = accounts;
       const { bondingV5, virtualToken } = contracts;
 
@@ -1854,7 +1862,7 @@ describe("BondingV5", function () {
         "Event Test Token", "EVT", [0, 1], "Description",
         "https://example.com/image.png", ["", "", "", ""],
         purchaseAmount, startTime,
-        LAUNCH_MODE_NORMAL, 5, false, ANTI_SNIPER_98M, true  // Use MAX_AIRDROP_PERCENT (5)
+        LAUNCH_MODE_NORMAL, 500, false, ANTI_SNIPER_98M, true  // 500 = 5.00%
       );
 
       const receipt = await tx.wait();
@@ -1868,7 +1876,7 @@ describe("BondingV5", function () {
       // Verify LaunchParams in event
       const launchParams = parsedEvent.args.launchParams;
       expect(launchParams.launchMode).to.equal(LAUNCH_MODE_NORMAL);
-      expect(launchParams.airdropPercent).to.equal(5);
+      expect(launchParams.airdropBips).to.equal(500);
       expect(launchParams.needAcf).to.equal(false);
       expect(launchParams.antiSniperTaxType).to.equal(ANTI_SNIPER_98M);
       expect(launchParams.isProject60days).to.equal(true);
@@ -1886,7 +1894,7 @@ describe("BondingV5", function () {
         "Launch Event Token", "LET", [0, 1], "Description",
         "https://example.com/image.png", ["", "", "", ""],
         purchaseAmount, startTime,
-        LAUNCH_MODE_NORMAL, 5, false, ANTI_SNIPER_60S, false
+        LAUNCH_MODE_NORMAL, 500, false, ANTI_SNIPER_60S, false  // 500 = 5.00%
       );
 
       let receipt = await tx.wait();
@@ -1911,7 +1919,7 @@ describe("BondingV5", function () {
       // Verify LaunchParams in Launched event
       const launchParams = parsedEvent.args.launchParams;
       expect(launchParams.launchMode).to.equal(LAUNCH_MODE_NORMAL);
-      expect(launchParams.airdropPercent).to.equal(5);
+      expect(launchParams.airdropBips).to.equal(500);
       expect(launchParams.needAcf).to.equal(false);
       expect(launchParams.antiSniperTaxType).to.equal(ANTI_SNIPER_60S);
       expect(launchParams.isProject60days).to.equal(false);
@@ -1922,7 +1930,7 @@ describe("BondingV5", function () {
   // Token Graduation Threshold Tests
   // ============================================
   describe("Token Graduation Threshold Calculation", function () {
-    it("Should calculate different gradThreshold for different airdropPercent", async function () {
+    it("Should calculate different gradThreshold for different airdropBips", async function () {
       const { user1 } = accounts;
       const { bondingV5, virtualToken } = contracts;
 
@@ -1945,14 +1953,14 @@ describe("BondingV5", function () {
       const token1 = bondingV5.interface.parseLog(event).args.token;
       const gradThreshold1 = await bondingV5.tokenGradThreshold(token1);
 
-      // Token 2: 5% airdrop (MAX_AIRDROP_PERCENT)
+      // Token 2: 5% airdrop (MAX_AIRDROP_BIPS = 500)
       await virtualToken.connect(user1).approve(addresses.bondingV5, purchaseAmount);
       startTime = (await time.latest()) + START_TIME_DELAY + 1;
       tx = await bondingV5.connect(user1).preLaunch(
         "5% Airdrop Grad", "G5", [0, 1], "Description",
         "https://example.com/image.png", ["", "", "", ""],
         purchaseAmount, startTime,
-        LAUNCH_MODE_NORMAL, 5, false, ANTI_SNIPER_60S, false
+        LAUNCH_MODE_NORMAL, 500, false, ANTI_SNIPER_60S, false  // 500 = 5.00%
       );
       receipt = await tx.wait();
       event = receipt.logs.find((log) => {
@@ -2019,7 +2027,7 @@ describe("BondingV5", function () {
       ).to.be.revertedWithCustomError(bondingV5, "LaunchModeNotEnabled");
     });
 
-    it("Should allow exact boundary of MAX_TOTAL_RESERVED_PERCENT (needAcf + 4% = 54%)", async function () {
+    it("Should allow exact boundary of MAX_TOTAL_RESERVED_BIPS (needAcf + 4% = 54%)", async function () {
       const { user1 } = accounts;
       const { bondingV5, virtualToken } = contracts;
 
@@ -2028,19 +2036,19 @@ describe("BondingV5", function () {
 
       const startTime = (await time.latest()) + START_TIME_DELAY + 1;
       
-      // needAcf (50%) + 4% = 54% should work (just under 55% limit)
+      // needAcf (5000 = 50%) + 400 (4%) = 5400 (54%) should work (just under 5500 = 55% limit)
       const tx = await bondingV5.connect(user1).preLaunch(
         "Boundary Test", "BNDY", [0, 1], "Description",
         "https://example.com/image.png", ["", "", "", ""],
         purchaseAmount, startTime,
-        LAUNCH_MODE_NORMAL, 4, true, ANTI_SNIPER_60S, false
+        LAUNCH_MODE_NORMAL, 400, true, ANTI_SNIPER_60S, false  // 400 = 4.00%
       );
 
       const receipt = await tx.wait();
       expect(receipt).to.not.be.undefined;
     });
 
-    it("Should revert at exact MAX_TOTAL_RESERVED_PERCENT (needAcf + 5% = 55%)", async function () {
+    it("Should revert at exact MAX_TOTAL_RESERVED_BIPS (needAcf + 5% = 55%)", async function () {
       const { user1 } = accounts;
       const { bondingV5, virtualToken, bondingConfig } = contracts;
 
@@ -2049,15 +2057,15 @@ describe("BondingV5", function () {
 
       const startTime = (await time.latest()) + START_TIME_DELAY + 1;
 
-      // needAcf (50%) + 5% = 55% should fail (at limit)
+      // needAcf (5000 = 50%) + 500 (5%) = 5500 (55%) should fail (at limit)
       await expect(
         bondingV5.connect(user1).preLaunch(
           "Over Limit", "OVER", [0, 1], "Description",
           "https://example.com/image.png", ["", "", "", ""],
           purchaseAmount, startTime,
-          LAUNCH_MODE_NORMAL, 5, true, ANTI_SNIPER_60S, false
+          LAUNCH_MODE_NORMAL, 500, true, ANTI_SNIPER_60S, false  // 500 = 5.00%
         )
-      ).to.be.revertedWithCustomError(bondingConfig, "InvalidReservePercent");
+      ).to.be.revertedWithCustomError(bondingConfig, "InvalidReserveBips");
     });
 
     it("Should allow needAcf = true with 0% airdrop (total 50%)", async function () {
@@ -2085,7 +2093,7 @@ describe("BondingV5", function () {
       
       const launchParams = await bondingV5.tokenLaunchParams(tokenAddress);
       expect(launchParams.needAcf).to.be.true;
-      expect(launchParams.airdropPercent).to.equal(0);
+      expect(launchParams.airdropBips).to.equal(0);
     });
 
     it("Should allow exactly 4% airdrop + ACF (total 54%)", async function () {
@@ -2097,12 +2105,12 @@ describe("BondingV5", function () {
 
       const startTime = (await time.latest()) + START_TIME_DELAY + 1;
       
-      // 4% + 50% (ACF) = 54% < 55% limit
+      // 400 (4%) + 5000 (50% ACF) = 5400 (54%) < 5500 (55%) limit
       const tx = await bondingV5.connect(user1).preLaunch(
         "Max ACF Combo", "MXAC", [0, 1], "Description",
         "https://example.com/image.png", ["", "", "", ""],
         purchaseAmount, startTime,
-        LAUNCH_MODE_NORMAL, 4, true, ANTI_SNIPER_60S, false
+        LAUNCH_MODE_NORMAL, 400, true, ANTI_SNIPER_60S, false  // 400 = 4.00%
       );
 
       const receipt = await tx.wait();
@@ -2118,15 +2126,15 @@ describe("BondingV5", function () {
 
       const startTime = (await time.latest()) + START_TIME_DELAY + 1;
 
-      // 5% + 50% (ACF) = 55% >= 55% limit
+      // 500 (5%) + 5000 (50% ACF) = 5500 (55%) >= 5500 (55%) limit
       await expect(
         bondingV5.connect(user1).preLaunch(
           "Over ACF Combo", "OVAC", [0, 1], "Description",
           "https://example.com/image.png", ["", "", "", ""],
           purchaseAmount, startTime,
-          LAUNCH_MODE_NORMAL, 5, true, ANTI_SNIPER_60S, false
+          LAUNCH_MODE_NORMAL, 500, true, ANTI_SNIPER_60S, false  // 500 = 5.00%
         )
-      ).to.be.revertedWithCustomError(bondingConfig, "InvalidReservePercent");
+      ).to.be.revertedWithCustomError(bondingConfig, "InvalidReserveBips");
     });
   });
 
@@ -2158,7 +2166,7 @@ describe("BondingV5", function () {
       
       const launchParams = await bondingV5.tokenLaunchParams(tokenAddress);
       expect(launchParams.launchMode).to.equal(LAUNCH_MODE_NORMAL);
-      expect(launchParams.airdropPercent).to.equal(0);
+      expect(launchParams.airdropBips).to.equal(0);
       expect(launchParams.needAcf).to.equal(false);
       expect(launchParams.antiSniperTaxType).to.equal(ANTI_SNIPER_NONE);
       expect(launchParams.isProject60days).to.equal(false);
@@ -2176,7 +2184,7 @@ describe("BondingV5", function () {
         "Max Params", "MAXP", [0, 1], "Description",
         "https://example.com/image.png", ["", "", "", ""],
         purchaseAmount, startTime,
-        LAUNCH_MODE_NORMAL, 5, false, ANTI_SNIPER_98M, true  // MAX_AIRDROP_PERCENT = 5
+        LAUNCH_MODE_NORMAL, 500, false, ANTI_SNIPER_98M, true  // MAX_AIRDROP_BIPS = 500 (5.00%)
       );
 
       const receipt = await tx.wait();
@@ -2187,7 +2195,7 @@ describe("BondingV5", function () {
       const tokenAddress = bondingV5.interface.parseLog(event).args.token;
       
       const launchParams = await bondingV5.tokenLaunchParams(tokenAddress);
-      expect(launchParams.airdropPercent).to.equal(5);
+      expect(launchParams.airdropBips).to.equal(500);
       expect(launchParams.antiSniperTaxType).to.equal(ANTI_SNIPER_98M);
       expect(launchParams.isProject60days).to.equal(true);
     });
@@ -2199,13 +2207,13 @@ describe("BondingV5", function () {
       const purchaseAmount = ethers.parseEther("1000");
       const tokens = [];
 
-      // Test matrix of parameter combinations (airdrop values <= MAX_AIRDROP_PERCENT = 5)
+      // Test matrix of parameter combinations (airdrop values <= MAX_AIRDROP_BIPS = 500)
       const testCases = [
         { airdrop: 0, needAcf: false, antiSniper: ANTI_SNIPER_NONE, is60days: false },
-        { airdrop: 3, needAcf: false, antiSniper: ANTI_SNIPER_60S, is60days: true },
-        { airdrop: 5, needAcf: false, antiSniper: ANTI_SNIPER_98M, is60days: false },
+        { airdrop: 300, needAcf: false, antiSniper: ANTI_SNIPER_60S, is60days: true },  // 300 = 3.00%
+        { airdrop: 500, needAcf: false, antiSniper: ANTI_SNIPER_98M, is60days: false }, // 500 = 5.00%
         { airdrop: 0, needAcf: true, antiSniper: ANTI_SNIPER_60S, is60days: false },
-        { airdrop: 4, needAcf: true, antiSniper: ANTI_SNIPER_98M, is60days: true },
+        { airdrop: 400, needAcf: true, antiSniper: ANTI_SNIPER_98M, is60days: true },   // 400 = 4.00%
       ];
 
       for (let i = 0; i < testCases.length; i++) {
@@ -2230,7 +2238,7 @@ describe("BondingV5", function () {
 
         // Verify stored parameters
         const launchParams = await bondingV5.tokenLaunchParams(tokenAddress);
-        expect(launchParams.airdropPercent).to.equal(tc.airdrop);
+        expect(launchParams.airdropBips).to.equal(tc.airdrop);
         expect(launchParams.needAcf).to.equal(tc.needAcf);
         expect(launchParams.antiSniperTaxType).to.equal(tc.antiSniper);
         expect(launchParams.isProject60days).to.equal(tc.is60days);
@@ -2257,7 +2265,7 @@ describe("BondingV5", function () {
         "Regression Token", "REGT", [0, 1, 2], "A regression test token",
         "https://example.com/image.png", ["url1", "url2", "url3", "url4"],
         purchaseAmount, startTime,
-        LAUNCH_MODE_NORMAL, 5, false, ANTI_SNIPER_60S, true  // Use MAX_AIRDROP_PERCENT (5)
+        LAUNCH_MODE_NORMAL, 500, false, ANTI_SNIPER_60S, true  // 500 = 5.00%
       );
 
       const receipt = await tx.wait();
@@ -2325,7 +2333,7 @@ describe("BondingV5", function () {
         "Preserve Token", "PRSV", [0, 1], "Description",
         "https://example.com/image.png", ["", "", "", ""],
         purchaseAmount, startTime,
-        LAUNCH_MODE_NORMAL, 5, false, ANTI_SNIPER_98M, true  // Use MAX_AIRDROP_PERCENT (5)
+        LAUNCH_MODE_NORMAL, 500, false, ANTI_SNIPER_98M, true  // 500 = 5.00%
       );
 
       const receipt = await tx.wait();
@@ -2341,7 +2349,7 @@ describe("BondingV5", function () {
 
       // Verify launch params are still correct after launch
       const launchParams = await bondingV5.tokenLaunchParams(tokenAddress);
-      expect(launchParams.airdropPercent).to.equal(5);
+      expect(launchParams.airdropBips).to.equal(500);
       expect(launchParams.needAcf).to.equal(false);
       expect(launchParams.antiSniperTaxType).to.equal(ANTI_SNIPER_98M);
       expect(launchParams.isProject60days).to.equal(true);
@@ -2488,7 +2496,7 @@ describe("BondingV5", function () {
           INITIAL_SUPPLY,
           owner.address,
           owner.address,
-          MAX_AIRDROP_PERCENT,
+          { maxAirdropBips: MAX_AIRDROP_BIPS, maxTotalReservedBips: MAX_TOTAL_RESERVED_BIPS, acfReservedBips: ACF_RESERVED_BIPS },
           { startTimeDelay: START_TIME_DELAY, normalLaunchFee: NORMAL_LAUNCH_FEE, acfFee: ACF_FEE },
           { tbaSalt: TBA_SALT, tbaImplementation: TBA_IMPLEMENTATION, daoVotingPeriod: DAO_VOTING_PERIOD, daoThreshold: DAO_THRESHOLD },
           { fakeInitialVirtualLiq: FAKE_INITIAL_VIRTUAL_LIQ, targetRealVirtual: TARGET_REAL_VIRTUAL },
@@ -2543,7 +2551,7 @@ describe("BondingV5", function () {
           purchaseAmount,
           startTime,
           LAUNCH_MODE_NORMAL,
-          3,
+          300,  // 300 = 3.00%
           true,
           ANTI_SNIPER_98M,
           true
@@ -2619,7 +2627,7 @@ describe("BondingV5", function () {
       const launchParams = await bondingV5.tokenLaunchParams(tokenAddress);
       
       expect(launchParams.launchMode).to.equal(LAUNCH_MODE_NORMAL);
-      expect(launchParams.airdropPercent).to.equal(3);
+      expect(launchParams.airdropBips).to.equal(300);  // 300 = 3.00%
       expect(launchParams.needAcf).to.be.true;
       expect(launchParams.antiSniperTaxType).to.equal(ANTI_SNIPER_98M);
       expect(launchParams.isProject60days).to.be.true;
@@ -2639,17 +2647,17 @@ describe("BondingV5", function () {
       const supply100 = await bondingConfig.calculateBondingCurveSupply(0, false);
       expect(supply100).to.equal(initialSupply);
 
-      // 5% airdrop, no ACF: 95% bonding curve
-      const supply95 = await bondingConfig.calculateBondingCurveSupply(5, false);
-      expect(supply95).to.equal((initialSupply * 95n) / 100n);
+      // 5% airdrop (500), no ACF: 95% bonding curve (9500/10000)
+      const supply95 = await bondingConfig.calculateBondingCurveSupply(500, false);
+      expect(supply95).to.equal((initialSupply * 9500n) / 10000n);
 
-      // 0% airdrop, with ACF: 50% bonding curve
+      // 0% airdrop, with ACF (5000 = 50%): 50% bonding curve (5000/10000)
       const supply50 = await bondingConfig.calculateBondingCurveSupply(0, true);
-      expect(supply50).to.equal((initialSupply * 50n) / 100n);
+      expect(supply50).to.equal((initialSupply * 5000n) / 10000n);
 
-      // 4% airdrop, with ACF: 46% bonding curve
-      const supply46 = await bondingConfig.calculateBondingCurveSupply(4, true);
-      expect(supply46).to.equal((initialSupply * 46n) / 100n);
+      // 4% airdrop (400), with ACF (5000): 46% bonding curve (4600/10000)
+      const supply46 = await bondingConfig.calculateBondingCurveSupply(400, true);
+      expect(supply46).to.equal((initialSupply * 4600n) / 10000n);
     });
 
     it("Should correctly identify special modes", async function () {
@@ -2811,13 +2819,13 @@ describe("BondingV5", function () {
 
       const reservedWalletBalanceBefore = await ethers.provider.getBalance(beOpsWallet.address);
 
-      // Create token with 5% airdrop (should transfer 5% to reserved wallet)
+      // Create token with 5% airdrop (500 = 5.00%, should transfer 5% to reserved wallet)
       const startTime = (await time.latest()) + START_TIME_DELAY + 1;
       const tx = await bondingV5.connect(user1).preLaunch(
         "Reserved Test Token", "RTT", [0, 1], "Description",
         "https://example.com/image.png", ["", "", "", ""],
         purchaseAmount, startTime,
-        LAUNCH_MODE_NORMAL, 5, false, ANTI_SNIPER_60S, false
+        LAUNCH_MODE_NORMAL, 500, false, ANTI_SNIPER_60S, false  // 500 = 5.00%
       );
 
       const receipt = await tx.wait();
@@ -2843,13 +2851,13 @@ describe("BondingV5", function () {
       const purchaseAmount = ethers.parseEther("1000");
       await virtualToken.connect(user1).approve(addresses.bondingV5, purchaseAmount);
 
-      // Create token with 4% airdrop and needAcf = true (54% total reserved)
+      // Create token with 4% airdrop (400) and needAcf = true (5400 = 54% total reserved)
       const startTime = (await time.latest()) + START_TIME_DELAY + 1;
       const tx = await bondingV5.connect(user1).preLaunch(
         "ACF Reserved Test", "ART", [0, 1], "Description",
         "https://example.com/image.png", ["", "", "", ""],
         purchaseAmount, startTime,
-        LAUNCH_MODE_NORMAL, 4, true, ANTI_SNIPER_60S, false
+        LAUNCH_MODE_NORMAL, 400, true, ANTI_SNIPER_60S, false  // 400 = 4.00%
       );
 
       const receipt = await tx.wait();

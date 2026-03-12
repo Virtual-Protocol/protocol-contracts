@@ -91,9 +91,19 @@ const { ethers, upgrades } = require("hardhat");
       throw new Error("AGENT_TAX_CONTRACT_ADDRESS not set in environment");
     }
 
-    const maxAirdropPercent = process.env.MAX_AIRDROP_PERCENT;
-    if (!maxAirdropPercent) {
-      throw new Error("MAX_AIRDROP_PERCENT not set in environment");
+    const maxAirdropBips = process.env.MAX_AIRDROP_BIPS;
+    if (!maxAirdropBips) {
+      throw new Error("MAX_AIRDROP_BIPS not set in environment");
+    }
+
+    const maxTotalReservedBips = process.env.MAX_TOTAL_RESERVED_BIPS;
+    if (!maxTotalReservedBips) {
+      throw new Error("MAX_TOTAL_RESERVED_BIPS not set in environment");
+    }
+
+    const acfReservedBips = process.env.ACF_RESERVED_BIPS;
+    if (!acfReservedBips) {
+      throw new Error("ACF_RESERVED_BIPS not set in environment");
     }
 
     console.log("\nDeployment arguments loaded:", {
@@ -113,7 +123,9 @@ const { ethers, upgrades } = require("hardhat");
       teamTokenReservedWallet,
       fakeInitialVirtualLiq,
       targetRealVirtual,
-      maxAirdropPercent,
+      maxAirdropBips,
+      maxTotalReservedBips,
+      acfReservedBips,
     });
 
     // ============================================
@@ -122,6 +134,12 @@ const { ethers, upgrades } = require("hardhat");
     console.log("\n--- Deploying BondingConfig ---");
     const BondingConfig = await ethers.getContractFactory("BondingConfig");
     
+    const reserveSupplyParams = {
+      maxAirdropBips: maxAirdropBips,
+      maxTotalReservedBips: maxTotalReservedBips,
+      acfReservedBips: acfReservedBips,
+    };
+
     const scheduledLaunchParams = {
       startTimeDelay: startTimeDelay,
       normalLaunchFee: parseEther(normalLaunchFee).toString(),
@@ -146,7 +164,7 @@ const { ethers, upgrades } = require("hardhat");
         initialSupply,
         creationFeeToAddress,
         teamTokenReservedWallet,
-        maxAirdropPercent,
+        reserveSupplyParams,
         scheduledLaunchParams,
         deployParams,
         bondingCurveParams,
@@ -231,11 +249,22 @@ const { ethers, upgrades } = require("hardhat");
     // Deployer still has admin roles from previous scripts (_0, _1, _2)
     // Roles will be revoked in _4.ts
     console.log("\n--- Granting roles and configuring contracts ---");
-
-    const fFactoryV2 = await ethers.getContractAt("FFactoryV2", fFactoryV2Address);
-    const fRouterV2 = await ethers.getContractAt("FRouterV2", fRouterV2Address);
-    const agentFactoryV6 = await ethers.getContractAt("AgentFactoryV6", agentFactoryV6Address);
-    const agentTax = await ethers.getContractAt("AgentTax", agentTaxAddress);
+    
+    var fFactoryV2 = await ethers.getContractAt("FFactoryV2", fFactoryV2Address);
+    var fRouterV2 = await ethers.getContractAt("FRouterV2", fRouterV2Address);
+    var agentFactoryV6 = await ethers.getContractAt("AgentFactoryV6", agentFactoryV6Address);
+    var agentTax = await ethers.getContractAt("AgentTax", agentTaxAddress);
+    const adminPrivateKey = process.env.ADMIN_PRIVATE_KEY;
+    if (adminPrivateKey) { // If ADMIN_PRIVATE_KEY is set, use it to grant roles, easier for testnet
+      const adminSigner = new ethers.Wallet(
+        adminPrivateKey,
+        ethers.provider
+      );
+      fFactoryV2 = await ethers.getContractAt("FFactoryV2", fFactoryV2Address, adminSigner);
+      fRouterV2 = await ethers.getContractAt("FRouterV2", fRouterV2Address, adminSigner);
+      agentFactoryV6 = await ethers.getContractAt("AgentFactoryV6", agentFactoryV6Address, adminSigner);
+      agentTax = await ethers.getContractAt("AgentTax", agentTaxAddress, adminSigner);
+    }
 
     // Grant CREATOR_ROLE of FFactoryV2 to BondingV5
     const creatorRole = await fFactoryV2.CREATOR_ROLE();
@@ -278,7 +307,10 @@ const { ethers, upgrades } = require("hardhat");
 
     console.log("\nConfiguration:");
     console.log("- Initial Supply:", initialSupply);
-    console.log("- Max Airdrop Percent:", maxAirdropPercent, "%");
+    console.log("- Reserve Supply Params (in bips, 1 bip = 0.01%):");
+    console.log("  - Max Airdrop Bips:", maxAirdropBips, "(", Number(maxAirdropBips) / 100, "%)");
+    console.log("  - Max Total Reserved Bips:", maxTotalReservedBips, "(", Number(maxTotalReservedBips) / 100, "%)");
+    console.log("  - ACF Reserved Bips:", acfReservedBips, "(", Number(acfReservedBips) / 100, "%)");
     console.log("- Start Time Delay:", startTimeDelay, "seconds");
     console.log("- Normal Launch Fee:", normalLaunchFee, "VIRTUAL (scheduled/marketing)");
     console.log("- ACF Fee:", acfFee, "VIRTUAL (extra fee when needAcf = true)");

@@ -79,7 +79,7 @@ contract BondingV5 is
     // Mapping to store configurable launch parameters for each token
     mapping(address => BondingConfig.LaunchParams) public tokenLaunchParams;
 
-    // Mapping to store graduation threshold for each token (calculated per-token based on airdropPercent and needAcf)
+    // Mapping to store graduation threshold for each token (calculated per-token based on airdropBips and needAcf)
     mapping(address => uint256) public tokenGradThreshold;
 
     event PreLaunched(
@@ -143,14 +143,14 @@ contract BondingV5 is
         uint256 purchaseAmount_,
         uint256 startTime_,
         uint8 launchMode_,
-        uint8 airdropPercent_,
+        uint16 airdropBips_,
         bool needAcf_,
         uint8 antiSniperTaxType_,
         bool isProject60days_
     ) public nonReentrant returns (address, address, uint, uint256) {
-        // Fail-fast: validate reserve percentages and calculate bonding curve supply upfront
-        // This validates: airdropPercent <= maxAirdropPercent AND totalReserved < MAX_TOTAL_RESERVED_PERCENT
-        uint256 bondingCurveSupplyBase = bondingConfig.calculateBondingCurveSupply(airdropPercent_, needAcf_);
+        // Fail-fast: validate reserve bips and calculate bonding curve supply upfront
+        // This validates: airdropBips <= maxAirdropBips AND totalReserved < maxTotalReservedBips
+        uint256 bondingCurveSupplyBase = bondingConfig.calculateBondingCurveSupply(airdropBips_, needAcf_);
 
         // Validate anti-sniper tax type
         if (!bondingConfig.isValidAntiSniperType(antiSniperTaxType_)) {
@@ -172,7 +172,7 @@ contract BondingV5 is
         _validateLaunchMode(
             launchMode_,
             antiSniperTaxType_,
-            airdropPercent_,
+            airdropBips_,
             needAcf_,
             isProject60days_,
             isScheduledLaunch
@@ -303,7 +303,7 @@ contract BondingV5 is
         // Store V5 configurable launch parameters
         tokenLaunchParams[token] = BondingConfig.LaunchParams({
             launchMode: launchMode_,
-            airdropPercent: airdropPercent_,
+            airdropBips: airdropBips_,
             needAcf: needAcf_,
             antiSniperTaxType: antiSniperTaxType_,
             isProject60days: isProject60days_
@@ -522,7 +522,7 @@ contract BondingV5 is
             tokenInfo[tokenAddress_].data.lastUpdated = block.timestamp;
         }
 
-        // Get per-token gradThreshold (calculated during preLaunch based on airdropPercent and needAcf)
+        // Get per-token gradThreshold (calculated during preLaunch based on airdropBips and needAcf)
         uint256 gradThreshold = tokenGradThreshold[tokenAddress_];
 
         if (
@@ -669,7 +669,7 @@ contract BondingV5 is
     function _validateLaunchMode(
         uint8 launchMode_,
         uint8 antiSniperTaxType_,
-        uint8 airdropPercent_,
+        uint16 airdropBips_,
         bool needAcf_,
         bool isProject60days_,
         bool isScheduledLaunch_
@@ -698,12 +698,12 @@ contract BondingV5 is
             // Special modes require:
             // 1. ANTI_SNIPER_NONE
             // 2. Immediate launch (startTime within 24h)
-            // 3. airdropPercent = 0
+            // 3. airdropBips = 0
             // 4. needAcf = false
             // 5. isProject60days_ = false
             if (antiSniperTaxType_ != bondingConfig.ANTI_SNIPER_NONE() ||
                 isScheduledLaunch_ ||
-                airdropPercent_ != 0 ||
+                airdropBips_ != 0 ||
                 needAcf_ ||
                 isProject60days_) {
                 revert InvalidSpecialLaunchParams();

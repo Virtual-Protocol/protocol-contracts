@@ -100,16 +100,19 @@ async function main() {
   // Check BondingConfig parameters
   const scheduledLaunchParams = await bondingConfig.scheduledLaunchParams();
   const bondingCurveParams = await bondingConfig.bondingCurveParams();
+  const reserveSupplyParams = await bondingConfig.reserveSupplyParams();
   const initialSupply = await bondingConfig.initialSupply();
-  const maxAirdropPercent = await bondingConfig.maxAirdropPercent();
   const feeTo = await bondingConfig.feeTo();
   const teamTokenReservedWallet = await bondingConfig.teamTokenReservedWallet();
 
   console.log("\n--- BondingConfig Parameters ---");
   console.log("Initial Supply:", initialSupply.toString());
-  console.log("Max Airdrop Percent:", maxAirdropPercent.toString(), "%");
   console.log("Fee To:", feeTo);
   console.log("Team Token Reserved Wallet:", teamTokenReservedWallet);
+  console.log("\n--- ReserveSupplyParams (in bips, 1 bip = 0.01%) ---");
+  console.log("Max Airdrop Bips:", reserveSupplyParams.maxAirdropBips.toString(), "(", Number(reserveSupplyParams.maxAirdropBips) / 100, "%)");
+  console.log("Max Total Reserved Bips:", reserveSupplyParams.maxTotalReservedBips.toString(), "(", Number(reserveSupplyParams.maxTotalReservedBips) / 100, "%)");
+  console.log("ACF Reserved Bips:", reserveSupplyParams.acfReservedBips.toString(), "(", Number(reserveSupplyParams.acfReservedBips) / 100, "%)");
   console.log("\n--- ScheduledLaunchParams ---");
   console.log("Start Time Delay:", scheduledLaunchParams.startTimeDelay.toString(), "seconds");
   console.log("Normal Launch Fee:", formatEther(scheduledLaunchParams.normalLaunchFee), "VIRTUAL");
@@ -229,7 +232,7 @@ async function main() {
   const startTime = currentTimestamp + 100; // immediate launch (100 seconds from now)
   
   const launchMode = LAUNCH_MODE_NORMAL;
-  const airdropPercent = 3; // 3% airdrop
+  const airdropBips = 300; // 300 = 3.00% (in bips, 1 bip = 0.01%)
   const needAcf = true; // Test with ACF fee
   const antiSniperTaxType = ANTI_SNIPER_60S; // 60 seconds anti-sniper
   const isProject60days = false;
@@ -247,7 +250,7 @@ async function main() {
   console.log("Scheduled Launch Start Time Delay:", startTimeDelayNum, "seconds");
   console.log("Is Scheduled Launch:", isScheduledLaunch, "(expected: false - immediate launch)");
   console.log("Launch Mode:", launchMode, "(NORMAL)");
-  console.log("Airdrop Percent:", airdropPercent, "%");
+  console.log("Airdrop Bips:", airdropBips, "(", airdropBips / 100, "%)");
   console.log("Need ACF:", needAcf);
   console.log("Anti-Sniper Tax Type:", antiSniperTaxType, "(60S)");
   console.log("Is Project 60 Days:", isProject60days);
@@ -283,7 +286,7 @@ async function main() {
       purchaseAmount,
       startTime,
       launchMode,
-      airdropPercent,
+      airdropBips,
       needAcf,
       antiSniperTaxType,
       isProject60days
@@ -322,7 +325,7 @@ async function main() {
     purchaseAmount,
     startTime,
     launchMode,
-    airdropPercent,
+    airdropBips,
     needAcf,
     antiSniperTaxType,
     isProject60days
@@ -343,7 +346,7 @@ async function main() {
     purchaseAmount,
     startTime,
     launchMode,
-    airdropPercent,
+    airdropBips,
     needAcf,
     antiSniperTaxType,
     isProject60days,
@@ -382,7 +385,7 @@ async function main() {
   console.log("Initial Purchase:", formatEther(initialPurchase), "VIRTUAL");
   console.log("LaunchParams from Event:", {
     launchMode: eventLaunchParams.launchMode,
-    airdropPercent: eventLaunchParams.airdropPercent,
+    airdropBips: eventLaunchParams.airdropBips,
     needAcf: eventLaunchParams.needAcf,
     antiSniperTaxType: eventLaunchParams.antiSniperTaxType,
     isProject60days: eventLaunchParams.isProject60days,
@@ -411,7 +414,7 @@ async function main() {
   const onChainLaunchParams = await bondingV5.tokenLaunchParams(tokenAddress);
   console.log("\n--- tokenLaunchParams (On-Chain) ---");
   console.log("Launch Mode:", onChainLaunchParams.launchMode, "(expected:", launchMode, ")");
-  console.log("Airdrop Percent:", onChainLaunchParams.airdropPercent, "(expected:", airdropPercent, ")");
+  console.log("Airdrop Percent:", Number(onChainLaunchParams.airdropBips) / 100, "% (expected:", airdropBips / 100, "%)");
   console.log("Need ACF:", onChainLaunchParams.needAcf, "(expected:", needAcf, ")");
   console.log("Anti-Sniper Tax Type:", onChainLaunchParams.antiSniperTaxType, "(expected:", antiSniperTaxType, ")");
   console.log("Is Project 60 Days:", onChainLaunchParams.isProject60days, "(expected:", isProject60days, ")");

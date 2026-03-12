@@ -8,7 +8,7 @@ import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
  * @title BondingConfig
  * @notice Configuration contract for BondingV5 multi-chain launch modes
  * @dev Stores configurable parameters for different launch modes.
- *      gradThreshold is calculated per-token based on airdropPercent and needAcf.
+ *      gradThreshold is calculated per-token based on airdropBips and needAcf.
  *      project60days is handled by backend (not a separate launch mode).
  */
 contract BondingConfig is Initializable, OwnableUpgradeable {
@@ -17,9 +17,13 @@ contract BondingConfig is Initializable, OwnableUpgradeable {
     uint8 public constant LAUNCH_MODE_X_LAUNCH = 1;
     uint8 public constant LAUNCH_MODE_ACP_SKILL = 2;
 
-    // Reserve percentage constants
-    uint8 public constant MAX_TOTAL_RESERVED_PERCENT = 55; // At least 45% must remain in bonding curve
-    uint8 public constant ACF_RESERVED_PERCENT = 50; // ACF operations reserve 50%
+    // Reserve supply parameters struct (in bips, 1 bip = 0.01%, e.g., 5500 = 55.00%)
+    struct ReserveSupplyParams {
+        uint16 maxAirdropBips; // Maximum airdrop (e.g., 500 = 5.00%)
+        uint16 maxTotalReservedBips; // At least (100% - this) must remain in bonding curve (e.g., 5500 = 55.00%)
+        uint16 acfReservedBips; // ACF operations reserve (e.g., 5000 = 50.00%)
+    }
+    ReserveSupplyParams public reserveSupplyParams;
 
     // Anti-sniper tax type constants
     // These define the duration over which anti-sniper tax decreases from 99% to 0%
@@ -39,9 +43,6 @@ contract BondingConfig is Initializable, OwnableUpgradeable {
 
     // Global wallet to receive reserved tokens (airdrop + ACF)
     address public teamTokenReservedWallet;
-
-    // Maximum airdrop percentage allowed (e.g., 5%)
-    uint8 public maxAirdropPercent;
 
     // Authorized launchers for special modes
     mapping(address => bool) public isXLauncher;
@@ -93,7 +94,7 @@ contract BondingConfig is Initializable, OwnableUpgradeable {
     // V5 configurable launch parameters (stored separately per token)
     struct LaunchParams {
         uint8 launchMode;
-        uint8 airdropPercent;
+        uint16 airdropBips; // in bips, 1 bip = 0.01% (e.g., 234 = 2.34%)
         bool needAcf;
         uint8 antiSniperTaxType;
         bool isProject60days;
@@ -118,11 +119,11 @@ contract BondingConfig is Initializable, OwnableUpgradeable {
     event TeamTokenReservedWalletUpdated(address wallet);
     event CommonParamsUpdated(uint256 initialSupply, address feeTo);
     event BondingCurveParamsUpdated(BondingCurveParams params);
-    event MaxAirdropPercentUpdated(uint8 maxAirdropPercent);
+    event ReserveSupplyParamsUpdated(ReserveSupplyParams params);
 
     error InvalidAntiSniperType();
-    error InvalidReservePercent();
-    error AirdropPercentExceedsMax();
+    error InvalidReserveBips();
+    error AirdropBipsExceedsMax();
 
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() {
@@ -133,7 +134,7 @@ contract BondingConfig is Initializable, OwnableUpgradeable {
         uint256 initialSupply_,
         address feeTo_,
         address teamTokenReservedWallet_,
-        uint8 maxAirdropPercent_,
+        ReserveSupplyParams memory reserveSupplyParams_,
         ScheduledLaunchParams memory scheduledLaunchParams_,
         DeployParams memory deployParams_,
         BondingCurveParams memory bondingCurveParams_
@@ -143,7 +144,7 @@ contract BondingConfig is Initializable, OwnableUpgradeable {
         initialSupply = initialSupply_;
         feeTo = feeTo_;
         teamTokenReservedWallet = teamTokenReservedWallet_;
-        maxAirdropPercent = maxAirdropPercent_;
+        reserveSupplyParams = reserveSupplyParams_;
         _scheduledLaunchParams = scheduledLaunchParams_;
         _deployParams = deployParams_;
         bondingCurveParams = bondingCurveParams_;
@@ -186,25 +187,26 @@ contract BondingConfig is Initializable, OwnableUpgradeable {
     /**
      * @notice Calculate bonding curve supply with validation
      * @dev Validates:
-     *      1. airdropPercent_ <= maxAirdropPercent
-     *      2. airdropPercent + (needAcf ? 50 : 0) < MAX_TOTAL_RESERVED_PERCENT
-     * @param airdropPercent_ Airdrop percentage
-     * @param needAcf_ Whether ACF operations are needed (adds 50% reserve)
+     *      1. airdropBips_ <= reserveSupplyParams.maxAirdropBips
+     *      2. airdropBips + (needAcf ? acfReservedBips : 0) < maxTotalReservedBips
+     *      All values are in bips (1 bip = 0.01%, e.g., 234 = 2.34%)
+     * @param airdropBips_ Airdrop in bips (e.g., 234 = 2.34%)
+     * @param needAcf_ Whether ACF operations are needed (adds acfReservedBips reserve)
      * @return bondingCurveSupply The supply available for bonding curve (in base units, not wei)
      */
     function calculateBondingCurveSupply(
-        uint8 airdropPercent_,
+        uint16 airdropBips_,
         bool needAcf_
     ) external view returns (uint256) {
-        if (airdropPercent_ > maxAirdropPercent) {
-            revert AirdropPercentExceedsMax();
+        if (airdropBips_ > reserveSupplyParams.maxAirdropBips) {
+            revert AirdropBipsExceedsMax();
         }
-        uint8 totalReserved = airdropPercent_ +
-            (needAcf_ ? ACF_RESERVED_PERCENT : 0);
-        if (totalReserved >= MAX_TOTAL_RESERVED_PERCENT) {
-            revert InvalidReservePercent();
+        uint16 totalReserved = airdropBips_ +
+            (needAcf_ ? reserveSupplyParams.acfReservedBips : 0);
+        if (totalReserved >= reserveSupplyParams.maxTotalReservedBips) {
+            revert InvalidReserveBips();
         }
-        return (initialSupply * (100 - totalReserved)) / 100;
+        return (initialSupply * (10000 - totalReserved)) / 10000;
     }
 
     /**
@@ -283,12 +285,19 @@ contract BondingConfig is Initializable, OwnableUpgradeable {
     }
 
     /**
-     * @notice Set maximum airdrop percentage
-     * @param maxAirdropPercent_ The maximum airdrop percentage (e.g., 5 for 5%)
+     * @notice Set reserve supply parameters
+     * @param params_ The reserve supply parameters (all in bips, 1 bip = 0.01%, e.g., 500 = 5.00%)
      */
-    function setMaxAirdropPercent(uint8 maxAirdropPercent_) external onlyOwner {
-        maxAirdropPercent = maxAirdropPercent_;
-        emit MaxAirdropPercentUpdated(maxAirdropPercent_);
+    function setReserveSupplyParams(
+        ReserveSupplyParams memory params_
+    ) external onlyOwner {
+        require(params_.maxAirdropBips + params_.acfReservedBips <= params_.maxTotalReservedBips, InvalidReserveBips());
+        require(params_.maxAirdropBips <= 10000, InvalidReserveBips());
+        require(params_.maxTotalReservedBips <= 10000, InvalidReserveBips());
+        require(params_.acfReservedBips <= 10000, InvalidReserveBips());
+        
+        reserveSupplyParams = params_;
+        emit ReserveSupplyParamsUpdated(params_);
     }
 
     /**

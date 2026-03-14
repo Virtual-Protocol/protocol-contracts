@@ -1411,24 +1411,26 @@ describe("BondingV5", function () {
         expect(feeToBalanceAfter).to.equal(feeToBalanceBefore);
       });
 
-      it("Should revert if needAcf = true and airdropBips causes total to exceed limit", async function () {
+      it("Should allow needAcf = true at exact MAX_TOTAL_RESERVED_BIPS boundary (55%)", async function () {
         const { user1 } = accounts;
-        const { bondingV5, virtualToken, bondingConfig } = contracts;
+        const { bondingV5, virtualToken } = contracts;
 
         const purchaseAmount = ethers.parseEther("1000");
         await virtualToken.connect(user1).approve(addresses.bondingV5, purchaseAmount);
 
         const startTime = (await time.latest()) + START_TIME_DELAY + 1;
 
-        // needAcf = true adds 5000 (50%) reserve, so total = 500 + 5000 = 5500 >= MAX_TOTAL_RESERVED_BIPS (5500)
-        await expect(
-          bondingV5.connect(user1).preLaunch(
-            "ACF Exceed", "ACFE", [0, 1], "Description",
-            "https://example.com/image.png", ["", "", "", ""],
-            purchaseAmount, startTime,
-            LAUNCH_MODE_NORMAL, 500, true, ANTI_SNIPER_60S, false  // 500 (5.00%) + 5000 (50%) = 5500 (55%)
-          )
-        ).to.be.revertedWithCustomError(bondingConfig, "InvalidReserveBips");
+        // needAcf = true adds 5000 (50%) reserve, so total = 500 + 5000 = 5500 = MAX_TOTAL_RESERVED_BIPS (55%)
+        // This should succeed (at exact limit, not over)
+        const tx = await bondingV5.connect(user1).preLaunch(
+          "ACF At Limit", "ACFL", [0, 1], "Description",
+          "https://example.com/image.png", ["", "", "", ""],
+          purchaseAmount, startTime,
+          LAUNCH_MODE_NORMAL, 500, true, ANTI_SNIPER_60S, false  // 500 (5.00%) + 5000 (50%) = 5500 (55%)
+        );
+
+        const receipt = await tx.wait();
+        expect(receipt).to.not.be.undefined;
       });
 
       it("Should allow needAcf = true with airdropBips = 400 (total 54%)", async function () {
@@ -2048,24 +2050,25 @@ describe("BondingV5", function () {
       expect(receipt).to.not.be.undefined;
     });
 
-    it("Should revert at exact MAX_TOTAL_RESERVED_BIPS (needAcf + 5% = 55%)", async function () {
+    it("Should allow exact MAX_TOTAL_RESERVED_BIPS (needAcf + 5% = 55%)", async function () {
       const { user1 } = accounts;
-      const { bondingV5, virtualToken, bondingConfig } = contracts;
+      const { bondingV5, virtualToken } = contracts;
 
       const purchaseAmount = ethers.parseEther("1000");
       await virtualToken.connect(user1).approve(addresses.bondingV5, purchaseAmount);
 
       const startTime = (await time.latest()) + START_TIME_DELAY + 1;
 
-      // needAcf (5000 = 50%) + 500 (5%) = 5500 (55%) should fail (at limit)
-      await expect(
-        bondingV5.connect(user1).preLaunch(
-          "Over Limit", "OVER", [0, 1], "Description",
-          "https://example.com/image.png", ["", "", "", ""],
-          purchaseAmount, startTime,
-          LAUNCH_MODE_NORMAL, 500, true, ANTI_SNIPER_60S, false  // 500 = 5.00%
-        )
-      ).to.be.revertedWithCustomError(bondingConfig, "InvalidReserveBips");
+      // needAcf (5000 = 50%) + 500 (5%) = 5500 (55%) should succeed (at exact limit)
+      const tx = await bondingV5.connect(user1).preLaunch(
+        "At Limit", "ATLIM", [0, 1], "Description",
+        "https://example.com/image.png", ["", "", "", ""],
+        purchaseAmount, startTime,
+        LAUNCH_MODE_NORMAL, 500, true, ANTI_SNIPER_60S, false  // 500 = 5.00%
+      );
+
+      const receipt = await tx.wait();
+      expect(receipt).to.not.be.undefined;
     });
 
     it("Should allow needAcf = true with 0% airdrop (total 50%)", async function () {
@@ -2117,7 +2120,28 @@ describe("BondingV5", function () {
       expect(receipt).to.not.be.undefined;
     });
 
-    it("Should revert 5% airdrop + ACF (total 55%)", async function () {
+    it("Should allow 5% airdrop + ACF at exact boundary (total 55%)", async function () {
+      const { user1 } = accounts;
+      const { bondingV5, virtualToken } = contracts;
+
+      const purchaseAmount = ethers.parseEther("1000");
+      await virtualToken.connect(user1).approve(addresses.bondingV5, purchaseAmount);
+
+      const startTime = (await time.latest()) + START_TIME_DELAY + 1;
+
+      // 500 (5%) + 5000 (50% ACF) = 5500 (55%) = 5500 (55%) limit - should be allowed at exact boundary
+      const tx = await bondingV5.connect(user1).preLaunch(
+        "At ACF Combo Limit", "ATLM", [0, 1], "Description",
+        "https://example.com/image.png", ["", "", "", ""],
+        purchaseAmount, startTime,
+        LAUNCH_MODE_NORMAL, 500, true, ANTI_SNIPER_60S, false  // 500 = 5.00%
+      );
+
+      const receipt = await tx.wait();
+      expect(receipt).to.not.be.undefined;
+    });
+
+    it("Should revert when airdropBips exceeds MAX_AIRDROP_BIPS", async function () {
       const { user1 } = accounts;
       const { bondingV5, virtualToken, bondingConfig } = contracts;
 
@@ -2126,15 +2150,15 @@ describe("BondingV5", function () {
 
       const startTime = (await time.latest()) + START_TIME_DELAY + 1;
 
-      // 500 (5%) + 5000 (50% ACF) = 5500 (55%) >= 5500 (55%) limit
+      // 600 (6%) > 500 (5%) maxAirdropBips - should revert with AirdropBipsExceedsMax
       await expect(
         bondingV5.connect(user1).preLaunch(
-          "Over ACF Combo", "OVAC", [0, 1], "Description",
+          "Over Airdrop", "OVAD", [0, 1], "Description",
           "https://example.com/image.png", ["", "", "", ""],
           purchaseAmount, startTime,
-          LAUNCH_MODE_NORMAL, 500, true, ANTI_SNIPER_60S, false  // 500 = 5.00%
+          LAUNCH_MODE_NORMAL, 600, false, ANTI_SNIPER_60S, false  // 600 = 6.00% > 5% max
         )
-      ).to.be.revertedWithCustomError(bondingConfig, "InvalidReserveBips");
+      ).to.be.revertedWithCustomError(bondingConfig, "AirdropBipsExceedsMax");
     });
   });
 

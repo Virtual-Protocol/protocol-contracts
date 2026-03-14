@@ -186,7 +186,7 @@ contract BondingConfig is Initializable, OwnableUpgradeable {
      * @notice Calculate bonding curve supply with validation
      * @dev Validates:
      *      1. airdropBips_ <= reserveSupplyParams.maxAirdropBips
-     *      2. airdropBips + (needAcf ? acfReservedBips : 0) < maxTotalReservedBips
+     *      2. airdropBips + (needAcf ? acfReservedBips : 0) <= maxTotalReservedBips
      *      All values are in bips (1 bip = 0.01%, e.g., 234 = 2.34%)
      * @param airdropBips_ Airdrop in bips (e.g., 234 = 2.34%)
      * @param needAcf_ Whether ACF operations are needed (adds acfReservedBips reserve)
@@ -201,7 +201,7 @@ contract BondingConfig is Initializable, OwnableUpgradeable {
         }
         uint16 totalReserved = airdropBips_ +
             (needAcf_ ? reserveSupplyParams.acfReservedBips : 0);
-        if (totalReserved >= reserveSupplyParams.maxTotalReservedBips) {
+        if (totalReserved > reserveSupplyParams.maxTotalReservedBips) {
             revert InvalidReserveBips();
         }
         return (initialSupply * (10000 - totalReserved)) / 10000;

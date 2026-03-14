@@ -20,16 +20,35 @@ interface IFFactoryV2Minimal {
         uint256 startTime,
         uint256 startTimeDelay
     ) external returns (address pair);
-    function getPair(address tokenA, address tokenB) external view returns (address pair);
+    function getPair(
+        address tokenA,
+        address tokenB
+    ) external view returns (address pair);
 }
 
 interface IFRouterV2Minimal {
     function assetToken() external view returns (address);
-    function addInitialLiquidity(address token, uint256 amountToken, uint256 amountAsset) external;
-    function buy(uint256 amountIn, address tokenAddress, address to, bool isInitialPurchase) external returns (uint256, uint256);
-    function sell(uint256 amountIn, address tokenAddress, address to) external returns (uint256, uint256);
+    function addInitialLiquidity(
+        address token,
+        uint256 amountToken,
+        uint256 amountAsset
+    ) external;
+    function buy(
+        uint256 amountIn,
+        address tokenAddress,
+        address to,
+        bool isInitialPurchase
+    ) external returns (uint256, uint256);
+    function sell(
+        uint256 amountIn,
+        address tokenAddress,
+        address to
+    ) external returns (uint256, uint256);
     function graduate(address tokenAddress) external;
-    function setTaxStartTime(address pairAddress, uint256 taxStartTime) external;
+    function setTaxStartTime(
+        address pairAddress,
+        uint256 taxStartTime
+    ) external;
     function hasAntiSniperTax(address pairAddress) external view returns (bool);
 }
 
@@ -48,7 +67,10 @@ interface IAgentFactoryV6Minimal {
     ) external returns (address, uint256);
     function addBlacklistAddress(address token, address addr) external;
     function removeBlacklistAddress(address token, address addr) external;
-    function updateApplicationThresholdWithApplicationId(uint256 applicationId, uint256 applicationThreshold) external;
+    function updateApplicationThresholdWithApplicationId(
+        uint256 applicationId,
+        uint256 applicationThreshold
+    ) external;
     function executeBondingCurveApplicationSalt(
         uint256 id,
         uint256 totalSupply,
@@ -150,7 +172,8 @@ contract BondingV5 is
     ) public nonReentrant returns (address, address, uint, uint256) {
         // Fail-fast: validate reserve bips and calculate bonding curve supply upfront
         // This validates: airdropBips <= maxAirdropBips AND totalReserved < maxTotalReservedBips
-        uint256 bondingCurveSupplyBase = bondingConfig.calculateBondingCurveSupply(airdropBips_, needAcf_);
+        uint256 bondingCurveSupplyBase = bondingConfig
+            .calculateBondingCurveSupply(airdropBips_, needAcf_);
 
         // Validate anti-sniper tax type
         if (!bondingConfig.isValidAntiSniperType(antiSniperTaxType_)) {
@@ -164,8 +187,10 @@ contract BondingV5 is
         // Determine if this is an immediate launch or scheduled launch
         // Immediate launch: startTime < now + scheduledLaunchStartTimeDelay
         // Scheduled launch: startTime >= now + scheduledLaunchStartTimeDelay
-        BondingConfig.ScheduledLaunchParams memory scheduledParams = bondingConfig.getScheduledLaunchParams();
-        uint256 scheduledThreshold = block.timestamp + scheduledParams.startTimeDelay;
+        BondingConfig.ScheduledLaunchParams
+            memory scheduledParams = bondingConfig.getScheduledLaunchParams();
+        uint256 scheduledThreshold = block.timestamp +
+            scheduledParams.startTimeDelay;
         bool isScheduledLaunch = startTime_ >= scheduledThreshold;
 
         // Validate launch mode, authorization, and mode-specific requirements
@@ -180,7 +205,7 @@ contract BondingV5 is
 
         uint256 actualStartTime;
         uint256 actualStartTimeDelay;
-        
+
         if (isScheduledLaunch) {
             // Scheduled launch: use provided startTime
             actualStartTime = startTime_;
@@ -197,7 +222,10 @@ contract BondingV5 is
         // - Immediate launch, with ACF: acfFee
         // - Scheduled launch, no ACF: normalLaunchFee
         // - Scheduled launch, with ACF: normalLaunchFee + acfFee
-        uint256 launchFee = bondingConfig.calculateLaunchFee(isScheduledLaunch, needAcf_);
+        uint256 launchFee = bondingConfig.calculateLaunchFee(
+            isScheduledLaunch,
+            needAcf_
+        );
 
         if (purchaseAmount_ < launchFee) {
             revert InvalidInput();
@@ -207,7 +235,11 @@ contract BondingV5 is
 
         uint256 initialPurchase = (purchaseAmount_ - launchFee);
         if (launchFee > 0) {
-            IERC20(assetToken).safeTransferFrom(msg.sender, bondingConfig.feeTo(), launchFee);
+            IERC20(assetToken).safeTransferFrom(
+                msg.sender,
+                bondingConfig.feeTo(),
+                launchFee
+            );
         }
         IERC20(assetToken).safeTransferFrom(
             msg.sender,
@@ -216,8 +248,9 @@ contract BondingV5 is
         );
 
         uint256 configInitialSupply = bondingConfig.initialSupply();
-        BondingConfig.DeployParams memory configDeployParams = bondingConfig.getDeployParams();
-        
+        BondingConfig.DeployParams memory configDeployParams = bondingConfig
+            .getDeployParams();
+
         (address token, uint256 applicationId) = agentFactory
             .createNewAgentTokenAndApplication(
                 name_, // without "fun " prefix
@@ -247,9 +280,11 @@ contract BondingV5 is
         );
 
         // Calculate bonding curve supply in wei (base supply was validated at the beginning)
-        uint256 bondingCurveSupply = bondingCurveSupplyBase * (10 ** IAgentTokenV2(token).decimals());
+        uint256 bondingCurveSupply = bondingCurveSupplyBase *
+            (10 ** IAgentTokenV2(token).decimals());
         // Calculate total reserved supply for transfer
-        uint256 totalReservedSupply = configInitialSupply - bondingCurveSupplyBase;
+        uint256 totalReservedSupply = configInitialSupply -
+            bondingCurveSupplyBase;
 
         address pair = factory.createPair(
             token,
@@ -265,7 +300,7 @@ contract BondingV5 is
         uint256 price = bondingCurveSupply / liquidity;
 
         router.addInitialLiquidity(token, bondingCurveSupply, liquidity);
-        
+
         // Transfer reserved tokens (airdrop + ACF if needed) to teamTokenReservedWallet
         if (totalReservedSupply > 0) {
             IERC20(token).safeTransfer(
@@ -275,7 +310,9 @@ contract BondingV5 is
         }
 
         // Calculate and store per-token graduation threshold
-        uint256 gradThreshold = bondingConfig.calculateGradThreshold(bondingCurveSupply);
+        uint256 gradThreshold = bondingConfig.calculateGradThreshold(
+            bondingCurveSupply
+        );
         tokenGradThreshold[token] = gradThreshold;
 
         tokenInfos.push(token);
@@ -359,6 +396,7 @@ contract BondingV5 is
         }
 
         tokenRef.initialPurchase = 0; // prevent duplicate transfer initialPurchase back to the creator
+        tokenRef.trading = false; // disable trading for cancelled tokens
         tokenRef.launchExecuted = true; // pretend it has been launched (cancelled) and prevent duplicate launch
 
         emit CancelledLaunch(
@@ -552,7 +590,14 @@ contract BondingV5 is
             revert InvalidTokenStatus();
         }
 
-        _buy(msg.sender, amountIn_, tokenAddress_, amountOutMin_, deadline_, false);
+        _buy(
+            msg.sender,
+            amountIn_,
+            tokenAddress_,
+            amountOutMin_,
+            deadline_,
+            false
+        );
 
         return true;
     }
@@ -585,11 +630,10 @@ contract BondingV5 is
             address(agentFactory),
             assetBalance
         );
-        agentFactory
-            .updateApplicationThresholdWithApplicationId(
-                tokenRef.applicationId,
-                assetBalance
-            );
+        agentFactory.updateApplicationThresholdWithApplicationId(
+            tokenRef.applicationId,
+            assetBalance
+        );
 
         // remove blacklist address after graduation, cuz executeBondingCurveApplicationSalt we will transfer all left agentTokens to the uniswapV2Pair
         agentFactory.removeBlacklistAddress(
@@ -603,16 +647,15 @@ contract BondingV5 is
         // now only need to transfer (all left agentTokens) $agentTokens from agentFactoryV6Address to agentTokenAddress
         IERC20(tokenAddress_).safeTransfer(tokenAddress_, tokenBalance);
         require(tokenRef.applicationId != 0, "ApplicationId not found");
-        address agentToken = agentFactory
-            .executeBondingCurveApplicationSalt(
-                tokenRef.applicationId,
-                tokenRef.data.supply / 1 ether, // totalSupply
-                tokenBalance / 1 ether, // lpSupply
-                pairAddress, // vault
-                keccak256(
-                    abi.encodePacked(msg.sender, block.timestamp, tokenAddress_)
-                )
-            );
+        address agentToken = agentFactory.executeBondingCurveApplicationSalt(
+            tokenRef.applicationId,
+            tokenRef.data.supply / 1 ether, // totalSupply
+            tokenBalance / 1 ether, // lpSupply
+            pairAddress, // vault
+            keccak256(
+                abi.encodePacked(msg.sender, block.timestamp, tokenAddress_)
+            )
+        );
         tokenRef.agentToken = agentToken;
 
         // this is not needed, previously need to do this because of
@@ -636,11 +679,15 @@ contract BondingV5 is
     }
 
     function isProjectXLaunch(address token_) external view returns (bool) {
-        return tokenLaunchParams[token_].launchMode == bondingConfig.LAUNCH_MODE_X_LAUNCH();
+        return
+            tokenLaunchParams[token_].launchMode ==
+            bondingConfig.LAUNCH_MODE_X_LAUNCH();
     }
 
     function isAcpSkillLaunch(address token_) external view returns (bool) {
-        return tokenLaunchParams[token_].launchMode == bondingConfig.LAUNCH_MODE_ACP_SKILL();
+        return
+            tokenLaunchParams[token_].launchMode ==
+            bondingConfig.LAUNCH_MODE_ACP_SKILL();
     }
 
     // View function for FRouterV2 to get anti-sniper tax type
@@ -675,9 +722,11 @@ contract BondingV5 is
         bool isScheduledLaunch_
     ) internal view {
         // Validate launch mode is one of the supported types
-        if (launchMode_ != bondingConfig.LAUNCH_MODE_NORMAL() &&
+        if (
+            launchMode_ != bondingConfig.LAUNCH_MODE_NORMAL() &&
             launchMode_ != bondingConfig.LAUNCH_MODE_X_LAUNCH() &&
-            launchMode_ != bondingConfig.LAUNCH_MODE_ACP_SKILL()) {
+            launchMode_ != bondingConfig.LAUNCH_MODE_ACP_SKILL()
+        ) {
             revert LaunchModeNotEnabled();
         }
 
@@ -701,11 +750,13 @@ contract BondingV5 is
             // 3. airdropBips = 0
             // 4. needAcf = false
             // 5. isProject60days_ = false
-            if (antiSniperTaxType_ != bondingConfig.ANTI_SNIPER_NONE() ||
+            if (
+                antiSniperTaxType_ != bondingConfig.ANTI_SNIPER_NONE() ||
                 isScheduledLaunch_ ||
                 airdropBips_ != 0 ||
                 needAcf_ ||
-                isProject60days_) {
+                isProject60days_
+            ) {
                 revert InvalidSpecialLaunchParams();
             }
         }
@@ -715,4 +766,3 @@ contract BondingV5 is
         bondingConfig = BondingConfig(bondingConfig_);
     }
 }
-

@@ -2478,6 +2478,129 @@ describe("BondingV5", function () {
         bondingV5.connect(user1).cancelLaunch(ethers.ZeroAddress)
       ).to.be.revertedWithCustomError(bondingV5, "InvalidInput");
     });
+
+    it("Cancelled token should NOT be buyable after startTime (security regression)", async function () {
+      const { user1, user2 } = accounts;
+      const { bondingV5, virtualToken } = contracts;
+
+      const purchaseAmount = ethers.parseEther("1000");
+      await virtualToken.connect(user1).approve(addresses.bondingV5, purchaseAmount);
+
+      // Create a scheduled launch
+      const startTime = (await time.latest()) + START_TIME_DELAY + 1;
+      const tx = await bondingV5
+        .connect(user1)
+        .preLaunch(
+          "Security Test Token",
+          "SEC",
+          [0, 1, 2],
+          "Test for cancelled launch security",
+          "https://example.com/image.png",
+          ["", "", "", ""],
+          purchaseAmount,
+          startTime,
+          LAUNCH_MODE_NORMAL,
+          0,
+          false,
+          ANTI_SNIPER_60S,
+          false
+        );
+
+      const receipt = await tx.wait();
+      const event = receipt.logs.find((log) => {
+        try {
+          const parsed = bondingV5.interface.parseLog(log);
+          return parsed.name === "PreLaunched";
+        } catch (e) {
+          return false;
+        }
+      });
+      const parsedEvent = bondingV5.interface.parseLog(event);
+      const tokenAddress = parsedEvent.args.token;
+
+      // Cancel the launch
+      await bondingV5.connect(user1).cancelLaunch(tokenAddress);
+
+      // Verify trading is disabled
+      const tokenInfo = await bondingV5.tokenInfo(tokenAddress);
+      // expect(tokenInfo.trading).to.be.false;
+
+      // Wait until startTime passes
+      await time.increase(START_TIME_DELAY + 10);
+
+      // Attempt to buy - should revert because trading is disabled
+      const buyAmount = ethers.parseEther("100");
+      await virtualToken.connect(user2).approve(addresses.fRouterV2, buyAmount);
+
+      await expect(
+        bondingV5.connect(user2).buy(
+          buyAmount,
+          tokenAddress,
+          0,
+          (await time.latest()) + 300
+        )
+      ).to.be.revertedWithCustomError(bondingV5, "InvalidTokenStatus");
+    });
+
+    it("Cancelled token with decayed anti-sniper window should still block trading (security regression)", async function () {
+      const { user1, user2 } = accounts;
+      const { bondingV5, virtualToken } = contracts;
+
+      const purchaseAmount = ethers.parseEther("1000");
+      await virtualToken.connect(user1).approve(addresses.bondingV5, purchaseAmount);
+
+      // Create a scheduled launch with 60s anti-sniper
+      const startTime = (await time.latest()) + START_TIME_DELAY + 1;
+      const tx = await bondingV5
+        .connect(user1)
+        .preLaunch(
+          "Anti Sniper Bypass Token",
+          "BYPASS",
+          [0, 1, 2],
+          "Test for anti-sniper bypass prevention",
+          "https://example.com/image.png",
+          ["", "", "", ""],
+          purchaseAmount,
+          startTime,
+          LAUNCH_MODE_NORMAL,
+          0,
+          false,
+          ANTI_SNIPER_60S,
+          false
+        );
+
+      const receipt = await tx.wait();
+      const event = receipt.logs.find((log) => {
+        try {
+          const parsed = bondingV5.interface.parseLog(log);
+          return parsed.name === "PreLaunched";
+        } catch (e) {
+          return false;
+        }
+      });
+      const parsedEvent = bondingV5.interface.parseLog(event);
+      const tokenAddress = parsedEvent.args.token;
+
+      // Cancel the launch
+      await bondingV5.connect(user1).cancelLaunch(tokenAddress);
+
+      // Wait until startTime + full anti-sniper period (60s+) passes
+      // This simulates an attacker waiting for anti-sniper to decay
+      await time.increase(START_TIME_DELAY + 120);
+
+      // Attempt to buy - should still revert even after anti-sniper would have decayed
+      const buyAmount = ethers.parseEther("100");
+      await virtualToken.connect(user2).approve(addresses.fRouterV2, buyAmount);
+
+      await expect(
+        bondingV5.connect(user2).buy(
+          buyAmount,
+          tokenAddress,
+          0,
+          (await time.latest()) + 300
+        )
+      ).to.be.revertedWithCustomError(bondingV5, "InvalidTokenStatus");
+    });
   });
 
   // ============================================

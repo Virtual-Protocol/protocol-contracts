@@ -745,13 +745,13 @@ contract BondingV5 is
         // Only LAUNCH_MODE_NORMAL can freely configure parameters
         if (bondingConfig.isSpecialMode(launchMode_)) {
             // Special modes require:
-            // 1. ANTI_SNIPER_NONE
+            // 1. ANTI_SNIPER_60S
             // 2. Immediate launch (startTime within 24h)
             // 3. airdropBips = 0
             // 4. needAcf = false
             // 5. isProject60days_ = false
             if (
-                antiSniperTaxType_ != bondingConfig.ANTI_SNIPER_NONE() ||
+                antiSniperTaxType_ != bondingConfig.ANTI_SNIPER_60S() ||
                 isScheduledLaunch_ ||
                 airdropBips_ != 0 ||
                 needAcf_ ||

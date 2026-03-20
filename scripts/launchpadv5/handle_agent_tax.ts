@@ -56,8 +56,9 @@ async function main() {
    * Format: bytes32 array (use ethers.id() or keccak256 to convert string to bytes32)
    */
   const TX_HASHES: string[] = [
-    ethers.id("0xda40edb25e65be793c6b314848ac131c85c40e136082e156ceb4f146f4c7a232"), // TODO: Replace with actual tx hashes
-    // ethers.id("0x6d2c9fa49f51324907dbc80d0084cbb8194aa50afed85c1f8b80e9c1baf2efef"), // Example: ethers.id("0x1234...abcd")
+    ethers.id("0x314d5817326615d46a961a4621d02523762bef360543d0e2d2a013f1e81cf6bd"), // TODO: Replace with actual tx hashes
+    ethers.id("0x3d37f6cd612d2857aad5a8351e88475415e42e1abfb3462312baccac5baf4b1c"), // Example: ethers.id("0x1234...abcd")
+    ethers.id("0x249fe02a374d15ec513644ad4ff21e32644c2c57b52694479ff2c4f78fdb0e64"), // Example: ethers.id("0x1234...abcd")
   ];
 
   /**
@@ -68,8 +69,9 @@ async function main() {
    * Format: BigInt in wei (e.g., ethers.parseEther("10") for 10 tokens)
    */
   const AMOUNTS: bigint[] = [
-    ethers.parseEther("1.01"), // TODO: Replace with actual amounts
-    // ethers.parseEther("0.5"),
+    ethers.parseEther("1"), // TODO: Replace with actual amounts
+    ethers.parseEther("0.5"),
+    ethers.parseEther("0.377586634943622633"),
   ];
 
   /**

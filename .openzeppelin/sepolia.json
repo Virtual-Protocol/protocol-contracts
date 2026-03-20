@@ -125,6 +125,16 @@
       "address": "0x2cfe727226955595f3027709282850C04E03112B",
       "txHash": "0x9a2fda7289756ac67bc6c5188f364c186162405aad7c7715f1322a81823bb7e1",
       "kind": "transparent"
+    },
+    {
+      "address": "0x253a247b357881ef0b3C6CEf49Fb272B921923cE",
+      "txHash": "0x8f80e7b6e4d3d8cc89d4b771a6b81736378d7a19799305c965ab0f78955c5132",
+      "kind": "transparent"
+    },
+    {
+      "address": "0x343594cAc6c7cA25fB0526a375589cD2C94A7839",
+      "txHash": "0x3fb48aba3d6b6cdfcd05a723379b6b266b72f1952a6395d1b798761ca982afda",
+      "kind": "transparent"
     }
   ],
   "impls": {
@@ -3662,7 +3672,7 @@
             "label": "router",
             "offset": 0,
             "slot": "2",
-            "type": "t_contract(IRouter)2539",
+            "type": "t_contract(IRouter)54273",
             "contract": "AgentTax",
             "src": "contracts/tax/AgentTax.sol:52"
           },
@@ -3702,7 +3712,7 @@
             "label": "agentNft",
             "offset": 0,
             "slot": "6",
-            "type": "t_contract(IAgentNft)4280",
+            "type": "t_contract(IAgentNft)75481",
             "contract": "AgentTax",
             "src": "contracts/tax/AgentTax.sol:57"
           },
@@ -3718,7 +3728,7 @@
             "label": "taxHistory",
             "offset": 0,
             "slot": "8",
-            "type": "t_mapping(t_bytes32,t_struct(TaxHistory)2608_storage)",
+            "type": "t_mapping(t_bytes32,t_struct(TaxHistory)56044_storage)",
             "contract": "AgentTax",
             "src": "contracts/tax/AgentTax.sol:75"
           },
@@ -3726,7 +3736,7 @@
             "label": "agentTaxAmounts",
             "offset": 0,
             "slot": "9",
-            "type": "t_mapping(t_uint256,t_struct(TaxAmounts)2613_storage)",
+            "type": "t_mapping(t_uint256,t_struct(TaxAmounts)56049_storage)",
             "contract": "AgentTax",
             "src": "contracts/tax/AgentTax.sol:76"
           },
@@ -3734,7 +3744,7 @@
             "label": "_agentRecipients",
             "offset": 0,
             "slot": "10",
-            "type": "t_mapping(t_uint256,t_struct(TaxRecipient)2715_storage)",
+            "type": "t_mapping(t_uint256,t_struct(TaxRecipient)56151_storage)",
             "contract": "AgentTax",
             "src": "contracts/tax/AgentTax.sol:95"
           },
@@ -3750,7 +3760,7 @@
             "label": "tbaBonus",
             "offset": 2,
             "slot": "11",
-            "type": "t_contract(ITBABonus)4135",
+            "type": "t_contract(ITBABonus)58071",
             "contract": "AgentTax",
             "src": "contracts/tax/AgentTax.sol:104"
           },
@@ -3758,7 +3768,7 @@
             "label": "bondingV2",
             "offset": 0,
             "slot": "12",
-            "type": "t_contract(IBondingV2ForTax)2558",
+            "type": "t_contract(IBondingV2ForTax)55994",
             "contract": "AgentTax",
             "src": "contracts/tax/AgentTax.sol:105"
           },
@@ -3766,7 +3776,7 @@
             "label": "bondingV4",
             "offset": 0,
             "slot": "13",
-            "type": "t_contract(IBondingV4ForTax)2573",
+            "type": "t_contract(IBondingV4ForTax)56009",
             "contract": "AgentTax",
             "src": "contracts/tax/AgentTax.sol:106"
           },
@@ -3774,7 +3784,7 @@
             "label": "bondingV5",
             "offset": 0,
             "slot": "14",
-            "type": "t_contract(IBondingV5ForTax)2595",
+            "type": "t_contract(IBondingV5ForTax)56031",
             "contract": "AgentTax",
             "src": "contracts/tax/AgentTax.sol:107"
           }
@@ -3812,7 +3822,7 @@
             ],
             "numberOfBytes": "32"
           },
-          "t_struct(InitializableStorage)145_storage": {
+          "t_struct(InitializableStorage)1512_storage": {
             "label": "struct Initializable.InitializableStorage",
             "members": [
               {
@@ -3852,31 +3862,31 @@
             "label": "uint64",
             "numberOfBytes": "8"
           },
-          "t_contract(IAgentNft)4280": {
+          "t_contract(IAgentNft)75481": {
             "label": "contract IAgentNft",
             "numberOfBytes": "20"
           },
-          "t_contract(IBondingV2ForTax)2558": {
+          "t_contract(IBondingV2ForTax)55994": {
             "label": "contract IBondingV2ForTax",
             "numberOfBytes": "20"
           },
-          "t_contract(IBondingV4ForTax)2573": {
+          "t_contract(IBondingV4ForTax)56009": {
             "label": "contract IBondingV4ForTax",
             "numberOfBytes": "20"
           },
-          "t_contract(IBondingV5ForTax)2595": {
+          "t_contract(IBondingV5ForTax)56031": {
             "label": "contract IBondingV5ForTax",
             "numberOfBytes": "20"
           },
-          "t_contract(IRouter)2539": {
+          "t_contract(IRouter)54273": {
             "label": "contract IRouter",
             "numberOfBytes": "20"
           },
-          "t_contract(ITBABonus)4135": {
+          "t_contract(ITBABonus)58071": {
             "label": "contract ITBABonus",
             "numberOfBytes": "20"
           },
-          "t_mapping(t_bytes32,t_struct(TaxHistory)2608_storage)": {
+          "t_mapping(t_bytes32,t_struct(TaxHistory)56044_storage)": {
             "label": "mapping(bytes32 => struct AgentTax.TaxHistory)",
             "numberOfBytes": "32"
           },
@@ -3884,15 +3894,15 @@
             "label": "mapping(uint256 => address)",
             "numberOfBytes": "32"
           },
-          "t_mapping(t_uint256,t_struct(TaxAmounts)2613_storage)": {
+          "t_mapping(t_uint256,t_struct(TaxAmounts)56049_storage)": {
             "label": "mapping(uint256 => struct AgentTax.TaxAmounts)",
             "numberOfBytes": "32"
           },
-          "t_mapping(t_uint256,t_struct(TaxRecipient)2715_storage)": {
+          "t_mapping(t_uint256,t_struct(TaxRecipient)56151_storage)": {
             "label": "mapping(uint256 => struct AgentTax.TaxRecipient)",
             "numberOfBytes": "32"
           },
-          "t_struct(TaxAmounts)2613_storage": {
+          "t_struct(TaxAmounts)56049_storage": {
             "label": "struct AgentTax.TaxAmounts",
             "members": [
               {
@@ -3910,7 +3920,7 @@
             ],
             "numberOfBytes": "64"
           },
-          "t_struct(TaxHistory)2608_storage": {
+          "t_struct(TaxHistory)56044_storage": {
             "label": "struct AgentTax.TaxHistory",
             "members": [
               {
@@ -3928,7 +3938,7 @@
             ],
             "numberOfBytes": "64"
           },
-          "t_struct(TaxRecipient)2715_storage": {
+          "t_struct(TaxRecipient)56151_storage": {
             "label": "struct AgentTax.TaxRecipient",
             "members": [
               {
@@ -4682,6 +4692,1077 @@
               "label": "_status",
               "type": "t_uint256",
               "src": "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol:40",
+              "offset": 0,
+              "slot": "0"
+            }
+          ],
+          "erc7201:openzeppelin.storage.Initializable": [
+            {
+              "contract": "Initializable",
+              "label": "_initialized",
+              "type": "t_uint64",
+              "src": "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol:69",
+              "offset": 0,
+              "slot": "0"
+            },
+            {
+              "contract": "Initializable",
+              "label": "_initializing",
+              "type": "t_bool",
+              "src": "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol:73",
+              "offset": 8,
+              "slot": "0"
+            }
+          ]
+        }
+      }
+    },
+    "09c813b059d780429e8b1a6f6f6d036cd03d9a8b2818f3e5558c65a6ab050277": {
+      "address": "0xA83B22b56d963E2aE4d70550d4E8F17361Af7044",
+      "txHash": "0x20d439eb84f2d6ebc3946af8eedbdba3ca8747aabe26c28de7d50fab5ed251bc",
+      "layout": {
+        "solcVersion": "0.8.26",
+        "storage": [
+          {
+            "label": "reserveSupplyParams",
+            "offset": 0,
+            "slot": "0",
+            "type": "t_struct(ReserveSupplyParams)1331_storage",
+            "contract": "BondingConfig",
+            "src": "contracts/launchpadv2/BondingConfig.sol:26"
+          },
+          {
+            "label": "scheduledLaunchParams",
+            "offset": 0,
+            "slot": "1",
+            "type": "t_struct(ScheduledLaunchParams)1350_storage",
+            "contract": "BondingConfig",
+            "src": "contracts/launchpadv2/BondingConfig.sol:41"
+          },
+          {
+            "label": "teamTokenReservedWallet",
+            "offset": 0,
+            "slot": "4",
+            "type": "t_address",
+            "contract": "BondingConfig",
+            "src": "contracts/launchpadv2/BondingConfig.sol:44"
+          },
+          {
+            "label": "isXLauncher",
+            "offset": 0,
+            "slot": "5",
+            "type": "t_mapping(t_address,t_bool)",
+            "contract": "BondingConfig",
+            "src": "contracts/launchpadv2/BondingConfig.sol:47"
+          },
+          {
+            "label": "isAcpSkillLauncher",
+            "offset": 0,
+            "slot": "6",
+            "type": "t_mapping(t_address,t_bool)",
+            "contract": "BondingConfig",
+            "src": "contracts/launchpadv2/BondingConfig.sol:48"
+          },
+          {
+            "label": "bondingCurveParams",
+            "offset": 0,
+            "slot": "7",
+            "type": "t_struct(BondingCurveParams)1368_storage",
+            "contract": "BondingConfig",
+            "src": "contracts/launchpadv2/BondingConfig.sol:55"
+          },
+          {
+            "label": "deployParams",
+            "offset": 0,
+            "slot": "9",
+            "type": "t_struct(DeployParams)1455_storage",
+            "contract": "BondingConfig",
+            "src": "contracts/launchpadv2/BondingConfig.sol:110"
+          },
+          {
+            "label": "initialSupply",
+            "offset": 0,
+            "slot": "12",
+            "type": "t_uint256",
+            "contract": "BondingConfig",
+            "src": "contracts/launchpadv2/BondingConfig.sol:113"
+          },
+          {
+            "label": "feeTo",
+            "offset": 0,
+            "slot": "13",
+            "type": "t_address",
+            "contract": "BondingConfig",
+            "src": "contracts/launchpadv2/BondingConfig.sol:114"
+          }
+        ],
+        "types": {
+          "t_address": {
+            "label": "address",
+            "numberOfBytes": "20"
+          },
+          "t_bool": {
+            "label": "bool",
+            "numberOfBytes": "1"
+          },
+          "t_struct(InitializableStorage)73_storage": {
+            "label": "struct Initializable.InitializableStorage",
+            "members": [
+              {
+                "label": "_initialized",
+                "type": "t_uint64",
+                "offset": 0,
+                "slot": "0"
+              },
+              {
+                "label": "_initializing",
+                "type": "t_bool",
+                "offset": 8,
+                "slot": "0"
+              }
+            ],
+            "numberOfBytes": "32"
+          },
+          "t_struct(OwnableStorage)13_storage": {
+            "label": "struct OwnableUpgradeable.OwnableStorage",
+            "members": [
+              {
+                "label": "_owner",
+                "type": "t_address",
+                "offset": 0,
+                "slot": "0"
+              }
+            ],
+            "numberOfBytes": "32"
+          },
+          "t_uint64": {
+            "label": "uint64",
+            "numberOfBytes": "8"
+          },
+          "t_bytes32": {
+            "label": "bytes32",
+            "numberOfBytes": "32"
+          },
+          "t_mapping(t_address,t_bool)": {
+            "label": "mapping(address => bool)",
+            "numberOfBytes": "32"
+          },
+          "t_struct(BondingCurveParams)1368_storage": {
+            "label": "struct BondingConfig.BondingCurveParams",
+            "members": [
+              {
+                "label": "fakeInitialVirtualLiq",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "0"
+              },
+              {
+                "label": "targetRealVirtual",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "1"
+              }
+            ],
+            "numberOfBytes": "64"
+          },
+          "t_struct(DeployParams)1455_storage": {
+            "label": "struct BondingConfig.DeployParams",
+            "members": [
+              {
+                "label": "tbaSalt",
+                "type": "t_bytes32",
+                "offset": 0,
+                "slot": "0"
+              },
+              {
+                "label": "tbaImplementation",
+                "type": "t_address",
+                "offset": 0,
+                "slot": "1"
+              },
+              {
+                "label": "daoVotingPeriod",
+                "type": "t_uint32",
+                "offset": 20,
+                "slot": "1"
+              },
+              {
+                "label": "daoThreshold",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "2"
+              }
+            ],
+            "numberOfBytes": "96"
+          },
+          "t_struct(ReserveSupplyParams)1331_storage": {
+            "label": "struct BondingConfig.ReserveSupplyParams",
+            "members": [
+              {
+                "label": "maxAirdropBips",
+                "type": "t_uint16",
+                "offset": 0,
+                "slot": "0"
+              },
+              {
+                "label": "maxTotalReservedBips",
+                "type": "t_uint16",
+                "offset": 2,
+                "slot": "0"
+              },
+              {
+                "label": "acfReservedBips",
+                "type": "t_uint16",
+                "offset": 4,
+                "slot": "0"
+              }
+            ],
+            "numberOfBytes": "32"
+          },
+          "t_struct(ScheduledLaunchParams)1350_storage": {
+            "label": "struct BondingConfig.ScheduledLaunchParams",
+            "members": [
+              {
+                "label": "startTimeDelay",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "0"
+              },
+              {
+                "label": "normalLaunchFee",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "1"
+              },
+              {
+                "label": "acfFee",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "2"
+              }
+            ],
+            "numberOfBytes": "96"
+          },
+          "t_uint16": {
+            "label": "uint16",
+            "numberOfBytes": "2"
+          },
+          "t_uint256": {
+            "label": "uint256",
+            "numberOfBytes": "32"
+          },
+          "t_uint32": {
+            "label": "uint32",
+            "numberOfBytes": "4"
+          }
+        },
+        "namespaces": {
+          "erc7201:openzeppelin.storage.Ownable": [
+            {
+              "contract": "OwnableUpgradeable",
+              "label": "_owner",
+              "type": "t_address",
+              "src": "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol:24",
+              "offset": 0,
+              "slot": "0"
+            }
+          ],
+          "erc7201:openzeppelin.storage.Initializable": [
+            {
+              "contract": "Initializable",
+              "label": "_initialized",
+              "type": "t_uint64",
+              "src": "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol:69",
+              "offset": 0,
+              "slot": "0"
+            },
+            {
+              "contract": "Initializable",
+              "label": "_initializing",
+              "type": "t_bool",
+              "src": "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol:73",
+              "offset": 8,
+              "slot": "0"
+            }
+          ]
+        }
+      }
+    },
+    "d115d2ffe6032e9c39422817d75ec527900e661f45b86034e26ae682084f16d9": {
+      "address": "0x6C0e0c6521cf89771146AE6bDC5241EBec910118",
+      "txHash": "0xbe4722cac6ff7c8ddf17ec010d954b0da6d18800da6eadb999802c4dfa9a2794",
+      "layout": {
+        "solcVersion": "0.8.26",
+        "storage": [
+          {
+            "label": "factory",
+            "offset": 0,
+            "slot": "0",
+            "type": "t_contract(IFFactoryV2Minimal)1992",
+            "contract": "BondingV5",
+            "src": "contracts/launchpadv2/BondingV5.sol:90"
+          },
+          {
+            "label": "router",
+            "offset": 0,
+            "slot": "1",
+            "type": "t_contract(IFRouterV2Minimal)2054",
+            "contract": "BondingV5",
+            "src": "contracts/launchpadv2/BondingV5.sol:91"
+          },
+          {
+            "label": "agentFactory",
+            "offset": 0,
+            "slot": "2",
+            "type": "t_contract(IAgentFactoryV6Minimal)2119",
+            "contract": "BondingV5",
+            "src": "contracts/launchpadv2/BondingV5.sol:92"
+          },
+          {
+            "label": "bondingConfig",
+            "offset": 0,
+            "slot": "3",
+            "type": "t_contract(BondingConfig)1959",
+            "contract": "BondingV5",
+            "src": "contracts/launchpadv2/BondingV5.sol:93"
+          },
+          {
+            "label": "tokenInfo",
+            "offset": 0,
+            "slot": "4",
+            "type": "t_mapping(t_address,t_struct(Token)1435_storage)",
+            "contract": "BondingV5",
+            "src": "contracts/launchpadv2/BondingV5.sol:95"
+          },
+          {
+            "label": "tokenInfos",
+            "offset": 0,
+            "slot": "5",
+            "type": "t_array(t_address)dyn_storage",
+            "contract": "BondingV5",
+            "src": "contracts/launchpadv2/BondingV5.sol:96"
+          },
+          {
+            "label": "tokenLaunchParams",
+            "offset": 0,
+            "slot": "6",
+            "type": "t_mapping(t_address,t_struct(LaunchParams)1446_storage)",
+            "contract": "BondingV5",
+            "src": "contracts/launchpadv2/BondingV5.sol:102"
+          },
+          {
+            "label": "tokenGradThreshold",
+            "offset": 0,
+            "slot": "7",
+            "type": "t_mapping(t_address,t_uint256)",
+            "contract": "BondingV5",
+            "src": "contracts/launchpadv2/BondingV5.sol:105"
+          }
+        ],
+        "types": {
+          "t_address": {
+            "label": "address",
+            "numberOfBytes": "20"
+          },
+          "t_bool": {
+            "label": "bool",
+            "numberOfBytes": "1"
+          },
+          "t_struct(InitializableStorage)73_storage": {
+            "label": "struct Initializable.InitializableStorage",
+            "members": [
+              {
+                "label": "_initialized",
+                "type": "t_uint64",
+                "offset": 0,
+                "slot": "0"
+              },
+              {
+                "label": "_initializing",
+                "type": "t_bool",
+                "offset": 8,
+                "slot": "0"
+              }
+            ],
+            "numberOfBytes": "32"
+          },
+          "t_struct(OwnableStorage)13_storage": {
+            "label": "struct OwnableUpgradeable.OwnableStorage",
+            "members": [
+              {
+                "label": "_owner",
+                "type": "t_address",
+                "offset": 0,
+                "slot": "0"
+              }
+            ],
+            "numberOfBytes": "32"
+          },
+          "t_struct(ReentrancyGuardStorage)158_storage": {
+            "label": "struct ReentrancyGuardUpgradeable.ReentrancyGuardStorage",
+            "members": [
+              {
+                "label": "_status",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "0"
+              }
+            ],
+            "numberOfBytes": "32"
+          },
+          "t_uint256": {
+            "label": "uint256",
+            "numberOfBytes": "32"
+          },
+          "t_uint64": {
+            "label": "uint64",
+            "numberOfBytes": "8"
+          },
+          "t_array(t_address)dyn_storage": {
+            "label": "address[]",
+            "numberOfBytes": "32"
+          },
+          "t_array(t_uint8)dyn_storage": {
+            "label": "uint8[]",
+            "numberOfBytes": "32"
+          },
+          "t_contract(BondingConfig)1959": {
+            "label": "contract BondingConfig",
+            "numberOfBytes": "20"
+          },
+          "t_contract(IAgentFactoryV6Minimal)2119": {
+            "label": "contract IAgentFactoryV6Minimal",
+            "numberOfBytes": "20"
+          },
+          "t_contract(IFFactoryV2Minimal)1992": {
+            "label": "contract IFFactoryV2Minimal",
+            "numberOfBytes": "20"
+          },
+          "t_contract(IFRouterV2Minimal)2054": {
+            "label": "contract IFRouterV2Minimal",
+            "numberOfBytes": "20"
+          },
+          "t_mapping(t_address,t_struct(LaunchParams)1446_storage)": {
+            "label": "mapping(address => struct BondingConfig.LaunchParams)",
+            "numberOfBytes": "32"
+          },
+          "t_mapping(t_address,t_struct(Token)1435_storage)": {
+            "label": "mapping(address => struct BondingConfig.Token)",
+            "numberOfBytes": "32"
+          },
+          "t_mapping(t_address,t_uint256)": {
+            "label": "mapping(address => uint256)",
+            "numberOfBytes": "32"
+          },
+          "t_string_storage": {
+            "label": "string",
+            "numberOfBytes": "32"
+          },
+          "t_struct(Data)1396_storage": {
+            "label": "struct BondingConfig.Data",
+            "members": [
+              {
+                "label": "token",
+                "type": "t_address",
+                "offset": 0,
+                "slot": "0"
+              },
+              {
+                "label": "name",
+                "type": "t_string_storage",
+                "offset": 0,
+                "slot": "1"
+              },
+              {
+                "label": "_name",
+                "type": "t_string_storage",
+                "offset": 0,
+                "slot": "2"
+              },
+              {
+                "label": "ticker",
+                "type": "t_string_storage",
+                "offset": 0,
+                "slot": "3"
+              },
+              {
+                "label": "supply",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "4"
+              },
+              {
+                "label": "price",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "5"
+              },
+              {
+                "label": "marketCap",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "6"
+              },
+              {
+                "label": "liquidity",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "7"
+              },
+              {
+                "label": "volume",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "8"
+              },
+              {
+                "label": "volume24H",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "9"
+              },
+              {
+                "label": "prevPrice",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "10"
+              },
+              {
+                "label": "lastUpdated",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "11"
+              }
+            ],
+            "numberOfBytes": "384"
+          },
+          "t_struct(LaunchParams)1446_storage": {
+            "label": "struct BondingConfig.LaunchParams",
+            "members": [
+              {
+                "label": "launchMode",
+                "type": "t_uint8",
+                "offset": 0,
+                "slot": "0"
+              },
+              {
+                "label": "airdropBips",
+                "type": "t_uint16",
+                "offset": 1,
+                "slot": "0"
+              },
+              {
+                "label": "needAcf",
+                "type": "t_bool",
+                "offset": 3,
+                "slot": "0"
+              },
+              {
+                "label": "antiSniperTaxType",
+                "type": "t_uint8",
+                "offset": 4,
+                "slot": "0"
+              },
+              {
+                "label": "isProject60days",
+                "type": "t_bool",
+                "offset": 5,
+                "slot": "0"
+              }
+            ],
+            "numberOfBytes": "32"
+          },
+          "t_struct(Token)1435_storage": {
+            "label": "struct BondingConfig.Token",
+            "members": [
+              {
+                "label": "creator",
+                "type": "t_address",
+                "offset": 0,
+                "slot": "0"
+              },
+              {
+                "label": "token",
+                "type": "t_address",
+                "offset": 0,
+                "slot": "1"
+              },
+              {
+                "label": "pair",
+                "type": "t_address",
+                "offset": 0,
+                "slot": "2"
+              },
+              {
+                "label": "agentToken",
+                "type": "t_address",
+                "offset": 0,
+                "slot": "3"
+              },
+              {
+                "label": "data",
+                "type": "t_struct(Data)1396_storage",
+                "offset": 0,
+                "slot": "4"
+              },
+              {
+                "label": "description",
+                "type": "t_string_storage",
+                "offset": 0,
+                "slot": "16"
+              },
+              {
+                "label": "cores",
+                "type": "t_array(t_uint8)dyn_storage",
+                "offset": 0,
+                "slot": "17"
+              },
+              {
+                "label": "image",
+                "type": "t_string_storage",
+                "offset": 0,
+                "slot": "18"
+              },
+              {
+                "label": "twitter",
+                "type": "t_string_storage",
+                "offset": 0,
+                "slot": "19"
+              },
+              {
+                "label": "telegram",
+                "type": "t_string_storage",
+                "offset": 0,
+                "slot": "20"
+              },
+              {
+                "label": "youtube",
+                "type": "t_string_storage",
+                "offset": 0,
+                "slot": "21"
+              },
+              {
+                "label": "website",
+                "type": "t_string_storage",
+                "offset": 0,
+                "slot": "22"
+              },
+              {
+                "label": "trading",
+                "type": "t_bool",
+                "offset": 0,
+                "slot": "23"
+              },
+              {
+                "label": "tradingOnUniswap",
+                "type": "t_bool",
+                "offset": 1,
+                "slot": "23"
+              },
+              {
+                "label": "applicationId",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "24"
+              },
+              {
+                "label": "initialPurchase",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "25"
+              },
+              {
+                "label": "virtualId",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "26"
+              },
+              {
+                "label": "launchExecuted",
+                "type": "t_bool",
+                "offset": 0,
+                "slot": "27"
+              }
+            ],
+            "numberOfBytes": "896"
+          },
+          "t_uint16": {
+            "label": "uint16",
+            "numberOfBytes": "2"
+          },
+          "t_uint8": {
+            "label": "uint8",
+            "numberOfBytes": "1"
+          }
+        },
+        "namespaces": {
+          "erc7201:openzeppelin.storage.Ownable": [
+            {
+              "contract": "OwnableUpgradeable",
+              "label": "_owner",
+              "type": "t_address",
+              "src": "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol:24",
+              "offset": 0,
+              "slot": "0"
+            }
+          ],
+          "erc7201:openzeppelin.storage.ReentrancyGuard": [
+            {
+              "contract": "ReentrancyGuardUpgradeable",
+              "label": "_status",
+              "type": "t_uint256",
+              "src": "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol:40",
+              "offset": 0,
+              "slot": "0"
+            }
+          ],
+          "erc7201:openzeppelin.storage.Initializable": [
+            {
+              "contract": "Initializable",
+              "label": "_initialized",
+              "type": "t_uint64",
+              "src": "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol:69",
+              "offset": 0,
+              "slot": "0"
+            },
+            {
+              "contract": "Initializable",
+              "label": "_initializing",
+              "type": "t_bool",
+              "src": "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol:73",
+              "offset": 8,
+              "slot": "0"
+            }
+          ]
+        }
+      }
+    },
+    "b826109609020650439c7de9fb0d6d728e591b484e604c59a809aace361e1e65": {
+      "address": "0x2686937F7342d4183f13331d12Df090A555A0d4C",
+      "txHash": "0x46690a9e05deb8f69bbe16d8f78ed222ae79314cdbaa13fda2f09b0a62256f31",
+      "layout": {
+        "solcVersion": "0.8.26",
+        "storage": [
+          {
+            "label": "assetToken",
+            "offset": 0,
+            "slot": "0",
+            "type": "t_address",
+            "contract": "AgentTax",
+            "src": "contracts/tax/AgentTax.sol:50"
+          },
+          {
+            "label": "taxToken",
+            "offset": 0,
+            "slot": "1",
+            "type": "t_address",
+            "contract": "AgentTax",
+            "src": "contracts/tax/AgentTax.sol:51"
+          },
+          {
+            "label": "router",
+            "offset": 0,
+            "slot": "2",
+            "type": "t_contract(IRouter)2539",
+            "contract": "AgentTax",
+            "src": "contracts/tax/AgentTax.sol:52"
+          },
+          {
+            "label": "treasury",
+            "offset": 0,
+            "slot": "3",
+            "type": "t_address",
+            "contract": "AgentTax",
+            "src": "contracts/tax/AgentTax.sol:53"
+          },
+          {
+            "label": "feeRate",
+            "offset": 20,
+            "slot": "3",
+            "type": "t_uint16",
+            "contract": "AgentTax",
+            "src": "contracts/tax/AgentTax.sol:54"
+          },
+          {
+            "label": "minSwapThreshold",
+            "offset": 0,
+            "slot": "4",
+            "type": "t_uint256",
+            "contract": "AgentTax",
+            "src": "contracts/tax/AgentTax.sol:55"
+          },
+          {
+            "label": "maxSwapThreshold",
+            "offset": 0,
+            "slot": "5",
+            "type": "t_uint256",
+            "contract": "AgentTax",
+            "src": "contracts/tax/AgentTax.sol:56"
+          },
+          {
+            "label": "agentNft",
+            "offset": 0,
+            "slot": "6",
+            "type": "t_contract(IAgentNft)4245",
+            "contract": "AgentTax",
+            "src": "contracts/tax/AgentTax.sol:57"
+          },
+          {
+            "label": "_agentTba",
+            "offset": 0,
+            "slot": "7",
+            "type": "t_mapping(t_uint256,t_address)",
+            "contract": "AgentTax",
+            "src": "contracts/tax/AgentTax.sol:74"
+          },
+          {
+            "label": "taxHistory",
+            "offset": 0,
+            "slot": "8",
+            "type": "t_mapping(t_bytes32,t_struct(TaxHistory)2608_storage)",
+            "contract": "AgentTax",
+            "src": "contracts/tax/AgentTax.sol:75"
+          },
+          {
+            "label": "agentTaxAmounts",
+            "offset": 0,
+            "slot": "9",
+            "type": "t_mapping(t_uint256,t_struct(TaxAmounts)2613_storage)",
+            "contract": "AgentTax",
+            "src": "contracts/tax/AgentTax.sol:76"
+          },
+          {
+            "label": "_agentRecipients",
+            "offset": 0,
+            "slot": "10",
+            "type": "t_mapping(t_uint256,t_struct(TaxRecipient)2715_storage)",
+            "contract": "AgentTax",
+            "src": "contracts/tax/AgentTax.sol:95"
+          },
+          {
+            "label": "creatorFeeRate",
+            "offset": 0,
+            "slot": "11",
+            "type": "t_uint16",
+            "contract": "AgentTax",
+            "src": "contracts/tax/AgentTax.sol:96"
+          },
+          {
+            "label": "tbaBonus",
+            "offset": 2,
+            "slot": "11",
+            "type": "t_contract(ITBABonus)4100",
+            "contract": "AgentTax",
+            "src": "contracts/tax/AgentTax.sol:104"
+          },
+          {
+            "label": "bondingV2",
+            "offset": 0,
+            "slot": "12",
+            "type": "t_contract(IBondingV2ForTax)2558",
+            "contract": "AgentTax",
+            "src": "contracts/tax/AgentTax.sol:105"
+          },
+          {
+            "label": "bondingV4",
+            "offset": 0,
+            "slot": "13",
+            "type": "t_contract(IBondingV4ForTax)2573",
+            "contract": "AgentTax",
+            "src": "contracts/tax/AgentTax.sol:106"
+          },
+          {
+            "label": "bondingV5",
+            "offset": 0,
+            "slot": "14",
+            "type": "t_contract(IBondingV5ForTax)2595",
+            "contract": "AgentTax",
+            "src": "contracts/tax/AgentTax.sol:107"
+          }
+        ],
+        "types": {
+          "t_address": {
+            "label": "address",
+            "numberOfBytes": "20"
+          },
+          "t_bool": {
+            "label": "bool",
+            "numberOfBytes": "1"
+          },
+          "t_bytes32": {
+            "label": "bytes32",
+            "numberOfBytes": "32"
+          },
+          "t_mapping(t_address,t_bool)": {
+            "label": "mapping(address => bool)",
+            "numberOfBytes": "32"
+          },
+          "t_mapping(t_bytes32,t_struct(RoleData)24_storage)": {
+            "label": "mapping(bytes32 => struct AccessControlUpgradeable.RoleData)",
+            "numberOfBytes": "32"
+          },
+          "t_struct(AccessControlStorage)34_storage": {
+            "label": "struct AccessControlUpgradeable.AccessControlStorage",
+            "members": [
+              {
+                "label": "_roles",
+                "type": "t_mapping(t_bytes32,t_struct(RoleData)24_storage)",
+                "offset": 0,
+                "slot": "0"
+              }
+            ],
+            "numberOfBytes": "32"
+          },
+          "t_struct(InitializableStorage)145_storage": {
+            "label": "struct Initializable.InitializableStorage",
+            "members": [
+              {
+                "label": "_initialized",
+                "type": "t_uint64",
+                "offset": 0,
+                "slot": "0"
+              },
+              {
+                "label": "_initializing",
+                "type": "t_bool",
+                "offset": 8,
+                "slot": "0"
+              }
+            ],
+            "numberOfBytes": "32"
+          },
+          "t_struct(RoleData)24_storage": {
+            "label": "struct AccessControlUpgradeable.RoleData",
+            "members": [
+              {
+                "label": "hasRole",
+                "type": "t_mapping(t_address,t_bool)",
+                "offset": 0,
+                "slot": "0"
+              },
+              {
+                "label": "adminRole",
+                "type": "t_bytes32",
+                "offset": 0,
+                "slot": "1"
+              }
+            ],
+            "numberOfBytes": "64"
+          },
+          "t_uint64": {
+            "label": "uint64",
+            "numberOfBytes": "8"
+          },
+          "t_contract(IAgentNft)4245": {
+            "label": "contract IAgentNft",
+            "numberOfBytes": "20"
+          },
+          "t_contract(IBondingV2ForTax)2558": {
+            "label": "contract IBondingV2ForTax",
+            "numberOfBytes": "20"
+          },
+          "t_contract(IBondingV4ForTax)2573": {
+            "label": "contract IBondingV4ForTax",
+            "numberOfBytes": "20"
+          },
+          "t_contract(IBondingV5ForTax)2595": {
+            "label": "contract IBondingV5ForTax",
+            "numberOfBytes": "20"
+          },
+          "t_contract(IRouter)2539": {
+            "label": "contract IRouter",
+            "numberOfBytes": "20"
+          },
+          "t_contract(ITBABonus)4100": {
+            "label": "contract ITBABonus",
+            "numberOfBytes": "20"
+          },
+          "t_mapping(t_bytes32,t_struct(TaxHistory)2608_storage)": {
+            "label": "mapping(bytes32 => struct AgentTax.TaxHistory)",
+            "numberOfBytes": "32"
+          },
+          "t_mapping(t_uint256,t_address)": {
+            "label": "mapping(uint256 => address)",
+            "numberOfBytes": "32"
+          },
+          "t_mapping(t_uint256,t_struct(TaxAmounts)2613_storage)": {
+            "label": "mapping(uint256 => struct AgentTax.TaxAmounts)",
+            "numberOfBytes": "32"
+          },
+          "t_mapping(t_uint256,t_struct(TaxRecipient)2715_storage)": {
+            "label": "mapping(uint256 => struct AgentTax.TaxRecipient)",
+            "numberOfBytes": "32"
+          },
+          "t_struct(TaxAmounts)2613_storage": {
+            "label": "struct AgentTax.TaxAmounts",
+            "members": [
+              {
+                "label": "amountCollected",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "0"
+              },
+              {
+                "label": "amountSwapped",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "1"
+              }
+            ],
+            "numberOfBytes": "64"
+          },
+          "t_struct(TaxHistory)2608_storage": {
+            "label": "struct AgentTax.TaxHistory",
+            "members": [
+              {
+                "label": "agentId",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "0"
+              },
+              {
+                "label": "amount",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "1"
+              }
+            ],
+            "numberOfBytes": "64"
+          },
+          "t_struct(TaxRecipient)2715_storage": {
+            "label": "struct AgentTax.TaxRecipient",
+            "members": [
+              {
+                "label": "tba",
+                "type": "t_address",
+                "offset": 0,
+                "slot": "0"
+              },
+              {
+                "label": "creator",
+                "type": "t_address",
+                "offset": 0,
+                "slot": "1"
+              }
+            ],
+            "numberOfBytes": "64"
+          },
+          "t_uint16": {
+            "label": "uint16",
+            "numberOfBytes": "2"
+          },
+          "t_uint256": {
+            "label": "uint256",
+            "numberOfBytes": "32"
+          }
+        },
+        "namespaces": {
+          "erc7201:openzeppelin.storage.AccessControl": [
+            {
+              "contract": "AccessControlUpgradeable",
+              "label": "_roles",
+              "type": "t_mapping(t_bytes32,t_struct(RoleData)24_storage)",
+              "src": "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol:61",
               "offset": 0,
               "slot": "0"
             }

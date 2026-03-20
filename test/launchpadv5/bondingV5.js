@@ -85,7 +85,10 @@ async function setupBondingV5Test() {
       ethers.parseEther("10000000000")
     );
     await virtualToken.waitForDeployment();
-    console.log("MockERC20 Virtual Token deployed at:", await virtualToken.getAddress());
+    console.log(
+      "MockERC20 Virtual Token deployed at:",
+      await virtualToken.getAddress()
+    );
 
     // ============================================
     // Step 1: Deploy FFactoryV2 and FRouterV2 (like deployLaunchpadv5_1.ts)
@@ -97,7 +100,13 @@ async function setupBondingV5Test() {
     const FFactoryV2 = await ethers.getContractFactory("FFactoryV2");
     const fFactoryV2 = await upgrades.deployProxy(
       FFactoryV2,
-      [FFactoryV2_TAX_VAULT, BUY_TAX, SELL_TAX, ANTI_SNIPER_BUY_TAX_START_VALUE, FFactoryV2_ANTI_SNIPER_TAX_VAULT],
+      [
+        FFactoryV2_TAX_VAULT,
+        BUY_TAX,
+        SELL_TAX,
+        ANTI_SNIPER_BUY_TAX_START_VALUE,
+        FFactoryV2_ANTI_SNIPER_TAX_VAULT,
+      ],
       { initializer: "initialize" }
     );
     await fFactoryV2.waitForDeployment();
@@ -118,14 +127,17 @@ async function setupBondingV5Test() {
     console.log("\n--- Configuring FFactoryV2 ---");
     await fFactoryV2.grantRole(await fFactoryV2.ADMIN_ROLE(), owner.address);
     console.log("ADMIN_ROLE granted to owner (deployer) in FFactoryV2");
-    
+
     await fFactoryV2.setRouter(await fRouterV2.getAddress());
     console.log("Router set in FFactoryV2");
 
     await fFactoryV2.grantRole(await fFactoryV2.ADMIN_ROLE(), admin.address);
     console.log("ADMIN_ROLE granted to admin in FFactoryV2");
 
-    await fFactoryV2.grantRole(await fFactoryV2.DEFAULT_ADMIN_ROLE(), admin.address);
+    await fFactoryV2.grantRole(
+      await fFactoryV2.DEFAULT_ADMIN_ROLE(),
+      admin.address
+    );
     console.log("DEFAULT_ADMIN_ROLE granted to admin in FFactoryV2");
 
     // 1.4 Configure FRouterV2
@@ -133,10 +145,16 @@ async function setupBondingV5Test() {
     await fRouterV2.grantRole(await fRouterV2.ADMIN_ROLE(), admin.address);
     console.log("ADMIN_ROLE granted to admin in FRouterV2");
 
-    await fRouterV2.grantRole(await fRouterV2.DEFAULT_ADMIN_ROLE(), admin.address);
+    await fRouterV2.grantRole(
+      await fRouterV2.DEFAULT_ADMIN_ROLE(),
+      admin.address
+    );
     console.log("DEFAULT_ADMIN_ROLE granted to admin in FRouterV2");
 
-    await fRouterV2.grantRole(await fRouterV2.EXECUTOR_ROLE(), beOpsWallet.address);
+    await fRouterV2.grantRole(
+      await fRouterV2.EXECUTOR_ROLE(),
+      beOpsWallet.address
+    );
     console.log("EXECUTOR_ROLE granted to BE_OPS_WALLET in FRouterV2");
 
     // ============================================
@@ -149,28 +167,42 @@ async function setupBondingV5Test() {
     const AgentTokenV2 = await ethers.getContractFactory("AgentTokenV2");
     const agentTokenV2 = await AgentTokenV2.deploy();
     await agentTokenV2.waitForDeployment();
-    console.log("AgentTokenV2 implementation deployed at:", await agentTokenV2.getAddress());
+    console.log(
+      "AgentTokenV2 implementation deployed at:",
+      await agentTokenV2.getAddress()
+    );
 
     // 2.2 Deploy AgentVeTokenV2 implementation
     console.log("\n--- Deploying AgentVeTokenV2 implementation ---");
     const AgentVeTokenV2 = await ethers.getContractFactory("AgentVeTokenV2");
     const agentVeTokenV2 = await AgentVeTokenV2.deploy();
     await agentVeTokenV2.waitForDeployment();
-    console.log("AgentVeTokenV2 implementation deployed at:", await agentVeTokenV2.getAddress());
+    console.log(
+      "AgentVeTokenV2 implementation deployed at:",
+      await agentVeTokenV2.getAddress()
+    );
 
     // 2.3 Deploy MockAgentDAO implementation
     console.log("\n--- Deploying MockAgentDAO implementation ---");
     const MockAgentDAO = await ethers.getContractFactory("MockAgentDAO");
     const mockAgentDAO = await MockAgentDAO.deploy();
     await mockAgentDAO.waitForDeployment();
-    console.log("MockAgentDAO implementation deployed at:", await mockAgentDAO.getAddress());
+    console.log(
+      "MockAgentDAO implementation deployed at:",
+      await mockAgentDAO.getAddress()
+    );
 
     // 2.4 Deploy MockERC6551Registry
     console.log("\n--- Deploying MockERC6551Registry ---");
-    const MockERC6551Registry = await ethers.getContractFactory("MockERC6551Registry");
+    const MockERC6551Registry = await ethers.getContractFactory(
+      "MockERC6551Registry"
+    );
     const mockERC6551Registry = await MockERC6551Registry.deploy();
     await mockERC6551Registry.waitForDeployment();
-    console.log("MockERC6551Registry deployed at:", await mockERC6551Registry.getAddress());
+    console.log(
+      "MockERC6551Registry deployed at:",
+      await mockERC6551Registry.getAddress()
+    );
 
     // 2.5 Deploy AgentNftV2
     console.log("\n--- Deploying AgentNftV2 ---");
@@ -184,19 +216,29 @@ async function setupBondingV5Test() {
 
     // 2.6 Deploy MockUniswapV2Factory and Router
     console.log("\n--- Deploying MockUniswapV2Factory ---");
-    const MockUniswapV2Factory = await ethers.getContractFactory("MockUniswapV2Factory");
+    const MockUniswapV2Factory = await ethers.getContractFactory(
+      "MockUniswapV2Factory"
+    );
     const mockUniswapFactory = await MockUniswapV2Factory.deploy();
     await mockUniswapFactory.waitForDeployment();
-    console.log("MockUniswapV2Factory deployed at:", await mockUniswapFactory.getAddress());
+    console.log(
+      "MockUniswapV2Factory deployed at:",
+      await mockUniswapFactory.getAddress()
+    );
 
     console.log("\n--- Deploying MockUniswapV2Router02 ---");
-    const MockUniswapV2Router02 = await ethers.getContractFactory("MockUniswapV2Router02");
+    const MockUniswapV2Router02 = await ethers.getContractFactory(
+      "MockUniswapV2Router02"
+    );
     const mockUniswapRouter = await MockUniswapV2Router02.deploy(
       await mockUniswapFactory.getAddress(),
       await virtualToken.getAddress()
     );
     await mockUniswapRouter.waitForDeployment();
-    console.log("MockUniswapV2Router02 deployed at:", await mockUniswapRouter.getAddress());
+    console.log(
+      "MockUniswapV2Router02 deployed at:",
+      await mockUniswapRouter.getAddress()
+    );
 
     // 2.7 Deploy AgentFactoryV6
     console.log("\n--- Deploying AgentFactoryV6 ---");
@@ -210,39 +252,54 @@ async function setupBondingV5Test() {
         await mockERC6551Registry.getAddress(),
         await virtualToken.getAddress(),
         await agentNftV2.getAddress(),
-        owner.address,  // vault
-        1,              // nextId
+        owner.address, // vault
+        1, // nextId
       ],
       { initializer: "initialize" }
     );
     await agentFactoryV6.waitForDeployment();
-    console.log("AgentFactoryV6 deployed at:", await agentFactoryV6.getAddress());
+    console.log(
+      "AgentFactoryV6 deployed at:",
+      await agentFactoryV6.getAddress()
+    );
 
     // 2.8 Configure AgentFactoryV6
     console.log("\n--- Configuring AgentFactoryV6 ---");
     await agentFactoryV6.setParams(
-      10 * 365 * 24 * 60 * 60,  // maturityDuration (10 years)
+      10 * 365 * 24 * 60 * 60, // maturityDuration (10 years)
       await mockUniswapRouter.getAddress(),
-      owner.address,  // defaultDelegatee
-      owner.address   // tokenAdmin
+      owner.address, // defaultDelegatee
+      owner.address // tokenAdmin
     );
     console.log("setParams() called for AgentFactoryV6");
 
     await agentFactoryV6.setTokenParams(BUY_TAX, SELL_TAX, 1000, owner.address);
     console.log("setTokenParams() called for AgentFactoryV6");
 
-    await agentFactoryV6.grantRole(await agentFactoryV6.DEFAULT_ADMIN_ROLE(), admin.address);
+    await agentFactoryV6.grantRole(
+      await agentFactoryV6.DEFAULT_ADMIN_ROLE(),
+      admin.address
+    );
     console.log("DEFAULT_ADMIN_ROLE granted to admin in AgentFactoryV6");
 
-    await agentFactoryV6.grantRole(await agentFactoryV6.REMOVE_LIQUIDITY_ROLE(), admin.address);
+    await agentFactoryV6.grantRole(
+      await agentFactoryV6.REMOVE_LIQUIDITY_ROLE(),
+      admin.address
+    );
     console.log("REMOVE_LIQUIDITY_ROLE granted to admin in AgentFactoryV6");
 
     // 2.9 Configure AgentNftV2 roles
     console.log("\n--- Configuring AgentNftV2 roles ---");
-    await agentNftV2.grantRole(await agentNftV2.MINTER_ROLE(), await agentFactoryV6.getAddress());
+    await agentNftV2.grantRole(
+      await agentNftV2.MINTER_ROLE(),
+      await agentFactoryV6.getAddress()
+    );
     console.log("MINTER_ROLE granted to AgentFactoryV6 in AgentNftV2");
 
-    await agentNftV2.grantRole(await agentNftV2.DEFAULT_ADMIN_ROLE(), admin.address);
+    await agentNftV2.grantRole(
+      await agentNftV2.DEFAULT_ADMIN_ROLE(),
+      admin.address
+    );
     console.log("DEFAULT_ADMIN_ROLE granted to admin in AgentNftV2");
 
     // ============================================
@@ -253,7 +310,7 @@ async function setupBondingV5Test() {
     // 3.1 Deploy BondingConfig
     console.log("\n--- Deploying BondingConfig ---");
     const BondingConfig = await ethers.getContractFactory("BondingConfig");
-    
+
     const reserveSupplyParams = {
       maxAirdropBips: MAX_AIRDROP_BIPS,
       maxTotalReservedBips: MAX_TOTAL_RESERVED_BIPS,
@@ -265,26 +322,26 @@ async function setupBondingV5Test() {
       normalLaunchFee: NORMAL_LAUNCH_FEE,
       acfFee: ACF_FEE,
     };
-    
+
     const deployParams = {
       tbaSalt: TBA_SALT,
       tbaImplementation: TBA_IMPLEMENTATION,
       daoVotingPeriod: DAO_VOTING_PERIOD,
       daoThreshold: DAO_THRESHOLD,
     };
-    
+
     const bondingCurveParams = {
       fakeInitialVirtualLiq: FAKE_INITIAL_VIRTUAL_LIQ,
       targetRealVirtual: TARGET_REAL_VIRTUAL,
     };
-    
+
     const bondingConfig = await upgrades.deployProxy(
       BondingConfig,
       [
         INITIAL_SUPPLY,
-        owner.address,              // feeTo
-        beOpsWallet.address,        // teamTokenReservedWallet
-        reserveSupplyParams,        // reserveSupplyParams
+        owner.address, // feeTo
+        beOpsWallet.address, // teamTokenReservedWallet
+        reserveSupplyParams, // reserveSupplyParams
         scheduledLaunchParams,
         deployParams,
         bondingCurveParams,
@@ -314,20 +371,32 @@ async function setupBondingV5Test() {
     console.log("\n--- Granting roles to BondingV5 ---");
 
     // Grant CREATOR_ROLE of FFactoryV2 to BondingV5
-    await fFactoryV2.grantRole(await fFactoryV2.CREATOR_ROLE(), await bondingV5.getAddress());
+    await fFactoryV2.grantRole(
+      await fFactoryV2.CREATOR_ROLE(),
+      await bondingV5.getAddress()
+    );
     console.log("CREATOR_ROLE granted to BondingV5 in FFactoryV2");
 
     // Set BondingV5 and BondingConfig in FRouterV2 (CRITICAL - was missing before)
     await fRouterV2.grantRole(await fRouterV2.ADMIN_ROLE(), owner.address);
-    await fRouterV2.setBondingV5(await bondingV5.getAddress(), await bondingConfig.getAddress());
+    await fRouterV2.setBondingV5(
+      await bondingV5.getAddress(),
+      await bondingConfig.getAddress()
+    );
     console.log("setBondingV5() called in FRouterV2");
 
     // Grant EXECUTOR_ROLE of FRouterV2 to BondingV5
-    await fRouterV2.grantRole(await fRouterV2.EXECUTOR_ROLE(), await bondingV5.getAddress());
+    await fRouterV2.grantRole(
+      await fRouterV2.EXECUTOR_ROLE(),
+      await bondingV5.getAddress()
+    );
     console.log("EXECUTOR_ROLE granted to BondingV5 in FRouterV2");
 
     // Grant BONDING_ROLE of AgentFactoryV6 to BondingV5
-    await agentFactoryV6.grantRole(await agentFactoryV6.BONDING_ROLE(), await bondingV5.getAddress());
+    await agentFactoryV6.grantRole(
+      await agentFactoryV6.BONDING_ROLE(),
+      await bondingV5.getAddress()
+    );
     console.log("BONDING_ROLE granted to BondingV5 in AgentFactoryV6");
 
     // Additional role for admin to call FRouterV2 directly in tests
@@ -340,7 +409,13 @@ async function setupBondingV5Test() {
     console.log("\n--- Minting Virtual Tokens to test addresses ---");
     const mintAmount = ethers.parseEther("1000000000");
 
-    const testAddresses = [owner.address, admin.address, beOpsWallet.address, user1.address, user2.address];
+    const testAddresses = [
+      owner.address,
+      admin.address,
+      beOpsWallet.address,
+      user1.address,
+      user2.address,
+    ];
 
     for (const address of testAddresses) {
       await virtualToken.mint(address, mintAmount);
@@ -436,9 +511,11 @@ describe("BondingV5", function () {
       expect(await bondingV5.owner()).to.equal(owner.address);
       expect(await bondingV5.agentFactory()).to.equal(addresses.agentFactoryV6);
       expect(await bondingV5.bondingConfig()).to.equal(addresses.bondingConfig);
-      
+
       // Check bondingConfig params
-      expect(await bondingConfig.initialSupply()).to.equal(params.initialSupply);
+      expect(await bondingConfig.initialSupply()).to.equal(
+        params.initialSupply
+      );
       expect(await bondingConfig.feeTo()).to.equal(owner.address);
     });
 
@@ -446,15 +523,24 @@ describe("BondingV5", function () {
       const { bondingV5, fRouterV2, agentFactoryV6, fFactoryV2 } = contracts;
 
       expect(
-        await fRouterV2.hasRole(await fRouterV2.EXECUTOR_ROLE(), addresses.bondingV5)
+        await fRouterV2.hasRole(
+          await fRouterV2.EXECUTOR_ROLE(),
+          addresses.bondingV5
+        )
       ).to.be.true;
 
       expect(
-        await agentFactoryV6.hasRole(await agentFactoryV6.BONDING_ROLE(), addresses.bondingV5)
+        await agentFactoryV6.hasRole(
+          await agentFactoryV6.BONDING_ROLE(),
+          addresses.bondingV5
+        )
       ).to.be.true;
 
       expect(
-        await fFactoryV2.hasRole(await fFactoryV2.CREATOR_ROLE(), addresses.bondingV5)
+        await fFactoryV2.hasRole(
+          await fFactoryV2.CREATOR_ROLE(),
+          addresses.bondingV5
+        )
       ).to.be.true;
     });
 
@@ -488,26 +574,26 @@ describe("BondingV5", function () {
       ];
       const purchaseAmount = ethers.parseEther("1000");
 
-      await virtualToken.connect(user1).approve(addresses.bondingV5, purchaseAmount);
+      await virtualToken
+        .connect(user1)
+        .approve(addresses.bondingV5, purchaseAmount);
 
       const startTime = (await time.latest()) + START_TIME_DELAY + 1;
-      const tx = await bondingV5
-        .connect(user1)
-        .preLaunch(
-          tokenName,
-          tokenTicker,
-          cores,
-          description,
-          image,
-          urls,
-          purchaseAmount,
-          startTime,
-          LAUNCH_MODE_NORMAL,     // launchMode_
-          0,                      // airdropBips_
-          false,                  // needAcf_
-          ANTI_SNIPER_60S,        // antiSniperTaxType_
-          false                   // isProject60days_
-        );
+      const tx = await bondingV5.connect(user1).preLaunch(
+        tokenName,
+        tokenTicker,
+        cores,
+        description,
+        image,
+        urls,
+        purchaseAmount,
+        startTime,
+        LAUNCH_MODE_NORMAL, // launchMode_
+        0, // airdropBips_
+        false, // needAcf_
+        ANTI_SNIPER_60S, // antiSniperTaxType_
+        false // isProject60days_
+      );
 
       const receipt = await tx.wait();
       const event = receipt.logs.find((log) => {
@@ -550,21 +636,23 @@ describe("BondingV5", function () {
       const startTime = (await time.latest()) + START_TIME_DELAY + 1;
 
       await expect(
-        bondingV5.connect(user1).preLaunch(
-          "Test Token",
-          "TEST",
-          [0, 1, 2],
-          "Description",
-          "https://example.com/image.png",
-          ["", "", "", ""],
-          purchaseAmount,
-          startTime,
-          LAUNCH_MODE_NORMAL,
-          0,
-          false,
-          ANTI_SNIPER_60S,
-          false
-        )
+        bondingV5
+          .connect(user1)
+          .preLaunch(
+            "Test Token",
+            "TEST",
+            [0, 1, 2],
+            "Description",
+            "https://example.com/image.png",
+            ["", "", "", ""],
+            purchaseAmount,
+            startTime,
+            LAUNCH_MODE_NORMAL,
+            0,
+            false,
+            ANTI_SNIPER_60S,
+            false
+          )
       ).to.be.revertedWithCustomError(bondingV5, ERR_INVALID_INPUT);
     });
 
@@ -599,26 +687,26 @@ describe("BondingV5", function () {
       const { bondingV5, virtualToken } = contracts;
 
       const purchaseAmount = ethers.parseEther("1000");
-      await virtualToken.connect(user1).approve(addresses.bondingV5, purchaseAmount);
+      await virtualToken
+        .connect(user1)
+        .approve(addresses.bondingV5, purchaseAmount);
 
       const startTime = (await time.latest()) + START_TIME_DELAY + 1;
-      const tx = await bondingV5
-        .connect(user1)
-        .preLaunch(
-          "Project60days Token",
-          "P60",
-          [0, 1, 2],
-          "Project60days test token",
-          "https://example.com/image.png",
-          ["", "", "", ""],
-          purchaseAmount,
-          startTime,
-          LAUNCH_MODE_NORMAL,
-          0,
-          false,
-          ANTI_SNIPER_60S,
-          true  // isProject60days_ = true
-        );
+      const tx = await bondingV5.connect(user1).preLaunch(
+        "Project60days Token",
+        "P60",
+        [0, 1, 2],
+        "Project60days test token",
+        "https://example.com/image.png",
+        ["", "", "", ""],
+        purchaseAmount,
+        startTime,
+        LAUNCH_MODE_NORMAL,
+        0,
+        false,
+        ANTI_SNIPER_60S,
+        true // isProject60days_ = true
+      );
 
       const receipt = await tx.wait();
       const event = receipt.logs.find((log) => {
@@ -649,7 +737,9 @@ describe("BondingV5", function () {
 
       const purchaseAmount = ethers.parseEther("1000");
 
-      await virtualToken.connect(user1).approve(addresses.bondingV5, purchaseAmount);
+      await virtualToken
+        .connect(user1)
+        .approve(addresses.bondingV5, purchaseAmount);
 
       const startTime = (await time.latest()) + START_TIME_DELAY + 1;
       const tx = await bondingV5
@@ -711,10 +801,9 @@ describe("BondingV5", function () {
     it("Should fail to launch if start time has not passed", async function () {
       const { bondingV5 } = contracts;
 
-      await expect(bondingV5.launch(tokenAddress)).to.be.revertedWithCustomError(
-        bondingV5,
-        "InvalidInput"
-      );
+      await expect(
+        bondingV5.launch(tokenAddress)
+      ).to.be.revertedWithCustomError(bondingV5, "InvalidInput");
     });
   });
 
@@ -727,7 +816,9 @@ describe("BondingV5", function () {
 
       const purchaseAmount = ethers.parseEther("1000");
 
-      await virtualToken.connect(user1).approve(addresses.bondingV5, purchaseAmount);
+      await virtualToken
+        .connect(user1)
+        .approve(addresses.bondingV5, purchaseAmount);
 
       const startTime = (await time.latest()) + START_TIME_DELAY + 1;
       const tx = await bondingV5
@@ -774,17 +865,19 @@ describe("BondingV5", function () {
       const buyAmount = ethers.parseEther("100");
       await virtualToken.connect(user2).approve(addresses.fRouterV2, buyAmount);
 
-      const tx = await bondingV5.connect(user2).buy(
-        buyAmount,
-        tokenAddress,
-        0,
-        (await time.latest()) + 300
-      );
+      const tx = await bondingV5
+        .connect(user2)
+        .buy(buyAmount, tokenAddress, 0, (await time.latest()) + 300);
 
       expect(tx).to.not.be.undefined;
 
-      const actualTokenContract = await ethers.getContractAt("AgentTokenV2", tokenAddress);
-      const user2AgentTokenBalance = await actualTokenContract.balanceOf(user2.address);
+      const actualTokenContract = await ethers.getContractAt(
+        "AgentTokenV2",
+        tokenAddress
+      );
+      const user2AgentTokenBalance = await actualTokenContract.balanceOf(
+        user2.address
+      );
       expect(user2AgentTokenBalance).to.be.greaterThan(0);
     });
   });
@@ -798,7 +891,9 @@ describe("BondingV5", function () {
 
       const purchaseAmount = ethers.parseEther("1000");
 
-      await virtualToken.connect(user1).approve(addresses.bondingV5, purchaseAmount);
+      await virtualToken
+        .connect(user1)
+        .approve(addresses.bondingV5, purchaseAmount);
 
       const startTime = (await time.latest()) + START_TIME_DELAY + 1;
       const tx = await bondingV5
@@ -839,27 +934,33 @@ describe("BondingV5", function () {
       await increaseTimeByMinutes(99);
       const buyAmount = ethers.parseEther("1000");
       await virtualToken.connect(user2).approve(addresses.fRouterV2, buyAmount);
-      await bondingV5.connect(user2).buy(buyAmount, tokenAddress, 0, (await time.latest()) + 300);
+      await bondingV5
+        .connect(user2)
+        .buy(buyAmount, tokenAddress, 0, (await time.latest()) + 300);
     });
 
     it("Should allow selling tokens", async function () {
       const { user2 } = accounts;
       const { bondingV5, virtualToken } = contracts;
 
-      const actualTokenContract = await ethers.getContractAt("AgentTokenV2", tokenAddress);
-      const user2AgentTokenBalance = await actualTokenContract.balanceOf(user2.address);
+      const actualTokenContract = await ethers.getContractAt(
+        "AgentTokenV2",
+        tokenAddress
+      );
+      const user2AgentTokenBalance = await actualTokenContract.balanceOf(
+        user2.address
+      );
 
       const sellAmount = user2AgentTokenBalance / 2n;
-      await actualTokenContract.connect(user2).approve(addresses.fRouterV2, sellAmount);
+      await actualTokenContract
+        .connect(user2)
+        .approve(addresses.fRouterV2, sellAmount);
 
       const virtualBalanceBefore = await virtualToken.balanceOf(user2.address);
 
-      const tx = await bondingV5.connect(user2).sell(
-        sellAmount,
-        tokenAddress,
-        0,
-        (await time.latest()) + 300
-      );
+      const tx = await bondingV5
+        .connect(user2)
+        .sell(sellAmount, tokenAddress, 0, (await time.latest()) + 300);
 
       expect(tx).to.not.be.undefined;
 
@@ -887,27 +988,27 @@ describe("BondingV5", function () {
 
       const purchaseAmount = ethers.parseEther("1000");
 
-      await virtualToken.connect(user1).approve(addresses.bondingV5, purchaseAmount);
+      await virtualToken
+        .connect(user1)
+        .approve(addresses.bondingV5, purchaseAmount);
 
       // Special modes require immediate launch (startTime within 24h)
       const startTime = (await time.latest()) + 100;
-      const tx = await bondingV5
-        .connect(user1)
-        .preLaunch(
-          "ProjectXLaunch Token",
-          "PXL",
-          [0, 1, 2],
-          "ProjectXLaunch test token",
-          "https://example.com/image.png",
-          ["", "", "", ""],
-          purchaseAmount,
-          startTime,
-          LAUNCH_MODE_X_LAUNCH,
-          0,                      // airdropBips must be 0 for special modes
-          false,                  // needAcf must be false for special modes
-          ANTI_SNIPER_NONE,       // antiSniperTaxType must be NONE for special modes
-          false                   // isProject60days must be false for special modes
-        );
+      const tx = await bondingV5.connect(user1).preLaunch(
+        "ProjectXLaunch Token",
+        "PXL",
+        [0, 1, 2],
+        "ProjectXLaunch test token",
+        "https://example.com/image.png",
+        ["", "", "", ""],
+        purchaseAmount,
+        startTime,
+        LAUNCH_MODE_X_LAUNCH,
+        0, // airdropBips must be 0 for special modes
+        false, // needAcf must be false for special modes
+        ANTI_SNIPER_NONE, // antiSniperTaxType must be NONE for special modes
+        false // isProject60days must be false for special modes
+      );
 
       const receipt = await tx.wait();
       const event = receipt.logs.find((log) => {
@@ -942,26 +1043,30 @@ describe("BondingV5", function () {
 
       const purchaseAmount = ethers.parseEther("1000");
 
-      await virtualToken.connect(user2).approve(addresses.bondingV5, purchaseAmount);
+      await virtualToken
+        .connect(user2)
+        .approve(addresses.bondingV5, purchaseAmount);
 
       const startTime = (await time.latest()) + 100;
 
       await expect(
-        bondingV5.connect(user2).preLaunch(
-          "Unauthorized X_LAUNCH",
-          "UXL",
-          [0, 1, 2],
-          "Test unauthorized",
-          "https://example.com/image.png",
-          ["", "", "", ""],
-          purchaseAmount,
-          startTime,
-          LAUNCH_MODE_X_LAUNCH,
-          0,
-          false,
-          ANTI_SNIPER_NONE,
-          false
-        )
+        bondingV5
+          .connect(user2)
+          .preLaunch(
+            "Unauthorized X_LAUNCH",
+            "UXL",
+            [0, 1, 2],
+            "Test unauthorized",
+            "https://example.com/image.png",
+            ["", "", "", ""],
+            purchaseAmount,
+            startTime,
+            LAUNCH_MODE_X_LAUNCH,
+            0,
+            false,
+            ANTI_SNIPER_NONE,
+            false
+          )
       ).to.be.revertedWithCustomError(bondingV5, "UnauthorizedLauncher");
     });
 
@@ -970,7 +1075,9 @@ describe("BondingV5", function () {
       const { bondingV5, virtualToken } = contracts;
 
       const purchaseAmount = ethers.parseEther("1000");
-      await virtualToken.connect(user1).approve(addresses.bondingV5, purchaseAmount);
+      await virtualToken
+        .connect(user1)
+        .approve(addresses.bondingV5, purchaseAmount);
 
       const startTime = (await time.latest()) + 100;
 
@@ -986,7 +1093,7 @@ describe("BondingV5", function () {
           purchaseAmount,
           startTime,
           LAUNCH_MODE_X_LAUNCH,
-          500,                    // airdropBips = 500 (5.00%, within maxAirdropBips but special modes require 0)
+          500, // airdropBips = 500 (5.00%, within maxAirdropBips but special modes require 0)
           false,
           ANTI_SNIPER_NONE,
           false
@@ -1004,8 +1111,12 @@ describe("BondingV5", function () {
       const { owner, user1 } = accounts;
 
       // Authorize user1 as AcpSkillLauncher for ACP_SKILL mode
-      await bondingConfig.connect(owner).setAcpSkillLauncher(user1.address, true);
-      console.log("user1 authorized as AcpSkillLauncher for LAUNCH_MODE_ACP_SKILL");
+      await bondingConfig
+        .connect(owner)
+        .setAcpSkillLauncher(user1.address, true);
+      console.log(
+        "user1 authorized as AcpSkillLauncher for LAUNCH_MODE_ACP_SKILL"
+      );
     });
 
     it("Should create a token with isAcpSkillLaunch returning true", async function () {
@@ -1014,7 +1125,9 @@ describe("BondingV5", function () {
 
       const purchaseAmount = ethers.parseEther("1000");
 
-      await virtualToken.connect(user1).approve(addresses.bondingV5, purchaseAmount);
+      await virtualToken
+        .connect(user1)
+        .approve(addresses.bondingV5, purchaseAmount);
 
       const startTime = (await time.latest()) + 100;
       const tx = await bondingV5
@@ -1064,30 +1177,36 @@ describe("BondingV5", function () {
       const { owner } = accounts;
 
       // Ensure user2 is NOT authorized
-      await bondingConfig.connect(owner).setAcpSkillLauncher(user2.address, false);
+      await bondingConfig
+        .connect(owner)
+        .setAcpSkillLauncher(user2.address, false);
 
       const purchaseAmount = ethers.parseEther("1000");
 
-      await virtualToken.connect(user2).approve(addresses.bondingV5, purchaseAmount);
+      await virtualToken
+        .connect(user2)
+        .approve(addresses.bondingV5, purchaseAmount);
 
       const startTime = (await time.latest()) + 100;
 
       await expect(
-        bondingV5.connect(user2).preLaunch(
-          "Unauthorized ACP_SKILL",
-          "UACP",
-          [0, 1, 2],
-          "Test unauthorized",
-          "https://example.com/image.png",
-          ["", "", "", ""],
-          purchaseAmount,
-          startTime,
-          LAUNCH_MODE_ACP_SKILL,
-          0,
-          false,
-          ANTI_SNIPER_NONE,
-          false
-        )
+        bondingV5
+          .connect(user2)
+          .preLaunch(
+            "Unauthorized ACP_SKILL",
+            "UACP",
+            [0, 1, 2],
+            "Test unauthorized",
+            "https://example.com/image.png",
+            ["", "", "", ""],
+            purchaseAmount,
+            startTime,
+            LAUNCH_MODE_ACP_SKILL,
+            0,
+            false,
+            ANTI_SNIPER_NONE,
+            false
+          )
       ).to.be.revertedWithCustomError(bondingV5, "UnauthorizedLauncher");
     });
   });
@@ -1132,7 +1251,9 @@ describe("BondingV5", function () {
       await bondingConfig.connect(owner).setBondingCurveParams(newParams);
 
       const params = await bondingConfig.bondingCurveParams();
-      expect(params.fakeInitialVirtualLiq).to.equal(newParams.fakeInitialVirtualLiq);
+      expect(params.fakeInitialVirtualLiq).to.equal(
+        newParams.fakeInitialVirtualLiq
+      );
       expect(params.targetRealVirtual).to.equal(newParams.targetRealVirtual);
 
       // Reset to original
@@ -1154,7 +1275,10 @@ describe("BondingV5", function () {
 
       await expect(
         bondingConfig.connect(user1).setScheduledLaunchParams(newParams)
-      ).to.be.revertedWithCustomError(bondingConfig, "OwnableUnauthorizedAccount");
+      ).to.be.revertedWithCustomError(
+        bondingConfig,
+        "OwnableUnauthorizedAccount"
+      );
     });
 
     it("Should allow owner to set and revoke XLauncher", async function () {
@@ -1181,11 +1305,15 @@ describe("BondingV5", function () {
       expect(await bondingConfig.isAcpSkillLauncher(user2.address)).to.be.false;
 
       // Authorize user2
-      await bondingConfig.connect(owner).setAcpSkillLauncher(user2.address, true);
+      await bondingConfig
+        .connect(owner)
+        .setAcpSkillLauncher(user2.address, true);
       expect(await bondingConfig.isAcpSkillLauncher(user2.address)).to.be.true;
 
       // Revoke authorization
-      await bondingConfig.connect(owner).setAcpSkillLauncher(user2.address, false);
+      await bondingConfig
+        .connect(owner)
+        .setAcpSkillLauncher(user2.address, false);
       expect(await bondingConfig.isAcpSkillLauncher(user2.address)).to.be.false;
     });
   });
@@ -1197,18 +1325,27 @@ describe("BondingV5", function () {
     it("Should validate anti-sniper tax types correctly", async function () {
       const { bondingConfig } = contracts;
 
-      expect(await bondingConfig.isValidAntiSniperType(ANTI_SNIPER_NONE)).to.be.true;
-      expect(await bondingConfig.isValidAntiSniperType(ANTI_SNIPER_60S)).to.be.true;
-      expect(await bondingConfig.isValidAntiSniperType(ANTI_SNIPER_98M)).to.be.true;
+      expect(await bondingConfig.isValidAntiSniperType(ANTI_SNIPER_NONE)).to.be
+        .true;
+      expect(await bondingConfig.isValidAntiSniperType(ANTI_SNIPER_60S)).to.be
+        .true;
+      expect(await bondingConfig.isValidAntiSniperType(ANTI_SNIPER_98M)).to.be
+        .true;
       expect(await bondingConfig.isValidAntiSniperType(3)).to.be.false;
     });
 
     it("Should return correct durations for anti-sniper types", async function () {
       const { bondingConfig } = contracts;
 
-      expect(await bondingConfig.getAntiSniperDuration(ANTI_SNIPER_NONE)).to.equal(0);
-      expect(await bondingConfig.getAntiSniperDuration(ANTI_SNIPER_60S)).to.equal(60);
-      expect(await bondingConfig.getAntiSniperDuration(ANTI_SNIPER_98M)).to.equal(98 * 60);
+      expect(
+        await bondingConfig.getAntiSniperDuration(ANTI_SNIPER_NONE)
+      ).to.equal(0);
+      expect(
+        await bondingConfig.getAntiSniperDuration(ANTI_SNIPER_60S)
+      ).to.equal(60);
+      expect(
+        await bondingConfig.getAntiSniperDuration(ANTI_SNIPER_98M)
+      ).to.equal(98 * 60);
     });
 
     it("Should revert preLaunch with invalid anti-sniper type", async function () {
@@ -1216,7 +1353,9 @@ describe("BondingV5", function () {
       const { bondingV5, virtualToken } = contracts;
 
       const purchaseAmount = ethers.parseEther("1000");
-      await virtualToken.connect(user1).approve(addresses.bondingV5, purchaseAmount);
+      await virtualToken
+        .connect(user1)
+        .approve(addresses.bondingV5, purchaseAmount);
 
       const startTime = (await time.latest()) + START_TIME_DELAY + 1;
 
@@ -1233,7 +1372,7 @@ describe("BondingV5", function () {
           LAUNCH_MODE_NORMAL,
           0,
           false,
-          5,  // Invalid anti-sniper type
+          5, // Invalid anti-sniper type
           false
         )
       ).to.be.revertedWithCustomError(bondingV5, "InvalidAntiSniperType");
@@ -1244,30 +1383,45 @@ describe("BondingV5", function () {
   // Comprehensive Permutation Tests for New Configurable Options
   // ============================================
   describe("Configurable Options Permutations", function () {
-    
     describe("airdropBips Variations", function () {
       it("Should create token with 0% airdrop", async function () {
         const { user1 } = accounts;
         const { bondingV5, virtualToken } = contracts;
 
         const purchaseAmount = ethers.parseEther("1000");
-        await virtualToken.connect(user1).approve(addresses.bondingV5, purchaseAmount);
+        await virtualToken
+          .connect(user1)
+          .approve(addresses.bondingV5, purchaseAmount);
 
         const startTime = (await time.latest()) + START_TIME_DELAY + 1;
-        const tx = await bondingV5.connect(user1).preLaunch(
-          "Zero Airdrop Token", "ZAT", [0, 1], "Description",
-          "https://example.com/image.png", ["", "", "", ""],
-          purchaseAmount, startTime,
-          LAUNCH_MODE_NORMAL, 0, false, ANTI_SNIPER_60S, false
-        );
+        const tx = await bondingV5
+          .connect(user1)
+          .preLaunch(
+            "Zero Airdrop Token",
+            "ZAT",
+            [0, 1],
+            "Description",
+            "https://example.com/image.png",
+            ["", "", "", ""],
+            purchaseAmount,
+            startTime,
+            LAUNCH_MODE_NORMAL,
+            0,
+            false,
+            ANTI_SNIPER_60S,
+            false
+          );
 
         const receipt = await tx.wait();
         const event = receipt.logs.find((log) => {
-          try { return bondingV5.interface.parseLog(log)?.name === "PreLaunched"; }
-          catch (e) { return false; }
+          try {
+            return bondingV5.interface.parseLog(log)?.name === "PreLaunched";
+          } catch (e) {
+            return false;
+          }
         });
         const tokenAddress = bondingV5.interface.parseLog(event).args.token;
-        
+
         const launchParams = await bondingV5.tokenLaunchParams(tokenAddress);
         expect(launchParams.airdropBips).to.equal(0);
       });
@@ -1277,23 +1431,37 @@ describe("BondingV5", function () {
         const { bondingV5, virtualToken } = contracts;
 
         const purchaseAmount = ethers.parseEther("1000");
-        await virtualToken.connect(user1).approve(addresses.bondingV5, purchaseAmount);
+        await virtualToken
+          .connect(user1)
+          .approve(addresses.bondingV5, purchaseAmount);
 
         const startTime = (await time.latest()) + START_TIME_DELAY + 1;
         const tx = await bondingV5.connect(user1).preLaunch(
-          "Max Airdrop Token", "T5", [0, 1], "Description",
-          "https://example.com/image.png", ["", "", "", ""],
-          purchaseAmount, startTime,
-          LAUNCH_MODE_NORMAL, 500, false, ANTI_SNIPER_60S, false  // MAX_AIRDROP_BIPS = 500 (5.00%)
+          "Max Airdrop Token",
+          "T5",
+          [0, 1],
+          "Description",
+          "https://example.com/image.png",
+          ["", "", "", ""],
+          purchaseAmount,
+          startTime,
+          LAUNCH_MODE_NORMAL,
+          500,
+          false,
+          ANTI_SNIPER_60S,
+          false // MAX_AIRDROP_BIPS = 500 (5.00%)
         );
 
         const receipt = await tx.wait();
         const event = receipt.logs.find((log) => {
-          try { return bondingV5.interface.parseLog(log)?.name === "PreLaunched"; }
-          catch (e) { return false; }
+          try {
+            return bondingV5.interface.parseLog(log)?.name === "PreLaunched";
+          } catch (e) {
+            return false;
+          }
         });
         const tokenAddress = bondingV5.interface.parseLog(event).args.token;
-        
+
         const launchParams = await bondingV5.tokenLaunchParams(tokenAddress);
         expect(launchParams.airdropBips).to.equal(500);
       });
@@ -1303,23 +1471,37 @@ describe("BondingV5", function () {
         const { bondingV5, virtualToken } = contracts;
 
         const purchaseAmount = ethers.parseEther("1000");
-        await virtualToken.connect(user1).approve(addresses.bondingV5, purchaseAmount);
+        await virtualToken
+          .connect(user1)
+          .approve(addresses.bondingV5, purchaseAmount);
 
         const startTime = (await time.latest()) + START_TIME_DELAY + 1;
         const tx = await bondingV5.connect(user1).preLaunch(
-          "3% Airdrop Token", "T3", [0, 1], "Description",
-          "https://example.com/image.png", ["", "", "", ""],
-          purchaseAmount, startTime,
-          LAUNCH_MODE_NORMAL, 300, false, ANTI_SNIPER_60S, false  // 300 = 3.00%
+          "3% Airdrop Token",
+          "T3",
+          [0, 1],
+          "Description",
+          "https://example.com/image.png",
+          ["", "", "", ""],
+          purchaseAmount,
+          startTime,
+          LAUNCH_MODE_NORMAL,
+          300,
+          false,
+          ANTI_SNIPER_60S,
+          false // 300 = 3.00%
         );
 
         const receipt = await tx.wait();
         const event = receipt.logs.find((log) => {
-          try { return bondingV5.interface.parseLog(log)?.name === "PreLaunched"; }
-          catch (e) { return false; }
+          try {
+            return bondingV5.interface.parseLog(log)?.name === "PreLaunched";
+          } catch (e) {
+            return false;
+          }
         });
         const tokenAddress = bondingV5.interface.parseLog(event).args.token;
-        
+
         const launchParams = await bondingV5.tokenLaunchParams(tokenAddress);
         expect(launchParams.airdropBips).to.equal(300);
       });
@@ -1329,16 +1511,27 @@ describe("BondingV5", function () {
         const { bondingV5, virtualToken, bondingConfig } = contracts;
 
         const purchaseAmount = ethers.parseEther("1000");
-        await virtualToken.connect(user1).approve(addresses.bondingV5, purchaseAmount);
+        await virtualToken
+          .connect(user1)
+          .approve(addresses.bondingV5, purchaseAmount);
 
         const startTime = (await time.latest()) + START_TIME_DELAY + 1;
 
         await expect(
           bondingV5.connect(user1).preLaunch(
-            "Exceed Airdrop", "EXC", [0, 1], "Description",
-            "https://example.com/image.png", ["", "", "", ""],
-            purchaseAmount, startTime,
-            LAUNCH_MODE_NORMAL, 600, false, ANTI_SNIPER_60S, false  // 600 (6.00%) > MAX_AIRDROP_BIPS (500 = 5.00%)
+            "Exceed Airdrop",
+            "EXC",
+            [0, 1],
+            "Description",
+            "https://example.com/image.png",
+            ["", "", "", ""],
+            purchaseAmount,
+            startTime,
+            LAUNCH_MODE_NORMAL,
+            600,
+            false,
+            ANTI_SNIPER_60S,
+            false // 600 (6.00%) > MAX_AIRDROP_BIPS (500 = 5.00%)
           )
         ).to.be.revertedWithCustomError(bondingConfig, "AirdropBipsExceedsMax");
       });
@@ -1350,26 +1543,40 @@ describe("BondingV5", function () {
         const { bondingV5, virtualToken } = contracts;
 
         const purchaseAmount = ethers.parseEther("1000");
-        await virtualToken.connect(user1).approve(addresses.bondingV5, purchaseAmount);
+        await virtualToken
+          .connect(user1)
+          .approve(addresses.bondingV5, purchaseAmount);
 
         const feeToBalanceBefore = await virtualToken.balanceOf(owner.address);
 
         // Immediate launch with needAcf = true should charge fee
         const startTime = (await time.latest()) + 100;
         const tx = await bondingV5.connect(user1).preLaunch(
-          "ACF Token", "ACF", [0, 1], "Description",
-          "https://example.com/image.png", ["", "", "", ""],
-          purchaseAmount, startTime,
-          LAUNCH_MODE_NORMAL, 0, true, ANTI_SNIPER_60S, false  // needAcf = true
+          "ACF Token",
+          "ACF",
+          [0, 1],
+          "Description",
+          "https://example.com/image.png",
+          ["", "", "", ""],
+          purchaseAmount,
+          startTime,
+          LAUNCH_MODE_NORMAL,
+          0,
+          true,
+          ANTI_SNIPER_60S,
+          false // needAcf = true
         );
 
         const receipt = await tx.wait();
         const event = receipt.logs.find((log) => {
-          try { return bondingV5.interface.parseLog(log)?.name === "PreLaunched"; }
-          catch (e) { return false; }
+          try {
+            return bondingV5.interface.parseLog(log)?.name === "PreLaunched";
+          } catch (e) {
+            return false;
+          }
         });
         const tokenAddress = bondingV5.interface.parseLog(event).args.token;
-        
+
         const launchParams = await bondingV5.tokenLaunchParams(tokenAddress);
         expect(launchParams.needAcf).to.be.true;
 
@@ -1383,26 +1590,40 @@ describe("BondingV5", function () {
         const { bondingV5, virtualToken } = contracts;
 
         const purchaseAmount = ethers.parseEther("1000");
-        await virtualToken.connect(user1).approve(addresses.bondingV5, purchaseAmount);
+        await virtualToken
+          .connect(user1)
+          .approve(addresses.bondingV5, purchaseAmount);
 
         const feeToBalanceBefore = await virtualToken.balanceOf(owner.address);
 
         // Immediate launch without ACF should not charge fee
         const startTime = (await time.latest()) + 100;
         const tx = await bondingV5.connect(user1).preLaunch(
-          "No ACF Token", "NACF", [0, 1], "Description",
-          "https://example.com/image.png", ["", "", "", ""],
-          purchaseAmount, startTime,
-          LAUNCH_MODE_NORMAL, 0, false, ANTI_SNIPER_60S, false  // needAcf = false
+          "No ACF Token",
+          "NACF",
+          [0, 1],
+          "Description",
+          "https://example.com/image.png",
+          ["", "", "", ""],
+          purchaseAmount,
+          startTime,
+          LAUNCH_MODE_NORMAL,
+          0,
+          false,
+          ANTI_SNIPER_60S,
+          false // needAcf = false
         );
 
         const receipt = await tx.wait();
         const event = receipt.logs.find((log) => {
-          try { return bondingV5.interface.parseLog(log)?.name === "PreLaunched"; }
-          catch (e) { return false; }
+          try {
+            return bondingV5.interface.parseLog(log)?.name === "PreLaunched";
+          } catch (e) {
+            return false;
+          }
         });
         const tokenAddress = bondingV5.interface.parseLog(event).args.token;
-        
+
         const launchParams = await bondingV5.tokenLaunchParams(tokenAddress);
         expect(launchParams.needAcf).to.be.false;
 
@@ -1416,17 +1637,28 @@ describe("BondingV5", function () {
         const { bondingV5, virtualToken } = contracts;
 
         const purchaseAmount = ethers.parseEther("1000");
-        await virtualToken.connect(user1).approve(addresses.bondingV5, purchaseAmount);
+        await virtualToken
+          .connect(user1)
+          .approve(addresses.bondingV5, purchaseAmount);
 
         const startTime = (await time.latest()) + START_TIME_DELAY + 1;
 
         // needAcf = true adds 5000 (50%) reserve, so total = 500 + 5000 = 5500 = MAX_TOTAL_RESERVED_BIPS (55%)
         // This should succeed (at exact limit, not over)
         const tx = await bondingV5.connect(user1).preLaunch(
-          "ACF At Limit", "ACFL", [0, 1], "Description",
-          "https://example.com/image.png", ["", "", "", ""],
-          purchaseAmount, startTime,
-          LAUNCH_MODE_NORMAL, 500, true, ANTI_SNIPER_60S, false  // 500 (5.00%) + 5000 (50%) = 5500 (55%)
+          "ACF At Limit",
+          "ACFL",
+          [0, 1],
+          "Description",
+          "https://example.com/image.png",
+          ["", "", "", ""],
+          purchaseAmount,
+          startTime,
+          LAUNCH_MODE_NORMAL,
+          500,
+          true,
+          ANTI_SNIPER_60S,
+          false // 500 (5.00%) + 5000 (50%) = 5500 (55%)
         );
 
         const receipt = await tx.wait();
@@ -1438,22 +1670,36 @@ describe("BondingV5", function () {
         const { bondingV5, virtualToken } = contracts;
 
         const purchaseAmount = ethers.parseEther("1000");
-        await virtualToken.connect(user1).approve(addresses.bondingV5, purchaseAmount);
+        await virtualToken
+          .connect(user1)
+          .approve(addresses.bondingV5, purchaseAmount);
 
         const startTime = (await time.latest()) + START_TIME_DELAY + 1;
-        
+
         // needAcf = true adds 5000 (50%) reserve, so total = 400 + 5000 = 5400 < 5500 OK
         const tx = await bondingV5.connect(user1).preLaunch(
-          "ACF With Airdrop", "ACFA", [0, 1], "Description",
-          "https://example.com/image.png", ["", "", "", ""],
-          purchaseAmount, startTime,
-          LAUNCH_MODE_NORMAL, 400, true, ANTI_SNIPER_60S, false  // 400 (4.00%) + 5000 (50%) = 5400 (54%)
+          "ACF With Airdrop",
+          "ACFA",
+          [0, 1],
+          "Description",
+          "https://example.com/image.png",
+          ["", "", "", ""],
+          purchaseAmount,
+          startTime,
+          LAUNCH_MODE_NORMAL,
+          400,
+          true,
+          ANTI_SNIPER_60S,
+          false // 400 (4.00%) + 5000 (50%) = 5400 (54%)
         );
 
         const receipt = await tx.wait();
         const event = receipt.logs.find((log) => {
-          try { return bondingV5.interface.parseLog(log)?.name === "PreLaunched"; }
-          catch (e) { return false; }
+          try {
+            return bondingV5.interface.parseLog(log)?.name === "PreLaunched";
+          } catch (e) {
+            return false;
+          }
         });
         expect(event).to.not.be.undefined;
       });
@@ -1465,24 +1711,42 @@ describe("BondingV5", function () {
         const { bondingV5, virtualToken } = contracts;
 
         const purchaseAmount = ethers.parseEther("1000");
-        await virtualToken.connect(user1).approve(addresses.bondingV5, purchaseAmount);
+        await virtualToken
+          .connect(user1)
+          .approve(addresses.bondingV5, purchaseAmount);
 
         const startTime = (await time.latest()) + START_TIME_DELAY + 1;
-        const tx = await bondingV5.connect(user1).preLaunch(
-          "No Anti-Sniper", "NOAS", [0, 1], "Description",
-          "https://example.com/image.png", ["", "", "", ""],
-          purchaseAmount, startTime,
-          LAUNCH_MODE_NORMAL, 0, false, ANTI_SNIPER_NONE, false
-        );
+        const tx = await bondingV5
+          .connect(user1)
+          .preLaunch(
+            "No Anti-Sniper",
+            "NOAS",
+            [0, 1],
+            "Description",
+            "https://example.com/image.png",
+            ["", "", "", ""],
+            purchaseAmount,
+            startTime,
+            LAUNCH_MODE_NORMAL,
+            0,
+            false,
+            ANTI_SNIPER_NONE,
+            false
+          );
 
         const receipt = await tx.wait();
         const event = receipt.logs.find((log) => {
-          try { return bondingV5.interface.parseLog(log)?.name === "PreLaunched"; }
-          catch (e) { return false; }
+          try {
+            return bondingV5.interface.parseLog(log)?.name === "PreLaunched";
+          } catch (e) {
+            return false;
+          }
         });
         const tokenAddress = bondingV5.interface.parseLog(event).args.token;
-        
-        expect(await bondingV5.tokenAntiSniperType(tokenAddress)).to.equal(ANTI_SNIPER_NONE);
+
+        expect(await bondingV5.tokenAntiSniperType(tokenAddress)).to.equal(
+          ANTI_SNIPER_NONE
+        );
       });
 
       it("Should create token with ANTI_SNIPER_60S (60s duration)", async function () {
@@ -1490,24 +1754,42 @@ describe("BondingV5", function () {
         const { bondingV5, virtualToken } = contracts;
 
         const purchaseAmount = ethers.parseEther("1000");
-        await virtualToken.connect(user1).approve(addresses.bondingV5, purchaseAmount);
+        await virtualToken
+          .connect(user1)
+          .approve(addresses.bondingV5, purchaseAmount);
 
         const startTime = (await time.latest()) + START_TIME_DELAY + 1;
-        const tx = await bondingV5.connect(user1).preLaunch(
-          "60s Anti-Sniper", "AS60", [0, 1], "Description",
-          "https://example.com/image.png", ["", "", "", ""],
-          purchaseAmount, startTime,
-          LAUNCH_MODE_NORMAL, 0, false, ANTI_SNIPER_60S, false
-        );
+        const tx = await bondingV5
+          .connect(user1)
+          .preLaunch(
+            "60s Anti-Sniper",
+            "AS60",
+            [0, 1],
+            "Description",
+            "https://example.com/image.png",
+            ["", "", "", ""],
+            purchaseAmount,
+            startTime,
+            LAUNCH_MODE_NORMAL,
+            0,
+            false,
+            ANTI_SNIPER_60S,
+            false
+          );
 
         const receipt = await tx.wait();
         const event = receipt.logs.find((log) => {
-          try { return bondingV5.interface.parseLog(log)?.name === "PreLaunched"; }
-          catch (e) { return false; }
+          try {
+            return bondingV5.interface.parseLog(log)?.name === "PreLaunched";
+          } catch (e) {
+            return false;
+          }
         });
         const tokenAddress = bondingV5.interface.parseLog(event).args.token;
-        
-        expect(await bondingV5.tokenAntiSniperType(tokenAddress)).to.equal(ANTI_SNIPER_60S);
+
+        expect(await bondingV5.tokenAntiSniperType(tokenAddress)).to.equal(
+          ANTI_SNIPER_60S
+        );
       });
 
       it("Should create token with ANTI_SNIPER_98M (98 minutes duration)", async function () {
@@ -1515,24 +1797,42 @@ describe("BondingV5", function () {
         const { bondingV5, virtualToken } = contracts;
 
         const purchaseAmount = ethers.parseEther("1000");
-        await virtualToken.connect(user1).approve(addresses.bondingV5, purchaseAmount);
+        await virtualToken
+          .connect(user1)
+          .approve(addresses.bondingV5, purchaseAmount);
 
         const startTime = (await time.latest()) + START_TIME_DELAY + 1;
-        const tx = await bondingV5.connect(user1).preLaunch(
-          "98m Anti-Sniper", "AS98", [0, 1], "Description",
-          "https://example.com/image.png", ["", "", "", ""],
-          purchaseAmount, startTime,
-          LAUNCH_MODE_NORMAL, 0, false, ANTI_SNIPER_98M, false
-        );
+        const tx = await bondingV5
+          .connect(user1)
+          .preLaunch(
+            "98m Anti-Sniper",
+            "AS98",
+            [0, 1],
+            "Description",
+            "https://example.com/image.png",
+            ["", "", "", ""],
+            purchaseAmount,
+            startTime,
+            LAUNCH_MODE_NORMAL,
+            0,
+            false,
+            ANTI_SNIPER_98M,
+            false
+          );
 
         const receipt = await tx.wait();
         const event = receipt.logs.find((log) => {
-          try { return bondingV5.interface.parseLog(log)?.name === "PreLaunched"; }
-          catch (e) { return false; }
+          try {
+            return bondingV5.interface.parseLog(log)?.name === "PreLaunched";
+          } catch (e) {
+            return false;
+          }
         });
         const tokenAddress = bondingV5.interface.parseLog(event).args.token;
-        
-        expect(await bondingV5.tokenAntiSniperType(tokenAddress)).to.equal(ANTI_SNIPER_98M);
+
+        expect(await bondingV5.tokenAntiSniperType(tokenAddress)).to.equal(
+          ANTI_SNIPER_98M
+        );
       });
     });
 
@@ -1542,23 +1842,37 @@ describe("BondingV5", function () {
         const { bondingV5, virtualToken } = contracts;
 
         const purchaseAmount = ethers.parseEther("1000");
-        await virtualToken.connect(user1).approve(addresses.bondingV5, purchaseAmount);
+        await virtualToken
+          .connect(user1)
+          .approve(addresses.bondingV5, purchaseAmount);
 
         const startTime = (await time.latest()) + START_TIME_DELAY + 1;
         const tx = await bondingV5.connect(user1).preLaunch(
-          "Project 60days", "P60D", [0, 1], "Description",
-          "https://example.com/image.png", ["", "", "", ""],
-          purchaseAmount, startTime,
-          LAUNCH_MODE_NORMAL, 0, false, ANTI_SNIPER_60S, true  // isProject60days = true
+          "Project 60days",
+          "P60D",
+          [0, 1],
+          "Description",
+          "https://example.com/image.png",
+          ["", "", "", ""],
+          purchaseAmount,
+          startTime,
+          LAUNCH_MODE_NORMAL,
+          0,
+          false,
+          ANTI_SNIPER_60S,
+          true // isProject60days = true
         );
 
         const receipt = await tx.wait();
         const event = receipt.logs.find((log) => {
-          try { return bondingV5.interface.parseLog(log)?.name === "PreLaunched"; }
-          catch (e) { return false; }
+          try {
+            return bondingV5.interface.parseLog(log)?.name === "PreLaunched";
+          } catch (e) {
+            return false;
+          }
         });
         const tokenAddress = bondingV5.interface.parseLog(event).args.token;
-        
+
         expect(await bondingV5.isProject60days(tokenAddress)).to.be.true;
       });
 
@@ -1567,23 +1881,37 @@ describe("BondingV5", function () {
         const { bondingV5, virtualToken } = contracts;
 
         const purchaseAmount = ethers.parseEther("1000");
-        await virtualToken.connect(user1).approve(addresses.bondingV5, purchaseAmount);
+        await virtualToken
+          .connect(user1)
+          .approve(addresses.bondingV5, purchaseAmount);
 
         const startTime = (await time.latest()) + START_TIME_DELAY + 1;
         const tx = await bondingV5.connect(user1).preLaunch(
-          "Regular Project", "REG", [0, 1], "Description",
-          "https://example.com/image.png", ["", "", "", ""],
-          purchaseAmount, startTime,
-          LAUNCH_MODE_NORMAL, 0, false, ANTI_SNIPER_60S, false  // isProject60days = false
+          "Regular Project",
+          "REG",
+          [0, 1],
+          "Description",
+          "https://example.com/image.png",
+          ["", "", "", ""],
+          purchaseAmount,
+          startTime,
+          LAUNCH_MODE_NORMAL,
+          0,
+          false,
+          ANTI_SNIPER_60S,
+          false // isProject60days = false
         );
 
         const receipt = await tx.wait();
         const event = receipt.logs.find((log) => {
-          try { return bondingV5.interface.parseLog(log)?.name === "PreLaunched"; }
-          catch (e) { return false; }
+          try {
+            return bondingV5.interface.parseLog(log)?.name === "PreLaunched";
+          } catch (e) {
+            return false;
+          }
         });
         const tokenAddress = bondingV5.interface.parseLog(event).args.token;
-        
+
         expect(await bondingV5.isProject60days(tokenAddress)).to.be.false;
       });
     });
@@ -1594,18 +1922,31 @@ describe("BondingV5", function () {
         const { bondingV5, virtualToken } = contracts;
 
         const purchaseAmount = ethers.parseEther("1000");
-        await virtualToken.connect(user1).approve(addresses.bondingV5, purchaseAmount);
+        await virtualToken
+          .connect(user1)
+          .approve(addresses.bondingV5, purchaseAmount);
 
         const feeToBalanceBefore = await virtualToken.balanceOf(owner.address);
 
         // Scheduled launch (startTime > now + 24h)
         const startTime = (await time.latest()) + START_TIME_DELAY + 1;
-        const tx = await bondingV5.connect(user1).preLaunch(
-          "Scheduled Token", "SCHD", [0, 1], "Description",
-          "https://example.com/image.png", ["", "", "", ""],
-          purchaseAmount, startTime,
-          LAUNCH_MODE_NORMAL, 0, false, ANTI_SNIPER_60S, false
-        );
+        const tx = await bondingV5
+          .connect(user1)
+          .preLaunch(
+            "Scheduled Token",
+            "SCHD",
+            [0, 1],
+            "Description",
+            "https://example.com/image.png",
+            ["", "", "", ""],
+            purchaseAmount,
+            startTime,
+            LAUNCH_MODE_NORMAL,
+            0,
+            false,
+            ANTI_SNIPER_60S,
+            false
+          );
 
         const receipt = await tx.wait();
         expect(receipt).to.not.be.undefined;
@@ -1620,18 +1961,31 @@ describe("BondingV5", function () {
         const { bondingV5, virtualToken } = contracts;
 
         const purchaseAmount = ethers.parseEther("1000");
-        await virtualToken.connect(user1).approve(addresses.bondingV5, purchaseAmount);
+        await virtualToken
+          .connect(user1)
+          .approve(addresses.bondingV5, purchaseAmount);
 
         const feeToBalanceBefore = await virtualToken.balanceOf(owner.address);
 
         // Immediate launch (startTime < now + 24h)
         const startTime = (await time.latest()) + 100;
-        const tx = await bondingV5.connect(user1).preLaunch(
-          "Immediate Token", "IMMD", [0, 1], "Description",
-          "https://example.com/image.png", ["", "", "", ""],
-          purchaseAmount, startTime,
-          LAUNCH_MODE_NORMAL, 0, false, ANTI_SNIPER_60S, false
-        );
+        const tx = await bondingV5
+          .connect(user1)
+          .preLaunch(
+            "Immediate Token",
+            "IMMD",
+            [0, 1],
+            "Description",
+            "https://example.com/image.png",
+            ["", "", "", ""],
+            purchaseAmount,
+            startTime,
+            LAUNCH_MODE_NORMAL,
+            0,
+            false,
+            ANTI_SNIPER_60S,
+            false
+          );
 
         const receipt = await tx.wait();
         expect(receipt).to.not.be.undefined;
@@ -1652,7 +2006,9 @@ describe("BondingV5", function () {
       const { owner, user1 } = accounts;
 
       await bondingConfig.connect(owner).setXLauncher(user1.address, true);
-      await bondingConfig.connect(owner).setAcpSkillLauncher(user1.address, true);
+      await bondingConfig
+        .connect(owner)
+        .setAcpSkillLauncher(user1.address, true);
     });
 
     it("Should revert X_LAUNCH with non-zero airdropBips", async function () {
@@ -1660,17 +2016,30 @@ describe("BondingV5", function () {
       const { bondingV5, virtualToken } = contracts;
 
       const purchaseAmount = ethers.parseEther("1000");
-      await virtualToken.connect(user1).approve(addresses.bondingV5, purchaseAmount);
+      await virtualToken
+        .connect(user1)
+        .approve(addresses.bondingV5, purchaseAmount);
 
       const startTime = (await time.latest()) + 100;
 
       await expect(
-        bondingV5.connect(user1).preLaunch(
-          "Invalid X_LAUNCH", "INV", [0, 1], "Description",
-          "https://example.com/image.png", ["", "", "", ""],
-          purchaseAmount, startTime,
-          LAUNCH_MODE_X_LAUNCH, 5, false, ANTI_SNIPER_NONE, false
-        )
+        bondingV5
+          .connect(user1)
+          .preLaunch(
+            "Invalid X_LAUNCH",
+            "INV",
+            [0, 1],
+            "Description",
+            "https://example.com/image.png",
+            ["", "", "", ""],
+            purchaseAmount,
+            startTime,
+            LAUNCH_MODE_X_LAUNCH,
+            5,
+            false,
+            ANTI_SNIPER_NONE,
+            false
+          )
       ).to.be.revertedWithCustomError(bondingV5, "InvalidSpecialLaunchParams");
     });
 
@@ -1679,17 +2048,30 @@ describe("BondingV5", function () {
       const { bondingV5, virtualToken } = contracts;
 
       const purchaseAmount = ethers.parseEther("1000");
-      await virtualToken.connect(user1).approve(addresses.bondingV5, purchaseAmount);
+      await virtualToken
+        .connect(user1)
+        .approve(addresses.bondingV5, purchaseAmount);
 
       const startTime = (await time.latest()) + 100;
 
       await expect(
-        bondingV5.connect(user1).preLaunch(
-          "Invalid X_LAUNCH ACF", "INVA", [0, 1], "Description",
-          "https://example.com/image.png", ["", "", "", ""],
-          purchaseAmount, startTime,
-          LAUNCH_MODE_X_LAUNCH, 0, true, ANTI_SNIPER_NONE, false
-        )
+        bondingV5
+          .connect(user1)
+          .preLaunch(
+            "Invalid X_LAUNCH ACF",
+            "INVA",
+            [0, 1],
+            "Description",
+            "https://example.com/image.png",
+            ["", "", "", ""],
+            purchaseAmount,
+            startTime,
+            LAUNCH_MODE_X_LAUNCH,
+            0,
+            true,
+            ANTI_SNIPER_NONE,
+            false
+          )
       ).to.be.revertedWithCustomError(bondingV5, "InvalidSpecialLaunchParams");
     });
 
@@ -1698,17 +2080,30 @@ describe("BondingV5", function () {
       const { bondingV5, virtualToken } = contracts;
 
       const purchaseAmount = ethers.parseEther("1000");
-      await virtualToken.connect(user1).approve(addresses.bondingV5, purchaseAmount);
+      await virtualToken
+        .connect(user1)
+        .approve(addresses.bondingV5, purchaseAmount);
 
       const startTime = (await time.latest()) + 100;
 
       await expect(
-        bondingV5.connect(user1).preLaunch(
-          "Invalid X_LAUNCH AS", "INAS", [0, 1], "Description",
-          "https://example.com/image.png", ["", "", "", ""],
-          purchaseAmount, startTime,
-          LAUNCH_MODE_X_LAUNCH, 0, false, ANTI_SNIPER_60S, false
-        )
+        bondingV5
+          .connect(user1)
+          .preLaunch(
+            "Invalid X_LAUNCH AS",
+            "INAS",
+            [0, 1],
+            "Description",
+            "https://example.com/image.png",
+            ["", "", "", ""],
+            purchaseAmount,
+            startTime,
+            LAUNCH_MODE_X_LAUNCH,
+            0,
+            false,
+            ANTI_SNIPER_60S,
+            false
+          )
       ).to.be.revertedWithCustomError(bondingV5, "InvalidSpecialLaunchParams");
     });
 
@@ -1717,17 +2112,30 @@ describe("BondingV5", function () {
       const { bondingV5, virtualToken } = contracts;
 
       const purchaseAmount = ethers.parseEther("1000");
-      await virtualToken.connect(user1).approve(addresses.bondingV5, purchaseAmount);
+      await virtualToken
+        .connect(user1)
+        .approve(addresses.bondingV5, purchaseAmount);
 
       const startTime = (await time.latest()) + 100;
 
       await expect(
-        bondingV5.connect(user1).preLaunch(
-          "Invalid X_LAUNCH 60D", "IN60", [0, 1], "Description",
-          "https://example.com/image.png", ["", "", "", ""],
-          purchaseAmount, startTime,
-          LAUNCH_MODE_X_LAUNCH, 0, false, ANTI_SNIPER_NONE, true
-        )
+        bondingV5
+          .connect(user1)
+          .preLaunch(
+            "Invalid X_LAUNCH 60D",
+            "IN60",
+            [0, 1],
+            "Description",
+            "https://example.com/image.png",
+            ["", "", "", ""],
+            purchaseAmount,
+            startTime,
+            LAUNCH_MODE_X_LAUNCH,
+            0,
+            false,
+            ANTI_SNIPER_NONE,
+            true
+          )
       ).to.be.revertedWithCustomError(bondingV5, "InvalidSpecialLaunchParams");
     });
 
@@ -1736,18 +2144,31 @@ describe("BondingV5", function () {
       const { bondingV5, virtualToken } = contracts;
 
       const purchaseAmount = ethers.parseEther("1000");
-      await virtualToken.connect(user1).approve(addresses.bondingV5, purchaseAmount);
+      await virtualToken
+        .connect(user1)
+        .approve(addresses.bondingV5, purchaseAmount);
 
       // Scheduled launch (startTime >= now + 24h)
       const startTime = (await time.latest()) + START_TIME_DELAY + 1;
 
       await expect(
-        bondingV5.connect(user1).preLaunch(
-          "Scheduled X_LAUNCH", "SCHP", [0, 1], "Description",
-          "https://example.com/image.png", ["", "", "", ""],
-          purchaseAmount, startTime,
-          LAUNCH_MODE_X_LAUNCH, 0, false, ANTI_SNIPER_NONE, false
-        )
+        bondingV5
+          .connect(user1)
+          .preLaunch(
+            "Scheduled X_LAUNCH",
+            "SCHP",
+            [0, 1],
+            "Description",
+            "https://example.com/image.png",
+            ["", "", "", ""],
+            purchaseAmount,
+            startTime,
+            LAUNCH_MODE_X_LAUNCH,
+            0,
+            false,
+            ANTI_SNIPER_NONE,
+            false
+          )
       ).to.be.revertedWithCustomError(bondingV5, "InvalidSpecialLaunchParams");
     });
 
@@ -1756,17 +2177,30 @@ describe("BondingV5", function () {
       const { bondingV5, virtualToken } = contracts;
 
       const purchaseAmount = ethers.parseEther("1000");
-      await virtualToken.connect(user1).approve(addresses.bondingV5, purchaseAmount);
+      await virtualToken
+        .connect(user1)
+        .approve(addresses.bondingV5, purchaseAmount);
 
       const startTime = (await time.latest()) + 100;
 
       await expect(
-        bondingV5.connect(user1).preLaunch(
-          "Invalid ACP_SKILL", "IACP", [0, 1], "Description",
-          "https://example.com/image.png", ["", "", "", ""],
-          purchaseAmount, startTime,
-          LAUNCH_MODE_ACP_SKILL, 5, false, ANTI_SNIPER_NONE, false
-        )
+        bondingV5
+          .connect(user1)
+          .preLaunch(
+            "Invalid ACP_SKILL",
+            "IACP",
+            [0, 1],
+            "Description",
+            "https://example.com/image.png",
+            ["", "", "", ""],
+            purchaseAmount,
+            startTime,
+            LAUNCH_MODE_ACP_SKILL,
+            5,
+            false,
+            ANTI_SNIPER_NONE,
+            false
+          )
       ).to.be.revertedWithCustomError(bondingV5, "InvalidSpecialLaunchParams");
     });
 
@@ -1775,17 +2209,30 @@ describe("BondingV5", function () {
       const { bondingV5, virtualToken } = contracts;
 
       const purchaseAmount = ethers.parseEther("1000");
-      await virtualToken.connect(user1).approve(addresses.bondingV5, purchaseAmount);
+      await virtualToken
+        .connect(user1)
+        .approve(addresses.bondingV5, purchaseAmount);
 
       const startTime = (await time.latest()) + 100;
 
       await expect(
-        bondingV5.connect(user1).preLaunch(
-          "Invalid ACP_SKILL ACF", "IACF", [0, 1], "Description",
-          "https://example.com/image.png", ["", "", "", ""],
-          purchaseAmount, startTime,
-          LAUNCH_MODE_ACP_SKILL, 0, true, ANTI_SNIPER_NONE, false
-        )
+        bondingV5
+          .connect(user1)
+          .preLaunch(
+            "Invalid ACP_SKILL ACF",
+            "IACF",
+            [0, 1],
+            "Description",
+            "https://example.com/image.png",
+            ["", "", "", ""],
+            purchaseAmount,
+            startTime,
+            LAUNCH_MODE_ACP_SKILL,
+            0,
+            true,
+            ANTI_SNIPER_NONE,
+            false
+          )
       ).to.be.revertedWithCustomError(bondingV5, "InvalidSpecialLaunchParams");
     });
 
@@ -1794,17 +2241,30 @@ describe("BondingV5", function () {
       const { bondingV5, virtualToken } = contracts;
 
       const purchaseAmount = ethers.parseEther("1000");
-      await virtualToken.connect(user1).approve(addresses.bondingV5, purchaseAmount);
+      await virtualToken
+        .connect(user1)
+        .approve(addresses.bondingV5, purchaseAmount);
 
       const startTime = (await time.latest()) + 100;
 
       await expect(
-        bondingV5.connect(user1).preLaunch(
-          "Invalid ACP_SKILL AS", "IAAS", [0, 1], "Description",
-          "https://example.com/image.png", ["", "", "", ""],
-          purchaseAmount, startTime,
-          LAUNCH_MODE_ACP_SKILL, 0, false, ANTI_SNIPER_98M, false
-        )
+        bondingV5
+          .connect(user1)
+          .preLaunch(
+            "Invalid ACP_SKILL AS",
+            "IAAS",
+            [0, 1],
+            "Description",
+            "https://example.com/image.png",
+            ["", "", "", ""],
+            purchaseAmount,
+            startTime,
+            LAUNCH_MODE_ACP_SKILL,
+            0,
+            false,
+            ANTI_SNIPER_98M,
+            false
+          )
       ).to.be.revertedWithCustomError(bondingV5, "InvalidSpecialLaunchParams");
     });
 
@@ -1813,17 +2273,30 @@ describe("BondingV5", function () {
       const { bondingV5, virtualToken } = contracts;
 
       const purchaseAmount = ethers.parseEther("1000");
-      await virtualToken.connect(user1).approve(addresses.bondingV5, purchaseAmount);
+      await virtualToken
+        .connect(user1)
+        .approve(addresses.bondingV5, purchaseAmount);
 
       const startTime = (await time.latest()) + 100;
 
       await expect(
-        bondingV5.connect(user1).preLaunch(
-          "Invalid ACP_SKILL 60D", "IA60", [0, 1], "Description",
-          "https://example.com/image.png", ["", "", "", ""],
-          purchaseAmount, startTime,
-          LAUNCH_MODE_ACP_SKILL, 0, false, ANTI_SNIPER_NONE, true
-        )
+        bondingV5
+          .connect(user1)
+          .preLaunch(
+            "Invalid ACP_SKILL 60D",
+            "IA60",
+            [0, 1],
+            "Description",
+            "https://example.com/image.png",
+            ["", "", "", ""],
+            purchaseAmount,
+            startTime,
+            LAUNCH_MODE_ACP_SKILL,
+            0,
+            false,
+            ANTI_SNIPER_NONE,
+            true
+          )
       ).to.be.revertedWithCustomError(bondingV5, "InvalidSpecialLaunchParams");
     });
 
@@ -1832,18 +2305,31 @@ describe("BondingV5", function () {
       const { bondingV5, virtualToken } = contracts;
 
       const purchaseAmount = ethers.parseEther("1000");
-      await virtualToken.connect(user1).approve(addresses.bondingV5, purchaseAmount);
+      await virtualToken
+        .connect(user1)
+        .approve(addresses.bondingV5, purchaseAmount);
 
       // Scheduled launch (startTime >= now + 24h)
       const startTime = (await time.latest()) + START_TIME_DELAY + 1;
 
       await expect(
-        bondingV5.connect(user1).preLaunch(
-          "Scheduled ACP_SKILL", "SACP", [0, 1], "Description",
-          "https://example.com/image.png", ["", "", "", ""],
-          purchaseAmount, startTime,
-          LAUNCH_MODE_ACP_SKILL, 0, false, ANTI_SNIPER_NONE, false
-        )
+        bondingV5
+          .connect(user1)
+          .preLaunch(
+            "Scheduled ACP_SKILL",
+            "SACP",
+            [0, 1],
+            "Description",
+            "https://example.com/image.png",
+            ["", "", "", ""],
+            purchaseAmount,
+            startTime,
+            LAUNCH_MODE_ACP_SKILL,
+            0,
+            false,
+            ANTI_SNIPER_NONE,
+            false
+          )
       ).to.be.revertedWithCustomError(bondingV5, "InvalidSpecialLaunchParams");
     });
   });
@@ -1857,24 +2343,38 @@ describe("BondingV5", function () {
       const { bondingV5, virtualToken } = contracts;
 
       const purchaseAmount = ethers.parseEther("1000");
-      await virtualToken.connect(user1).approve(addresses.bondingV5, purchaseAmount);
+      await virtualToken
+        .connect(user1)
+        .approve(addresses.bondingV5, purchaseAmount);
 
       const startTime = (await time.latest()) + START_TIME_DELAY + 1;
       const tx = await bondingV5.connect(user1).preLaunch(
-        "Event Test Token", "EVT", [0, 1], "Description",
-        "https://example.com/image.png", ["", "", "", ""],
-        purchaseAmount, startTime,
-        LAUNCH_MODE_NORMAL, 500, false, ANTI_SNIPER_98M, true  // 500 = 5.00%
+        "Event Test Token",
+        "EVT",
+        [0, 1],
+        "Description",
+        "https://example.com/image.png",
+        ["", "", "", ""],
+        purchaseAmount,
+        startTime,
+        LAUNCH_MODE_NORMAL,
+        500,
+        false,
+        ANTI_SNIPER_98M,
+        true // 500 = 5.00%
       );
 
       const receipt = await tx.wait();
       const event = receipt.logs.find((log) => {
-        try { return bondingV5.interface.parseLog(log)?.name === "PreLaunched"; }
-        catch (e) { return false; }
+        try {
+          return bondingV5.interface.parseLog(log)?.name === "PreLaunched";
+        } catch (e) {
+          return false;
+        }
       });
-      
+
       const parsedEvent = bondingV5.interface.parseLog(event);
-      
+
       // Verify LaunchParams in event
       const launchParams = parsedEvent.args.launchParams;
       expect(launchParams.launchMode).to.equal(LAUNCH_MODE_NORMAL);
@@ -1889,20 +2389,34 @@ describe("BondingV5", function () {
       const { bondingV5, virtualToken } = contracts;
 
       const purchaseAmount = ethers.parseEther("1000");
-      await virtualToken.connect(user1).approve(addresses.bondingV5, purchaseAmount);
+      await virtualToken
+        .connect(user1)
+        .approve(addresses.bondingV5, purchaseAmount);
 
       const startTime = (await time.latest()) + START_TIME_DELAY + 1;
       let tx = await bondingV5.connect(user1).preLaunch(
-        "Launch Event Token", "LET", [0, 1], "Description",
-        "https://example.com/image.png", ["", "", "", ""],
-        purchaseAmount, startTime,
-        LAUNCH_MODE_NORMAL, 500, false, ANTI_SNIPER_60S, false  // 500 = 5.00%
+        "Launch Event Token",
+        "LET",
+        [0, 1],
+        "Description",
+        "https://example.com/image.png",
+        ["", "", "", ""],
+        purchaseAmount,
+        startTime,
+        LAUNCH_MODE_NORMAL,
+        500,
+        false,
+        ANTI_SNIPER_60S,
+        false // 500 = 5.00%
       );
 
       let receipt = await tx.wait();
       let event = receipt.logs.find((log) => {
-        try { return bondingV5.interface.parseLog(log)?.name === "PreLaunched"; }
-        catch (e) { return false; }
+        try {
+          return bondingV5.interface.parseLog(log)?.name === "PreLaunched";
+        } catch (e) {
+          return false;
+        }
       });
       const tokenAddress = bondingV5.interface.parseLog(event).args.token;
 
@@ -1912,12 +2426,15 @@ describe("BondingV5", function () {
       receipt = await tx.wait();
 
       event = receipt.logs.find((log) => {
-        try { return bondingV5.interface.parseLog(log)?.name === "Launched"; }
-        catch (e) { return false; }
+        try {
+          return bondingV5.interface.parseLog(log)?.name === "Launched";
+        } catch (e) {
+          return false;
+        }
       });
-      
+
       const parsedEvent = bondingV5.interface.parseLog(event);
-      
+
       // Verify LaunchParams in Launched event
       const launchParams = parsedEvent.args.launchParams;
       expect(launchParams.launchMode).to.equal(LAUNCH_MODE_NORMAL);
@@ -1939,35 +2456,65 @@ describe("BondingV5", function () {
       const purchaseAmount = ethers.parseEther("1000");
 
       // Token 1: 0% airdrop
-      await virtualToken.connect(user1).approve(addresses.bondingV5, purchaseAmount);
+      await virtualToken
+        .connect(user1)
+        .approve(addresses.bondingV5, purchaseAmount);
       let startTime = (await time.latest()) + START_TIME_DELAY + 1;
-      let tx = await bondingV5.connect(user1).preLaunch(
-        "0% Airdrop Grad", "G0", [0, 1], "Description",
-        "https://example.com/image.png", ["", "", "", ""],
-        purchaseAmount, startTime,
-        LAUNCH_MODE_NORMAL, 0, false, ANTI_SNIPER_60S, false
-      );
+      let tx = await bondingV5
+        .connect(user1)
+        .preLaunch(
+          "0% Airdrop Grad",
+          "G0",
+          [0, 1],
+          "Description",
+          "https://example.com/image.png",
+          ["", "", "", ""],
+          purchaseAmount,
+          startTime,
+          LAUNCH_MODE_NORMAL,
+          0,
+          false,
+          ANTI_SNIPER_60S,
+          false
+        );
       let receipt = await tx.wait();
       let event = receipt.logs.find((log) => {
-        try { return bondingV5.interface.parseLog(log)?.name === "PreLaunched"; }
-        catch (e) { return false; }
+        try {
+          return bondingV5.interface.parseLog(log)?.name === "PreLaunched";
+        } catch (e) {
+          return false;
+        }
       });
       const token1 = bondingV5.interface.parseLog(event).args.token;
       const gradThreshold1 = await bondingV5.tokenGradThreshold(token1);
 
       // Token 2: 5% airdrop (MAX_AIRDROP_BIPS = 500)
-      await virtualToken.connect(user1).approve(addresses.bondingV5, purchaseAmount);
+      await virtualToken
+        .connect(user1)
+        .approve(addresses.bondingV5, purchaseAmount);
       startTime = (await time.latest()) + START_TIME_DELAY + 1;
       tx = await bondingV5.connect(user1).preLaunch(
-        "5% Airdrop Grad", "G5", [0, 1], "Description",
-        "https://example.com/image.png", ["", "", "", ""],
-        purchaseAmount, startTime,
-        LAUNCH_MODE_NORMAL, 500, false, ANTI_SNIPER_60S, false  // 500 = 5.00%
+        "5% Airdrop Grad",
+        "G5",
+        [0, 1],
+        "Description",
+        "https://example.com/image.png",
+        ["", "", "", ""],
+        purchaseAmount,
+        startTime,
+        LAUNCH_MODE_NORMAL,
+        500,
+        false,
+        ANTI_SNIPER_60S,
+        false // 500 = 5.00%
       );
       receipt = await tx.wait();
       event = receipt.logs.find((log) => {
-        try { return bondingV5.interface.parseLog(log)?.name === "PreLaunched"; }
-        catch (e) { return false; }
+        try {
+          return bondingV5.interface.parseLog(log)?.name === "PreLaunched";
+        } catch (e) {
+          return false;
+        }
       });
       const token2 = bondingV5.interface.parseLog(event).args.token;
       const gradThreshold2 = await bondingV5.tokenGradThreshold(token2);
@@ -1985,21 +2532,37 @@ describe("BondingV5", function () {
       const purchaseAmount = ethers.parseEther("1000");
 
       // Token with ACF (adds 50% reserve) and 0% airdrop
-      await virtualToken.connect(user1).approve(addresses.bondingV5, purchaseAmount);
+      await virtualToken
+        .connect(user1)
+        .approve(addresses.bondingV5, purchaseAmount);
       const startTime = (await time.latest()) + START_TIME_DELAY + 1;
-      const tx = await bondingV5.connect(user1).preLaunch(
-        "ACF Token Grad", "GACF", [0, 1], "Description",
-        "https://example.com/image.png", ["", "", "", ""],
-        purchaseAmount, startTime,
-        LAUNCH_MODE_NORMAL, 0, true, ANTI_SNIPER_60S, false
-      );
+      const tx = await bondingV5
+        .connect(user1)
+        .preLaunch(
+          "ACF Token Grad",
+          "GACF",
+          [0, 1],
+          "Description",
+          "https://example.com/image.png",
+          ["", "", "", ""],
+          purchaseAmount,
+          startTime,
+          LAUNCH_MODE_NORMAL,
+          0,
+          true,
+          ANTI_SNIPER_60S,
+          false
+        );
       const receipt = await tx.wait();
       const event = receipt.logs.find((log) => {
-        try { return bondingV5.interface.parseLog(log)?.name === "PreLaunched"; }
-        catch (e) { return false; }
+        try {
+          return bondingV5.interface.parseLog(log)?.name === "PreLaunched";
+        } catch (e) {
+          return false;
+        }
       });
       const tokenAddress = bondingV5.interface.parseLog(event).args.token;
-      
+
       const gradThreshold = await bondingV5.tokenGradThreshold(tokenAddress);
       expect(gradThreshold).to.be.greaterThan(0);
     });
@@ -2014,17 +2577,27 @@ describe("BondingV5", function () {
       const { bondingV5, virtualToken } = contracts;
 
       const purchaseAmount = ethers.parseEther("1000");
-      await virtualToken.connect(user1).approve(addresses.bondingV5, purchaseAmount);
+      await virtualToken
+        .connect(user1)
+        .approve(addresses.bondingV5, purchaseAmount);
 
       const startTime = (await time.latest()) + START_TIME_DELAY + 1;
 
       await expect(
         bondingV5.connect(user1).preLaunch(
-          "Invalid Mode", "INV", [0, 1], "Description",
-          "https://example.com/image.png", ["", "", "", ""],
-          purchaseAmount, startTime,
-          3,  // Invalid launch mode
-          0, false, ANTI_SNIPER_60S, false
+          "Invalid Mode",
+          "INV",
+          [0, 1],
+          "Description",
+          "https://example.com/image.png",
+          ["", "", "", ""],
+          purchaseAmount,
+          startTime,
+          3, // Invalid launch mode
+          0,
+          false,
+          ANTI_SNIPER_60S,
+          false
         )
       ).to.be.revertedWithCustomError(bondingV5, "LaunchModeNotEnabled");
     });
@@ -2034,16 +2607,27 @@ describe("BondingV5", function () {
       const { bondingV5, virtualToken } = contracts;
 
       const purchaseAmount = ethers.parseEther("1000");
-      await virtualToken.connect(user1).approve(addresses.bondingV5, purchaseAmount);
+      await virtualToken
+        .connect(user1)
+        .approve(addresses.bondingV5, purchaseAmount);
 
       const startTime = (await time.latest()) + START_TIME_DELAY + 1;
-      
+
       // needAcf (5000 = 50%) + 400 (4%) = 5400 (54%) should work (just under 5500 = 55% limit)
       const tx = await bondingV5.connect(user1).preLaunch(
-        "Boundary Test", "BNDY", [0, 1], "Description",
-        "https://example.com/image.png", ["", "", "", ""],
-        purchaseAmount, startTime,
-        LAUNCH_MODE_NORMAL, 400, true, ANTI_SNIPER_60S, false  // 400 = 4.00%
+        "Boundary Test",
+        "BNDY",
+        [0, 1],
+        "Description",
+        "https://example.com/image.png",
+        ["", "", "", ""],
+        purchaseAmount,
+        startTime,
+        LAUNCH_MODE_NORMAL,
+        400,
+        true,
+        ANTI_SNIPER_60S,
+        false // 400 = 4.00%
       );
 
       const receipt = await tx.wait();
@@ -2055,16 +2639,27 @@ describe("BondingV5", function () {
       const { bondingV5, virtualToken } = contracts;
 
       const purchaseAmount = ethers.parseEther("1000");
-      await virtualToken.connect(user1).approve(addresses.bondingV5, purchaseAmount);
+      await virtualToken
+        .connect(user1)
+        .approve(addresses.bondingV5, purchaseAmount);
 
       const startTime = (await time.latest()) + START_TIME_DELAY + 1;
 
       // needAcf (5000 = 50%) + 500 (5%) = 5500 (55%) should succeed (at exact limit)
       const tx = await bondingV5.connect(user1).preLaunch(
-        "At Limit", "ATLIM", [0, 1], "Description",
-        "https://example.com/image.png", ["", "", "", ""],
-        purchaseAmount, startTime,
-        LAUNCH_MODE_NORMAL, 500, true, ANTI_SNIPER_60S, false  // 500 = 5.00%
+        "At Limit",
+        "ATLIM",
+        [0, 1],
+        "Description",
+        "https://example.com/image.png",
+        ["", "", "", ""],
+        purchaseAmount,
+        startTime,
+        LAUNCH_MODE_NORMAL,
+        500,
+        true,
+        ANTI_SNIPER_60S,
+        false // 500 = 5.00%
       );
 
       const receipt = await tx.wait();
@@ -2076,24 +2671,40 @@ describe("BondingV5", function () {
       const { bondingV5, virtualToken } = contracts;
 
       const purchaseAmount = ethers.parseEther("1000");
-      await virtualToken.connect(user1).approve(addresses.bondingV5, purchaseAmount);
+      await virtualToken
+        .connect(user1)
+        .approve(addresses.bondingV5, purchaseAmount);
 
       const startTime = (await time.latest()) + START_TIME_DELAY + 1;
-      
-      const tx = await bondingV5.connect(user1).preLaunch(
-        "ACF Only", "ACFO", [0, 1], "Description",
-        "https://example.com/image.png", ["", "", "", ""],
-        purchaseAmount, startTime,
-        LAUNCH_MODE_NORMAL, 0, true, ANTI_SNIPER_60S, false
-      );
+
+      const tx = await bondingV5
+        .connect(user1)
+        .preLaunch(
+          "ACF Only",
+          "ACFO",
+          [0, 1],
+          "Description",
+          "https://example.com/image.png",
+          ["", "", "", ""],
+          purchaseAmount,
+          startTime,
+          LAUNCH_MODE_NORMAL,
+          0,
+          true,
+          ANTI_SNIPER_60S,
+          false
+        );
 
       const receipt = await tx.wait();
       const event = receipt.logs.find((log) => {
-        try { return bondingV5.interface.parseLog(log)?.name === "PreLaunched"; }
-        catch (e) { return false; }
+        try {
+          return bondingV5.interface.parseLog(log)?.name === "PreLaunched";
+        } catch (e) {
+          return false;
+        }
       });
       const tokenAddress = bondingV5.interface.parseLog(event).args.token;
-      
+
       const launchParams = await bondingV5.tokenLaunchParams(tokenAddress);
       expect(launchParams.needAcf).to.be.true;
       expect(launchParams.airdropBips).to.equal(0);
@@ -2104,16 +2715,27 @@ describe("BondingV5", function () {
       const { bondingV5, virtualToken } = contracts;
 
       const purchaseAmount = ethers.parseEther("1000");
-      await virtualToken.connect(user1).approve(addresses.bondingV5, purchaseAmount);
+      await virtualToken
+        .connect(user1)
+        .approve(addresses.bondingV5, purchaseAmount);
 
       const startTime = (await time.latest()) + START_TIME_DELAY + 1;
-      
+
       // 400 (4%) + 5000 (50% ACF) = 5400 (54%) < 5500 (55%) limit
       const tx = await bondingV5.connect(user1).preLaunch(
-        "Max ACF Combo", "MXAC", [0, 1], "Description",
-        "https://example.com/image.png", ["", "", "", ""],
-        purchaseAmount, startTime,
-        LAUNCH_MODE_NORMAL, 400, true, ANTI_SNIPER_60S, false  // 400 = 4.00%
+        "Max ACF Combo",
+        "MXAC",
+        [0, 1],
+        "Description",
+        "https://example.com/image.png",
+        ["", "", "", ""],
+        purchaseAmount,
+        startTime,
+        LAUNCH_MODE_NORMAL,
+        400,
+        true,
+        ANTI_SNIPER_60S,
+        false // 400 = 4.00%
       );
 
       const receipt = await tx.wait();
@@ -2125,16 +2747,27 @@ describe("BondingV5", function () {
       const { bondingV5, virtualToken } = contracts;
 
       const purchaseAmount = ethers.parseEther("1000");
-      await virtualToken.connect(user1).approve(addresses.bondingV5, purchaseAmount);
+      await virtualToken
+        .connect(user1)
+        .approve(addresses.bondingV5, purchaseAmount);
 
       const startTime = (await time.latest()) + START_TIME_DELAY + 1;
 
       // 500 (5%) + 5000 (50% ACF) = 5500 (55%) = 5500 (55%) limit - should be allowed at exact boundary
       const tx = await bondingV5.connect(user1).preLaunch(
-        "At ACF Combo Limit", "ATLM", [0, 1], "Description",
-        "https://example.com/image.png", ["", "", "", ""],
-        purchaseAmount, startTime,
-        LAUNCH_MODE_NORMAL, 500, true, ANTI_SNIPER_60S, false  // 500 = 5.00%
+        "At ACF Combo Limit",
+        "ATLM",
+        [0, 1],
+        "Description",
+        "https://example.com/image.png",
+        ["", "", "", ""],
+        purchaseAmount,
+        startTime,
+        LAUNCH_MODE_NORMAL,
+        500,
+        true,
+        ANTI_SNIPER_60S,
+        false // 500 = 5.00%
       );
 
       const receipt = await tx.wait();
@@ -2146,17 +2779,28 @@ describe("BondingV5", function () {
       const { bondingV5, virtualToken, bondingConfig } = contracts;
 
       const purchaseAmount = ethers.parseEther("1000");
-      await virtualToken.connect(user1).approve(addresses.bondingV5, purchaseAmount);
+      await virtualToken
+        .connect(user1)
+        .approve(addresses.bondingV5, purchaseAmount);
 
       const startTime = (await time.latest()) + START_TIME_DELAY + 1;
 
       // 600 (6%) > 500 (5%) maxAirdropBips - should revert with AirdropBipsExceedsMax
       await expect(
         bondingV5.connect(user1).preLaunch(
-          "Over Airdrop", "OVAD", [0, 1], "Description",
-          "https://example.com/image.png", ["", "", "", ""],
-          purchaseAmount, startTime,
-          LAUNCH_MODE_NORMAL, 600, false, ANTI_SNIPER_60S, false  // 600 = 6.00% > 5% max
+          "Over Airdrop",
+          "OVAD",
+          [0, 1],
+          "Description",
+          "https://example.com/image.png",
+          ["", "", "", ""],
+          purchaseAmount,
+          startTime,
+          LAUNCH_MODE_NORMAL,
+          600,
+          false,
+          ANTI_SNIPER_60S,
+          false // 600 = 6.00% > 5% max
         )
       ).to.be.revertedWithCustomError(bondingConfig, "AirdropBipsExceedsMax");
     });
@@ -2171,23 +2815,39 @@ describe("BondingV5", function () {
       const { bondingV5, virtualToken } = contracts;
 
       const purchaseAmount = ethers.parseEther("1000");
-      await virtualToken.connect(user1).approve(addresses.bondingV5, purchaseAmount);
+      await virtualToken
+        .connect(user1)
+        .approve(addresses.bondingV5, purchaseAmount);
 
       const startTime = (await time.latest()) + START_TIME_DELAY + 1;
-      const tx = await bondingV5.connect(user1).preLaunch(
-        "Default Params", "DFLT", [0, 1], "Description",
-        "https://example.com/image.png", ["", "", "", ""],
-        purchaseAmount, startTime,
-        LAUNCH_MODE_NORMAL, 0, false, ANTI_SNIPER_NONE, false
-      );
+      const tx = await bondingV5
+        .connect(user1)
+        .preLaunch(
+          "Default Params",
+          "DFLT",
+          [0, 1],
+          "Description",
+          "https://example.com/image.png",
+          ["", "", "", ""],
+          purchaseAmount,
+          startTime,
+          LAUNCH_MODE_NORMAL,
+          0,
+          false,
+          ANTI_SNIPER_NONE,
+          false
+        );
 
       const receipt = await tx.wait();
       const event = receipt.logs.find((log) => {
-        try { return bondingV5.interface.parseLog(log)?.name === "PreLaunched"; }
-        catch (e) { return false; }
+        try {
+          return bondingV5.interface.parseLog(log)?.name === "PreLaunched";
+        } catch (e) {
+          return false;
+        }
       });
       const tokenAddress = bondingV5.interface.parseLog(event).args.token;
-      
+
       const launchParams = await bondingV5.tokenLaunchParams(tokenAddress);
       expect(launchParams.launchMode).to.equal(LAUNCH_MODE_NORMAL);
       expect(launchParams.airdropBips).to.equal(0);
@@ -2201,23 +2861,37 @@ describe("BondingV5", function () {
       const { bondingV5, virtualToken } = contracts;
 
       const purchaseAmount = ethers.parseEther("1000");
-      await virtualToken.connect(user1).approve(addresses.bondingV5, purchaseAmount);
+      await virtualToken
+        .connect(user1)
+        .approve(addresses.bondingV5, purchaseAmount);
 
       const startTime = (await time.latest()) + START_TIME_DELAY + 1;
       const tx = await bondingV5.connect(user1).preLaunch(
-        "Max Params", "MAXP", [0, 1], "Description",
-        "https://example.com/image.png", ["", "", "", ""],
-        purchaseAmount, startTime,
-        LAUNCH_MODE_NORMAL, 500, false, ANTI_SNIPER_98M, true  // MAX_AIRDROP_BIPS = 500 (5.00%)
+        "Max Params",
+        "MAXP",
+        [0, 1],
+        "Description",
+        "https://example.com/image.png",
+        ["", "", "", ""],
+        purchaseAmount,
+        startTime,
+        LAUNCH_MODE_NORMAL,
+        500,
+        false,
+        ANTI_SNIPER_98M,
+        true // MAX_AIRDROP_BIPS = 500 (5.00%)
       );
 
       const receipt = await tx.wait();
       const event = receipt.logs.find((log) => {
-        try { return bondingV5.interface.parseLog(log)?.name === "PreLaunched"; }
-        catch (e) { return false; }
+        try {
+          return bondingV5.interface.parseLog(log)?.name === "PreLaunched";
+        } catch (e) {
+          return false;
+        }
       });
       const tokenAddress = bondingV5.interface.parseLog(event).args.token;
-      
+
       const launchParams = await bondingV5.tokenLaunchParams(tokenAddress);
       expect(launchParams.airdropBips).to.equal(500);
       expect(launchParams.antiSniperTaxType).to.equal(ANTI_SNIPER_98M);
@@ -2233,29 +2907,70 @@ describe("BondingV5", function () {
 
       // Test matrix of parameter combinations (airdrop values <= MAX_AIRDROP_BIPS = 500)
       const testCases = [
-        { airdrop: 0, needAcf: false, antiSniper: ANTI_SNIPER_NONE, is60days: false },
-        { airdrop: 300, needAcf: false, antiSniper: ANTI_SNIPER_60S, is60days: true },  // 300 = 3.00%
-        { airdrop: 500, needAcf: false, antiSniper: ANTI_SNIPER_98M, is60days: false }, // 500 = 5.00%
-        { airdrop: 0, needAcf: true, antiSniper: ANTI_SNIPER_60S, is60days: false },
-        { airdrop: 400, needAcf: true, antiSniper: ANTI_SNIPER_98M, is60days: true },   // 400 = 4.00%
+        {
+          airdrop: 0,
+          needAcf: false,
+          antiSniper: ANTI_SNIPER_NONE,
+          is60days: false,
+        },
+        {
+          airdrop: 300,
+          needAcf: false,
+          antiSniper: ANTI_SNIPER_60S,
+          is60days: true,
+        }, // 300 = 3.00%
+        {
+          airdrop: 500,
+          needAcf: false,
+          antiSniper: ANTI_SNIPER_98M,
+          is60days: false,
+        }, // 500 = 5.00%
+        {
+          airdrop: 0,
+          needAcf: true,
+          antiSniper: ANTI_SNIPER_60S,
+          is60days: false,
+        },
+        {
+          airdrop: 400,
+          needAcf: true,
+          antiSniper: ANTI_SNIPER_98M,
+          is60days: true,
+        }, // 400 = 4.00%
       ];
 
       for (let i = 0; i < testCases.length; i++) {
         const tc = testCases[i];
-        await virtualToken.connect(user1).approve(addresses.bondingV5, purchaseAmount);
+        await virtualToken
+          .connect(user1)
+          .approve(addresses.bondingV5, purchaseAmount);
         const startTime = (await time.latest()) + START_TIME_DELAY + 1;
-        
-        const tx = await bondingV5.connect(user1).preLaunch(
-          `Combo Token ${i}`, `CMB${i}`, [0, 1], "Description",
-          "https://example.com/image.png", ["", "", "", ""],
-          purchaseAmount, startTime,
-          LAUNCH_MODE_NORMAL, tc.airdrop, tc.needAcf, tc.antiSniper, tc.is60days
-        );
+
+        const tx = await bondingV5
+          .connect(user1)
+          .preLaunch(
+            `Combo Token ${i}`,
+            `CMB${i}`,
+            [0, 1],
+            "Description",
+            "https://example.com/image.png",
+            ["", "", "", ""],
+            purchaseAmount,
+            startTime,
+            LAUNCH_MODE_NORMAL,
+            tc.airdrop,
+            tc.needAcf,
+            tc.antiSniper,
+            tc.is60days
+          );
 
         const receipt = await tx.wait();
         const event = receipt.logs.find((log) => {
-          try { return bondingV5.interface.parseLog(log)?.name === "PreLaunched"; }
-          catch (e) { return false; }
+          try {
+            return bondingV5.interface.parseLog(log)?.name === "PreLaunched";
+          } catch (e) {
+            return false;
+          }
         });
         const tokenAddress = bondingV5.interface.parseLog(event).args.token;
         tokens.push(tokenAddress);
@@ -2282,20 +2997,34 @@ describe("BondingV5", function () {
       const { bondingV5, virtualToken } = contracts;
 
       const purchaseAmount = ethers.parseEther("1000");
-      await virtualToken.connect(user1).approve(addresses.bondingV5, purchaseAmount);
+      await virtualToken
+        .connect(user1)
+        .approve(addresses.bondingV5, purchaseAmount);
 
       const startTime = (await time.latest()) + START_TIME_DELAY + 1;
       const tx = await bondingV5.connect(user1).preLaunch(
-        "Regression Token", "REGT", [0, 1, 2], "A regression test token",
-        "https://example.com/image.png", ["url1", "url2", "url3", "url4"],
-        purchaseAmount, startTime,
-        LAUNCH_MODE_NORMAL, 500, false, ANTI_SNIPER_60S, true  // 500 = 5.00%
+        "Regression Token",
+        "REGT",
+        [0, 1, 2],
+        "A regression test token",
+        "https://example.com/image.png",
+        ["url1", "url2", "url3", "url4"],
+        purchaseAmount,
+        startTime,
+        LAUNCH_MODE_NORMAL,
+        500,
+        false,
+        ANTI_SNIPER_60S,
+        true // 500 = 5.00%
       );
 
       const receipt = await tx.wait();
       const event = receipt.logs.find((log) => {
-        try { return bondingV5.interface.parseLog(log)?.name === "PreLaunched"; }
-        catch (e) { return false; }
+        try {
+          return bondingV5.interface.parseLog(log)?.name === "PreLaunched";
+        } catch (e) {
+          return false;
+        }
       });
       const tokenAddress = bondingV5.interface.parseLog(event).args.token;
 
@@ -2304,8 +3033,8 @@ describe("BondingV5", function () {
       expect(tokenInfo.creator).to.equal(user1.address);
       expect(tokenInfo.description).to.equal("A regression test token");
       expect(tokenInfo.image).to.equal("https://example.com/image.png");
-      expect(tokenInfo.trading).to.be.true;  // Bonding curve trading is active after preLaunch
-      expect(tokenInfo.launchExecuted).to.be.false;  // Launch() not yet called
+      expect(tokenInfo.trading).to.be.true; // Bonding curve trading is active after preLaunch
+      expect(tokenInfo.launchExecuted).to.be.false; // Launch() not yet called
     });
 
     it("Should correctly transition from preLaunch to launch", async function () {
@@ -2313,27 +3042,43 @@ describe("BondingV5", function () {
       const { bondingV5, virtualToken } = contracts;
 
       const purchaseAmount = ethers.parseEther("1000");
-      await virtualToken.connect(user1).approve(addresses.bondingV5, purchaseAmount);
+      await virtualToken
+        .connect(user1)
+        .approve(addresses.bondingV5, purchaseAmount);
 
       const startTime = (await time.latest()) + START_TIME_DELAY + 1;
-      const tx = await bondingV5.connect(user1).preLaunch(
-        "Transition Token", "TRAN", [0, 1], "Description",
-        "https://example.com/image.png", ["", "", "", ""],
-        purchaseAmount, startTime,
-        LAUNCH_MODE_NORMAL, 0, false, ANTI_SNIPER_60S, false
-      );
+      const tx = await bondingV5
+        .connect(user1)
+        .preLaunch(
+          "Transition Token",
+          "TRAN",
+          [0, 1],
+          "Description",
+          "https://example.com/image.png",
+          ["", "", "", ""],
+          purchaseAmount,
+          startTime,
+          LAUNCH_MODE_NORMAL,
+          0,
+          false,
+          ANTI_SNIPER_60S,
+          false
+        );
 
       const receipt = await tx.wait();
       const event = receipt.logs.find((log) => {
-        try { return bondingV5.interface.parseLog(log)?.name === "PreLaunched"; }
-        catch (e) { return false; }
+        try {
+          return bondingV5.interface.parseLog(log)?.name === "PreLaunched";
+        } catch (e) {
+          return false;
+        }
       });
       const tokenAddress = bondingV5.interface.parseLog(event).args.token;
 
       // Check state after preLaunch (before launch() call)
       let tokenInfo = await bondingV5.tokenInfo(tokenAddress);
-      expect(tokenInfo.trading).to.be.true;  // Bonding curve trading active
-      expect(tokenInfo.launchExecuted).to.be.false;  // launch() not yet called
+      expect(tokenInfo.trading).to.be.true; // Bonding curve trading active
+      expect(tokenInfo.launchExecuted).to.be.false; // launch() not yet called
 
       // Wait and call launch()
       await time.increase(START_TIME_DELAY + 1);
@@ -2341,8 +3086,8 @@ describe("BondingV5", function () {
 
       // Check state after launch()
       tokenInfo = await bondingV5.tokenInfo(tokenAddress);
-      expect(tokenInfo.trading).to.be.true;  // Still trading on bonding curve
-      expect(tokenInfo.launchExecuted).to.be.true;  // Launch executed
+      expect(tokenInfo.trading).to.be.true; // Still trading on bonding curve
+      expect(tokenInfo.launchExecuted).to.be.true; // Launch executed
     });
 
     it("Should preserve launch params after launch", async function () {
@@ -2350,20 +3095,34 @@ describe("BondingV5", function () {
       const { bondingV5, virtualToken } = contracts;
 
       const purchaseAmount = ethers.parseEther("1000");
-      await virtualToken.connect(user1).approve(addresses.bondingV5, purchaseAmount);
+      await virtualToken
+        .connect(user1)
+        .approve(addresses.bondingV5, purchaseAmount);
 
       const startTime = (await time.latest()) + START_TIME_DELAY + 1;
       const tx = await bondingV5.connect(user1).preLaunch(
-        "Preserve Token", "PRSV", [0, 1], "Description",
-        "https://example.com/image.png", ["", "", "", ""],
-        purchaseAmount, startTime,
-        LAUNCH_MODE_NORMAL, 500, false, ANTI_SNIPER_98M, true  // 500 = 5.00%
+        "Preserve Token",
+        "PRSV",
+        [0, 1],
+        "Description",
+        "https://example.com/image.png",
+        ["", "", "", ""],
+        purchaseAmount,
+        startTime,
+        LAUNCH_MODE_NORMAL,
+        500,
+        false,
+        ANTI_SNIPER_98M,
+        true // 500 = 5.00%
       );
 
       const receipt = await tx.wait();
       const event = receipt.logs.find((log) => {
-        try { return bondingV5.interface.parseLog(log)?.name === "PreLaunched"; }
-        catch (e) { return false; }
+        try {
+          return bondingV5.interface.parseLog(log)?.name === "PreLaunched";
+        } catch (e) {
+          return false;
+        }
       });
       const tokenAddress = bondingV5.interface.parseLog(event).args.token;
 
@@ -2392,7 +3151,9 @@ describe("BondingV5", function () {
       const { bondingV5, virtualToken } = contracts;
 
       const purchaseAmount = ethers.parseEther("1000");
-      await virtualToken.connect(user1).approve(addresses.bondingV5, purchaseAmount);
+      await virtualToken
+        .connect(user1)
+        .approve(addresses.bondingV5, purchaseAmount);
 
       const startTime = (await time.latest()) + START_TIME_DELAY + 1;
       const tx = await bondingV5
@@ -2508,7 +3269,9 @@ describe("BondingV5", function () {
       const { bondingV5, virtualToken } = contracts;
 
       const purchaseAmount = ethers.parseEther("1000");
-      await virtualToken.connect(user1).approve(addresses.bondingV5, purchaseAmount);
+      await virtualToken
+        .connect(user1)
+        .approve(addresses.bondingV5, purchaseAmount);
 
       // Create a scheduled launch
       const startTime = (await time.latest()) + START_TIME_DELAY + 1;
@@ -2557,12 +3320,9 @@ describe("BondingV5", function () {
       await virtualToken.connect(user2).approve(addresses.fRouterV2, buyAmount);
 
       await expect(
-        bondingV5.connect(user2).buy(
-          buyAmount,
-          tokenAddress,
-          0,
-          (await time.latest()) + 300
-        )
+        bondingV5
+          .connect(user2)
+          .buy(buyAmount, tokenAddress, 0, (await time.latest()) + 300)
       ).to.be.revertedWithCustomError(bondingV5, "InvalidTokenStatus");
     });
 
@@ -2571,7 +3331,9 @@ describe("BondingV5", function () {
       const { bondingV5, virtualToken } = contracts;
 
       const purchaseAmount = ethers.parseEther("1000");
-      await virtualToken.connect(user1).approve(addresses.bondingV5, purchaseAmount);
+      await virtualToken
+        .connect(user1)
+        .approve(addresses.bondingV5, purchaseAmount);
 
       // Create a scheduled launch with 60s anti-sniper
       const startTime = (await time.latest()) + START_TIME_DELAY + 1;
@@ -2617,12 +3379,9 @@ describe("BondingV5", function () {
       await virtualToken.connect(user2).approve(addresses.fRouterV2, buyAmount);
 
       await expect(
-        bondingV5.connect(user2).buy(
-          buyAmount,
-          tokenAddress,
-          0,
-          (await time.latest()) + 300
-        )
+        bondingV5
+          .connect(user2)
+          .buy(buyAmount, tokenAddress, 0, (await time.latest()) + 300)
       ).to.be.revertedWithCustomError(bondingV5, "InvalidTokenStatus");
     });
   });
@@ -2643,23 +3402,45 @@ describe("BondingV5", function () {
           INITIAL_SUPPLY,
           owner.address,
           owner.address,
-          { maxAirdropBips: MAX_AIRDROP_BIPS, maxTotalReservedBips: MAX_TOTAL_RESERVED_BIPS, acfReservedBips: ACF_RESERVED_BIPS },
-          { startTimeDelay: START_TIME_DELAY, normalLaunchFee: NORMAL_LAUNCH_FEE, acfFee: ACF_FEE },
-          { tbaSalt: TBA_SALT, tbaImplementation: TBA_IMPLEMENTATION, daoVotingPeriod: DAO_VOTING_PERIOD, daoThreshold: DAO_THRESHOLD },
-          { fakeInitialVirtualLiq: FAKE_INITIAL_VIRTUAL_LIQ, targetRealVirtual: TARGET_REAL_VIRTUAL },
+          {
+            maxAirdropBips: MAX_AIRDROP_BIPS,
+            maxTotalReservedBips: MAX_TOTAL_RESERVED_BIPS,
+            acfReservedBips: ACF_RESERVED_BIPS,
+          },
+          {
+            startTimeDelay: START_TIME_DELAY,
+            normalLaunchFee: NORMAL_LAUNCH_FEE,
+            acfFee: ACF_FEE,
+          },
+          {
+            tbaSalt: TBA_SALT,
+            tbaImplementation: TBA_IMPLEMENTATION,
+            daoVotingPeriod: DAO_VOTING_PERIOD,
+            daoThreshold: DAO_THRESHOLD,
+          },
+          {
+            fakeInitialVirtualLiq: FAKE_INITIAL_VIRTUAL_LIQ,
+            targetRealVirtual: TARGET_REAL_VIRTUAL,
+          },
         ],
         { initializer: "initialize" }
       );
       await newBondingConfig.waitForDeployment();
 
       // Update BondingConfig
-      await bondingV5.connect(owner).setBondingConfig(await newBondingConfig.getAddress());
+      await bondingV5
+        .connect(owner)
+        .setBondingConfig(await newBondingConfig.getAddress());
 
       // Verify the update
-      expect(await bondingV5.bondingConfig()).to.equal(await newBondingConfig.getAddress());
+      expect(await bondingV5.bondingConfig()).to.equal(
+        await newBondingConfig.getAddress()
+      );
 
       // Reset to original
-      await bondingV5.connect(owner).setBondingConfig(await bondingConfig.getAddress());
+      await bondingV5
+        .connect(owner)
+        .setBondingConfig(await bondingConfig.getAddress());
     });
 
     it("Should revert if non-owner tries to update BondingConfig", async function () {
@@ -2683,26 +3464,26 @@ describe("BondingV5", function () {
       const { bondingV5, virtualToken } = contracts;
 
       const purchaseAmount = ethers.parseEther("1000");
-      await virtualToken.connect(user1).approve(addresses.bondingV5, purchaseAmount);
+      await virtualToken
+        .connect(user1)
+        .approve(addresses.bondingV5, purchaseAmount);
 
       const startTime = (await time.latest()) + START_TIME_DELAY + 1;
-      const tx = await bondingV5
-        .connect(user1)
-        .preLaunch(
-          "View Test Token",
-          "VTT",
-          [0, 1, 2],
-          "Test token for view functions",
-          "https://example.com/image.png",
-          ["", "", "", ""],
-          purchaseAmount,
-          startTime,
-          LAUNCH_MODE_NORMAL,
-          300,  // 300 = 3.00%
-          true,
-          ANTI_SNIPER_98M,
-          true
-        );
+      const tx = await bondingV5.connect(user1).preLaunch(
+        "View Test Token",
+        "VTT",
+        [0, 1, 2],
+        "Test token for view functions",
+        "https://example.com/image.png",
+        ["", "", "", ""],
+        purchaseAmount,
+        startTime,
+        LAUNCH_MODE_NORMAL,
+        300, // 300 = 3.00%
+        true,
+        ANTI_SNIPER_98M,
+        true
+      );
 
       const receipt = await tx.wait();
       const event = receipt.logs.find((log) => {
@@ -2734,7 +3515,9 @@ describe("BondingV5", function () {
 
     it("Should return correct tokenAntiSniperType value", async function () {
       const { bondingV5 } = contracts;
-      expect(await bondingV5.tokenAntiSniperType(tokenAddress)).to.equal(ANTI_SNIPER_98M);
+      expect(await bondingV5.tokenAntiSniperType(tokenAddress)).to.equal(
+        ANTI_SNIPER_98M
+      );
     });
 
     it("Should revert tokenAntiSniperType for non-BondingV5 token", async function () {
@@ -2742,7 +3525,7 @@ describe("BondingV5", function () {
 
       // Use a random address that doesn't exist as a token
       const randomAddress = ethers.Wallet.createRandom().address;
-      
+
       await expect(
         bondingV5.tokenAntiSniperType(randomAddress)
       ).to.be.revertedWithCustomError(bondingV5, "InvalidTokenStatus");
@@ -2759,7 +3542,7 @@ describe("BondingV5", function () {
       const { bondingV5 } = contracts;
 
       const tokenInfo = await bondingV5.tokenInfo(tokenAddress);
-      
+
       expect(tokenInfo.creator).to.equal(user1.address);
       expect(tokenInfo.token).to.equal(tokenAddress);
       expect(tokenInfo.pair).to.not.equal(ethers.ZeroAddress);
@@ -2772,9 +3555,9 @@ describe("BondingV5", function () {
       const { bondingV5 } = contracts;
 
       const launchParams = await bondingV5.tokenLaunchParams(tokenAddress);
-      
+
       expect(launchParams.launchMode).to.equal(LAUNCH_MODE_NORMAL);
-      expect(launchParams.airdropBips).to.equal(300);  // 300 = 3.00%
+      expect(launchParams.airdropBips).to.equal(300); // 300 = 3.00%
       expect(launchParams.needAcf).to.be.true;
       expect(launchParams.antiSniperTaxType).to.equal(ANTI_SNIPER_98M);
       expect(launchParams.isProject60days).to.be.true;
@@ -2791,11 +3574,17 @@ describe("BondingV5", function () {
       const initialSupply = BigInt(INITIAL_SUPPLY);
 
       // 0% airdrop, no ACF: 100% bonding curve
-      const supply100 = await bondingConfig.calculateBondingCurveSupply(0, false);
+      const supply100 = await bondingConfig.calculateBondingCurveSupply(
+        0,
+        false
+      );
       expect(supply100).to.equal(initialSupply);
 
       // 5% airdrop (500), no ACF: 95% bonding curve (9500/10000)
-      const supply95 = await bondingConfig.calculateBondingCurveSupply(500, false);
+      const supply95 = await bondingConfig.calculateBondingCurveSupply(
+        500,
+        false
+      );
       expect(supply95).to.equal((initialSupply * 9500n) / 10000n);
 
       // 0% airdrop, with ACF (5000 = 50%): 50% bonding curve (5000/10000)
@@ -2803,7 +3592,10 @@ describe("BondingV5", function () {
       expect(supply50).to.equal((initialSupply * 5000n) / 10000n);
 
       // 4% airdrop (400), with ACF (5000): 46% bonding curve (4600/10000)
-      const supply46 = await bondingConfig.calculateBondingCurveSupply(400, true);
+      const supply46 = await bondingConfig.calculateBondingCurveSupply(
+        400,
+        true
+      );
       expect(supply46).to.equal((initialSupply * 4600n) / 10000n);
     });
 
@@ -2811,18 +3603,24 @@ describe("BondingV5", function () {
       const { bondingConfig } = contracts;
 
       expect(await bondingConfig.isSpecialMode(LAUNCH_MODE_NORMAL)).to.be.false;
-      expect(await bondingConfig.isSpecialMode(LAUNCH_MODE_X_LAUNCH)).to.be.true;
-      expect(await bondingConfig.isSpecialMode(LAUNCH_MODE_ACP_SKILL)).to.be.true;
+      expect(await bondingConfig.isSpecialMode(LAUNCH_MODE_X_LAUNCH)).to.be
+        .true;
+      expect(await bondingConfig.isSpecialMode(LAUNCH_MODE_ACP_SKILL)).to.be
+        .true;
     });
 
     it("Should return correct fakeInitialVirtualLiq", async function () {
       const { bondingConfig } = contracts;
-      expect(await bondingConfig.getFakeInitialVirtualLiq()).to.equal(FAKE_INITIAL_VIRTUAL_LIQ);
+      expect(await bondingConfig.getFakeInitialVirtualLiq()).to.equal(
+        FAKE_INITIAL_VIRTUAL_LIQ
+      );
     });
 
     it("Should return correct targetRealVirtual", async function () {
       const { bondingConfig } = contracts;
-      expect(await bondingConfig.getTargetRealVirtual()).to.equal(TARGET_REAL_VIRTUAL);
+      expect(await bondingConfig.getTargetRealVirtual()).to.equal(
+        TARGET_REAL_VIRTUAL
+      );
     });
 
     it("Should correctly calculate launch fee for different scenarios", async function () {
@@ -2832,13 +3630,19 @@ describe("BondingV5", function () {
       expect(await bondingConfig.calculateLaunchFee(false, false)).to.equal(0);
 
       // Immediate launch, with ACF: acfFee
-      expect(await bondingConfig.calculateLaunchFee(false, true)).to.equal(ACF_FEE);
+      expect(await bondingConfig.calculateLaunchFee(false, true)).to.equal(
+        ACF_FEE
+      );
 
       // Scheduled launch, no ACF: normalLaunchFee
-      expect(await bondingConfig.calculateLaunchFee(true, false)).to.equal(NORMAL_LAUNCH_FEE);
+      expect(await bondingConfig.calculateLaunchFee(true, false)).to.equal(
+        NORMAL_LAUNCH_FEE
+      );
 
       // Scheduled launch, with ACF: normalLaunchFee + acfFee
-      expect(await bondingConfig.calculateLaunchFee(true, true)).to.equal(NORMAL_LAUNCH_FEE + ACF_FEE);
+      expect(await bondingConfig.calculateLaunchFee(true, true)).to.equal(
+        NORMAL_LAUNCH_FEE + ACF_FEE
+      );
     });
 
     it("Should allow owner to set deploy params", async function () {
@@ -2856,8 +3660,12 @@ describe("BondingV5", function () {
 
       const deployParams = await bondingConfig.getDeployParams();
       expect(deployParams.tbaSalt).to.equal(newDeployParams.tbaSalt);
-      expect(deployParams.tbaImplementation).to.equal(newDeployParams.tbaImplementation);
-      expect(deployParams.daoVotingPeriod).to.equal(newDeployParams.daoVotingPeriod);
+      expect(deployParams.tbaImplementation).to.equal(
+        newDeployParams.tbaImplementation
+      );
+      expect(deployParams.daoVotingPeriod).to.equal(
+        newDeployParams.daoVotingPeriod
+      );
       expect(deployParams.daoThreshold).to.equal(newDeployParams.daoThreshold);
 
       // Reset to original
@@ -2882,7 +3690,9 @@ describe("BondingV5", function () {
       expect(await bondingConfig.feeTo()).to.equal(newFeeTo);
 
       // Reset to original
-      await bondingConfig.connect(owner).setCommonParams(INITIAL_SUPPLY, owner.address);
+      await bondingConfig
+        .connect(owner)
+        .setCommonParams(INITIAL_SUPPLY, owner.address);
     });
 
     it("Should allow owner to set team token reserved wallet", async function () {
@@ -2891,11 +3701,17 @@ describe("BondingV5", function () {
 
       const originalWallet = await bondingConfig.teamTokenReservedWallet();
 
-      await bondingConfig.connect(owner).setTeamTokenReservedWallet(user2.address);
-      expect(await bondingConfig.teamTokenReservedWallet()).to.equal(user2.address);
+      await bondingConfig
+        .connect(owner)
+        .setTeamTokenReservedWallet(user2.address);
+      expect(await bondingConfig.teamTokenReservedWallet()).to.equal(
+        user2.address
+      );
 
       // Reset to original
-      await bondingConfig.connect(owner).setTeamTokenReservedWallet(originalWallet);
+      await bondingConfig
+        .connect(owner)
+        .setTeamTokenReservedWallet(originalWallet);
     });
   });
 
@@ -2908,18 +3724,31 @@ describe("BondingV5", function () {
       const { bondingV5, virtualToken } = contracts;
 
       const purchaseAmount = ethers.parseEther("1000");
-      await virtualToken.connect(user1).approve(addresses.bondingV5, purchaseAmount);
+      await virtualToken
+        .connect(user1)
+        .approve(addresses.bondingV5, purchaseAmount);
 
       const feeToBalanceBefore = await virtualToken.balanceOf(owner.address);
 
       // Scheduled launch with ACF
       const startTime = (await time.latest()) + START_TIME_DELAY + 1;
-      await bondingV5.connect(user1).preLaunch(
-        "Fee Test Token", "FTT", [0, 1], "Description",
-        "https://example.com/image.png", ["", "", "", ""],
-        purchaseAmount, startTime,
-        LAUNCH_MODE_NORMAL, 0, true, ANTI_SNIPER_60S, false
-      );
+      await bondingV5
+        .connect(user1)
+        .preLaunch(
+          "Fee Test Token",
+          "FTT",
+          [0, 1],
+          "Description",
+          "https://example.com/image.png",
+          ["", "", "", ""],
+          purchaseAmount,
+          startTime,
+          LAUNCH_MODE_NORMAL,
+          0,
+          true,
+          ANTI_SNIPER_60S,
+          false
+        );
 
       const feeToBalanceAfter = await virtualToken.balanceOf(owner.address);
       const feeCollected = feeToBalanceAfter - feeToBalanceBefore;
@@ -2933,18 +3762,31 @@ describe("BondingV5", function () {
       const { bondingV5, virtualToken } = contracts;
 
       const purchaseAmount = ethers.parseEther("1000");
-      await virtualToken.connect(user1).approve(addresses.bondingV5, purchaseAmount);
+      await virtualToken
+        .connect(user1)
+        .approve(addresses.bondingV5, purchaseAmount);
 
       const feeToBalanceBefore = await virtualToken.balanceOf(owner.address);
 
       // Immediate launch without ACF
       const startTime = (await time.latest()) + 100;
-      await bondingV5.connect(user1).preLaunch(
-        "No Fee Token", "NFT", [0, 1], "Description",
-        "https://example.com/image.png", ["", "", "", ""],
-        purchaseAmount, startTime,
-        LAUNCH_MODE_NORMAL, 0, false, ANTI_SNIPER_60S, false
-      );
+      await bondingV5
+        .connect(user1)
+        .preLaunch(
+          "No Fee Token",
+          "NFT",
+          [0, 1],
+          "Description",
+          "https://example.com/image.png",
+          ["", "", "", ""],
+          purchaseAmount,
+          startTime,
+          LAUNCH_MODE_NORMAL,
+          0,
+          false,
+          ANTI_SNIPER_60S,
+          false
+        );
 
       const feeToBalanceAfter = await virtualToken.balanceOf(owner.address);
       const feeCollected = feeToBalanceAfter - feeToBalanceBefore;
@@ -2962,30 +3804,51 @@ describe("BondingV5", function () {
       const { bondingV5, virtualToken } = contracts;
 
       const purchaseAmount = ethers.parseEther("1000");
-      await virtualToken.connect(user1).approve(addresses.bondingV5, purchaseAmount);
+      await virtualToken
+        .connect(user1)
+        .approve(addresses.bondingV5, purchaseAmount);
 
-      const reservedWalletBalanceBefore = await ethers.provider.getBalance(beOpsWallet.address);
+      const reservedWalletBalanceBefore = await ethers.provider.getBalance(
+        beOpsWallet.address
+      );
 
       // Create token with 5% airdrop (500 = 5.00%, should transfer 5% to reserved wallet)
       const startTime = (await time.latest()) + START_TIME_DELAY + 1;
       const tx = await bondingV5.connect(user1).preLaunch(
-        "Reserved Test Token", "RTT", [0, 1], "Description",
-        "https://example.com/image.png", ["", "", "", ""],
-        purchaseAmount, startTime,
-        LAUNCH_MODE_NORMAL, 500, false, ANTI_SNIPER_60S, false  // 500 = 5.00%
+        "Reserved Test Token",
+        "RTT",
+        [0, 1],
+        "Description",
+        "https://example.com/image.png",
+        ["", "", "", ""],
+        purchaseAmount,
+        startTime,
+        LAUNCH_MODE_NORMAL,
+        500,
+        false,
+        ANTI_SNIPER_60S,
+        false // 500 = 5.00%
       );
 
       const receipt = await tx.wait();
       const event = receipt.logs.find((log) => {
-        try { return bondingV5.interface.parseLog(log)?.name === "PreLaunched"; }
-        catch (e) { return false; }
+        try {
+          return bondingV5.interface.parseLog(log)?.name === "PreLaunched";
+        } catch (e) {
+          return false;
+        }
       });
       const tokenAddress = bondingV5.interface.parseLog(event).args.token;
 
       // Check that reserved tokens were transferred to teamTokenReservedWallet
-      const actualTokenContract = await ethers.getContractAt("AgentTokenV2", tokenAddress);
-      const reservedWalletTokenBalance = await actualTokenContract.balanceOf(beOpsWallet.address);
-      
+      const actualTokenContract = await ethers.getContractAt(
+        "AgentTokenV2",
+        tokenAddress
+      );
+      const reservedWalletTokenBalance = await actualTokenContract.balanceOf(
+        beOpsWallet.address
+      );
+
       // 5% of 1B = 50M tokens (with 18 decimals)
       const expectedReserved = ethers.parseEther("50000000");
       expect(reservedWalletTokenBalance).to.equal(expectedReserved);
@@ -2996,28 +3859,47 @@ describe("BondingV5", function () {
       const { bondingV5, virtualToken } = contracts;
 
       const purchaseAmount = ethers.parseEther("1000");
-      await virtualToken.connect(user1).approve(addresses.bondingV5, purchaseAmount);
+      await virtualToken
+        .connect(user1)
+        .approve(addresses.bondingV5, purchaseAmount);
 
       // Create token with 4% airdrop (400) and needAcf = true (5400 = 54% total reserved)
       const startTime = (await time.latest()) + START_TIME_DELAY + 1;
       const tx = await bondingV5.connect(user1).preLaunch(
-        "ACF Reserved Test", "ART", [0, 1], "Description",
-        "https://example.com/image.png", ["", "", "", ""],
-        purchaseAmount, startTime,
-        LAUNCH_MODE_NORMAL, 400, true, ANTI_SNIPER_60S, false  // 400 = 4.00%
+        "ACF Reserved Test",
+        "ART",
+        [0, 1],
+        "Description",
+        "https://example.com/image.png",
+        ["", "", "", ""],
+        purchaseAmount,
+        startTime,
+        LAUNCH_MODE_NORMAL,
+        400,
+        true,
+        ANTI_SNIPER_60S,
+        false // 400 = 4.00%
       );
 
       const receipt = await tx.wait();
       const event = receipt.logs.find((log) => {
-        try { return bondingV5.interface.parseLog(log)?.name === "PreLaunched"; }
-        catch (e) { return false; }
+        try {
+          return bondingV5.interface.parseLog(log)?.name === "PreLaunched";
+        } catch (e) {
+          return false;
+        }
       });
       const tokenAddress = bondingV5.interface.parseLog(event).args.token;
 
       // Check reserved tokens (54% = 4% airdrop + 50% ACF)
-      const actualTokenContract = await ethers.getContractAt("AgentTokenV2", tokenAddress);
-      const reservedWalletTokenBalance = await actualTokenContract.balanceOf(beOpsWallet.address);
-      
+      const actualTokenContract = await ethers.getContractAt(
+        "AgentTokenV2",
+        tokenAddress
+      );
+      const reservedWalletTokenBalance = await actualTokenContract.balanceOf(
+        beOpsWallet.address
+      );
+
       // 54% of 1B = 540M tokens (with 18 decimals)
       const expectedReserved = ethers.parseEther("540000000");
       expect(reservedWalletTokenBalance).to.equal(expectedReserved);

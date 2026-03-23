@@ -106,6 +106,13 @@ contract AgentTax is Initializable, AccessControlUpgradeable {
     IBondingV4ForTax public bondingV4;
     IBondingV5ForTax public bondingV5;
 
+    // V3 storage - On-chain tax attribution (direct tokenAddress → creator mapping)
+    mapping(address tokenAddress => TaxRecipient) public tokenRecipients;
+    mapping(address tokenAddress => TaxAmounts) public tokenTaxAmounts;
+
+    event TokenRegistered(address indexed tokenAddress, address indexed creator, address tba);
+    event TaxDeposited(address indexed tokenAddress, uint256 amount);
+
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() {
         _disableInitializers();
@@ -492,5 +499,172 @@ contract AgentTax is Initializable, AccessControlUpgradeable {
             uint256 minOutput = (amountToSwap * minConversionRate) / rateDenom;
             _swapForAsset(agentId, minOutput, maxOverride);
         }
+    }
+
+    // ============ V3 Functions - On-chain Tax Attribution ============
+
+    /**
+     * @notice Register a token with its tax recipient (creator and TBA)
+     * @dev Called during launch() to associate token with creator
+     * @param tokenAddress The address of the agent token
+     * @param tba The Token Bound Address for the agent
+     * @param creator The creator address that will receive tax rewards
+     */
+    function registerToken(
+        address tokenAddress,
+        address tba,
+        address creator
+    ) external onlyRole(EXECUTOR_V2_ROLE) {
+        require(tokenAddress != address(0), "Invalid token address");
+        require(creator != address(0), "Invalid creator");
+
+        tokenRecipients[tokenAddress] = TaxRecipient({
+            tba: tba,
+            creator: creator
+        });
+        emit TokenRegistered(tokenAddress, creator, tba);
+    }
+
+    /**
+     * @notice Deposit tax for a specific token and auto-swap if threshold reached
+     * @dev Caller must have approved this contract to spend taxToken
+     * @param tokenAddress The address of the agent token
+     * @param amount The amount of tax being deposited
+     */
+    function depositTax(address tokenAddress, uint256 amount) external {
+        TaxRecipient memory recipient = tokenRecipients[tokenAddress];
+        require(recipient.creator != address(0), "Token not registered");
+        require(amount > 0, "Amount must be greater than 0");
+
+        IERC20(taxToken).safeTransferFrom(msg.sender, address(this), amount);
+
+        TaxAmounts storage amounts = tokenTaxAmounts[tokenAddress];
+        amounts.amountCollected += amount;
+
+        emit TaxDeposited(tokenAddress, amount);
+        // No auto-swap here - backend triggers swaps via swapForTokenAddress()
+    }
+
+    /**
+     * @notice Backend-triggered swap for a specific token's accumulated tax
+     * @dev Only backend can trigger swaps to ensure proper price verification.
+     *      Backend should verify conversion rate externally before calling.
+     * @param tokenAddress The address of the agent token to swap taxes for
+     * @param minOutput Minimum output amount (calculated by backend with proper price check)
+     */
+    function swapForTokenAddress(
+        address tokenAddress,
+        uint256 minOutput
+    ) external onlyRole(EXECUTOR_V2_ROLE) {
+        TaxRecipient memory recipient = tokenRecipients[tokenAddress];
+        require(recipient.creator != address(0), "Token not registered");
+        TaxAmounts storage amounts = tokenTaxAmounts[tokenAddress];
+        _swapForTokenAddress(tokenAddress, recipient, amounts, minOutput);
+    }
+
+    /**
+     * @notice Internal function to swap accumulated tax for a token
+     * @param tokenAddress The address of the agent token
+     * @param recipient The tax recipient info
+     * @param amounts The tax amounts storage reference
+     * @param minOutput Minimum output amount (from backend with price verification)
+     */
+    function _swapForTokenAddress(
+        address tokenAddress,
+        TaxRecipient memory recipient,
+        TaxAmounts storage amounts,
+        uint256 minOutput
+    ) internal {
+        uint256 amountToSwap = amounts.amountCollected - amounts.amountSwapped;
+
+        if (amountToSwap < minSwapThreshold) {
+            return;
+        }
+
+        if (amountToSwap > maxSwapThreshold) {
+            amountToSwap = maxSwapThreshold;
+        }
+
+        uint256 balance = IERC20(taxToken).balanceOf(address(this));
+        if (balance < amountToSwap) {
+            return;
+        }
+
+        address[] memory path = new address[](2);
+        path[0] = taxToken;
+        path[1] = assetToken;
+
+        try
+            router.swapExactTokensForTokens(
+                amountToSwap,
+                minOutput,
+                path,
+                address(this),
+                block.timestamp + 300
+            )
+        returns (uint256[] memory swapAmounts) {
+            uint256 assetReceived = swapAmounts[1];
+            emit SwapExecuted(0, amountToSwap, assetReceived);
+
+            uint256 feeAmount = (assetReceived * feeRate) / DENOM;
+            uint256 creatorFee = assetReceived - feeAmount;
+
+            if (creatorFee > 0) {
+                IERC20(assetToken).safeTransfer(recipient.creator, creatorFee);
+            }
+
+            if (feeAmount > 0) {
+                IERC20(assetToken).safeTransfer(treasury, feeAmount);
+            }
+
+            amounts.amountSwapped += amountToSwap;
+        } catch {
+            emit SwapFailed(0, amountToSwap);
+        }
+    }
+
+    /**
+     * @notice Get the tax recipient for a token
+     * @param tokenAddress The address to lookup
+     * @return tba The Token Bound Address
+     * @return creator The creator address
+     */
+    function getTokenRecipient(address tokenAddress) external view returns (address tba, address creator) {
+        TaxRecipient memory recipient = tokenRecipients[tokenAddress];
+        return (recipient.tba, recipient.creator);
+    }
+
+    /**
+     * @notice Get tax amounts for a token
+     * @param tokenAddress The address to lookup
+     * @return amountCollected Total tax collected
+     * @return amountSwapped Total tax swapped
+     */
+    function getTokenTaxAmounts(address tokenAddress) external view returns (uint256 amountCollected, uint256 amountSwapped) {
+        TaxAmounts memory amounts = tokenTaxAmounts[tokenAddress];
+        return (amounts.amountCollected, amounts.amountSwapped);
+    }
+
+    /**
+     * @notice Update the creator for a registered token
+     * @param tokenAddress The token address
+     * @param newCreator The new creator address
+     */
+    function updateTokenCreator(
+        address tokenAddress,
+        address newCreator
+    ) public {
+        TaxRecipient storage recipient = tokenRecipients[tokenAddress];
+        require(recipient.creator != address(0), "Token not registered");
+        
+        address sender = _msgSender();
+        require(
+            sender == recipient.creator || hasRole(ADMIN_ROLE, sender),
+            "Only creator or admin can update"
+        );
+        
+        address oldCreator = recipient.creator;
+        recipient.creator = newCreator;
+        emit CreatorUpdated(0, oldCreator, newCreator);
     }
 }

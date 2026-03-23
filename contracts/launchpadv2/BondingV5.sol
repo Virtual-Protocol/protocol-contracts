@@ -12,7 +12,7 @@ import "./BondingConfig.sol";
 import "./IFPairV2.sol";
 import "../virtualPersona/IAgentTokenV2.sol";
 
-// Minimal interfaces to reduce contract size (matches FFactoryV2/FRouterV2)
+// Minimal interfaces to reduce contract size
 interface IFFactoryV2Minimal {
     function createPair(
         address tokenA,
@@ -24,9 +24,10 @@ interface IFFactoryV2Minimal {
         address tokenA,
         address tokenB
     ) external view returns (address pair);
+    function taxVault() external view returns (address);
 }
 
-interface IFRouterV2Minimal {
+interface IFRouterV3Minimal {
     function assetToken() external view returns (address);
     function addInitialLiquidity(
         address token,
@@ -80,6 +81,10 @@ interface IAgentFactoryV6Minimal {
     ) external returns (address);
 }
 
+interface IAgentTaxMinimal {
+    function registerToken(address tokenAddress, address tba, address creator) external;
+}
+
 contract BondingV5 is
     Initializable,
     ReentrancyGuardUpgradeable,
@@ -88,7 +93,7 @@ contract BondingV5 is
     using SafeERC20 for IERC20;
 
     IFFactoryV2Minimal public factory;
-    IFRouterV2Minimal public router;
+    IFRouterV3Minimal public router;
     IAgentFactoryV6Minimal public agentFactory;
     BondingConfig public bondingConfig; // Configuration contract for multi-chain launch modes
 
@@ -150,7 +155,7 @@ contract BondingV5 is
         __ReentrancyGuard_init();
 
         factory = IFFactoryV2Minimal(factory_);
-        router = IFRouterV2Minimal(router_);
+        router = IFRouterV3Minimal(router_);
         agentFactory = IAgentFactoryV6Minimal(agentFactory_);
         bondingConfig = BondingConfig(bondingConfig_);
     }
@@ -433,6 +438,16 @@ contract BondingV5 is
         // Set tax start time to current block timestamp for proper anti-sniper tax calculation
         router.setTaxStartTime(tokenRef.pair, block.timestamp);
 
+        // Register token with AgentTax for on-chain tax attribution
+        // This must happen BEFORE _buy() is called, as _buy() triggers depositTax()
+        address taxVault = factory.taxVault();
+        require(taxVault != address(0), "TaxVault not set");
+        IAgentTaxMinimal(taxVault).registerToken(
+            tokenAddress_,
+            tokenRef.creator, // Use creator as TBA
+            tokenRef.creator
+        );
+
         // Make initial purchase for creator
         // bondingContract will transfer initialPurchase $Virtual to pairAddress
         // pairAddress will transfer amountsOut $agentToken to bondingContract
@@ -690,8 +705,8 @@ contract BondingV5 is
             bondingConfig.LAUNCH_MODE_ACP_SKILL();
     }
 
-    // View function for FRouterV2 to get anti-sniper tax type
-    // Reverts if token was not created by BondingV5, allowing FRouterV2 to fallback to legacy logic
+    // View function for FRouterV3 to get anti-sniper tax type
+    // Reverts if token was not created by BondingV5, allowing FRouterV3 to fallback to legacy logic
     function tokenAntiSniperType(address token_) external view returns (uint8) {
         if (tokenInfo[token_].creator == address(0)) {
             revert InvalidTokenStatus();

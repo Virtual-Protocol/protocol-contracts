@@ -1,5 +1,13 @@
 /** @type import('hardhat/config').HardhatUserConfig */
-require("dotenv").config();
+// Load env file: defaults to .env, or specify via ENV_FILE
+// Usage: ENV_FILE=.env.launchpadv5_local npx hardhat run ...
+const envFile = process.env.ENV_FILE;
+if (envFile) {
+  require("dotenv").config({ path: envFile });
+  console.log(`Loaded env file: ${envFile}`);
+} else {
+  require("dotenv").config(); // defaults to .env
+}
 require("@nomicfoundation/hardhat-toolbox");
 require("hardhat-deploy");
 require("@openzeppelin/hardhat-upgrades");
@@ -125,6 +133,27 @@ module.exports = {
     },
     local: {
       url: "http://127.0.0.1:8545",
+      // For forked node: npx hardhat node --fork <rpc_url> --fork-block-number <block>
+    },
+    // Local fork of base_sepolia for testing with real env
+    hardhat: {
+      forking: {
+        url: process.env.BASE_SEPOLIA_RPC_URL || "https://base-sepolia.drpc.org",
+        enabled: process.env.FORK_ENABLED === "true",
+        blockNumber: process.env.FORK_BLOCK_NUMBER ? parseInt(process.env.FORK_BLOCK_NUMBER) : 
+        39256635,
+      },
+      accounts: process.env.PRIVATE_KEY ? [{
+        privateKey: process.env.PRIVATE_KEY,
+        balance: "10000000000000000000000" // 10000 ETH
+      }] : undefined,
+      chains: {
+        84532: {  // base_sepolia chainId
+          hardforkHistory: {
+            cancun: 0,
+          },
+        },
+      },
     },
     polygon: {
       url: "https://rpc-mainnet.maticvigil.com/",

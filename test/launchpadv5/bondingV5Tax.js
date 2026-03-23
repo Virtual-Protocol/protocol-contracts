@@ -213,7 +213,7 @@ async function setupV2V3TaxComparisonTest() {
   // Configure AgentNftV2 roles
   await agentNftV2.grantRole(await agentNftV2.MINTER_ROLE(), await agentFactoryV6.getAddress());
 
-  // Deploy Asset Token (USDC) for AgentTax
+  // Deploy Asset Token (USDC) for AgentTaxV2
   const AssetToken = await ethers.getContractFactory("MockERC20");
   const assetToken = await AssetToken.deploy(
     "Mock USDC",
@@ -223,25 +223,28 @@ async function setupV2V3TaxComparisonTest() {
   );
   await assetToken.waitForDeployment();
 
-  // Deploy AgentTax
-  const AgentTax = await ethers.getContractFactory("AgentTax");
+  // Deploy AgentTaxV2 (simplified V3-only contract)
+  // This replaces AgentTax for V3 tokens - much cleaner, no legacy V2 code
+  const AgentTaxV2 = await ethers.getContractFactory("AgentTaxV2");
   const agentTax = await upgrades.deployProxy(
-    AgentTax,
+    AgentTaxV2,
     [
-      owner.address,
-      await assetToken.getAddress(),
-      await virtualToken.getAddress(),
-      await mockUniswapRouter.getAddress(),
-      owner.address,
-      ethers.parseEther("100"),
-      ethers.parseEther("10000"),
-      await agentNftV2.getAddress(),
+      owner.address,                            // defaultAdmin
+      await assetToken.getAddress(),            // assetToken (USDC)
+      await virtualToken.getAddress(),          // taxToken (VIRTUAL)
+      await mockUniswapRouter.getAddress(),     // router
+      owner.address,                            // treasury
+      ethers.parseEther("100"),                 // minSwapThreshold
+      ethers.parseEther("10000"),               // maxSwapThreshold
+      3000,                                     // feeRate (30%)
     ],
     { initializer: "initialize" }
   );
   await agentTax.waitForDeployment();
 
-  // Configure FFactoryV2 to use AgentTax as taxVault
+  // Configure FFactoryV2 to use AgentTaxV2 as taxVault
+  // Note: In production, FFactoryV2 would use old AgentTax for V2 tokens
+  // Here we use AgentTaxV2 for simplicity since we're testing V3 flow
   await fFactoryV2.setTaxParams(
     await agentTax.getAddress(),
     BUY_TAX,
@@ -250,7 +253,7 @@ async function setupV2V3TaxComparisonTest() {
     FFactoryV2_ANTI_SNIPER_TAX_VAULT
   );
 
-  // Configure FFactoryV3 to use AgentTax as taxVault (same as FFactoryV2)
+  // Configure FFactoryV3 to use AgentTaxV2 as taxVault
   await fFactoryV3.setTaxParams(
     await agentTax.getAddress(),
     BUY_TAX,
@@ -340,9 +343,9 @@ async function setupV2V3TaxComparisonTest() {
   await fRouterV3.grantRole(await fRouterV3.EXECUTOR_ROLE(), await bondingV5.getAddress());
   await agentFactoryV6.grantRole(await agentFactoryV6.BONDING_ROLE(), await bondingV5.getAddress());
 
-  // Grant EXECUTOR_V2_ROLE to BondingV5 in AgentTax (for registerToken)
-  const EXECUTOR_V2_ROLE = await agentTax.EXECUTOR_V2_ROLE();
-  await agentTax.grantRole(EXECUTOR_V2_ROLE, await bondingV5.getAddress());
+  // Grant EXECUTOR_ROLE to BondingV5 in AgentTaxV2 (for registerToken)
+  const EXECUTOR_ROLE = await agentTax.EXECUTOR_ROLE();
+  await agentTax.grantRole(EXECUTOR_ROLE, await bondingV5.getAddress());
 
   // Mint Virtual Tokens to test addresses
   const mintAmount = ethers.parseEther("1000000000");

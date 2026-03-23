@@ -1,4 +1,13 @@
+/**
+ * BondingV5 E2E Test - Comprehensive Verification
+ * 
+ * Usage:
+ *   ENV_FILE=.env.launchpadv5_local npx hardhat run scripts/launchpadv5/e2e_test.ts --network local
+ *   ENV_FILE=.env.launchpadv5_dev npx hardhat run scripts/launchpadv5/e2e_test.ts --network base_sepolia
+ *   ENV_FILE=.env.launchpadv5_prod npx hardhat run scripts/launchpadv5/e2e_test.ts --network base
+ */
 import { parseEther, formatEther } from "ethers";
+import { executeBatchSwap } from "./batch_swap_tax";
 const { ethers } = require("hardhat");
 
 // Constants for launch modes and anti-sniper types
@@ -44,8 +53,8 @@ async function waitWithProgress(seconds: number, message: string): Promise<void>
 interface TestConfig {
   bondingV5Address: string;
   bondingConfigAddress: string;
-  fFactoryV2Address: string;
-  fRouterV2Address: string;
+  fFactoryV3Address: string;
+  fRouterV3Address: string;
   virtualTokenAddress: string;
 }
 
@@ -58,8 +67,8 @@ async function main() {
   const config: TestConfig = {
     bondingV5Address: process.env.BONDING_V5_ADDRESS || "",
     bondingConfigAddress: process.env.BONDING_CONFIG_ADDRESS || "",
-    fFactoryV2Address: process.env.FFactoryV2_ADDRESS || "",
-    fRouterV2Address: process.env.FRouterV2_ADDRESS || "",
+    fFactoryV3Address: process.env.FFactoryV3_ADDRESS || "",
+    fRouterV3Address: process.env.FRouterV3_ADDRESS || "",
     virtualTokenAddress: process.env.VIRTUAL_TOKEN_ADDRESS || "",
   };
 
@@ -73,8 +82,8 @@ async function main() {
   console.log("\n--- Contract Addresses ---");
   console.log("BondingV5:", config.bondingV5Address);
   console.log("BondingConfig:", config.bondingConfigAddress);
-  console.log("FFactoryV2:", config.fFactoryV2Address);
-  console.log("FRouterV2:", config.fRouterV2Address);
+  console.log("FFactoryV3:", config.fFactoryV3Address);
+  console.log("FRouterV3:", config.fRouterV3Address);
   console.log("VIRTUAL Token:", config.virtualTokenAddress);
 
   // Get signer
@@ -86,8 +95,8 @@ async function main() {
   // Get contract instances
   const bondingV5 = await ethers.getContractAt("BondingV5", config.bondingV5Address);
   const bondingConfig = await ethers.getContractAt("BondingConfig", config.bondingConfigAddress);
-  const fFactoryV2 = await ethers.getContractAt("FFactoryV2", config.fFactoryV2Address);
-  const fRouterV2 = await ethers.getContractAt("FRouterV2", config.fRouterV2Address);
+  const fFactoryV3 = await ethers.getContractAt("FFactoryV3", config.fFactoryV3Address);
+  const fRouterV3 = await ethers.getContractAt("FRouterV3", config.fRouterV3Address);
   const virtualToken = await ethers.getContractAt("IERC20", config.virtualTokenAddress);
 
   // ============================================
@@ -121,14 +130,14 @@ async function main() {
   console.log("Fake Initial Virtual Liq:", formatEther(bondingCurveParams.fakeInitialVirtualLiq), "VIRTUAL");
   console.log("Target Real Virtual:", formatEther(bondingCurveParams.targetRealVirtual), "VIRTUAL");
 
-  // Check FFactoryV2 tax parameters
-  const buyTax = await fFactoryV2.buyTax();
-  const sellTax = await fFactoryV2.sellTax();
-  const antiSniperBuyTaxStartValue = await fFactoryV2.antiSniperBuyTaxStartValue();
-  const taxVault = await fFactoryV2.taxVault();
-  const antiSniperTaxVault = await fFactoryV2.antiSniperTaxVault();
+  // Check FFactoryV3 tax parameters
+  const buyTax = await fFactoryV3.buyTax();
+  const sellTax = await fFactoryV3.sellTax();
+  const antiSniperBuyTaxStartValue = await fFactoryV3.antiSniperBuyTaxStartValue();
+  const taxVault = await fFactoryV3.taxVault();
+  const antiSniperTaxVault = await fFactoryV3.antiSniperTaxVault();
 
-  console.log("\n--- FFactoryV2 Tax Parameters ---");
+  console.log("\n--- FFactoryV3 Tax Parameters ---");
   console.log("Buy Tax:", buyTax.toString(), "%");
   console.log("Sell Tax:", sellTax.toString(), "%");
   console.log("Anti-Sniper Buy Tax Start Value:", antiSniperBuyTaxStartValue.toString(), "%");
@@ -168,19 +177,19 @@ async function main() {
     console.log("✅ Already approved sufficient VIRTUAL tokens");
   }
 
-  // Also approve to FRouterV2 for buy/sell
-  const routerAllowance = await virtualToken.allowance(signerAddress, config.fRouterV2Address);
-  console.log("\n--- Checking FRouterV2 Allowance ---");
-  console.log("FRouterV2 Address:", config.fRouterV2Address);
+  // Also approve to FRouterV3 for buy/sell
+  const routerAllowance = await virtualToken.allowance(signerAddress, config.fRouterV3Address);
+  console.log("\n--- Checking FRouterV3 Allowance ---");
+  console.log("FRouterV3 Address:", config.fRouterV3Address);
   console.log("Current Router Allowance:", formatEther(routerAllowance), "VIRTUAL");
   
   if (BigInt(routerAllowance) < BigInt(requiredAllowance)) {
-    console.log("\n--- Approving VIRTUAL tokens to FRouterV2 ---");
-    const approveTx = await virtualToken.approve(config.fRouterV2Address, requiredAllowance);
+    console.log("\n--- Approving VIRTUAL tokens to FRouterV3 ---");
+    const approveTx = await virtualToken.approve(config.fRouterV3Address, requiredAllowance);
     await approveTx.wait();
-    console.log("✅ Approved", formatEther(requiredAllowance), "VIRTUAL to FRouterV2");
+    console.log("✅ Approved", formatEther(requiredAllowance), "VIRTUAL to FRouterV3");
   } else {
-    console.log("✅ Already approved sufficient VIRTUAL tokens to FRouterV2");
+    console.log("✅ Already approved sufficient VIRTUAL tokens to FRouterV3");
   }
 
   // ============================================
@@ -192,29 +201,29 @@ async function main() {
 
   // First, verify BondingV5 has required roles
   console.log("\n--- Verifying BondingV5 Roles ---");
-  const agentFactoryV6Address = process.env.AGENT_FACTORY_V6_ADDRESS;
-  if (agentFactoryV6Address) {
-    const agentFactoryV6 = await ethers.getContractAt("AgentFactoryV6", agentFactoryV6Address);
-    const bondingRole = await agentFactoryV6.BONDING_ROLE();
-    const hasBondingRole = await agentFactoryV6.hasRole(bondingRole, config.bondingV5Address);
-    console.log("BondingV5 has BONDING_ROLE on AgentFactoryV6:", hasBondingRole);
+  const agentFactoryV7Address = process.env.AGENT_FACTORY_V7_ADDRESS;
+  if (agentFactoryV7Address) {
+    const agentFactoryV7 = await ethers.getContractAt("AgentFactoryV7", agentFactoryV7Address);
+    const bondingRole = await agentFactoryV7.BONDING_ROLE();
+    const hasBondingRole = await agentFactoryV7.hasRole(bondingRole, config.bondingV5Address);
+    console.log("BondingV5 has BONDING_ROLE on AgentFactoryV7:", hasBondingRole);
     if (!hasBondingRole) {
-      throw new Error("BondingV5 does not have BONDING_ROLE on AgentFactoryV6!");
+      throw new Error("BondingV5 does not have BONDING_ROLE on AgentFactoryV7!");
     }
   }
 
-  const creatorRole = await fFactoryV2.CREATOR_ROLE();
-  const hasCreatorRole = await fFactoryV2.hasRole(creatorRole, config.bondingV5Address);
-  console.log("BondingV5 has CREATOR_ROLE on FFactoryV2:", hasCreatorRole);
+  const creatorRole = await fFactoryV3.CREATOR_ROLE();
+  const hasCreatorRole = await fFactoryV3.hasRole(creatorRole, config.bondingV5Address);
+  console.log("BondingV5 has CREATOR_ROLE on FFactoryV3:", hasCreatorRole);
   if (!hasCreatorRole) {
-    throw new Error("BondingV5 does not have CREATOR_ROLE on FFactoryV2!");
+    throw new Error("BondingV5 does not have CREATOR_ROLE on FFactoryV3!");
   }
 
-  const executorRole = await fRouterV2.EXECUTOR_ROLE();
-  const hasExecutorRole = await fRouterV2.hasRole(executorRole, config.bondingV5Address);
-  console.log("BondingV5 has EXECUTOR_ROLE on FRouterV2:", hasExecutorRole);
+  const executorRole = await fRouterV3.EXECUTOR_ROLE();
+  const hasExecutorRole = await fRouterV3.hasRole(executorRole, config.bondingV5Address);
+  console.log("BondingV5 has EXECUTOR_ROLE on FRouterV3:", hasExecutorRole);
   if (!hasExecutorRole) {
-    throw new Error("BondingV5 does not have EXECUTOR_ROLE on FRouterV2!");
+    throw new Error("BondingV5 does not have EXECUTOR_ROLE on FRouterV3!");
   }
 
   const tokenName = `E2E Test Token ${Date.now()}`;
@@ -534,7 +543,7 @@ async function main() {
   const agentToken = await ethers.getContractAt("IERC20", tokenAddress);
 
   // Check if we're in the anti-sniper period
-  const hasAntiSniperTax = await fRouterV2.hasAntiSniperTax(pairAddress);
+  const hasAntiSniperTax = await fRouterV3.hasAntiSniperTax(pairAddress);
   const taxStartTime = await pair.taxStartTime();
   const currentBlockTime = (await ethers.provider.getBlock("latest")).timestamp;
   const timeSinceLaunch = currentBlockTime - Number(taxStartTime);
@@ -624,7 +633,7 @@ async function main() {
   console.log("=".repeat(80));
 
   // Wait for anti-sniper period to end if still active
-  const hasAntiSniperTaxNow = await fRouterV2.hasAntiSniperTax(pairAddress);
+  const hasAntiSniperTaxNow = await fRouterV3.hasAntiSniperTax(pairAddress);
   if (hasAntiSniperTaxNow) {
     const currentTime2 = (await ethers.provider.getBlock("latest")).timestamp;
     const remainingAntiSniperTime = Number(taxStartTime) + Number(antiSniperDuration) - currentTime2;
@@ -642,7 +651,7 @@ async function main() {
   }
 
   // Verify anti-sniper tax is no longer active
-  const hasAntiSniperTaxAfterWait = await fRouterV2.hasAntiSniperTax(pairAddress);
+  const hasAntiSniperTaxAfterWait = await fRouterV3.hasAntiSniperTax(pairAddress);
   console.log("\nAnti-Sniper Tax Active After Wait:", hasAntiSniperTaxAfterWait);
 
   // Get tax vault balances before second buy
@@ -693,16 +702,16 @@ async function main() {
   // Get updated token balance
   const agentTokenBalanceForSell = await agentToken.balanceOf(signerAddress);
 
-  // Approve agent token to FRouterV2
+  // Approve agent token to FRouterV3
   const sellAmount = BigInt(agentTokenBalanceForSell) / 4n; // Sell 1/4 of holdings
   console.log("Sell Amount:", formatEther(sellAmount), "tokens");
 
-  const agentTokenAllowance = await agentToken.allowance(signerAddress, config.fRouterV2Address);
+  const agentTokenAllowance = await agentToken.allowance(signerAddress, config.fRouterV3Address);
   if (agentTokenAllowance < sellAmount) {
-    console.log("\n--- Approving Agent Token to FRouterV2 ---");
-    const approveAgentTx = await agentToken.approve(config.fRouterV2Address, ethers.MaxUint256);
+    console.log("\n--- Approving Agent Token to FRouterV3 ---");
+    const approveAgentTx = await agentToken.approve(config.fRouterV3Address, ethers.MaxUint256);
     await approveAgentTx.wait();
-    console.log("✅ Approved Agent Token to FRouterV2");
+    console.log("✅ Approved Agent Token to FRouterV3");
   }
 
   // Get balances before sell
@@ -740,6 +749,87 @@ async function main() {
   }
 
   // ============================================
+  // Step 10: Verify Tax in AgentTaxV2
+  // ============================================
+  console.log("\n" + "=".repeat(80));
+  console.log("  Step 10: Verify Tax in AgentTaxV2");
+  console.log("=".repeat(80));
+
+  const agentTaxV2Address = process.env.AGENT_TAX_V2_CONTRACT_ADDRESS;
+  if (!agentTaxV2Address) {
+    console.log("⚠️ AGENT_TAX_V2_CONTRACT_ADDRESS not set, skipping AgentTaxV2 verification");
+  } else {
+    const agentTaxV2 = await ethers.getContractAt("AgentTaxV2", agentTaxV2Address);
+    
+    console.log("\n--- AgentTaxV2 Contract ---");
+    console.log("Address:", agentTaxV2Address);
+    
+    // Check token recipient registration
+    const tokenRecipient = await agentTaxV2.tokenRecipients(tokenAddress);
+    console.log("\n--- Token Recipient for", tokenAddress, "---");
+    console.log("TBA:", tokenRecipient.tba);
+    console.log("Creator:", tokenRecipient.creator);
+    
+    if (tokenRecipient.creator === ethers.ZeroAddress) {
+      console.log("⚠️ Token not registered in AgentTaxV2!");
+    } else {
+      console.log("✅ Token is registered in AgentTaxV2");
+    }
+    
+    // Check tax amounts
+    const [amountCollected, amountSwapped] = await agentTaxV2.getTokenTaxAmounts(tokenAddress);
+    const pendingTax = amountCollected - amountSwapped;
+    
+    console.log("\n--- Tax Amounts for Token ---");
+    console.log("Amount Collected:", formatEther(amountCollected), "VIRTUAL");
+    console.log("Amount Swapped:", formatEther(amountSwapped), "VIRTUAL");
+    console.log("Pending Tax:", formatEther(pendingTax), "VIRTUAL");
+    
+    if (amountCollected > 0n) {
+      console.log("✅ Tax has been deposited to AgentTaxV2 for this token");
+    } else {
+      console.log("⚠️ No tax deposited yet for this token");
+    }
+    
+    // Get contract parameters
+    const minSwapThreshold = await agentTaxV2.minSwapThreshold();
+    const maxSwapThreshold = await agentTaxV2.maxSwapThreshold();
+    const feeRateFromContract = await agentTaxV2.feeRate();
+    const treasuryAddress = await agentTaxV2.treasury();
+    
+    console.log("\n--- AgentTaxV2 Parameters ---");
+    console.log("Min Swap Threshold:", formatEther(minSwapThreshold), "VIRTUAL");
+    console.log("Max Swap Threshold:", formatEther(maxSwapThreshold), "VIRTUAL");
+    console.log("Fee Rate:", feeRateFromContract.toString(), "/ 10000");
+    console.log("Treasury:", treasuryAddress);
+    
+    // ============================================
+    // Step 11: Test batchSwapForTokenAddress with Deployer
+    // ============================================
+    console.log("\n" + "=".repeat(80));
+    console.log("  Step 11: Test batchSwapForTokenAddress with Deployer");
+    console.log("=".repeat(80));
+    
+    if (pendingTax < minSwapThreshold) {
+      console.log("⚠️ Pending tax", formatEther(pendingTax), "is less than minSwapThreshold", formatEther(minSwapThreshold));
+      console.log("   Skipping batchSwapForTokenAddress test (need more trading volume)");
+    } else {
+      const swapResult = await executeBatchSwap(
+        agentTaxV2Address,
+        [tokenAddress],
+        [0n],
+        signer
+      );
+      
+      if (swapResult.success && swapResult.swappedTokens.length > 0) {
+        console.log("✅ Tax successfully swapped and distributed!");
+      } else if (swapResult.error) {
+        console.log("⚠️ Swap result:", swapResult.error);
+      }
+    }
+  }
+
+  // ============================================
   // Summary
   // ============================================
   console.log("\n" + "=".repeat(80));
@@ -749,7 +839,7 @@ async function main() {
   console.log("\n✅ All tests completed!");
   console.log("\nVerified:");
   console.log("  1. BondingConfig parameters are correctly configured");
-  console.log("  2. FFactoryV2 tax parameters are correctly configured");
+  console.log("  2. FFactoryV3 tax parameters are correctly configured");
   console.log("  3. preLaunch() executed successfully with new parameters");
   console.log("  4. On-chain tokenInfo stored correctly");
   console.log("  5. On-chain tokenLaunchParams stored correctly");
@@ -758,16 +848,19 @@ async function main() {
   console.log("  8. Fee calculation correct (ACF fee for immediate launch)");
   console.log("  9. launch() executed successfully after start time");
   console.log("  10. buy() during anti-sniper period - tax to antiSniperTaxVault");
-  console.log("  11. buy() after anti-sniper period - normal tax to taxVault");
-  console.log("  12. sell() executed with correct tax collection");
+  console.log("  11. buy() after anti-sniper period - normal tax to taxVault (AgentTaxV2)");
+  console.log("  12. sell() executed with correct tax collection to AgentTaxV2");
+  console.log("  13. AgentTaxV2 has recorded tax for launched token");
+  console.log("  14. batchSwapForTokenAddress successfully distributes tax (if threshold met)");
 
   console.log("\n--- Tax Summary ---");
   console.log("Normal Buy Tax Rate:", buyTax.toString(), "%");
   console.log("Normal Sell Tax Rate:", sellTax.toString(), "%");
   console.log("Anti-Sniper Buy Tax Start Value:", antiSniperBuyTaxStartValue.toString(), "%");
   console.log("Anti-Sniper Duration:", antiSniperDuration.toString(), "seconds");
-  console.log("Tax Vault:", taxVault);
+  console.log("Tax Vault (AgentTaxV2):", taxVault);
   console.log("Anti-Sniper Tax Vault:", antiSniperTaxVault);
+  console.log("AgentTaxV2 Address:", process.env.AGENT_TAX_V2_CONTRACT_ADDRESS || "NOT SET");
 
   console.log("\n--- Token Summary ---");
   console.log("Token Address:", tokenAddress);

@@ -53,7 +53,7 @@ interface IFRouterV3Minimal {
     function hasAntiSniperTax(address pairAddress) external view returns (bool);
 }
 
-interface IAgentFactoryV6Minimal {
+interface IAgentFactoryV7Minimal {
     function createNewAgentTokenAndApplication(
         string memory name,
         string memory symbol,
@@ -94,7 +94,7 @@ contract BondingV5 is
 
     IFFactoryV2Minimal public factory;
     IFRouterV3Minimal public router;
-    IAgentFactoryV6Minimal public agentFactory;
+    IAgentFactoryV7Minimal public agentFactory;
     BondingConfig public bondingConfig; // Configuration contract for multi-chain launch modes
 
     mapping(address => BondingConfig.Token) public tokenInfo;
@@ -156,7 +156,7 @@ contract BondingV5 is
 
         factory = IFFactoryV2Minimal(factory_);
         router = IFRouterV3Minimal(router_);
-        agentFactory = IAgentFactoryV6Minimal(agentFactory_);
+        agentFactory = IAgentFactoryV7Minimal(agentFactory_);
         bondingConfig = BondingConfig(bondingConfig_);
     }
 

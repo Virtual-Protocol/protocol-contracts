@@ -5,9 +5,18 @@
 This document describes the on-chain tax attribution solution that eliminates the need for chain-specific `tax-listener` services when expanding to multiple chains.
 
 **Key Changes:**
-- New contracts: `FFactoryV3`, `FRouterV3`, `AgentTokenV3`
-- Modified contracts: `AgentTax`, `BondingV5`
-- Reused (unchanged): `FPairV2`
+- New contracts: `AgentFactoryV7`, `FFactoryV3`, `FRouterV3`, `AgentTokenV3`, `AgentTaxV2`
+- Modified contracts: `BondingV5`
+- Reused (unchanged): `FPairV2`, `AgentNft`, `AgentVeTokenV2`, `AgentDAO`
+
+**V5 Suite Architecture:**
+```
+V4 Suite (Legacy):
+  BondingV4 → AgentFactoryV6 → AgentTokenV2 → FFactoryV2 → FRouterV2 → AgentTax
+  
+V5 Suite (New):
+  BondingV5 → AgentFactoryV7 → AgentTokenV3 → FFactoryV3 → FRouterV3 → AgentTaxV2
+```
 
 ---
 
@@ -168,48 +177,179 @@ Instead of having AgentTax passively receive transfers, we make **all tax inflow
 
 ## 3. Contract Design Decisions
 
-### Summary: Which Contracts Need V3?
+### Summary: Which Contracts Need New Versions?
 
-| Contract | Needs V3? | Reason |
-|----------|-----------|--------|
-| **FFactory** | ✅ Yes (`FFactoryV3`) | Frontend determines router by factory; need separate factory for V3 tokens |
-| **FRouter** | ✅ Yes (`FRouterV3`) | Must call `depositTax()` for tax attribution |
-| **AgentToken** | ✅ Yes (`AgentTokenV3`) | Must call `depositTax()` in `_swapTax()` for graduated tokens |
-| **AgentTax** | 🔄 Upgrade | Add `registerToken()`, `depositTax()`, `swapForTokenAddress()` |
-| **BondingV5** | 🔄 Modify | Use FFactoryV3 + FRouterV3, call `registerToken()` during launch |
-| **FPair** | ❌ No | `FPairV2.transferAsset()` is sufficient; router handles the rest |
-| **BondingConfig** | ❌ No | Shared configuration, no changes needed |
+| Contract | Action | Reason |
+|----------|--------|--------|
+| **AgentFactory** | ✅ **New (`AgentFactoryV7`)** | Separate `projectTaxRecipient` config for V3 tokens (AgentTaxV2) |
+| **AgentTax** | ✅ **New (`AgentTaxV2`)** | Simplified contract with only V3 functions (~300 lines vs ~670 lines) |
+| **FFactory** | ✅ **New (`FFactoryV3`)** | Frontend determines router by factory; need separate factory for V3 tokens |
+| **FRouter** | ✅ **New (`FRouterV3`)** | Must call `depositTax()` for tax attribution |
+| **AgentToken** | ✅ **New (`AgentTokenV3`)** | Must call `depositTax()` in `_swapTax()` for graduated tokens |
+| **BondingV5** | 🔄 Modify | Use FFactoryV3 + FRouterV3 + AgentFactoryV7, call `registerToken()` during launch |
+| **FPair** | ❌ Unchanged | `FPairV2.transferAsset()` is sufficient; router handles the rest |
+| **BondingConfig** | ❌ Unchanged | Shared configuration, no changes needed |
+| **AgentNft** | ❌ Unchanged | Shared by both V6 and V7 factories |
+| **AgentVeToken** | ❌ Unchanged | Same implementation used by V7 |
+| **AgentDAO** | ❌ Unchanged | Same implementation used by V7 |
+
+### Why AgentFactoryV7?
+
+| Aspect | Reuse AgentFactoryV6 | New AgentFactoryV7 |
+|--------|---------------------|-------------------|
+| **projectTaxRecipient** | Single config shared by all tokens | Separate config for V5 suite |
+| **V4 Token Tax** | Conflict if set to AgentTaxV2 | N/A (V4 uses V6) |
+| **V5 Token Tax** | Conflict if set to AgentTax | Works with AgentTaxV2 |
+| **nextIdBase** | 60_000_000_000 | 70_000_000_000 (new range) |
+| **Clean Separation** | Mixed V4/V5 tokens | Pure V5 tokens only |
+
+**Decision:** New `AgentFactoryV7` for V5 suite:
+- **AgentFactoryV6** (old) → BondingV4 + AgentTokenV2 → AgentTax
+- **AgentFactoryV7** (new) → BondingV5 + AgentTokenV3 → AgentTaxV2
+
+#### The Core Problem: projectTaxRecipient Conflict
+
+`AgentFactoryV6` has a single `_tokenTaxParams` that includes `projectTaxRecipient`. This recipient is used by **all graduated tokens** created through the factory for tax distribution in `_swapTax()`:
+
+```solidity
+// AgentFactoryV6.sol - Single config for all tokens
+bytes private _tokenTaxParams; // Contains projectTaxRecipient
+
+// Set via setTokenTaxParams() - applies to ALL tokens created by this factory
+function setTokenTaxParams(..., address projectTaxRecipient) {
+    _tokenTaxParams = abi.encode(..., projectTaxRecipient);
+}
+```
+
+**If both BondingV4 and BondingV5 use AgentFactoryV6:**
+
+| `projectTaxRecipient` Setting | BondingV4 Graduated Token | BondingV5 Graduated Token |
+|------------------------------|---------------------------|---------------------------|
+| **AgentTax (old)** | ✅ Works with tax-listener | ❌ **FAILS** - AgentTax lacks `depositTax(address, uint256)` |
+| **AgentTaxV2 (new)** | ❌ **FAILS** - Token not registered (no `registerToken()` was called) | ✅ Works correctly |
+
+**Solution:** Separate factories ensure each suite has its own `projectTaxRecipient` configuration.
+
+### V4 vs V5 Suite Architecture Comparison
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                         V4 SUITE (Legacy)                                   │
+│                    Tax Attribution: OFF-CHAIN (tax-listener)                │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                             │
+│   ┌────────────┐    ┌─────────────────┐    ┌───────────────┐               │
+│   │ BondingV4  │───▶│ AgentFactoryV6  │───▶│ AgentTokenV2  │               │
+│   └────────────┘    └─────────────────┘    └───────────────┘               │
+│         │                   │                      │                        │
+│         │           projectTaxRecipient            │                        │
+│         │                   ▼                      │                        │
+│         │              AgentTax ◀──────────────────┘                        │
+│         │                   ▲              _swapTax() direct transfer       │
+│         │                   │                                               │
+│         ▼                   │                                               │
+│   ┌────────────┐    ┌─────────────┐                                        │
+│   │ FFactoryV2 │───▶│  FRouterV2  │──── direct transfer to AgentTax        │
+│   └────────────┘    └─────────────┘                                        │
+│                             │                                               │
+│                             ▼                                               │
+│                     tax-listener scans Transfer events                      │
+│                     calls handleAgentTaxes(agentId, hashes, amounts)        │
+│                                                                             │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                         V5 SUITE (New)                                      │
+│                    Tax Attribution: ON-CHAIN (depositTax)                   │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                             │
+│   ┌────────────┐    ┌─────────────────┐    ┌───────────────┐               │
+│   │ BondingV5  │───▶│ AgentFactoryV7  │───▶│ AgentTokenV3  │               │
+│   └────────────┘    └─────────────────┘    └───────────────┘               │
+│         │                   │                      │                        │
+│         │           projectTaxRecipient            │                        │
+│         │                   ▼                      │                        │
+│         │             AgentTaxV2 ◀─────────────────┘                        │
+│         │                   ▲           _swapTax() → depositTax()           │
+│         │                   │                                               │
+│         ▼           registerToken() + depositTax()                          │
+│   ┌────────────┐    ┌─────────────┐                                        │
+│   │ FFactoryV3 │───▶│  FRouterV3  │──── depositTax() to AgentTaxV2         │
+│   └────────────┘    └─────────────┘                                        │
+│                             │                                               │
+│                             ▼                                               │
+│                     Backend calls swapForTokenAddress(tokenAddr, minOutput) │
+│                     when threshold reached (hourly check via distributeTax) │
+│                                                                             │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+### Key Configuration Differences
+
+| Configuration | AgentFactoryV6 (V4) | AgentFactoryV7 (V5) |
+|--------------|---------------------|---------------------|
+| `nextIdBase` | 60,000,000,000 | 70,000,000,000 |
+| `tokenImplementation` | AgentTokenV2 | AgentTokenV3 |
+| `projectTaxRecipient` | AgentTax (old) | AgentTaxV2 (new) |
+| **Tax Flow** | Direct transfer → tax-listener | depositTax() → on-chain |
+
+### Why AgentTaxV2 Instead of Upgrading AgentTax?
+
+| Aspect | Upgrade AgentTax | New AgentTaxV2 |
+|--------|------------------|----------------|
+| **Code Size** | ~670 lines (V2 + V3 mixed) | ~300 lines (V3 only) |
+| **Complexity** | High (legacy code, deprecated fields) | Low (clean design) |
+| **Audit Cost** | Higher (mixed responsibilities) | Lower (single purpose) |
+| **Dependencies** | Needs `AgentNft`, `BondingV2/V4/V5` refs | None (standalone) |
+| **Storage** | Multiple mappings (agentId + tokenAddress) | Single mapping (tokenAddress only) |
+| **Maintenance** | Both V2 and V3 logic to maintain | Only V3 logic |
+
+**Decision:** New `AgentTaxV2` contract for cleaner separation:
+- **AgentTax** (old) → V2 tokens via tax-listener
+- **AgentTaxV2** (new) → V3 tokens via on-chain attribution
 
 ### Contract Relationship Diagram
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────┐
-│                    V2/V4 TOKEN ARCHITECTURE                             │
+│                    V4 SUITE (Legacy)                                    │
 │                    (Old tokens, tax-listener required)                  │
 ├─────────────────────────────────────────────────────────────────────────┤
 │                                                                         │
-│   BondingV4 ──────┬──→ FFactoryV2 ──→ FPairV2 (router=FRouterV2)       │
+│   BondingV4 ──────┬──→ AgentFactoryV6 ──→ AgentTokenV2                 │
+│                   │        │                                            │
+│                   │        └──→ projectTaxRecipient = AgentTax         │
 │                   │                                                     │
-│                   └──→ FRouterV2 ──→ direct transfer to AgentTax       │
-│                                                                         │
-│   AgentTokenV2 ──→ _swapTax() ──→ direct transfer to AgentTax          │
+│                   ├──→ FFactoryV2 ──→ FPairV2 (router=FRouterV2)       │
+│                   │                        │                            │
+│                   └──→ FRouterV2 ──────────┴──→ AgentTax (old)         │
+│                                                     │                   │
+│   AgentTokenV2 ──→ _swapTax() ──→ direct transfer ──┘                  │
 │                                                                         │
 │   Tax Attribution: OFF-CHAIN (tax-listener scans events)               │
+│   Backend: handleAgentTaxes(agentId, txhashes, amounts)                │
 │                                                                         │
 └─────────────────────────────────────────────────────────────────────────┘
 
 ┌─────────────────────────────────────────────────────────────────────────┐
-│                    V3/V5 TOKEN ARCHITECTURE                             │
+│                    V5 SUITE (New)                                       │
 │                    (New tokens, on-chain attribution)                   │
 ├─────────────────────────────────────────────────────────────────────────┤
 │                                                                         │
-│   BondingV5 ──────┬──→ FFactoryV3 ──→ FPairV2 (router=FRouterV3)       │
-│                   │                                                     │
-│                   └──→ FRouterV3 ──→ depositTax() to AgentTax          │
+│   BondingV5 ──────┬──→ AgentFactoryV7 ──→ AgentTokenV3                 │
+│        │          │        │                                            │
+│        │          │        └──→ projectTaxRecipient = AgentTaxV2       │
+│        │          │                                                     │
+│        │          ├──→ FFactoryV3 ──→ FPairV2 (router=FRouterV3)       │
+│        │          │                        │                            │
+│        │          └──→ FRouterV3 ──────────┴──→ AgentTaxV2 (new)       │
+│        │                                            │                   │
+│        └──→ registerToken() ────────────────────────┘                  │
 │                                                                         │
-│   AgentTokenV3 ──→ _swapTax() ──→ depositTax() to AgentTax             │
+│   AgentTokenV3 ──→ _swapTax() ──→ depositTax() ─────┘                  │
 │                                                                         │
 │   Tax Attribution: ON-CHAIN (depositTax records tokenAddress)          │
+│   Backend: swapForTokenAddress(tokenAddr, minOutput)                   │
 │                                                                         │
 └─────────────────────────────────────────────────────────────────────────┘
 ```
@@ -471,12 +611,28 @@ if (virtualId) {
 
 | File | Type | Description |
 |------|------|-------------|
-| `contracts/tax/AgentTax.sol` | Modified | Add `registerToken()`, `depositTax()`, `swapForTokenAddress()` |
+| `contracts/tax/AgentTaxV2.sol` | **New** | Simplified tax contract for V3 tokens (~300 lines) |
 | `contracts/launchpadv2/FFactoryV3.sol` | **New** | Identical to FFactoryV2, separate instance for V3 tokens |
 | `contracts/launchpadv2/FRouterV3.sol` | **New** | Router with `depositTax()` calls for buy/sell |
 | `contracts/launchpadv2/BondingV5.sol` | Modified | Use FFactoryV3 + FRouterV3, call `registerToken()` in `launch()` |
 | `contracts/virtualPersona/AgentTokenV3.sol` | **New** | `_swapTax()` calls `depositTax()` |
 | `tax-listener/src/services/chain.ts` | Modified | Add BondingV5 token check to skip V3 tokens |
+
+### AgentTaxV2 vs AgentTax Comparison
+
+```
+AgentTax (old, ~670 lines):
+├── V2 Functions: handleAgentTaxes, dcaSell, updateCreatorFor*
+├── V2 Storage: agentTaxAmounts[agentId], _agentRecipients[agentId], taxHistory[txhash]
+├── Dependencies: AgentNft, BondingV2/V4/V5 refs
+└── Legacy: tbaBonus (deprecated), creatorFeeRate (unused)
+
+AgentTaxV2 (new, ~300 lines):
+├── V3 Functions: registerToken, depositTax, swapForTokenAddress, batchSwap
+├── V3 Storage: tokenTaxAmounts[tokenAddr], tokenRecipients[tokenAddr]
+├── Dependencies: None (standalone)
+└── Clean design, single responsibility
+```
 
 ---
 
@@ -484,34 +640,94 @@ if (virtualId) {
 
 ### Contract Deployment
 
-1. [ ] Deploy/Upgrade `AgentTax` with V3 functions:
-   - `registerToken(tokenAddress, tba, creator)`
-   - `depositTax(tokenAddress, amount)`
-   - `swapForTokenAddress(tokenAddress, minOutput)`
+**Step 1: Deploy Tax Contract**
 
-2. [ ] Deploy `FFactoryV3`:
+1. [ ] Deploy `AgentTaxV2`:
+   ```solidity
+   AgentTaxV2.initialize(
+       admin,           // defaultAdmin
+       usdcAddress,     // assetToken
+       virtualAddress,  // taxToken
+       routerAddress,   // Uniswap router
+       treasury,        // treasury
+       minThreshold,    // minSwapThreshold
+       maxThreshold,    // maxSwapThreshold
+       3000             // feeRate (30%)
+   )
+   ```
+
+**Step 2: Deploy Token Implementation**
+
+2. [ ] Deploy `AgentTokenV3` implementation contract
+
+**Step 3: Deploy AgentFactoryV7**
+
+3. [ ] Deploy `AgentFactoryV7`:
+   ```solidity
+   AgentFactoryV7.initialize(
+       agentTokenV3Impl,    // tokenImplementation
+       veTokenImpl,         // veTokenImplementation (same as V6)
+       daoImpl,             // daoImplementation (same as V6)
+       tbaRegistry,         // tbaRegistry (same as V6)
+       assetToken,          // assetToken (VIRTUAL)
+       agentNft,            // nft (same as V6)
+       vault,               // vault (same as V6)
+       0                    // nextId (starts fresh with 70_000_000_000 base)
+   )
+   ```
+
+4. [ ] Configure `AgentFactoryV7`:
+   ```solidity
+   agentFactoryV7.setParams(
+       maturityDuration,    // same as V6
+       uniswapRouter,       // Uniswap V2 Router
+       defaultDelegatee,    // same as V6
+       tokenAdmin           // same as V6
+   )
+   
+   agentFactoryV7.setTokenParams(
+       500,                 // projectBuyTaxBasisPoints (5%)
+       500,                 // projectSellTaxBasisPoints (5%)
+       100,                 // taxSwapThresholdBasisPoints
+       agentTaxV2Address    // projectTaxRecipient = AgentTaxV2 ⚠️ KEY CONFIG
+   )
+   ```
+
+**Step 4: Deploy Factory & Router**
+
+5. [ ] Deploy `FFactoryV3`:
    - Identical code to FFactoryV2
-   - Configure same tax params as FFactoryV2
-   - Purpose: Frontend can determine router by factory/bonding version
+   - Configure with `AgentTaxV2` as taxVault
 
-3. [ ] Deploy `FRouterV3` (pointing to `FFactoryV3`)
+6. [ ] Deploy `FRouterV3` (pointing to `FFactoryV3`)
 
-4. [ ] Configure `FFactoryV3`:
+7. [ ] Configure `FFactoryV3`:
    - `fFactoryV3.setRouter(fRouterV3Address)`
-   - `fFactoryV3.setTaxParams(...)` (same as FFactoryV2)
+   - `fFactoryV3.setTaxParams(agentTaxV2, buyTax, sellTax, antiSniperTax, antiSniperVault)`
 
-5. [ ] Grant roles on `FFactoryV3`:
+**Step 5: Deploy BondingV5**
+
+8. [ ] Deploy/Upgrade `BondingV5`:
+   ```solidity
+   BondingV5.initialize(
+       fFactoryV3Address,
+       fRouterV3Address,
+       agentFactoryV7Address,  // ⚠️ Use AgentFactoryV7, not V6
+       bondingConfigAddress
+   )
+   ```
+
+**Step 6: Grant Roles**
+
+9. [ ] Grant roles on `FFactoryV3`:
    - `CREATOR_ROLE` to `BondingV5`
 
-6. [ ] Deploy `AgentTokenV3` implementation
+10. [ ] Grant roles on `AgentFactoryV7`:
+   - `BONDING_ROLE` to `BondingV5`
 
-7. [ ] Update `AgentFactoryV6.tokenImplementation` to `AgentTokenV3`
-
-8. [ ] Upgrade `BondingV5` to use `FFactoryV3` + `FRouterV3`
-
-9. [ ] Grant roles on `AgentTax`:
-   - `EXECUTOR_V2_ROLE` to `BondingV5` (for `registerToken()`)
-   - `EXECUTOR_V2_ROLE` to backend wallet (for `swapForTokenAddress()`)
+11. [ ] Grant roles on `AgentTaxV2`:
+   - `EXECUTOR_ROLE` to `BondingV5` (for `registerToken()`)
+   - `EXECUTOR_ROLE` to backend wallet (for `swapForTokenAddress()`)
 
 ### Tax-Listener Update (Critical)
 
@@ -519,15 +735,70 @@ if (virtualId) {
     - Call `ai-contribution-be` API to check if token is from BondingV5
     - If BondingV5 token, return `undefined` to skip processing
 
-### Backend Swap Setup
+### Backend Monitoring Setup: `distributeTaxMultichain`
 
-11. [ ] Implement monitoring:
-    - Option 1: Direct on-chain monitoring of `tokenTaxAmounts`
-    - Option 2 (Recommended): Volume-based monitoring (`volume24h >= 1000 VIRTUAL`, hourly checks)
+11. [ ] Deploy `distributeTaxMultichain` Lambda function in `tax-listener`:
+    - Location: `tax-listener/src/functions/distributeTaxMultichain.ts`
+    - Schedule: Hourly (`cron(0 * * * ? *)`)
+    - Reserved concurrency: 1
 
-12. [ ] When threshold reached:
-    - Verify conversion rate externally
-    - Call `AgentTax.swapForTokenAddress(tokenAddress, minOutput)`
+12. [ ] The function implements the following logic:
+
+    **Step 1: Query BONDING_V5 Virtuals from Platform-BE API**
+    ```
+    SELECT * FROM virtuals 
+    WHERE factory = 'BONDING_V5' 
+      AND status != 'DRAFT'
+      AND (
+        (created_at <= '25hrs ago' AND volume_24_h >= 1000) 
+        OR (created_at > '25hrs ago')
+      )
+    ```
+    
+    - Old tokens (> 25 hours): Only process if `volume24h >= 1000 VIRTUAL`
+    - New tokens (< 25 hours): Process all (grace period for new launches)
+
+    **Step 2: Group by Chain**
+    - Group virtuals by `blockchain` field (base, eth, bsc)
+    - Each chain has its own `AgentTaxV2` contract address
+
+    **Step 3: For Each Chain**
+    - Get chain-specific config (RPC, AgentTaxV2 address, conversion rate key)
+    - Fetch `minSwapThreshold` from `AgentTaxV2` contract
+    - For each token, call `getTokenTaxAmounts(preToken)`:
+      - If `(amountCollected - amountSwapped) >= minSwapThreshold`, add to batch
+
+    **Step 4: Execute Batch Swap**
+    - Calculate `minOutput = pendingAmount * conversionRate`
+    - Adjust for asset token decimals (8 for cbBTC, 18 for WETH/WBNB)
+    - Call `batchSwapForTokenAddress(tokenAddresses, minOutputs)` with max 100 tokens per batch
+
+    **Configuration Required** (in `config.{stage}.json`):
+    ```json
+    {
+      "AGENT_TAX_V2_BASE": "0x...",
+      "AGENT_TAX_V2_ETH": "0x...",
+      "AGENT_TAX_V2_BSC": "0x...",
+      "DISTRIBUTE_TAX_GAS_MULTIPLIER": "1.3"
+    }
+    ```
+
+    **Conversion Rate Keys** (already updated by `updateVirtRate`):
+    - Base: `VIRTBTC_RATE` (VIRTUAL → cbBTC)
+    - ETH: `VIRTETH_RATE` (VIRTUAL → WETH)
+    - BSC: `VIRTBNB_RATE` (VIRTUAL → WBNB)
+
+### Configuration Sync (Important)
+
+13. [ ] Maintain configuration for both tax contracts:
+
+| Config | AgentTax (V2 tokens) | AgentTaxV2 (V3 tokens) |
+|--------|---------------------|------------------------|
+| Router | Existing | Same or new |
+| Treasury | Existing | Same |
+| FeeRate | 3000 (30%) | 3000 (30%) |
+| MinThreshold | 100 VIRTUAL | 100 VIRTUAL |
+| MaxThreshold | 10000 VIRTUAL | 10000 VIRTUAL |
 
 ---
 
@@ -535,16 +806,55 @@ if (virtualId) {
 
 The on-chain tax attribution solution provides a scalable approach for multi-chain expansion by eliminating the need for chain-specific `tax-listener` services.
 
+**Full V4 vs V5 Suite Comparison:**
+
+| Component | V4 Suite (Legacy) | V5 Suite (New) |
+|-----------|------------------|----------------|
+| Bonding | BondingV4 | BondingV5 |
+| AgentFactory | AgentFactoryV6 | **AgentFactoryV7** |
+| AgentToken | AgentTokenV2 | AgentTokenV3 |
+| FFactory | FFactoryV2 | FFactoryV3 |
+| FRouter | FRouterV2 | FRouterV3 |
+| FPair | FPairV2 | FPairV2 (reused) |
+| Tax Contract | AgentTax | AgentTaxV2 |
+| Tax Attribution | Off-chain (tax-listener) | On-chain (depositTax) |
+
+**Architecture Flow:**
+```
+V4 Suite:
+  BondingV4 → AgentFactoryV6 → AgentTokenV2
+                    ↓
+            FFactoryV2 → FRouterV2 → AgentTax (tax-listener processes)
+  
+V5 Suite:
+  BondingV5 → AgentFactoryV7 → AgentTokenV3
+                    ↓
+            FFactoryV3 → FRouterV3 → AgentTaxV2 (on-chain attribution)
+```
+
+**Why AgentFactoryV7?**
+- `AgentFactoryV6` and `AgentFactoryV7` share the same `_tokenTaxParams` which includes `projectTaxRecipient`
+- V6's `projectTaxRecipient` → AgentTax (for graduated AgentTokenV2 tax)
+- V7's `projectTaxRecipient` → AgentTaxV2 (for graduated AgentTokenV3 tax)
+- Using separate factories ensures clean separation and no configuration conflicts
+
 **Key Trade-offs:**
 - Users pay ~6-9% more gas per trade
 - This percentage remains constant regardless of gas price fluctuations
+- Two complete suites to maintain (V4 + V5)
 
 **Key Benefits:**
 - No new tax-listener service needed per chain (saves ~$50-100/month per chain)
 - Real-time tax attribution
-- Simplified backend architecture
+- Simplified backend architecture (no tx scanning/grouping)
 - No risk of missed transactions
+- Clean separation between legacy (V4) and new (V5) ecosystems
+- Clean `AgentTaxV2` contract (~300 lines vs ~670 lines)
+- No legacy code or deprecated fields in V5 suite
 
 **Critical Requirements:**
 - Tax-listener must be updated to skip BondingV5 tokens
-- Backend must call `swapForTokenAddress()` when threshold reached
+- Deploy `distributeTaxMultichain` Lambda to trigger swaps hourly
+- Configure `AGENT_TAX_V2_*` addresses for each chain
+- Deploy and configure AgentFactoryV7 with `projectTaxRecipient = AgentTaxV2`
+- Grant `BONDING_ROLE` to BondingV5 in AgentFactoryV7

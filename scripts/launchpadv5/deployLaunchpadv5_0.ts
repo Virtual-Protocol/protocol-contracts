@@ -1,19 +1,31 @@
-// npx hardhat run scripts/launchpadv5/deployLaunchpadv5_0.ts --network eth_sepolia
+/**
+ * V5 Suite - Step 0: Deploy Prerequisites (AgentNftV2, AgentTaxV2)
+ * 
+ * Usage:
+ *   ENV_FILE=.env.launchpadv5_local npx hardhat run scripts/launchpadv5/deployLaunchpadv5_0.ts --network local
+ *   ENV_FILE=.env.launchpadv5_dev npx hardhat run scripts/launchpadv5/deployLaunchpadv5_0.ts --network base_sepolia
+ *   ENV_FILE=.env.launchpadv5_prod npx hardhat run scripts/launchpadv5/deployLaunchpadv5_0.ts --network base
+ */
 import { parseEther } from "ethers";
 import { verifyContract } from "./utils";
 const { ethers, upgrades } = require("hardhat");
 
 /**
- * Deploy prerequisites for FFactoryV2:
- * - AgentNftV2 (optional, if not already deployed)
- * - AgentTax (AGENT_TAX_CONTRACT_ADDRESS / FFactoryV2_TAX_VAULT)
+ * V5 Suite - Step 0: Deploy Prerequisites
+ * 
+ * Deploys:
+ * - AgentNftV2 (optional, reuse if already deployed)
+ * - AgentTaxV2 (NEW - for on-chain tax attribution)
+ * 
+ * V5 Suite Architecture:
+ * - AgentFactoryV7 + AgentTokenV3 + BondingV5 + FRouterV3 → AgentTaxV2 (on-chain)
  * 
  * Run this script before deployLaunchpadv5_1.ts
  */
 (async () => {
   try {
     console.log("\n" + "=".repeat(80));
-    console.log("  Launchpad V5 - Step 0: Deploy Prerequisites (AgentTax)");
+    console.log("  V5 Suite - Step 0: Deploy Prerequisites (AgentNftV2, AgentTaxV2)");
     console.log("=".repeat(80));
 
     const [deployer] = await ethers.getSigners();
@@ -32,7 +44,7 @@ const { ethers, upgrades } = require("hardhat");
       throw new Error("ADMIN not set in environment");
     }
 
-    // Backend wallet addresses for EXECUTOR_V2_ROLE (comma-separated)
+    // Backend wallet addresses for EXECUTOR_ROLE (for swapForTokenAddress / batchSwapForTokenAddress)
     const beTaxOpsWallets = process.env.BE_TAX_OPS_WALLETS;
     if (!beTaxOpsWallets) {
       throw new Error("BE_TAX_OPS_WALLETS not set in environment (comma-separated addresses)");
@@ -42,26 +54,15 @@ const { ethers, upgrades } = require("hardhat");
       throw new Error("BE_TAX_OPS_WALLETS must contain at least one address");
     }
 
-    // Backend wallet addresses for EXECUTOR_ROLE (comma-separated), calling handleAgentTaxes()
-    const beHandleAgentTaxesWallets = process.env.BE_HANDLE_AGENT_TAXES_WALLETS;
-    if (!beHandleAgentTaxesWallets) {
-      throw new Error("BE_HANDLE_AGENT_TAXES_WALLETS not set in environment (comma-separated addresses)");
-    }
-    const beHandleAgentTaxesWalletList = beHandleAgentTaxesWallets.split(",").map((addr) => addr.trim()).filter((addr) => addr.length > 0);
-    if (beHandleAgentTaxesWalletList.length === 0) {
-      throw new Error("BE_HANDLE_AGENT_TAXES_WALLETS must contain at least one address");
-    }
-
-    // AgentTax parameters
+    // AgentTaxV2 parameters (reuse same env names, just deploy V2 contract)
     const assetToken = process.env.AGENT_TAX_ASSET_TOKEN;
     if (!assetToken) {
-      throw new Error("AGENT_TAX_ASSET_TOKEN not set in environment (used as assetToken for AgentTax)");
+      throw new Error("AGENT_TAX_ASSET_TOKEN not set in environment");
     }
     
-    // Tax token - typically the same as asset token, or a separate tax token
     const taxToken = process.env.AGENT_TAX_TAX_TOKEN;
     if (!taxToken) {
-      throw new Error("AGENT_TAX_TAX_TOKEN not set in environment (used as taxToken for AgentTax)");
+      throw new Error("AGENT_TAX_TAX_TOKEN not set in environment");
     }
     
     const agentTaxDexRouter = process.env.AGENT_TAX_DEX_ROUTER;
@@ -82,8 +83,12 @@ const { ethers, upgrades } = require("hardhat");
     if (!maxSwapThreshold) {
       throw new Error("AGENT_TAX_MAX_SWAP_THRESHOLD not set in environment");
     }
+    const feeRate = process.env.AGENT_TAX_FEE_RATE;
+    if (!feeRate) {
+      throw new Error("AGENT_TAX_FEE_RATE not set in environment");
+    }
 
-    // AgentNftV2 - required for AgentTax
+    // AgentNftV2 - optional, reuse if exists
     let agentNftV2Address: string | undefined = process.env.AGENT_NFT_V2_ADDRESS;
 
     console.log("\nDeployment arguments loaded:", {
@@ -96,6 +101,7 @@ const { ethers, upgrades } = require("hardhat");
       treasury,
       minSwapThreshold,
       maxSwapThreshold,
+      feeRate,
       agentNftV2Address: agentNftV2Address || "(will deploy)",
     });
 
@@ -104,15 +110,14 @@ const { ethers, upgrades } = require("hardhat");
     const reusedContracts: { [key: string]: string } = {};
 
     // ============================================
-    // 1. Deploy AgentNftV2 (if not provided)
+    // 1. Deploy or Reuse AgentNftV2
     // ============================================
     if (!agentNftV2Address) {
       console.log("\n--- Deploying AgentNftV2 (proxy) ---");
       const AgentNftV2 = await ethers.getContractFactory("AgentNftV2");
-      // Initialize with deployer first so we can grant MINTER_ROLE later in _2.ts
       const agentNftV2 = await upgrades.deployProxy(
         AgentNftV2,
-        [deployerAddress], // initialize with deployer as defaultAdmin
+        [deployerAddress],
         {
           initializer: "initialize",
           initialOwner: contractController,
@@ -124,86 +129,93 @@ const { ethers, upgrades } = require("hardhat");
       console.log("AgentNftV2 deployed at:", agentNftV2Address);
       deployedContracts["AGENT_NFT_V2_ADDRESS"] = agentNftV2Address!;
 
-      // Grant DEFAULT_ADMIN_ROLE to admin as well
+      // Grant DEFAULT_ADMIN_ROLE to admin
       const defaultAdminRole = await agentNftV2.DEFAULT_ADMIN_ROLE();
       const tx = await agentNftV2.grantRole(defaultAdminRole, admin);
       await tx.wait();
       console.log("DEFAULT_ADMIN_ROLE of AgentNftV2 granted to admin:", admin);
 
-      // Grant ADMIN_ROLE to admin as well
-      // because agentVeTokenV2.setMatureAt() needs agentNftV2.adminRole
+      // Grant ADMIN_ROLE to admin (needed for agentVeTokenV2.setMatureAt())
       const adminRole = await agentNftV2.ADMIN_ROLE();
       const tx2 = await agentNftV2.grantRole(adminRole, admin);
       await tx2.wait();
       console.log("ADMIN_ROLE of AgentNftV2 granted to admin:", admin);
 
+      // Grant VALIDATOR_ADMIN_ROLE to admin
       const validatorAdminRole = await agentNftV2.VALIDATOR_ADMIN_ROLE();
       const tx3 = await agentNftV2.grantRole(validatorAdminRole, admin);
       await tx3.wait();
       console.log("VALIDATOR_ADMIN_ROLE of AgentNftV2 granted to admin:", admin);
 
-      // Verify AgentNftV2 proxy
       await verifyContract(agentNftV2Address!);
     } else {
-      console.log("\n--- Using existing AgentNftV2 ---");
+      console.log("\n--- Reusing existing AgentNftV2 ---");
       console.log("AgentNftV2 address:", agentNftV2Address);
       reusedContracts["AGENT_NFT_V2_ADDRESS"] = agentNftV2Address;
     }
 
     // ============================================
-    // 2. Deploy AgentTax (AGENT_TAX_CONTRACT_ADDRESS)
+    // 2. Deploy AgentTaxV2 (NEW - for V5 Suite)
     // ============================================
-    const existingAgentTax = process.env.AGENT_TAX_CONTRACT_ADDRESS;
-    let agentTaxAddress: string;
+    const existingAgentTaxV2 = process.env.AGENT_TAX_V2_CONTRACT_ADDRESS;
+    let agentTaxV2Address: string;
 
-    if (!existingAgentTax) {
-      console.log("\n--- Deploying AgentTax (AGENT_TAX_CONTRACT_ADDRESS) ---");
-      const AgentTax = await ethers.getContractFactory("AgentTax");
-      const agentTax = await upgrades.deployProxy(
-        AgentTax,
+    if (!existingAgentTaxV2) {
+      console.log("\n--- Deploying AgentTaxV2 (NEW for V5 Suite) ---");
+      const AgentTaxV2 = await ethers.getContractFactory("AgentTaxV2");
+      // Initialize with deployer as defaultAdmin so we can grant roles
+      // Admin roles will be transferred later
+      const agentTaxV2 = await upgrades.deployProxy(
+        AgentTaxV2,
         [
-          admin,                          // defaultAdmin_
-          assetToken,                     // assetToken_
-          taxToken,                       // taxToken_ (VIRTUAL_TOKEN)
-          agentTaxDexRouter,                // router_
-          treasury,                       // treasury_
-          minSwapThreshold,   // minSwapThreshold_
-          maxSwapThreshold,   // maxSwapThreshold_
-          agentNftV2Address,              // nft_ (AgentNftV2)
+          deployerAddress,      // defaultAdmin_ (deployer first, so we can grant roles)
+          assetToken,           // assetToken_
+          taxToken,             // taxToken_ (VIRTUAL)
+          agentTaxDexRouter,    // router_
+          treasury,             // treasury_
+          minSwapThreshold,     // minSwapThreshold_
+          maxSwapThreshold,     // maxSwapThreshold_
+          feeRate,              // feeRate_ (30% = 3000)
         ],
         {
           initializer: "initialize",
           initialOwner: contractController,
         }
       );
-      await agentTax.waitForDeployment();
-      agentTaxAddress = await agentTax.getAddress();
-      console.log("AgentTax deployed at:", agentTaxAddress);
-      deployedContracts["AGENT_TAX_CONTRACT_ADDRESS"] = agentTaxAddress;
+      await agentTaxV2.waitForDeployment();
+      agentTaxV2Address = await agentTaxV2.getAddress();
+      console.log("AgentTaxV2 deployed at:", agentTaxV2Address);
+      deployedContracts["AGENT_TAX_V2_CONTRACT_ADDRESS"] = agentTaxV2Address;
 
-      // Grant EXECUTOR_V2_ROLE to BE_TAX_OPS_WALLETS (for updateCreator functions)
-      const executorV2Role = await agentTax.EXECUTOR_V2_ROLE();
+      // Grant EXECUTOR_ROLE to backend wallets (for swapForTokenAddress / batchSwapForTokenAddress)
+      const executorRole = await agentTaxV2.EXECUTOR_ROLE();
       for (const wallet of beTaxOpsWalletList) {
-        const grantTx = await agentTax.grantRole(executorV2Role, wallet);
+        const grantTx = await agentTaxV2.grantRole(executorRole, wallet);
         await grantTx.wait();
-        console.log("EXECUTOR_V2_ROLE of AgentTax granted to:", wallet);
+        console.log("EXECUTOR_ROLE of AgentTaxV2 granted to:", wallet);
       }
 
-      // Grant EXECUTOR_ROLE to BE_HANDLE_AGENT_TAXES_WALLETS (for handleAgentTaxes)
-      const executorRole = await agentTax.EXECUTOR_ROLE();
-      for (const wallet of beHandleAgentTaxesWalletList) {
-        const grantTx = await agentTax.grantRole(executorRole, wallet);
-        await grantTx.wait();
-        console.log("EXECUTOR_ROLE of AgentTax granted to:", wallet);
-      }
+      // Grant DEFAULT_ADMIN_ROLE and ADMIN_ROLE to admin
+      const defaultAdminRole = await agentTaxV2.DEFAULT_ADMIN_ROLE();
+      const adminRole = await agentTaxV2.ADMIN_ROLE();
+      
+      const grantDefaultAdminTx = await agentTaxV2.grantRole(defaultAdminRole, admin);
+      await grantDefaultAdminTx.wait();
+      console.log("DEFAULT_ADMIN_ROLE of AgentTaxV2 granted to admin:", admin);
 
-      // Verify AgentTax proxy
-      await verifyContract(agentTaxAddress);
+      const grantAdminTx = await agentTaxV2.grantRole(adminRole, admin);
+      await grantAdminTx.wait();
+      console.log("ADMIN_ROLE of AgentTaxV2 granted to admin:", admin);
+
+      // Note: EXECUTOR_ROLE for BondingV5 (registerToken) will be granted in _3.ts
+      // Note: Deployer's roles will be revoked in _4.ts
+
+      await verifyContract(agentTaxV2Address);
     } else {
-      console.log("\n--- Using existing AgentTax ---");
-      console.log("AgentTax address:", existingAgentTax);
-      agentTaxAddress = existingAgentTax;
-      reusedContracts["AGENT_TAX_CONTRACT_ADDRESS"] = existingAgentTax;
+      console.log("\n--- Reusing existing AgentTaxV2 ---");
+      console.log("AgentTaxV2 address:", existingAgentTaxV2);
+      agentTaxV2Address = existingAgentTaxV2;
+      reusedContracts["AGENT_TAX_V2_CONTRACT_ADDRESS"] = existingAgentTaxV2;
     }
 
     // ============================================
@@ -228,15 +240,21 @@ const { ethers, upgrades } = require("hardhat");
     }
 
     console.log("\n--- Environment Variables for .env file ---");
-    console.log("# Prerequisites for FFactoryV2:");
+    console.log("# V5 Suite Prerequisites:");
     console.log(`AGENT_NFT_V2_ADDRESS=${agentNftV2Address}`);
-    console.log(`AGENT_TAX_CONTRACT_ADDRESS=${agentTaxAddress}`);
-    console.log(`FFactoryV2_TAX_VAULT=${agentTaxAddress}`);
+    console.log(`AGENT_TAX_V2_CONTRACT_ADDRESS=${agentTaxV2Address}`);
+    console.log(`FFactoryV3_TAX_VAULT=${agentTaxV2Address}`);
 
-    console.log("\n--- Manual Steps Required (by admin) ---");
-    console.log("1. AgentNftV2: MINTER_ROLE will be granted to AgentFactoryV6 in deployLaunchpadv5_2.ts");
-    console.log(`2. AgentTax: EXECUTOR_V2_ROLE has been granted to ${beTaxOpsWalletList.length} wallet(s)`);
-    console.log("3. AgentTax: Admin may need to grant EXECUTOR_ROLE to executor address for handleAgentTaxes()");
+    console.log("\n--- Roles Configured ---");
+    console.log(`1. AgentTaxV2: EXECUTOR_ROLE granted to ${beTaxOpsWalletList.length} wallet(s) for swapForTokenAddress()`);
+    console.log("2. AgentTaxV2: DEFAULT_ADMIN_ROLE and ADMIN_ROLE granted to admin");
+    console.log("3. AgentTaxV2: EXECUTOR_ROLE for BondingV5 (registerToken) will be granted in _3.ts");
+    console.log("4. AgentNftV2: MINTER_ROLE will be granted to AgentFactoryV7 in _2.ts");
+    console.log("5. Deployer's roles will be revoked in _4.ts");
+
+    console.log("\n--- V5 Suite Architecture ---");
+    console.log("AgentFactoryV7 + AgentTokenV3 + BondingV5 + FRouterV3 → AgentTaxV2");
+    console.log("(On-chain tax attribution via depositTax())");
 
     console.log("\n--- Next Step ---");
     console.log("Run: npx hardhat run scripts/launchpadv5/deployLaunchpadv5_1.ts --network <network>");

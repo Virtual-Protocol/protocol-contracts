@@ -1,8 +1,7 @@
 # Smart Contract Audit Summary V2 - On-Chain Tax Attribution
 
 **Previous Audit Commit:** `8a539e03b727d14c35522d241c3023ec24388010`  
-**Current Commit:** feat/vp-2173 lastest commit
-**PR:** 
+**New Branch:** `feat/vp-2173`  
 **Date:** March 2026
 
 ---
@@ -36,6 +35,7 @@ contracts/virtualPersona/IAgentTokenV3.sol  |   14 + (NEW)
 ### Commits Since Last Audit
 
 ```
+9f5d343 init OnChainTaxAttribution
 130cf00 add getAmountsOut validation before swap
 7e4d0c4 init on-chain tax attribution
 896d71c upgrade contracts and upload deployment json
@@ -452,23 +452,123 @@ const MIN_OUTPUTS: bigint[] = [
 
 ---
 
-## 6. Contract Addresses (Base Sepolia - Development)
+## 6. E2E Example Transactions (Base Sepolia)
 
-After deployment, addresses are saved to the env file. Example:
+The following transactions demonstrate a complete token lifecycle on Base Sepolia testnet, showing the on-chain tax attribution flow:
 
-```bash
-AGENT_NFT_V2_ADDRESS=0x...
-AGENT_TAX_V2_CONTRACT_ADDRESS=0x...
-FFactoryV3_ADDRESS=0x...
-FRouterV3_ADDRESS=0x...
-AGENT_TOKEN_V3_IMPLEMENTATION=0x...
-AGENT_FACTORY_V7_ADDRESS=0x...
-BONDING_CONFIG_ADDRESS=0x...
-BONDING_V5_ADDRESS=0x...
+### Token: E2E Test Token (E2E229)
+- **Token Address:** `0xeb7e0463ACb5672C318eb34dFaB4082E1592C188`
+- **Pair Address:** `0x9a7819E356EB91E755a7971a03E7fF0C2B19E11E`
+- **AgentTaxV2:** `0xC7475Af17c2041f4e3a027F9840623054ae5FC36`
+
+### Transaction Flow
+
+| Step | Action | Transaction | Key Events |
+|------|--------|-------------|------------|
+| 1 | **preLaunch** | [0x1f081c8c...](https://sepolia.basescan.org/tx/0x1f081c8cd075866ec8ba09079f5bd322eb7a8b41bc07bffecc1b9d1fdba51d83) | Token created, pair created |
+| 2 | **launch** | [0xd41613c2...](https://sepolia.basescan.org/tx/0xd41613c228472a54897938925a21f939128f27a6ad7d346db8d313db0de78ddf) | `TokenRegistered`, `TaxDeposited`, `Launched` |
+| 3 | **buy (1)** | [0x680da80e...](https://sepolia.basescan.org/tx/0x680da80ee92f2408e3cb1ea83c16a5dbd9b02286fe8c18ae843aed9675333356) | `TaxDeposited` (1 VIRTUAL tax) |
+| 4 | **buy (2)** | [0x4981d1f8...](https://sepolia.basescan.org/tx/0x4981d1f89dec87fe1ced02e69584e6981df19885686ac3fda975b6dcd7717089) | `TaxDeposited` |
+| 5 | **sell** | [0x1a3cf565...](https://sepolia.basescan.org/tx/0x1a3cf565aa5ca98e2356cebfb0de56c4bf41013cdc21b1c3627164afddccb7b1) | `TaxDeposited` (0.142 VIRTUAL tax) |
+| 6 | **batchSwapForTokenAddress** | [0x91c4fa80...](https://sepolia.basescan.org/tx/0x91c4fa807a74ae91437704420827a03ea64e1db053379c16931b0239616cb886) | `SwapExecuted` |
+
+### Key Event Analysis
+
+#### 1. TokenRegistered (during launch)
+
+```
+Event: TokenRegistered
+Address: 0xC7475Af17c2041f4e3a027F9840623054ae5FC36 (AgentTaxV2)
+Topics:
+  - tokenAddress: 0xeb7e0463ACb5672C318eb34dFaB4082E1592C188
+  - creator: 0x046308A74968E199C274Ae784c93a0ee18aF1aBF
+Data:
+  - tba: 0x046308A74968E199C274Ae784c93a0ee18aF1aBF
+```
+
+This event is emitted when `BondingV5.launch()` calls `AgentTaxV2.registerToken()`, registering the token with its creator for tax distribution.
+
+#### 2. TaxDeposited (during buy/sell)
+
+```
+Event: TaxDeposited
+Address: 0xC7475Af17c2041f4e3a027F9840623054ae5FC36 (AgentTaxV2)
+Topics:
+  - tokenAddress: 0xeb7e0463ACb5672C318eb34dFaB4082E1592C188
+Data:
+  - amount: 1000000000000000000 (1 VIRTUAL)
+```
+
+This event is emitted during each trade when `FRouterV3` (for prototype trades) or `AgentTokenV3` (for graduated trades) calls `AgentTaxV2.depositTax()`.
+
+#### 3. SwapExecuted (during batchSwapForTokenAddress)
+
+```
+Event: SwapExecuted
+Address: 0xC7475Af17c2041f4e3a027F9840623054ae5FC36 (AgentTaxV2)
+Topics:
+  - tokenAddress: 0xeb7e0463ACb5672C318eb34dFaB4082E1592C188
+Data:
+  - taxTokenAmount: accumulated VIRTUAL tax
+  - assetTokenAmount: received asset tokens (distributed to creator and treasury)
+```
+
+This event is emitted when the backend calls `AgentTaxV2.batchSwapForTokenAddress()` to swap accumulated tax and distribute to the creator and treasury.
+
+### Tax Flow Diagram
+
+```
+User Buy (100 VIRTUAL)
+    │
+    ├─► 7 VIRTUAL → Pair (swap for tokens)
+    ├─► 1 VIRTUAL → FRouterV3 → AgentTaxV2.depositTax()  ✓ TaxDeposited
+    └─► 92 VIRTUAL → Anti-sniper vault (during anti-sniper period)
+
+User Sell (tokens)
+    │
+    ├─► Pair returns 14.21 VIRTUAL
+    ├─► 14.07 VIRTUAL → User
+    └─► 0.142 VIRTUAL → FRouterV3 → AgentTaxV2.depositTax()  ✓ TaxDeposited
+
+Backend (hourly)
+    │
+    └─► AgentTaxV2.batchSwapForTokenAddress([token], [minOutput])
+        ├─► Swap accumulated VIRTUAL → Asset token
+        ├─► 70% → Creator
+        └─► 30% → Treasury
 ```
 
 ---
 
-## 7. Contact
+## 7. Contract Addresses (Base Sepolia - Development)
+
+### Deployed Addresses (from E2E test)
+
+| Contract | Address |
+|----------|---------|
+| BondingV5 | `0x2eB4313e3047845FD07315A51003F1f440780cdD` |
+| AgentTaxV2 | `0xC7475Af17c2041f4e3a027F9840623054ae5FC36` |
+| FRouterV3 | `0x2c224aC500927B8a583799bfe1e35AA68983CE10` |
+| VIRTUAL Token | `0xbfAB80ccc15DF6fb7185f9498d6039317331846a` |
+| Anti-Sniper Vault | `0x6EB12855a21564A1aC4aD0674e032A88e757570C` |
+
+### Environment File Template
+
+After deployment, addresses are saved to the env file:
+
+```bash
+AGENT_NFT_V2_ADDRESS=0x...
+AGENT_TAX_V2_CONTRACT_ADDRESS=0xC7475Af17c2041f4e3a027F9840623054ae5FC36
+FFactoryV3_ADDRESS=0x...
+FRouterV3_ADDRESS=0x2c224aC500927B8a583799bfe1e35AA68983CE10
+AGENT_TOKEN_V3_IMPLEMENTATION=0x...
+AGENT_FACTORY_V7_ADDRESS=0x...
+BONDING_CONFIG_ADDRESS=0x...
+BONDING_V5_ADDRESS=0x2eB4313e3047845FD07315A51003F1f440780cdD
+```
+
+---
+
+## 8. Contact
 
 For questions about this audit scope, please contact the Virtuals Protocol team.

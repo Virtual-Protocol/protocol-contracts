@@ -232,7 +232,7 @@ async function main() {
   const description = "E2E Test Token for BondingV5";
   const image = "https://example.com/e2e-test.png";
   const urls = ["", "", "", ""];
-  const purchaseAmount = parseEther("200"); // 1000 VIRTUAL
+  const purchaseAmount = parseEther("150"); // 150 VIRTUAL
   
   // Immediate launch (startTime < now + scheduledLaunchStartTimeDelay)
   const latestBlock = await ethers.provider.getBlock("latest");
@@ -240,9 +240,15 @@ async function main() {
   const startTimeDelayNum = Number(scheduledLaunchParams.startTimeDelay);
   const startTime = currentTimestamp + 100; // immediate launch (100 seconds from now)
   
-  const launchMode = LAUNCH_MODE_NORMAL;
-  const airdropBips = 300; // 300 = 3.00% (in bips, 1 bip = 0.01%)
-  const needAcf = true; // Test with ACF fee
+  // const launchMode = LAUNCH_MODE_NORMAL;
+  // const airdropBips = 300; // 300 = 3.00% (in bips, 1 bip = 0.01%)
+  // const needAcf = true; // Test with ACF fee
+  // const antiSniperTaxType = ANTI_SNIPER_60S; // 60 seconds anti-sniper
+  // const isProject60days = false;
+
+  const launchMode = LAUNCH_MODE_ACP_SKILL;
+  const airdropBips = 0; // 300 = 3.00% (in bips, 1 bip = 0.01%)
+  const needAcf = false; // Test with ACF fee
   const antiSniperTaxType = ANTI_SNIPER_60S; // 60 seconds anti-sniper
   const isProject60days = false;
 
@@ -563,7 +569,7 @@ async function main() {
   console.log("Tax Vault Balance:", formatEther(taxVaultBalanceBefore), "VIRTUAL");
   console.log("Anti-Sniper Tax Vault Balance:", formatEther(antiSniperTaxVaultBalanceBefore), "VIRTUAL");
 
-  const buyAmount = parseEther("100"); // 100 VIRTUAL
+  const buyAmount = parseEther("10"); // 10 VIRTUAL
   const deadline = Math.floor(Date.now() / 1000) + 300; // 5 minutes
 
   const agentTokenBalanceBefore = await agentToken.balanceOf(signerAddress);
@@ -662,7 +668,7 @@ async function main() {
   console.log("Tax Vault Balance:", formatEther(taxVaultBalanceBeforeBuy2), "VIRTUAL");
   console.log("Anti-Sniper Tax Vault Balance:", formatEther(antiSniperTaxVaultBalanceBeforeBuy2), "VIRTUAL");
 
-  const buyAmount2 = parseEther("50"); // 50 VIRTUAL
+  const buyAmount2 = parseEther("5"); // 5 VIRTUAL
   const deadline2 = Math.floor(Date.now() / 1000) + 300;
 
   console.log("\n--- Executing buy (after anti-sniper period) ---");

@@ -7,14 +7,14 @@ const { ethers } = require("hardhat");
 const CONFIG = {
   // Token address to buy/sell
   // tokenAddress: "0x0Ee7F7450C639736d7D9A252D5f21BA4cA1379d3", // TODO: Set your token address
-  tokenAddress: "0x108ABf3350EDA0769E3B91d3a8bB9b05AB9B470c", // TODO: Set your token address
+  tokenAddress: "0xD972075b06B6141D36dd35C5C4bb1C0d87462CfF", // TODO: Set your token address
   
   // Amount of VIRTUAL to spend on buy
   buyAmount: "1", // 1 VIRTUAL
   
   // Contract addresses (from environment or hardcode)
-  bondingV5Address: process.env.BONDING_V2_ADDRESS || "",
-  fRouterV2Address: process.env.FRouterV2_ADDRESS || "",
+  bondingV5Address: process.env.BONDING_V5_ADDRESS || "",
+  fRouterV3Address: process.env.FRouterV3_ADDRESS || "",
   virtualTokenAddress: process.env.VIRTUAL_TOKEN_ADDRESS || "",
 };
 
@@ -35,7 +35,7 @@ async function main() {
 
   // Get contract instances
   const bondingV5 = await ethers.getContractAt("BondingV5", CONFIG.bondingV5Address);
-  const fRouterV2 = await ethers.getContractAt("FRouterV2", CONFIG.fRouterV2Address);
+  const fRouterV3 = await ethers.getContractAt("FRouterV3", CONFIG.fRouterV3Address);
   const virtualToken = await ethers.getContractAt("IERC20", CONFIG.virtualTokenAddress);
   const agentToken = await ethers.getContractAt("IERC20", CONFIG.tokenAddress);
 
@@ -78,7 +78,7 @@ async function main() {
 
   // Check and approve VIRTUAL token
   const bondingAllowance = await virtualToken.allowance(signerAddress, CONFIG.bondingV5Address);
-  const routerAllowance = await virtualToken.allowance(signerAddress, CONFIG.fRouterV2Address);
+  const routerAllowance = await virtualToken.allowance(signerAddress, CONFIG.fRouterV3Address);
 
   if (bondingAllowance < buyAmountWei) {
     console.log("Approving VIRTUAL to BondingV5...");
@@ -89,7 +89,7 @@ async function main() {
 
   if (routerAllowance < buyAmountWei) {
     console.log("Approving VIRTUAL to FRouterV2...");
-    const approveTx2 = await virtualToken.approve(CONFIG.fRouterV2Address, ethers.MaxUint256);
+    const approveTx2 = await virtualToken.approve(CONFIG.fRouterV3Address, ethers.MaxUint256);
     await approveTx2.wait();
     console.log("✅ Approved to FRouterV2");
   }
@@ -131,10 +131,10 @@ async function main() {
   }
 
   // Approve agent token to FRouterV2 for sell
-  const agentTokenAllowance = await agentToken.allowance(signerAddress, CONFIG.fRouterV2Address);
+  const agentTokenAllowance = await agentToken.allowance(signerAddress, CONFIG.fRouterV3Address);
   if (agentTokenAllowance < sellAmount) {
     console.log("Approving Agent Token to FRouterV2...");
-    const approveAgentTx = await agentToken.approve(CONFIG.fRouterV2Address, ethers.MaxUint256);
+    const approveAgentTx = await agentToken.approve(CONFIG.fRouterV3Address, ethers.MaxUint256);
     await approveAgentTx.wait();
     console.log("✅ Approved Agent Token to FRouterV2");
   }

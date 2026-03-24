@@ -24,7 +24,7 @@ const { ethers } = require("hardhat");
 // ============================================================================
 const TOKEN_ADDRESSES: string[] = [
   // Add token addresses here, e.g.:
-  "0xeb7e0463ACb5672C318eb34dFaB4082E1592C188",
+  "0xD972075b06B6141D36dd35C5C4bb1C0d87462CfF",
 ];
 
 // Minimum output amounts for each token (same length as TOKEN_ADDRESSES)
@@ -272,10 +272,13 @@ async function main() {
   }
 }
 
-main()
-  .then(() => process.exit(0))
-  .catch((error) => {
-    console.error("\n❌ Script failed:");
-    console.error(error);
-    process.exit(1);
-  });
+// Only run main() when this script is executed directly, not when imported as a module
+if (require.main === module) {
+  main()
+    .then(() => process.exit(0))
+    .catch((error) => {
+      console.error("\n❌ Script failed:");
+      console.error(error);
+      process.exit(1);
+    });
+}

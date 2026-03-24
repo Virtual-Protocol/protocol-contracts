@@ -8,6 +8,15 @@ import "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol"
 import "../pool/IRouter.sol";
 
 /**
+ * @dev Minimal interface for BondingV5 to check token launch types
+ */
+interface IBondingV5ForTaxV2 {
+    function isProject60days(address token) external view returns (bool);
+    function isProjectXLaunch(address token) external view returns (bool);
+    function isAcpSkillLaunch(address token) external view returns (bool);
+}
+
+/**
  * @title AgentTaxV2
  * @notice Simplified tax contract for V3 tokens with on-chain attribution
  * @dev This contract handles tax collection and distribution for tokens launched via BondingV5
@@ -29,6 +38,8 @@ contract AgentTaxV2 is Initializable, AccessControlUpgradeable {
     }
 
     bytes32 public constant ADMIN_ROLE = keccak256("ADMIN_ROLE");
+    bytes32 public constant REGISTER_ROLE = keccak256("REGISTER_ROLE");
+    bytes32 public constant SWAP_ROLE = keccak256("SWAP_ROLE");
     bytes32 public constant EXECUTOR_ROLE = keccak256("EXECUTOR_ROLE");
 
     uint256 internal constant DENOM = 10000;
@@ -43,6 +54,8 @@ contract AgentTaxV2 is Initializable, AccessControlUpgradeable {
 
     mapping(address tokenAddress => TaxRecipient) public tokenRecipients;
     mapping(address tokenAddress => TaxAmounts) public tokenTaxAmounts;
+
+    IBondingV5ForTaxV2 public bondingV5;
 
     event TokenRegistered(address indexed tokenAddress, address indexed creator, address tba);
     event TaxDeposited(address indexed tokenAddress, uint256 amount);
@@ -126,7 +139,7 @@ contract AgentTaxV2 is Initializable, AccessControlUpgradeable {
         address tokenAddress,
         address tba,
         address creator
-    ) external onlyRole(EXECUTOR_ROLE) {
+    ) external onlyRole(REGISTER_ROLE) {
         require(tokenAddress != address(0), "Invalid token address");
         require(creator != address(0), "Invalid creator");
 
@@ -168,7 +181,7 @@ contract AgentTaxV2 is Initializable, AccessControlUpgradeable {
     function swapForTokenAddress(
         address tokenAddress,
         uint256 minOutput
-    ) external onlyRole(EXECUTOR_ROLE) {
+    ) external onlyRole(SWAP_ROLE) {
         TaxRecipient memory recipient = tokenRecipients[tokenAddress];
         require(recipient.creator != address(0), "Token not registered");
 
@@ -184,7 +197,7 @@ contract AgentTaxV2 is Initializable, AccessControlUpgradeable {
     function batchSwapForTokenAddress(
         address[] memory tokenAddresses,
         uint256[] memory minOutputs
-    ) external onlyRole(EXECUTOR_ROLE) {
+    ) external onlyRole(SWAP_ROLE) {
         require(tokenAddresses.length == minOutputs.length, "Length mismatch");
 
         for (uint i = 0; i < tokenAddresses.length; i++) {
@@ -198,6 +211,47 @@ contract AgentTaxV2 is Initializable, AccessControlUpgradeable {
             TaxAmounts storage amounts = tokenTaxAmounts[tokenAddress];
             _swapAndDistribute(tokenAddress, recipient, amounts, minOutputs[i]);
         }
+    }
+
+/**
+     * @notice Update tax recipient for special launch agents (Project60days, X_LAUNCH, or ACP_SKILL)
+     * @dev Called by backend for tokens that need creator updates:
+     * 
+     *      Project60days tokens:
+     *        - After graduation: set creator = vaultAddress (60-day lock)
+     *        - After COMMIT: set creator = walletAddress (creator receives tax)
+     * 
+     *      X_LAUNCH / ACP_SKILL tokens:
+     *        - Before launch: set creator = taxRecipient (partner address)
+     * 
+     * @param tokenAddress The address of the agent token
+     * @param tba The Token Bound Address (usually same as dbVirtuals.walletAddress)
+     * @param creator The creator address that will receive tax rewards
+     */
+    function updateCreatorForSpecialLaunchAgents(
+        address tokenAddress,
+        address tba,
+        address creator
+    ) external onlyRole(EXECUTOR_ROLE) {
+        require(address(bondingV5) != address(0), "BondingV5 not set");
+        require(tokenAddress != address(0), "Invalid token address");
+        require(tba != address(0), "Invalid TBA");
+        require(creator != address(0), "Invalid creator");
+
+        bool isSpecialLaunch = bondingV5.isProject60days(tokenAddress) ||
+            bondingV5.isProjectXLaunch(tokenAddress) ||
+            bondingV5.isAcpSkillLaunch(tokenAddress);
+
+        require(isSpecialLaunch, "Token is not a special launch type");
+
+        TaxRecipient storage recipient = tokenRecipients[tokenAddress];
+        require(recipient.creator != address(0), "Token not registered");
+
+        address oldCreator = recipient.creator;
+        recipient.tba = tba;
+        recipient.creator = creator;
+
+        emit CreatorUpdated(tokenAddress, oldCreator, creator);
     }
 
     // ============ Internal Functions ============
@@ -311,6 +365,15 @@ contract AgentTaxV2 is Initializable, AccessControlUpgradeable {
     }
 
     // ============ Admin Functions ============
+
+    /**
+     * @notice Set BondingV5 contract address
+     * @param bondingV5_ The address of the BondingV5 contract
+     */
+    function setBondingV5(address bondingV5_) external onlyRole(ADMIN_ROLE) {
+        require(bondingV5_ != address(0), "Invalid BondingV5 address");
+        bondingV5 = IBondingV5ForTaxV2(bondingV5_);
+    }
 
     /**
      * @notice Update swap parameters

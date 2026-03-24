@@ -44,7 +44,7 @@ const { ethers, upgrades } = require("hardhat");
       throw new Error("ADMIN not set in environment");
     }
 
-    // Backend wallet addresses for EXECUTOR_ROLE (for swapForTokenAddress / batchSwapForTokenAddress)
+    // Backend wallet addresses for SWAP_ROLE (for swapForTokenAddress / batchSwapForTokenAddress)
     const beTaxOpsWallets = process.env.BE_TAX_OPS_WALLETS;
     if (!beTaxOpsWallets) {
       throw new Error("BE_TAX_OPS_WALLETS not set in environment (comma-separated addresses)");
@@ -52,6 +52,16 @@ const { ethers, upgrades } = require("hardhat");
     const beTaxOpsWalletList = beTaxOpsWallets.split(",").map((addr) => addr.trim()).filter((addr) => addr.length > 0);
     if (beTaxOpsWalletList.length === 0) {
       throw new Error("BE_TAX_OPS_WALLETS must contain at least one address");
+    }
+
+    // Backend wallet addresses for EXECUTOR_ROLE (for updateCreatorForSpecialLaunchAgents)
+    const beOpsWallets = process.env.BE_OPS_WALLETS;
+    if (!beOpsWallets) {
+      throw new Error("BE_OPS_WALLETS not set in environment (comma-separated addresses)");
+    }
+    const beOpsWalletList = beOpsWallets.split(",").map((addr) => addr.trim()).filter((addr) => addr.length > 0);
+    if (beOpsWalletList.length === 0) {
+      throw new Error("BE_OPS_WALLETS must contain at least one address");
     }
 
     // AgentTaxV2 parameters (reuse same env names, just deploy V2 contract)
@@ -95,6 +105,7 @@ const { ethers, upgrades } = require("hardhat");
       contractController,
       admin,
       beTaxOpsWallets: beTaxOpsWalletList,
+      beOpsWallets: beOpsWalletList,
       assetToken,
       taxToken,
       agentTaxDexRouter,
@@ -187,9 +198,17 @@ const { ethers, upgrades } = require("hardhat");
       console.log("AgentTaxV2 deployed at:", agentTaxV2Address);
       deployedContracts["AGENT_TAX_V2_CONTRACT_ADDRESS"] = agentTaxV2Address;
 
-      // Grant EXECUTOR_ROLE to backend wallets (for swapForTokenAddress / batchSwapForTokenAddress)
-      const executorRole = await agentTaxV2.EXECUTOR_ROLE();
+      // Grant SWAP_ROLE to BE_TAX_OPS wallets (for swapForTokenAddress / batchSwapForTokenAddress)
+      const swapRole = await agentTaxV2.SWAP_ROLE();
       for (const wallet of beTaxOpsWalletList) {
+        const grantTx = await agentTaxV2.grantRole(swapRole, wallet);
+        await grantTx.wait();
+        console.log("SWAP_ROLE of AgentTaxV2 granted to:", wallet);
+      }
+
+      // Grant EXECUTOR_ROLE to BE_OPS wallets (for updateCreatorForSpecialLaunchAgents)
+      const executorRole = await agentTaxV2.EXECUTOR_ROLE();
+      for (const wallet of beOpsWalletList) {
         const grantTx = await agentTaxV2.grantRole(executorRole, wallet);
         await grantTx.wait();
         console.log("EXECUTOR_ROLE of AgentTaxV2 granted to:", wallet);
@@ -207,7 +226,8 @@ const { ethers, upgrades } = require("hardhat");
       await grantAdminTx.wait();
       console.log("ADMIN_ROLE of AgentTaxV2 granted to admin:", admin);
 
-      // Note: EXECUTOR_ROLE for BondingV5 (registerToken) will be granted in _3.ts
+      // Note: REGISTER_ROLE for BondingV5 (registerToken) will be granted in _3.ts
+      // Note: setBondingV5() will be called in _3.ts
       // Note: Deployer's roles will be revoked in _4.ts
 
       await verifyContract(agentTaxV2Address);
@@ -246,11 +266,13 @@ const { ethers, upgrades } = require("hardhat");
     console.log(`FFactoryV3_TAX_VAULT=${agentTaxV2Address}`);
 
     console.log("\n--- Roles Configured ---");
-    console.log(`1. AgentTaxV2: EXECUTOR_ROLE granted to ${beTaxOpsWalletList.length} wallet(s) for swapForTokenAddress()`);
-    console.log("2. AgentTaxV2: DEFAULT_ADMIN_ROLE and ADMIN_ROLE granted to admin");
-    console.log("3. AgentTaxV2: EXECUTOR_ROLE for BondingV5 (registerToken) will be granted in _3.ts");
-    console.log("4. AgentNftV2: MINTER_ROLE will be granted to AgentFactoryV7 in _2.ts");
-    console.log("5. Deployer's roles will be revoked in _4.ts");
+    console.log(`1. AgentTaxV2: SWAP_ROLE granted to ${beTaxOpsWalletList.length} wallet(s) for swapForTokenAddress()`);
+    console.log(`2. AgentTaxV2: EXECUTOR_ROLE granted to ${beOpsWalletList.length} wallet(s) for updateCreatorForSpecialLaunchAgents()`);
+    console.log("3. AgentTaxV2: DEFAULT_ADMIN_ROLE and ADMIN_ROLE granted to admin");
+    console.log("4. AgentTaxV2: REGISTER_ROLE for BondingV5 (registerToken) will be granted in _3.ts");
+    console.log("5. AgentTaxV2: setBondingV5() will be called in _3.ts");
+    console.log("6. AgentNftV2: MINTER_ROLE will be granted to AgentFactoryV7 in _2.ts");
+    console.log("7. Deployer's roles will be revoked in _4.ts");
 
     console.log("\n--- V5 Suite Architecture ---");
     console.log("AgentFactoryV7 + AgentTokenV3 + BondingV5 + FRouterV3 → AgentTaxV2");

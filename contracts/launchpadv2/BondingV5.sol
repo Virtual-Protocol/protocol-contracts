@@ -365,6 +365,16 @@ contract BondingV5 is
         newToken.data.prevPrice = price;
         newToken.data.lastUpdated = block.timestamp;
 
+        // Register token with AgentTax for on-chain tax attribution
+        // This must happen BEFORE _buy() is called, as _buy() triggers depositTax()
+        address taxVault = factory.taxVault();
+        require(taxVault != address(0), "TaxVault not set");
+        IAgentTaxMinimal(taxVault).registerToken(
+            token,
+            newToken.creator, // Use creator as TBA
+            newToken.creator
+        );
+
         emit PreLaunched(
             token,
             pair,
@@ -437,16 +447,6 @@ contract BondingV5 is
 
         // Set tax start time to current block timestamp for proper anti-sniper tax calculation
         router.setTaxStartTime(tokenRef.pair, block.timestamp);
-
-        // Register token with AgentTax for on-chain tax attribution
-        // This must happen BEFORE _buy() is called, as _buy() triggers depositTax()
-        address taxVault = factory.taxVault();
-        require(taxVault != address(0), "TaxVault not set");
-        IAgentTaxMinimal(taxVault).registerToken(
-            tokenAddress_,
-            tokenRef.creator, // Use creator as TBA
-            tokenRef.creator
-        );
 
         // Make initial purchase for creator
         // bondingContract will transfer initialPurchase $Virtual to pairAddress

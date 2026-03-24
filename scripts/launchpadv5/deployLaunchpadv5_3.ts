@@ -303,12 +303,16 @@ const { ethers, upgrades } = require("hardhat");
     await (await agentFactoryV7.grantRole(bondingRole, bondingV5Address)).wait();
     console.log("✅ BONDING_ROLE of AgentFactoryV7 granted to BondingV5:", bondingV5Address);
 
-    // Grant EXECUTOR_ROLE of AgentTaxV2 to BondingV5 (for registerToken)
+    // Grant REGISTER_ROLE of AgentTaxV2 to BondingV5 (for registerToken)
     // BondingV5 uses factory.taxVault() to get AgentTaxV2 address
-    const agentTaxV2ExecutorRole = await agentTaxV2.EXECUTOR_ROLE();
-    await (await agentTaxV2.grantRole(agentTaxV2ExecutorRole, bondingV5Address)).wait();
-    console.log("✅ EXECUTOR_ROLE of AgentTaxV2 granted to BondingV5 (for registerToken):", bondingV5Address);
+    const agentTaxV2RegisterRole = await agentTaxV2.REGISTER_ROLE();
+    await (await agentTaxV2.grantRole(agentTaxV2RegisterRole, bondingV5Address)).wait();
+    console.log("✅ REGISTER_ROLE of AgentTaxV2 granted to BondingV5 (for registerToken):", bondingV5Address);
     console.log("   Note: BondingV5 uses FFactoryV3.taxVault() to get AgentTaxV2 address");
+
+    // Set BondingV5 address in AgentTaxV2 (for updateCreatorForSpecialLaunchAgents validation)
+    await (await agentTaxV2.setBondingV5(bondingV5Address)).wait();
+    console.log("✅ AgentTaxV2.setBondingV5() called:", bondingV5Address);
 
     console.log("\n✅ All role grants and configurations completed!");
 
@@ -346,7 +350,8 @@ const { ethers, upgrades } = require("hardhat");
     console.log("- FFactoryV3.CREATOR_ROLE → BondingV5 (create preToken pairs)");
     console.log("- FRouterV3.EXECUTOR_ROLE → BondingV5 (buy/sell operations)");
     console.log("- AgentFactoryV7.BONDING_ROLE → BondingV5 (launch tokens)");
-    console.log("- AgentTaxV2.EXECUTOR_ROLE → BondingV5 (registerToken on launch)");
+    console.log("- AgentTaxV2.REGISTER_ROLE → BondingV5 (registerToken on launch)");
+    console.log("- AgentTaxV2.setBondingV5() → BondingV5 (for special launch validation)");
 
     console.log("\n--- V5 Suite Tax Flow ---");
     console.log("Prototype Buy/Sell:");

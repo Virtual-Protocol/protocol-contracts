@@ -1,49 +1,75 @@
-# Smart Contract Audit Summary V2 - On-Chain Tax Attribution
+# Smart Contract Audit Summary V2 - On-Chain Tax Attribution (V5 Suite)
 
-**Previous Audit Commit:** `8a539e03b727d14c35522d241c3023ec24388010`  
-**New Branch:** `feat/vp-2173`  
+**Branch:** `feat/vp-2173`  
+**Base:** `main` (V4 Suite)  
 **Date:** March 2026
 
 ---
 
 ## 1. Executive Summary
 
-This document describes changes made since the previous audit, focusing on the implementation of **on-chain tax attribution** which eliminates the need for chain-specific `tax-listener` backend services.
+This document describes the **V5 Suite** - a new contract suite that implements **on-chain tax attribution**, eliminating the need for chain-specific `tax-listener` backend services.
 
-### Key Changes Since Last Audit
+**V5 Suite is a parallel deployment alongside the existing V4 Suite.** The V4 Suite on `main` branch remains unchanged and continues to operate. V5 Suite contracts are evolved versions of V4 contracts with minimal changes to support `depositTax()` calls.
 
-| Category | Details |
-|----------|---------|
-| **New Contracts** | `AgentTaxV2.sol`, `FFactoryV3.sol`, `FRouterV3.sol`, `AgentTokenV3.sol`, `IAgentTokenV3.sol` |
-| **Modified Contracts** | `BondingV5.sol`, `BondingConfig.sol`, `AgentFactoryV6.sol`, `AgentTax.sol` |
-| **Total Lines Changed** | ~2,100 lines in contracts |
+### V4 Suite vs V5 Suite Comparison
 
-### Files Changed (Contracts Only)
+| V4 Suite (on `main`) | V5 Suite (NEW) | Relationship | How to Compare |
+|----------------------|----------------|--------------|----------------|
+| `FFactoryV2.sol` | `FFactoryV3.sol` | **Identical code** (separate instance) | `diff FFactoryV2.sol FFactoryV3.sol` |
+| `FRouterV2.sol` | `FRouterV3.sol` | +`depositTax()` calls in buy/sell | `diff FRouterV2.sol FRouterV3.sol` |
+| `AgentTokenV2.sol` | `AgentTokenV3.sol` | +`depositTax()` in `_swapTax()` | `diff AgentTokenV2.sol AgentTokenV3.sol` |
+| `AgentTax.sol` | `AgentTaxV2.sol` | **Simplified rewrite** (~438 vs ~520 lines) | New design, see Section 3 |
+| `BondingV4.sol` | `BondingV5.sol` | +`registerToken()` call in `launch()` | `diff BondingV4.sol BondingV5.sol` |
+| `AgentFactoryV6.sol` | `AgentFactoryV7.sol` | Points to V3 token and AgentTaxV2 | `diff AgentFactoryV6.sol AgentFactoryV7.sol` |
 
+### What's NOT Changed on `main`
+
+- `AgentTax.sol` - **No functional changes** (only added comments for clarity)
+- `FFactoryV2.sol`, `FRouterV2.sol` - Unchanged
+- `AgentTokenV2.sol`, `AgentFactoryV6.sol` - Unchanged
+- `BondingV4.sol`, `BondingConfig.sol` - Unchanged
+
+### V5 Suite New Contracts (relative to `main`)
+
+| Contract | Lines | Description |
+|----------|-------|-------------|
+| `FFactoryV3.sol` | 135 | Copy of FFactoryV2 (separate instance for V5 routing) |
+| `FRouterV3.sol` | 335 | FRouterV2 + `depositTax()` calls (~30 lines added) |
+| `AgentTokenV3.sol` | 1238 | AgentTokenV2 + `depositTax()` in `_swapTax()` (~10 lines added) |
+| `AgentTaxV2.sol` | 438 | Simplified tax contract for V5 (tokenAddress-based) |
+| `AgentFactoryV7.sol` | ~400 | AgentFactoryV6 pointing to V3 implementations |
+| `BondingV5.sol` | 784 | BondingV4 + `registerToken()` call (~20 lines added) |
+
+### Recommended Diff Commands
+
+```bash
+# FFactory: Should be identical (just a separate deployment)
+diff contracts/launchpadv2/FFactoryV2.sol contracts/launchpadv2/FFactoryV3.sol
+
+# FRouter: See depositTax() additions
+diff contracts/launchpadv2/FRouterV2.sol contracts/launchpadv2/FRouterV3.sol
+
+# AgentToken: See depositTax() in _swapTax()
+diff contracts/virtualPersona/AgentTokenV2.sol contracts/virtualPersona/AgentTokenV3.sol
+
+# Bonding: See registerToken() call
+diff contracts/launchpadv2/BondingV4.sol contracts/launchpadv2/BondingV5.sol
+
+# AgentFactory: See implementation pointer changes
+diff contracts/virtualPersona/AgentFactoryV6.sol contracts/virtualPersona/AgentFactoryV7.sol
 ```
-contracts/launchpadv2/BondingConfig.sol     |  105 ++-
-contracts/launchpadv2/BondingV5.sol         |  195 +++--
-contracts/launchpadv2/FFactoryV3.sol        |  135 +++ (NEW)
-contracts/launchpadv2/FRouterV3.sol         |  335 ++++++++ (NEW)
-contracts/tax/AgentTax.sol                  |  177 ++++
-contracts/tax/AgentTaxV2.sol                |  375 ++++++++ (NEW)
-contracts/virtualPersona/AgentFactoryV6.sol |   12 +-
-contracts/virtualPersona/AgentTokenV3.sol   | 1238 +++++++ (NEW)
-contracts/virtualPersona/IAgentTokenV3.sol  |   14 + (NEW)
-```
 
-### Commits Since Last Audit
+### Net New Code Summary
 
-```
-9f5d343 init OnChainTaxAttribution
-130cf00 add getAmountsOut validation before swap
-7e4d0c4 init on-chain tax attribution
-896d71c upgrade contracts and upload deployment json
-6c2bee8 fix: Incorrect Boundary Condition for Reserved Percentage
-bba530b fix: Cancelled launches still become tradable at scheduled start
-854e4af make scheduledLaunchParams and deployParams var public
-65af952 make airdropPercent related to bips
-```
+| Change Type | Estimated Lines |
+|-------------|-----------------|
+| `depositTax()` calls in FRouterV3 | ~30 lines |
+| `depositTax()` call in AgentTokenV3 | ~10 lines |
+| `registerToken()` call in BondingV5 | ~20 lines |
+| AgentTaxV2 (simplified rewrite) | ~438 lines (but simpler than AgentTax's ~520) |
+
+**The actual net new logic for on-chain tax attribution is approximately ~60 lines across FRouterV3, AgentTokenV3, and BondingV5.** AgentTaxV2 is a standalone simplified contract.
 
 ---
 

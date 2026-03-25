@@ -55,13 +55,13 @@ const { ethers, upgrades } = require("hardhat");
     }
 
     // Backend wallet addresses for EXECUTOR_ROLE (for updateCreatorForSpecialLaunchAgents)
-    const beOpsWallets = process.env.BE_OPS_WALLETS;
-    if (!beOpsWallets) {
-      throw new Error("BE_OPS_WALLETS not set in environment (comma-separated addresses)");
+    const agentTaxV2ExecutorWallets = process.env.AGENT_TAX_V2_EXECUTOR_WALLETS;
+    if (!agentTaxV2ExecutorWallets) {
+      throw new Error("AGENT_TAX_V2_EXECUTOR_WALLETS not set in environment (comma-separated addresses)");
     }
-    const beOpsWalletList = beOpsWallets.split(",").map((addr) => addr.trim()).filter((addr) => addr.length > 0);
-    if (beOpsWalletList.length === 0) {
-      throw new Error("BE_OPS_WALLETS must contain at least one address");
+    const agentTaxV2ExecutorWalletList = agentTaxV2ExecutorWallets.split(",").map((addr) => addr.trim()).filter((addr) => addr.length > 0);
+    if (agentTaxV2ExecutorWalletList.length === 0) {
+      throw new Error("AGENT_TAX_V2_EXECUTOR_WALLETS must contain at least one address");
     }
 
     // AgentTaxV2 parameters (reuse same env names, just deploy V2 contract)
@@ -105,7 +105,7 @@ const { ethers, upgrades } = require("hardhat");
       contractController,
       admin,
       beTaxOpsWallets: beTaxOpsWalletList,
-      beOpsWallets: beOpsWalletList,
+      agentTaxV2ExecutorWallets: agentTaxV2ExecutorWalletList,
       assetToken,
       taxToken,
       agentTaxDexRouter,
@@ -208,7 +208,7 @@ const { ethers, upgrades } = require("hardhat");
 
       // Grant EXECUTOR_ROLE to BE_OPS wallets (for updateCreatorForSpecialLaunchAgents)
       const executorRole = await agentTaxV2.EXECUTOR_ROLE();
-      for (const wallet of beOpsWalletList) {
+      for (const wallet of agentTaxV2ExecutorWalletList) {
         const grantTx = await agentTaxV2.grantRole(executorRole, wallet);
         await grantTx.wait();
         console.log("EXECUTOR_ROLE of AgentTaxV2 granted to:", wallet);
@@ -267,7 +267,7 @@ const { ethers, upgrades } = require("hardhat");
 
     console.log("\n--- Roles Configured ---");
     console.log(`1. AgentTaxV2: SWAP_ROLE granted to ${beTaxOpsWalletList.length} wallet(s) for swapForTokenAddress()`);
-    console.log(`2. AgentTaxV2: EXECUTOR_ROLE granted to ${beOpsWalletList.length} wallet(s) for updateCreatorForSpecialLaunchAgents()`);
+    console.log(`2. AgentTaxV2: EXECUTOR_ROLE granted to ${agentTaxV2ExecutorWalletList.length} wallet(s) for updateCreatorForSpecialLaunchAgents()`);
     console.log("3. AgentTaxV2: DEFAULT_ADMIN_ROLE and ADMIN_ROLE granted to admin");
     console.log("4. AgentTaxV2: REGISTER_ROLE for BondingV5 (registerToken) will be granted in _3.ts");
     console.log("5. AgentTaxV2: setBondingV5() will be called in _3.ts");

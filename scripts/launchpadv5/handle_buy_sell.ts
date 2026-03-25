@@ -7,10 +7,10 @@ const { ethers } = require("hardhat");
 const CONFIG = {
   // Token address to buy/sell
   // tokenAddress: "0x0Ee7F7450C639736d7D9A252D5f21BA4cA1379d3", // TODO: Set your token address
-  tokenAddress: "0xD972075b06B6141D36dd35C5C4bb1C0d87462CfF", // TODO: Set your token address
+  tokenAddress: "0xF940345C0e54DfB1474137c45b4D50C336C95a4d", // TODO: Set your token address
   
   // Amount of VIRTUAL to spend on buy
-  buyAmount: "1", // 1 VIRTUAL
+  buyAmount: "10", // 1 VIRTUAL
   
   // Contract addresses (from environment or hardcode)
   bondingV5Address: process.env.BONDING_V5_ADDRESS || "",

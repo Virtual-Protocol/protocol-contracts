@@ -38,9 +38,6 @@ interface IFPairV2 {
     function taxStartTime() external view returns (uint256);
 
     function tokenA() external view returns (address);
-<<<<<<< HEAD
 
     function syncAfterDrain(uint256 assetAmount, uint256 tokenAmount) external;
-=======
->>>>>>> main
 }

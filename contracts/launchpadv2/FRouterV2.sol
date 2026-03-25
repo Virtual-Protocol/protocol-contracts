@@ -20,6 +20,11 @@ interface IBondingV2ForRouter {
     function agentFactory() external view returns (address);
 }
 
+// Minimal interface for BondingV4 to check if token is X_LAUNCH
+interface IBondingV4ForRouter {
+    function isProjectXLaunch(address token) external view returns (bool);
+}
+
 contract FRouterV2 is
     Initializable,
     AccessControlUpgradeable,
@@ -49,6 +54,9 @@ contract FRouterV2 is
         address indexed recipient,
         uint256 veTokenAmount
     );
+
+    // BondingV4 reference for checking X_LAUNCH tokens
+    IBondingV4ForRouter public bondingV4;
 
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() {
@@ -260,6 +268,15 @@ contract FRouterV2 is
         bondingV2 = IBondingV2ForRouter(bondingV2_);
     }
 
+    /**
+     * @dev Set the BondingV4 contract address for X_LAUNCH token checks
+     * @param bondingV4_ The address of the BondingV4 contract
+     */
+    function setBondingV4(address bondingV4_) public onlyRole(ADMIN_ROLE) {
+        require(bondingV4_ != address(0), "Zero address not allowed");
+        bondingV4 = IBondingV4ForRouter(bondingV4_);
+    }
+
     function resetTime(
         address tokenAddress,
         uint256 newStartTime
@@ -273,7 +290,8 @@ contract FRouterV2 is
 
     /**
      * @dev Calculate anti-sniper tax based on time elapsed since pair start
-     * Tax starts at 99% and decreases by 1% per minute to 0% over 99 minutes
+     * For regular tokens: Tax starts at 99% and decreases by 1% per minute to 0% over 99 minutes
+     * For X_LAUNCH tokens: Tax starts at 99% and decreases by 1% per second to 0% over 99 seconds
      * @param pairAddress The address of the pair
      * @return taxPercentage Tax in percentage (1 = 1%)
      */
@@ -281,6 +299,9 @@ contract FRouterV2 is
         address pairAddress
     ) private view returns (uint256) {
         IFPairV2 pair = IFPairV2(pairAddress);
+
+        // Get token address directly from pair (tokenA is the agent token)
+        address tokenAddress = pair.tokenA();
 
         uint256 finalTaxStartTime = pair.startTime();
         // Try to get taxStartTime safely for backward compatibility
@@ -295,16 +316,33 @@ contract FRouterV2 is
         if (taxStartTime > 0) {
             finalTaxStartTime = taxStartTime; // use taxStartTime if it's set (for new pairs)
         }
+
+        uint256 startTax = factory.antiSniperBuyTaxStartValue(); // 99%
+
         // If trading hasn't started yet, use maximum tax
         if (block.timestamp < finalTaxStartTime) {
-            return factory.antiSniperBuyTaxStartValue();
+            return startTax;
         }
 
-        // Tax decreases by 1% per minute from 99% to 0%
-        // tax = 99% - (timeElapsed / 60) * 1%
-        uint256 startTax = factory.antiSniperBuyTaxStartValue(); // 99%
         uint256 timeElapsed = block.timestamp - finalTaxStartTime;
-        uint256 taxReduction = timeElapsed / 60; // 1% per minute
+
+        // Check if this is an X_LAUNCH token (shorter anti-sniper period)
+        bool isXLaunch = false;
+        if (address(bondingV4) != address(0)) {
+            try bondingV4.isProjectXLaunch(tokenAddress) returns (
+                bool _isXLaunch
+            ) {
+                isXLaunch = _isXLaunch;
+            } catch {
+                // If call fails, treat as non-X_LAUNCH
+                isXLaunch = false;
+            }
+        }
+
+        // X_LAUNCH: 1% per second (99 seconds to 0%)
+        // ACP_SKILL: 1% per minute (99 minutes to 0%)
+        // Regular: 1% per minute (99 minutes to 0%)
+        uint256 taxReduction = isXLaunch ? timeElapsed : (timeElapsed / 60);
 
         // return early cuz contract not allow negative value
         if (startTax <= taxReduction) {

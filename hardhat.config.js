@@ -143,10 +143,8 @@ module.exports = {
         blockNumber: process.env.FORK_BLOCK_NUMBER ? parseInt(process.env.FORK_BLOCK_NUMBER) : 
         39256635,
       },
-      accounts: process.env.PRIVATE_KEY ? [{
-        privateKey: process.env.PRIVATE_KEY,
-        balance: "10000000000000000000000" // 10000 ETH
-      }] : undefined,
+      // Don't restrict accounts for hardhat network - use default 20 test accounts
+      // This ensures tests have enough signers available
       chains: {
         84532: {  // base_sepolia chainId
           hardforkHistory: {

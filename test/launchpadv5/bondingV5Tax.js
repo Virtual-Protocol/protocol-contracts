@@ -343,9 +343,12 @@ async function setupV2V3TaxComparisonTest() {
   await fRouterV3.grantRole(await fRouterV3.EXECUTOR_ROLE(), await bondingV5.getAddress());
   await agentFactoryV6.grantRole(await agentFactoryV6.BONDING_ROLE(), await bondingV5.getAddress());
 
-  // Grant EXECUTOR_ROLE to BondingV5 in AgentTaxV2 (for registerToken)
-  const EXECUTOR_ROLE = await agentTax.EXECUTOR_ROLE();
-  await agentTax.grantRole(EXECUTOR_ROLE, await bondingV5.getAddress());
+  // Grant REGISTER_ROLE to BondingV5 in AgentTaxV2 (for registerToken)
+  const REGISTER_ROLE = await agentTax.REGISTER_ROLE();
+  await agentTax.grantRole(REGISTER_ROLE, await bondingV5.getAddress());
+  
+  // Set BondingV5 in AgentTaxV2 (required for special launch agent updates)
+  await agentTax.setBondingV5(await bondingV5.getAddress());
 
   // Mint Virtual Tokens to test addresses
   const mintAmount = ethers.parseEther("1000000000");
@@ -492,13 +495,8 @@ describe("V2 vs V3 Tax Attribution Comparison", function () {
       expect(v3TokenAddress).to.not.equal(ethers.ZeroAddress);
       expect(v3PairAddress).to.not.equal(ethers.ZeroAddress);
 
-      // Wait and launch - this should register the token in AgentTax
-      await time.increaseTo(startTime + 1);
-      const launchTx = await bondingV5.launch(v3TokenAddress);
-      const launchReceipt = await launchTx.wait();
-
-      // Verify TokenRegistered event was emitted
-      const tokenRegisteredEvent = launchReceipt.logs.find((log) => {
+      // Verify TokenRegistered event was emitted during preLaunch (not launch)
+      const tokenRegisteredEvent = receipt.logs.find((log) => {
         try { return agentTax.interface.parseLog(log)?.name === "TokenRegistered"; } catch (e) { return false; }
       });
       expect(tokenRegisteredEvent).to.not.be.undefined;
@@ -506,6 +504,10 @@ describe("V2 vs V3 Tax Attribution Comparison", function () {
       // Verify creator info is recorded in AgentTax
       const recipient = await agentTax.tokenRecipients(v3TokenAddress);
       expect(recipient.creator).to.equal(user2.address);
+
+      // Wait and launch
+      await time.increaseTo(startTime + 1);
+      await bondingV5.launch(v3TokenAddress);
 
       console.log("V3 Token created:", v3TokenAddress);
       console.log("V3 Pair:", v3PairAddress);
@@ -661,8 +663,8 @@ describe("V2 vs V3 Tax Attribution Comparison", function () {
       await virtualToken.connect(user1).approve(await fRouterV3.getAddress(), ethers.MaxUint256);
       await bondingV5.connect(user1).buy(ethers.parseEther("1000"), v3TokenAddress, 0, (await time.latest()) + 300);
 
-      // Get token contract and approve for sell
-      const v3Token = await ethers.getContractAt("AgentTokenV2", v3TokenAddress);
+      // Get token contract and approve for sell (V3 token uses AgentTokenV3)
+      const v3Token = await ethers.getContractAt("AgentTokenV3", v3TokenAddress);
       const tokenBalance = await v3Token.balanceOf(user1.address);
       await v3Token.connect(user1).approve(await bondingV5.getAddress(), tokenBalance);
       await v3Token.connect(user1).approve(await fRouterV3.getAddress(), tokenBalance);

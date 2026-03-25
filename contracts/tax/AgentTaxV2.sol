@@ -200,6 +200,13 @@ contract AgentTaxV2 is Initializable, AccessControlUpgradeable {
     ) external onlyRole(SWAP_ROLE) {
         require(tokenAddresses.length == minOutputs.length, "Length mismatch");
 
+        // Trade-off: keep per-token swap/distribution instead of aggregating all pending tax
+        // into one large swap. This path is currently low-frequency, so we prioritize
+        // correctness/isolation over gas optimization:
+        // - Per-token minOutput/slippage checks remain explicit.
+        // - Per-token accounting and recipient attribution stay simple/auditable.
+        // - A single token issue does not block others in the batch.
+        // If execution frequency increases materially, revisit aggregate-swap design.
         for (uint i = 0; i < tokenAddresses.length; i++) {
             address tokenAddress = tokenAddresses[i];
             TaxRecipient memory recipient = tokenRecipients[tokenAddress];

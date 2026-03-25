@@ -29,7 +29,6 @@ const {
   BUY_TAX,
   SELL_TAX,
   ANTI_SNIPER_BUY_TAX_START_VALUE,
-  FFactoryV2_TAX_VAULT,
   FFactoryV2_ANTI_SNIPER_TAX_VAULT,
 } = require("../launchpadv2/const.js");
 
@@ -57,16 +56,18 @@ const FAKE_INITIAL_VIRTUAL_LIQ = ethers.parseEther("6300");
 const TARGET_REAL_VIRTUAL = ethers.parseEther("42000");
 
 /**
- * Setup function for BondingV5 tests
+ * Setup function for BondingV5 tests (V5 Suite)
  * Deploys all necessary contracts following the same order as deployment scripts:
- * - Step 1: FFactoryV2 and FRouterV2 (like deployLaunchpadv5_1.ts)
- * - Step 2: AgentFactoryV6 and dependencies (like deployLaunchpadv5_2.ts)
- * - Step 3: BondingConfig and BondingV5, then grant roles (like deployLaunchpadv5_3.ts)
+ * - Step 0: Deploy Virtual Token and Asset Token
+ * - Step 1: Deploy FFactoryV3 and FRouterV3 (V5 Suite)
+ * - Step 2: Deploy AgentFactoryV7 with AgentTokenV3 implementation
+ * - Step 3: Deploy AgentTaxV2 for on-chain tax attribution
+ * - Step 4: Deploy BondingConfig and BondingV5, then grant roles
  */
 async function setupBondingV5Test() {
   const setup = {};
 
-  console.log("\n=== BondingV5 Test Setup Starting ===");
+  console.log("\n=== BondingV5 Test Setup Starting (V5 Suite) ===");
   const [owner, admin, beOpsWallet, user1, user2] = await ethers.getSigners();
   console.log("Owner address:", await owner.getAddress());
   console.log("Admin address:", await admin.getAddress());
@@ -74,7 +75,7 @@ async function setupBondingV5Test() {
 
   try {
     // ============================================
-    // Step 0: Deploy Virtual Token (test prerequisite)
+    // Step 0: Deploy Virtual Token and Asset Token (test prerequisites)
     // ============================================
     console.log("\n--- Deploying MockERC20 for Virtual Token ---");
     const VirtualToken = await ethers.getContractFactory("MockERC20");
@@ -90,18 +91,32 @@ async function setupBondingV5Test() {
       await virtualToken.getAddress()
     );
 
-    // ============================================
-    // Step 1: Deploy FFactoryV2 and FRouterV2 (like deployLaunchpadv5_1.ts)
-    // ============================================
-    console.log("\n=== Step 1: Deploying FFactoryV2 and FRouterV2 ===");
+    console.log("\n--- Deploying MockERC20 for Asset Token (USDC) ---");
+    const AssetToken = await ethers.getContractFactory("MockERC20");
+    const assetToken = await AssetToken.deploy(
+      "Mock USDC",
+      "USDC",
+      owner.address,
+      ethers.parseEther("10000000000")
+    );
+    await assetToken.waitForDeployment();
+    console.log(
+      "MockERC20 Asset Token deployed at:",
+      await assetToken.getAddress()
+    );
 
-    // 1.1 Deploy FFactoryV2
-    console.log("\n--- Deploying FFactoryV2 ---");
-    const FFactoryV2 = await ethers.getContractFactory("FFactoryV2");
-    const fFactoryV2 = await upgrades.deployProxy(
-      FFactoryV2,
+    // ============================================
+    // Step 1: Deploy FFactoryV3 and FRouterV3 (V5 Suite)
+    // ============================================
+    console.log("\n=== Step 1: Deploying FFactoryV3 and FRouterV3 (V5 Suite) ===");
+
+    // 1.1 Deploy FFactoryV3 (taxVault will be set to AgentTaxV2 later)
+    console.log("\n--- Deploying FFactoryV3 ---");
+    const FFactoryV3 = await ethers.getContractFactory("FFactoryV3");
+    const fFactoryV3 = await upgrades.deployProxy(
+      FFactoryV3,
       [
-        FFactoryV2_TAX_VAULT,
+        owner.address, // temporary taxVault, will be updated to AgentTaxV2
         BUY_TAX,
         SELL_TAX,
         ANTI_SNIPER_BUY_TAX_START_VALUE,
@@ -109,67 +124,67 @@ async function setupBondingV5Test() {
       ],
       { initializer: "initialize" }
     );
-    await fFactoryV2.waitForDeployment();
-    console.log("FFactoryV2 deployed at:", await fFactoryV2.getAddress());
+    await fFactoryV3.waitForDeployment();
+    console.log("FFactoryV3 deployed at:", await fFactoryV3.getAddress());
 
-    // 1.2 Deploy FRouterV2
-    console.log("\n--- Deploying FRouterV2 ---");
-    const FRouterV2 = await ethers.getContractFactory("FRouterV2");
-    const fRouterV2 = await upgrades.deployProxy(
-      FRouterV2,
-      [await fFactoryV2.getAddress(), await virtualToken.getAddress()],
+    // 1.2 Deploy FRouterV3
+    console.log("\n--- Deploying FRouterV3 ---");
+    const FRouterV3 = await ethers.getContractFactory("FRouterV3");
+    const fRouterV3 = await upgrades.deployProxy(
+      FRouterV3,
+      [await fFactoryV3.getAddress(), await virtualToken.getAddress()],
       { initializer: "initialize" }
     );
-    await fRouterV2.waitForDeployment();
-    console.log("FRouterV2 deployed at:", await fRouterV2.getAddress());
+    await fRouterV3.waitForDeployment();
+    console.log("FRouterV3 deployed at:", await fRouterV3.getAddress());
 
-    // 1.3 Configure FFactoryV2
-    console.log("\n--- Configuring FFactoryV2 ---");
-    await fFactoryV2.grantRole(await fFactoryV2.ADMIN_ROLE(), owner.address);
-    console.log("ADMIN_ROLE granted to owner (deployer) in FFactoryV2");
+    // 1.3 Configure FFactoryV3
+    console.log("\n--- Configuring FFactoryV3 ---");
+    await fFactoryV3.grantRole(await fFactoryV3.ADMIN_ROLE(), owner.address);
+    console.log("ADMIN_ROLE granted to owner (deployer) in FFactoryV3");
 
-    await fFactoryV2.setRouter(await fRouterV2.getAddress());
-    console.log("Router set in FFactoryV2");
+    await fFactoryV3.setRouter(await fRouterV3.getAddress());
+    console.log("Router set in FFactoryV3");
 
-    await fFactoryV2.grantRole(await fFactoryV2.ADMIN_ROLE(), admin.address);
-    console.log("ADMIN_ROLE granted to admin in FFactoryV2");
+    await fFactoryV3.grantRole(await fFactoryV3.ADMIN_ROLE(), admin.address);
+    console.log("ADMIN_ROLE granted to admin in FFactoryV3");
 
-    await fFactoryV2.grantRole(
-      await fFactoryV2.DEFAULT_ADMIN_ROLE(),
+    await fFactoryV3.grantRole(
+      await fFactoryV3.DEFAULT_ADMIN_ROLE(),
       admin.address
     );
-    console.log("DEFAULT_ADMIN_ROLE granted to admin in FFactoryV2");
+    console.log("DEFAULT_ADMIN_ROLE granted to admin in FFactoryV3");
 
-    // 1.4 Configure FRouterV2
-    console.log("\n--- Configuring FRouterV2 ---");
-    await fRouterV2.grantRole(await fRouterV2.ADMIN_ROLE(), admin.address);
-    console.log("ADMIN_ROLE granted to admin in FRouterV2");
+    // 1.4 Configure FRouterV3
+    console.log("\n--- Configuring FRouterV3 ---");
+    await fRouterV3.grantRole(await fRouterV3.ADMIN_ROLE(), admin.address);
+    console.log("ADMIN_ROLE granted to admin in FRouterV3");
 
-    await fRouterV2.grantRole(
-      await fRouterV2.DEFAULT_ADMIN_ROLE(),
+    await fRouterV3.grantRole(
+      await fRouterV3.DEFAULT_ADMIN_ROLE(),
       admin.address
     );
-    console.log("DEFAULT_ADMIN_ROLE granted to admin in FRouterV2");
+    console.log("DEFAULT_ADMIN_ROLE granted to admin in FRouterV3");
 
-    await fRouterV2.grantRole(
-      await fRouterV2.EXECUTOR_ROLE(),
+    await fRouterV3.grantRole(
+      await fRouterV3.EXECUTOR_ROLE(),
       beOpsWallet.address
     );
-    console.log("EXECUTOR_ROLE granted to BE_OPS_WALLET in FRouterV2");
+    console.log("EXECUTOR_ROLE granted to BE_OPS_WALLET in FRouterV3");
 
     // ============================================
-    // Step 2: Deploy AgentFactoryV6 and dependencies (like deployLaunchpadv5_2.ts)
+    // Step 2: Deploy AgentFactoryV7 and dependencies (V5 Suite)
     // ============================================
-    console.log("\n=== Step 2: Deploying AgentFactoryV6 and dependencies ===");
+    console.log("\n=== Step 2: Deploying AgentFactoryV7 and dependencies (V5 Suite) ===");
 
-    // 2.1 Deploy AgentTokenV2 implementation
-    console.log("\n--- Deploying AgentTokenV2 implementation ---");
-    const AgentTokenV2 = await ethers.getContractFactory("AgentTokenV2");
-    const agentTokenV2 = await AgentTokenV2.deploy();
-    await agentTokenV2.waitForDeployment();
+    // 2.1 Deploy AgentTokenV3 implementation (V5 Suite uses AgentTokenV3)
+    console.log("\n--- Deploying AgentTokenV3 implementation ---");
+    const AgentTokenV3 = await ethers.getContractFactory("AgentTokenV3");
+    const agentTokenV3 = await AgentTokenV3.deploy();
+    await agentTokenV3.waitForDeployment();
     console.log(
-      "AgentTokenV2 implementation deployed at:",
-      await agentTokenV2.getAddress()
+      "AgentTokenV3 implementation deployed at:",
+      await agentTokenV3.getAddress()
     );
 
     // 2.2 Deploy AgentVeTokenV2 implementation
@@ -240,13 +255,13 @@ async function setupBondingV5Test() {
       await mockUniswapRouter.getAddress()
     );
 
-    // 2.7 Deploy AgentFactoryV6
-    console.log("\n--- Deploying AgentFactoryV6 ---");
-    const AgentFactoryV6 = await ethers.getContractFactory("AgentFactoryV6");
-    const agentFactoryV6 = await upgrades.deployProxy(
-      AgentFactoryV6,
+    // 2.7 Deploy AgentFactoryV7 (V5 Suite uses AgentFactoryV7)
+    console.log("\n--- Deploying AgentFactoryV7 ---");
+    const AgentFactoryV7 = await ethers.getContractFactory("AgentFactoryV7");
+    const agentFactoryV7 = await upgrades.deployProxy(
+      AgentFactoryV7,
       [
-        await agentTokenV2.getAddress(),
+        await agentTokenV3.getAddress(),
         await agentVeTokenV2.getAddress(),
         await mockAgentDAO.getAddress(),
         await mockERC6551Registry.getAddress(),
@@ -257,44 +272,44 @@ async function setupBondingV5Test() {
       ],
       { initializer: "initialize" }
     );
-    await agentFactoryV6.waitForDeployment();
+    await agentFactoryV7.waitForDeployment();
     console.log(
-      "AgentFactoryV6 deployed at:",
-      await agentFactoryV6.getAddress()
+      "AgentFactoryV7 deployed at:",
+      await agentFactoryV7.getAddress()
     );
 
-    // 2.8 Configure AgentFactoryV6
-    console.log("\n--- Configuring AgentFactoryV6 ---");
-    await agentFactoryV6.setParams(
+    // 2.8 Configure AgentFactoryV7
+    console.log("\n--- Configuring AgentFactoryV7 ---");
+    await agentFactoryV7.setParams(
       10 * 365 * 24 * 60 * 60, // maturityDuration (10 years)
       await mockUniswapRouter.getAddress(),
       owner.address, // defaultDelegatee
       owner.address // tokenAdmin
     );
-    console.log("setParams() called for AgentFactoryV6");
+    console.log("setParams() called for AgentFactoryV7");
 
-    await agentFactoryV6.setTokenParams(BUY_TAX, SELL_TAX, 1000, owner.address);
-    console.log("setTokenParams() called for AgentFactoryV6");
+    await agentFactoryV7.setTokenParams(BUY_TAX, SELL_TAX, 1000, owner.address);
+    console.log("setTokenParams() called for AgentFactoryV7");
 
-    await agentFactoryV6.grantRole(
-      await agentFactoryV6.DEFAULT_ADMIN_ROLE(),
+    await agentFactoryV7.grantRole(
+      await agentFactoryV7.DEFAULT_ADMIN_ROLE(),
       admin.address
     );
-    console.log("DEFAULT_ADMIN_ROLE granted to admin in AgentFactoryV6");
+    console.log("DEFAULT_ADMIN_ROLE granted to admin in AgentFactoryV7");
 
-    await agentFactoryV6.grantRole(
-      await agentFactoryV6.REMOVE_LIQUIDITY_ROLE(),
+    await agentFactoryV7.grantRole(
+      await agentFactoryV7.REMOVE_LIQUIDITY_ROLE(),
       admin.address
     );
-    console.log("REMOVE_LIQUIDITY_ROLE granted to admin in AgentFactoryV6");
+    console.log("REMOVE_LIQUIDITY_ROLE granted to admin in AgentFactoryV7");
 
     // 2.9 Configure AgentNftV2 roles
     console.log("\n--- Configuring AgentNftV2 roles ---");
     await agentNftV2.grantRole(
       await agentNftV2.MINTER_ROLE(),
-      await agentFactoryV6.getAddress()
+      await agentFactoryV7.getAddress()
     );
-    console.log("MINTER_ROLE granted to AgentFactoryV6 in AgentNftV2");
+    console.log("MINTER_ROLE granted to AgentFactoryV7 in AgentNftV2");
 
     await agentNftV2.grantRole(
       await agentNftV2.DEFAULT_ADMIN_ROLE(),
@@ -303,11 +318,44 @@ async function setupBondingV5Test() {
     console.log("DEFAULT_ADMIN_ROLE granted to admin in AgentNftV2");
 
     // ============================================
-    // Step 3: Deploy BondingConfig and BondingV5 (like deployLaunchpadv5_3.ts)
+    // Step 3: Deploy AgentTaxV2 for on-chain tax attribution (V5 Suite)
     // ============================================
-    console.log("\n=== Step 3: Deploying BondingConfig and BondingV5 ===");
+    console.log("\n=== Step 3: Deploying AgentTaxV2 (V5 Suite) ===");
 
-    // 3.1 Deploy BondingConfig
+    const AgentTaxV2 = await ethers.getContractFactory("AgentTaxV2");
+    const agentTaxV2 = await upgrades.deployProxy(
+      AgentTaxV2,
+      [
+        owner.address,                            // defaultAdmin
+        await assetToken.getAddress(),            // assetToken (USDC)
+        await virtualToken.getAddress(),          // taxToken (VIRTUAL)
+        await mockUniswapRouter.getAddress(),     // router
+        owner.address,                            // treasury
+        ethers.parseEther("100"),                 // minSwapThreshold
+        ethers.parseEther("10000"),               // maxSwapThreshold
+        3000,                                     // feeRate (30%)
+      ],
+      { initializer: "initialize" }
+    );
+    await agentTaxV2.waitForDeployment();
+    console.log("AgentTaxV2 deployed at:", await agentTaxV2.getAddress());
+
+    // Update FFactoryV3 taxVault to AgentTaxV2
+    await fFactoryV3.setTaxParams(
+      await agentTaxV2.getAddress(),
+      BUY_TAX,
+      SELL_TAX,
+      ANTI_SNIPER_BUY_TAX_START_VALUE,
+      FFactoryV2_ANTI_SNIPER_TAX_VAULT
+    );
+    console.log("FFactoryV3 taxVault updated to AgentTaxV2");
+
+    // ============================================
+    // Step 4: Deploy BondingConfig and BondingV5 (V5 Suite)
+    // ============================================
+    console.log("\n=== Step 4: Deploying BondingConfig and BondingV5 ===");
+
+    // 4.1 Deploy BondingConfig
     console.log("\n--- Deploying BondingConfig ---");
     const BondingConfig = await ethers.getContractFactory("BondingConfig");
 
@@ -351,15 +399,15 @@ async function setupBondingV5Test() {
     await bondingConfig.waitForDeployment();
     console.log("BondingConfig deployed at:", await bondingConfig.getAddress());
 
-    // 3.2 Deploy BondingV5
+    // 4.2 Deploy BondingV5
     console.log("\n--- Deploying BondingV5 ---");
     const BondingV5 = await ethers.getContractFactory("BondingV5");
     const bondingV5 = await upgrades.deployProxy(
       BondingV5,
       [
-        await fFactoryV2.getAddress(),
-        await fRouterV2.getAddress(),
-        await agentFactoryV6.getAddress(),
+        await fFactoryV3.getAddress(),
+        await fRouterV3.getAddress(),
+        await agentFactoryV7.getAddress(),
         await bondingConfig.getAddress(),
       ],
       { initializer: "initialize" }
@@ -367,44 +415,69 @@ async function setupBondingV5Test() {
     await bondingV5.waitForDeployment();
     console.log("BondingV5 deployed at:", await bondingV5.getAddress());
 
-    // 3.3 Grant roles and configure contracts (using owner as deployer has all roles in tests)
+    // 4.3 Grant roles and configure contracts
     console.log("\n--- Granting roles to BondingV5 ---");
 
-    // Grant CREATOR_ROLE of FFactoryV2 to BondingV5
-    await fFactoryV2.grantRole(
-      await fFactoryV2.CREATOR_ROLE(),
+    // Grant CREATOR_ROLE of FFactoryV3 to BondingV5
+    await fFactoryV3.grantRole(
+      await fFactoryV3.CREATOR_ROLE(),
       await bondingV5.getAddress()
     );
-    console.log("CREATOR_ROLE granted to BondingV5 in FFactoryV2");
+    console.log("CREATOR_ROLE granted to BondingV5 in FFactoryV3");
 
-    // Set BondingV5 and BondingConfig in FRouterV2 (CRITICAL - was missing before)
-    await fRouterV2.grantRole(await fRouterV2.ADMIN_ROLE(), owner.address);
-    await fRouterV2.setBondingV5(
+    // Set BondingV5 and BondingConfig in FRouterV3
+    await fRouterV3.grantRole(await fRouterV3.ADMIN_ROLE(), owner.address);
+    await fRouterV3.setBondingV5(
       await bondingV5.getAddress(),
       await bondingConfig.getAddress()
     );
-    console.log("setBondingV5() called in FRouterV2");
+    console.log("setBondingV5() called in FRouterV3");
 
-    // Grant EXECUTOR_ROLE of FRouterV2 to BondingV5
-    await fRouterV2.grantRole(
-      await fRouterV2.EXECUTOR_ROLE(),
+    // Grant EXECUTOR_ROLE of FRouterV3 to BondingV5
+    await fRouterV3.grantRole(
+      await fRouterV3.EXECUTOR_ROLE(),
       await bondingV5.getAddress()
     );
-    console.log("EXECUTOR_ROLE granted to BondingV5 in FRouterV2");
+    console.log("EXECUTOR_ROLE granted to BondingV5 in FRouterV3");
 
-    // Grant BONDING_ROLE of AgentFactoryV6 to BondingV5
-    await agentFactoryV6.grantRole(
-      await agentFactoryV6.BONDING_ROLE(),
+    // Grant BONDING_ROLE of AgentFactoryV7 to BondingV5
+    await agentFactoryV7.grantRole(
+      await agentFactoryV7.BONDING_ROLE(),
       await bondingV5.getAddress()
     );
-    console.log("BONDING_ROLE granted to BondingV5 in AgentFactoryV6");
+    console.log("BONDING_ROLE granted to BondingV5 in AgentFactoryV7");
 
-    // Additional role for admin to call FRouterV2 directly in tests
-    await fRouterV2.grantRole(await fRouterV2.EXECUTOR_ROLE(), admin.address);
-    console.log("EXECUTOR_ROLE granted to admin in FRouterV2");
+    // Grant REGISTER_ROLE of AgentTaxV2 to BondingV5 (for token registration)
+    await agentTaxV2.grantRole(
+      await agentTaxV2.REGISTER_ROLE(),
+      await bondingV5.getAddress()
+    );
+    console.log("REGISTER_ROLE granted to BondingV5 in AgentTaxV2");
+
+    // Set BondingV5 in AgentTaxV2 (for special launch agent updates)
+    await agentTaxV2.setBondingV5(await bondingV5.getAddress());
+    console.log("setBondingV5() called in AgentTaxV2");
+
+    // Grant SWAP_ROLE to beOpsWallet in AgentTaxV2
+    await agentTaxV2.grantRole(
+      await agentTaxV2.SWAP_ROLE(),
+      beOpsWallet.address
+    );
+    console.log("SWAP_ROLE granted to beOpsWallet in AgentTaxV2");
+
+    // Grant EXECUTOR_ROLE to beOpsWallet in AgentTaxV2
+    await agentTaxV2.grantRole(
+      await agentTaxV2.EXECUTOR_ROLE(),
+      beOpsWallet.address
+    );
+    console.log("EXECUTOR_ROLE granted to beOpsWallet in AgentTaxV2");
+
+    // Additional role for admin to call FRouterV3 directly in tests
+    await fRouterV3.grantRole(await fRouterV3.EXECUTOR_ROLE(), admin.address);
+    console.log("EXECUTOR_ROLE granted to admin in FRouterV3");
 
     // ============================================
-    // Step 4: Mint Virtual Tokens to test addresses
+    // Step 5: Mint Virtual Tokens to test addresses
     // ============================================
     console.log("\n--- Minting Virtual Tokens to test addresses ---");
     const mintAmount = ethers.parseEther("1000000000");
@@ -424,20 +497,22 @@ async function setupBondingV5Test() {
     }
 
     // ============================================
-    // Store all deployed contracts in setup object
+    // Store all deployed contracts in setup object (V5 Suite)
     // ============================================
     setup.contracts = {
       virtualToken,
-      fFactoryV2,
-      fRouterV2,
+      assetToken,
+      fFactoryV3,
+      fRouterV3,
       mockUniswapFactory,
       mockUniswapRouter,
-      agentToken: agentTokenV2,
+      agentToken: agentTokenV3,
       agentVeToken: agentVeTokenV2,
       mockAgentDAO,
       mockERC6551Registry,
       agentNftV2,
-      agentFactoryV6,
+      agentFactoryV7,
+      agentTaxV2,
       bondingConfig,
       bondingV5,
     };
@@ -446,20 +521,22 @@ async function setupBondingV5Test() {
 
     setup.addresses = {
       virtualToken: await virtualToken.getAddress(),
-      fFactoryV2: await fFactoryV2.getAddress(),
-      fRouterV2: await fRouterV2.getAddress(),
+      assetToken: await assetToken.getAddress(),
+      fFactoryV3: await fFactoryV3.getAddress(),
+      fRouterV3: await fRouterV3.getAddress(),
       mockUniswapFactory: await mockUniswapFactory.getAddress(),
       mockUniswapRouter: await mockUniswapRouter.getAddress(),
-      agentToken: await agentTokenV2.getAddress(),
+      agentToken: await agentTokenV3.getAddress(),
       agentVeToken: await agentVeTokenV2.getAddress(),
       mockAgentDAO: await mockAgentDAO.getAddress(),
       mockERC6551Registry: await mockERC6551Registry.getAddress(),
       agentNftV2: await agentNftV2.getAddress(),
-      agentFactoryV6: await agentFactoryV6.getAddress(),
+      agentFactoryV7: await agentFactoryV7.getAddress(),
+      agentTaxV2: await agentTaxV2.getAddress(),
       bondingConfig: await bondingConfig.getAddress(),
       bondingV5: await bondingV5.getAddress(),
-      taxVault: await fFactoryV2.taxVault(),
-      antiSniperTaxVault: await fFactoryV2.antiSniperTaxVault(),
+      taxVault: await fFactoryV3.taxVault(),
+      antiSniperTaxVault: await fFactoryV3.antiSniperTaxVault(),
     };
 
     setup.params = {
@@ -475,12 +552,14 @@ async function setupBondingV5Test() {
       targetRealVirtual: TARGET_REAL_VIRTUAL,
     };
 
-    console.log("\n=== BondingV5 Test Setup Completed Successfully ===");
+    console.log("\n=== BondingV5 Test Setup Completed Successfully (V5 Suite) ===");
     console.log("All contracts deployed and configured:");
     console.log("- Virtual Token:", setup.addresses.virtualToken);
-    console.log("- FFactoryV2:", setup.addresses.fFactoryV2);
-    console.log("- FRouterV2:", setup.addresses.fRouterV2);
-    console.log("- AgentFactoryV6:", setup.addresses.agentFactoryV6);
+    console.log("- Asset Token (USDC):", setup.addresses.assetToken);
+    console.log("- FFactoryV3:", setup.addresses.fFactoryV3);
+    console.log("- FRouterV3:", setup.addresses.fRouterV3);
+    console.log("- AgentFactoryV7:", setup.addresses.agentFactoryV7);
+    console.log("- AgentTaxV2:", setup.addresses.agentTaxV2);
     console.log("- BondingConfig:", setup.addresses.bondingConfig);
     console.log("- BondingV5:", setup.addresses.bondingV5);
 
@@ -509,7 +588,7 @@ describe("BondingV5", function () {
       const { bondingV5, bondingConfig } = contracts;
 
       expect(await bondingV5.owner()).to.equal(owner.address);
-      expect(await bondingV5.agentFactory()).to.equal(addresses.agentFactoryV6);
+      expect(await bondingV5.agentFactory()).to.equal(addresses.agentFactoryV7);
       expect(await bondingV5.bondingConfig()).to.equal(addresses.bondingConfig);
 
       // Check bondingConfig params
@@ -520,25 +599,33 @@ describe("BondingV5", function () {
     });
 
     it("Should have correct roles granted", async function () {
-      const { bondingV5, fRouterV2, agentFactoryV6, fFactoryV2 } = contracts;
+      const { bondingV5, fRouterV3, agentFactoryV7, fFactoryV3, agentTaxV2 } = contracts;
 
       expect(
-        await fRouterV2.hasRole(
-          await fRouterV2.EXECUTOR_ROLE(),
+        await fRouterV3.hasRole(
+          await fRouterV3.EXECUTOR_ROLE(),
           addresses.bondingV5
         )
       ).to.be.true;
 
       expect(
-        await agentFactoryV6.hasRole(
-          await agentFactoryV6.BONDING_ROLE(),
+        await agentFactoryV7.hasRole(
+          await agentFactoryV7.BONDING_ROLE(),
           addresses.bondingV5
         )
       ).to.be.true;
 
       expect(
-        await fFactoryV2.hasRole(
-          await fFactoryV2.CREATOR_ROLE(),
+        await fFactoryV3.hasRole(
+          await fFactoryV3.CREATOR_ROLE(),
+          addresses.bondingV5
+        )
+      ).to.be.true;
+
+      // V5 Suite: Check AgentTaxV2 REGISTER_ROLE granted to BondingV5
+      expect(
+        await agentTaxV2.hasRole(
+          await agentTaxV2.REGISTER_ROLE(),
           addresses.bondingV5
         )
       ).to.be.true;
@@ -863,7 +950,7 @@ describe("BondingV5", function () {
       await increaseTimeByMinutes(99);
 
       const buyAmount = ethers.parseEther("100");
-      await virtualToken.connect(user2).approve(addresses.fRouterV2, buyAmount);
+      await virtualToken.connect(user2).approve(addresses.fRouterV3, buyAmount);
 
       const tx = await bondingV5
         .connect(user2)
@@ -872,7 +959,7 @@ describe("BondingV5", function () {
       expect(tx).to.not.be.undefined;
 
       const actualTokenContract = await ethers.getContractAt(
-        "AgentTokenV2",
+        "AgentTokenV3",
         tokenAddress
       );
       const user2AgentTokenBalance = await actualTokenContract.balanceOf(
@@ -933,7 +1020,7 @@ describe("BondingV5", function () {
       // Buy tokens first
       await increaseTimeByMinutes(99);
       const buyAmount = ethers.parseEther("1000");
-      await virtualToken.connect(user2).approve(addresses.fRouterV2, buyAmount);
+      await virtualToken.connect(user2).approve(addresses.fRouterV3, buyAmount);
       await bondingV5
         .connect(user2)
         .buy(buyAmount, tokenAddress, 0, (await time.latest()) + 300);
@@ -944,7 +1031,7 @@ describe("BondingV5", function () {
       const { bondingV5, virtualToken } = contracts;
 
       const actualTokenContract = await ethers.getContractAt(
-        "AgentTokenV2",
+        "AgentTokenV3",
         tokenAddress
       );
       const user2AgentTokenBalance = await actualTokenContract.balanceOf(
@@ -954,7 +1041,7 @@ describe("BondingV5", function () {
       const sellAmount = user2AgentTokenBalance / 2n;
       await actualTokenContract
         .connect(user2)
-        .approve(addresses.fRouterV2, sellAmount);
+        .approve(addresses.fRouterV3, sellAmount);
 
       const virtualBalanceBefore = await virtualToken.balanceOf(user2.address);
 
@@ -1006,7 +1093,7 @@ describe("BondingV5", function () {
         LAUNCH_MODE_X_LAUNCH,
         0, // airdropBips must be 0 for special modes
         false, // needAcf must be false for special modes
-        ANTI_SNIPER_NONE, // antiSniperTaxType must be NONE for special modes
+        ANTI_SNIPER_60S, // antiSniperTaxType must be 60S for special modes
         false // isProject60days must be false for special modes
       );
 
@@ -1144,7 +1231,7 @@ describe("BondingV5", function () {
           LAUNCH_MODE_ACP_SKILL,
           0,
           false,
-          ANTI_SNIPER_NONE,
+          ANTI_SNIPER_60S, // antiSniperTaxType must be 60S for special modes
           false
         );
 
@@ -2075,7 +2162,7 @@ describe("BondingV5", function () {
       ).to.be.revertedWithCustomError(bondingV5, "InvalidSpecialLaunchParams");
     });
 
-    it("Should revert X_LAUNCH with non-NONE anti-sniper type", async function () {
+    it("Should revert X_LAUNCH with non-60S anti-sniper type (NONE)", async function () {
       const { user1 } = accounts;
       const { bondingV5, virtualToken } = contracts;
 
@@ -2086,6 +2173,7 @@ describe("BondingV5", function () {
 
       const startTime = (await time.latest()) + 100;
 
+      // Special modes require ANTI_SNIPER_60S, using ANTI_SNIPER_NONE should revert
       await expect(
         bondingV5
           .connect(user1)
@@ -2101,7 +2189,7 @@ describe("BondingV5", function () {
             LAUNCH_MODE_X_LAUNCH,
             0,
             false,
-            ANTI_SNIPER_60S,
+            ANTI_SNIPER_NONE, // Should revert: special modes require ANTI_SNIPER_60S
             false
           )
       ).to.be.revertedWithCustomError(bondingV5, "InvalidSpecialLaunchParams");
@@ -3317,7 +3405,7 @@ describe("BondingV5", function () {
 
       // Attempt to buy - should revert because trading is disabled
       const buyAmount = ethers.parseEther("100");
-      await virtualToken.connect(user2).approve(addresses.fRouterV2, buyAmount);
+      await virtualToken.connect(user2).approve(addresses.fRouterV3, buyAmount);
 
       await expect(
         bondingV5
@@ -3376,7 +3464,7 @@ describe("BondingV5", function () {
 
       // Attempt to buy - should still revert even after anti-sniper would have decayed
       const buyAmount = ethers.parseEther("100");
-      await virtualToken.connect(user2).approve(addresses.fRouterV2, buyAmount);
+      await virtualToken.connect(user2).approve(addresses.fRouterV3, buyAmount);
 
       await expect(
         bondingV5
@@ -3842,7 +3930,7 @@ describe("BondingV5", function () {
 
       // Check that reserved tokens were transferred to teamTokenReservedWallet
       const actualTokenContract = await ethers.getContractAt(
-        "AgentTokenV2",
+        "AgentTokenV3",
         tokenAddress
       );
       const reservedWalletTokenBalance = await actualTokenContract.balanceOf(
@@ -3893,7 +3981,7 @@ describe("BondingV5", function () {
 
       // Check reserved tokens (54% = 4% airdrop + 50% ACF)
       const actualTokenContract = await ethers.getContractAt(
-        "AgentTokenV2",
+        "AgentTokenV3",
         tokenAddress
       );
       const reservedWalletTokenBalance = await actualTokenContract.balanceOf(

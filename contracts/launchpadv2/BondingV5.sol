@@ -445,6 +445,14 @@ contract BondingV5 is
             revert InvalidInput();
         }
 
+        // X_LAUNCH, ACP_SKILL, and Project60days: taxRecipient (AgentTax) must be updated by the backend
+        // before trading starts; only privileged backend wallets may call launch() so that ordering is enforced.
+        if (isProject60days(tokenAddress_) || isProjectXLaunch(tokenAddress_) || isAcpSkillLaunch(tokenAddress_)) {
+            if (!bondingConfig.isPrivilegedLauncher(msg.sender)) {
+                revert UnauthorizedLauncher();
+            }
+        }
+
         // Set tax start time to current block timestamp for proper anti-sniper tax calculation
         router.setTaxStartTime(tokenRef.pair, block.timestamp);
 
@@ -689,17 +697,17 @@ contract BondingV5 is
     }
 
     // View functions to check token launch type (affects tax recipient updates and liquidity drain permissions)
-    function isProject60days(address token_) external view returns (bool) {
+    function isProject60days(address token_) public view returns (bool) {
         return tokenLaunchParams[token_].isProject60days;
     }
 
-    function isProjectXLaunch(address token_) external view returns (bool) {
+    function isProjectXLaunch(address token_) public view returns (bool) {
         return
             tokenLaunchParams[token_].launchMode ==
             bondingConfig.LAUNCH_MODE_X_LAUNCH();
     }
 
-    function isAcpSkillLaunch(address token_) external view returns (bool) {
+    function isAcpSkillLaunch(address token_) public view returns (bool) {
         return
             tokenLaunchParams[token_].launchMode ==
             bondingConfig.LAUNCH_MODE_ACP_SKILL();
@@ -745,21 +753,15 @@ contract BondingV5 is
             revert LaunchModeNotEnabled();
         }
 
-        // Check authorization for special modes
-        if (launchMode_ == bondingConfig.LAUNCH_MODE_X_LAUNCH()) {
-            if (!bondingConfig.isXLauncher(msg.sender)) {
+        // X_LAUNCH & ACP_SKILL: privileged preLaunch + strict params. Project60days stays NORMAL here;
+        // launch() still requires privileged wallet for 60d / X / ACP so taxRecipient is backend-orchestrated.
+        if (
+            launchMode_ == bondingConfig.LAUNCH_MODE_X_LAUNCH() ||
+            launchMode_ == bondingConfig.LAUNCH_MODE_ACP_SKILL()
+        ) {
+            if (!bondingConfig.isPrivilegedLauncher(msg.sender)) {
                 revert UnauthorizedLauncher();
             }
-        } else if (launchMode_ == bondingConfig.LAUNCH_MODE_ACP_SKILL()) {
-            if (!bondingConfig.isAcpSkillLauncher(msg.sender)) {
-                revert UnauthorizedLauncher();
-            }
-        }
-
-        // Special launch modes have strict requirements
-        // Only LAUNCH_MODE_NORMAL can freely configure parameters
-        if (bondingConfig.isSpecialMode(launchMode_)) {
-            // Special modes require:
             // 1. ANTI_SNIPER_60S
             // 2. Immediate launch (startTime within 24h)
             // 3. airdropBips = 0

@@ -399,6 +399,10 @@ async function setupBondingV5Test() {
     await bondingConfig.waitForDeployment();
     console.log("BondingConfig deployed at:", await bondingConfig.getAddress());
 
+    // Backend allowlist: Project60days launch() + X/ACP preLaunch (tests use owner as default launcher)
+    await bondingConfig.setPrivilegedLauncher(owner.address, true);
+    console.log("setPrivilegedLauncher(true) for owner (test default backend)");
+
     // 4.2 Deploy BondingV5
     console.log("\n--- Deploying BondingV5 ---");
     const BondingV5 = await ethers.getContractFactory("BondingV5");
@@ -1065,8 +1069,8 @@ describe("BondingV5", function () {
       const { owner, user1 } = accounts;
 
       // Authorize user1 as XLauncher for X_LAUNCH mode
-      await bondingConfig.connect(owner).setXLauncher(user1.address, true);
-      console.log("user1 authorized as XLauncher for LAUNCH_MODE_X_LAUNCH");
+      await bondingConfig.connect(owner).setPrivilegedLauncher(user1.address, true);
+      console.log("user1 authorized as privileged launcher for LAUNCH_MODE_X_LAUNCH");
     });
 
     it("Should create a token with isProjectXLaunch returning true", async function () {
@@ -1126,7 +1130,7 @@ describe("BondingV5", function () {
       const { owner } = accounts;
 
       // Ensure user2 is NOT authorized
-      await bondingConfig.connect(owner).setXLauncher(user2.address, false);
+      await bondingConfig.connect(owner).setPrivilegedLauncher(user2.address, false);
 
       const purchaseAmount = ethers.parseEther("1000");
 
@@ -1200,9 +1204,9 @@ describe("BondingV5", function () {
       // Authorize user1 as AcpSkillLauncher for ACP_SKILL mode
       await bondingConfig
         .connect(owner)
-        .setAcpSkillLauncher(user1.address, true);
+        .setPrivilegedLauncher(user1.address, true);
       console.log(
-        "user1 authorized as AcpSkillLauncher for LAUNCH_MODE_ACP_SKILL"
+        "user1 authorized as privileged launcher for LAUNCH_MODE_ACP_SKILL"
       );
     });
 
@@ -1266,7 +1270,7 @@ describe("BondingV5", function () {
       // Ensure user2 is NOT authorized
       await bondingConfig
         .connect(owner)
-        .setAcpSkillLauncher(user2.address, false);
+        .setPrivilegedLauncher(user2.address, false);
 
       const purchaseAmount = ethers.parseEther("1000");
 
@@ -1373,15 +1377,15 @@ describe("BondingV5", function () {
       const { bondingConfig } = contracts;
 
       // Initially user2 should not be authorized
-      expect(await bondingConfig.isXLauncher(user2.address)).to.be.false;
+      expect(await bondingConfig.isPrivilegedLauncher(user2.address)).to.be.false;
 
       // Authorize user2
-      await bondingConfig.connect(owner).setXLauncher(user2.address, true);
-      expect(await bondingConfig.isXLauncher(user2.address)).to.be.true;
+      await bondingConfig.connect(owner).setPrivilegedLauncher(user2.address, true);
+      expect(await bondingConfig.isPrivilegedLauncher(user2.address)).to.be.true;
 
       // Revoke authorization
-      await bondingConfig.connect(owner).setXLauncher(user2.address, false);
-      expect(await bondingConfig.isXLauncher(user2.address)).to.be.false;
+      await bondingConfig.connect(owner).setPrivilegedLauncher(user2.address, false);
+      expect(await bondingConfig.isPrivilegedLauncher(user2.address)).to.be.false;
     });
 
     it("Should allow owner to set and revoke AcpSkillLauncher", async function () {
@@ -1389,19 +1393,19 @@ describe("BondingV5", function () {
       const { bondingConfig } = contracts;
 
       // Initially user2 should not be authorized
-      expect(await bondingConfig.isAcpSkillLauncher(user2.address)).to.be.false;
+      expect(await bondingConfig.isPrivilegedLauncher(user2.address)).to.be.false;
 
       // Authorize user2
       await bondingConfig
         .connect(owner)
-        .setAcpSkillLauncher(user2.address, true);
-      expect(await bondingConfig.isAcpSkillLauncher(user2.address)).to.be.true;
+        .setPrivilegedLauncher(user2.address, true);
+      expect(await bondingConfig.isPrivilegedLauncher(user2.address)).to.be.true;
 
       // Revoke authorization
       await bondingConfig
         .connect(owner)
-        .setAcpSkillLauncher(user2.address, false);
-      expect(await bondingConfig.isAcpSkillLauncher(user2.address)).to.be.false;
+        .setPrivilegedLauncher(user2.address, false);
+      expect(await bondingConfig.isPrivilegedLauncher(user2.address)).to.be.false;
     });
   });
 
@@ -2092,10 +2096,7 @@ describe("BondingV5", function () {
       const { bondingConfig } = contracts;
       const { owner, user1 } = accounts;
 
-      await bondingConfig.connect(owner).setXLauncher(user1.address, true);
-      await bondingConfig
-        .connect(owner)
-        .setAcpSkillLauncher(user1.address, true);
+      await bondingConfig.connect(owner).setPrivilegedLauncher(user1.address, true);
     });
 
     it("Should revert X_LAUNCH with non-zero airdropBips", async function () {
@@ -3178,6 +3179,53 @@ describe("BondingV5", function () {
       expect(tokenInfo.launchExecuted).to.be.true; // Launch executed
     });
 
+    it("Should revert launch for Project60days if caller is not privileged launcher", async function () {
+      const { user1, user2, owner } = accounts;
+      const { bondingV5, virtualToken, bondingConfig } = contracts;
+
+      const purchaseAmount = ethers.parseEther("1000");
+      await virtualToken
+        .connect(user1)
+        .approve(addresses.bondingV5, purchaseAmount);
+
+      const startTime = (await time.latest()) + START_TIME_DELAY + 1;
+      const tx = await bondingV5.connect(user1).preLaunch(
+        "P60 Gate Token",
+        "P60G",
+        [0, 1, 2],
+        "Project60days launch gate",
+        "https://example.com/image.png",
+        ["", "", "", ""],
+        purchaseAmount,
+        startTime,
+        LAUNCH_MODE_NORMAL,
+        0,
+        false,
+        ANTI_SNIPER_60S,
+        true // isProject60days
+      );
+      const receipt = await tx.wait();
+      const event = receipt.logs.find((log) => {
+        try {
+          return bondingV5.interface.parseLog(log)?.name === "PreLaunched";
+        } catch (e) {
+          return false;
+        }
+      });
+      const tokenAddr = bondingV5.interface.parseLog(event).args.token;
+
+      await time.increase(START_TIME_DELAY + 1);
+
+      await bondingConfig.connect(owner).setPrivilegedLauncher(user2.address, false);
+      await expect(
+        bondingV5.connect(user2).launch(tokenAddr)
+      ).to.be.revertedWithCustomError(bondingV5, "UnauthorizedLauncher");
+
+      await bondingV5.connect(owner).launch(tokenAddr);
+      const info = await bondingV5.tokenInfo(tokenAddr);
+      expect(info.launchExecuted).to.be.true;
+    });
+
     it("Should preserve launch params after launch", async function () {
       const { user1 } = accounts;
       const { bondingV5, virtualToken } = contracts;
@@ -3685,16 +3733,6 @@ describe("BondingV5", function () {
         true
       );
       expect(supply46).to.equal((initialSupply * 4600n) / 10000n);
-    });
-
-    it("Should correctly identify special modes", async function () {
-      const { bondingConfig } = contracts;
-
-      expect(await bondingConfig.isSpecialMode(LAUNCH_MODE_NORMAL)).to.be.false;
-      expect(await bondingConfig.isSpecialMode(LAUNCH_MODE_X_LAUNCH)).to.be
-        .true;
-      expect(await bondingConfig.isSpecialMode(LAUNCH_MODE_ACP_SKILL)).to.be
-        .true;
     });
 
     it("Should return correct fakeInitialVirtualLiq", async function () {

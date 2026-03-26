@@ -43,9 +43,8 @@ contract BondingConfig is Initializable, OwnableUpgradeable {
     // Global wallet to receive reserved tokens (airdrop + ACF)
     address public teamTokenReservedWallet;
 
-    // Authorized launchers for special modes
-    mapping(address => bool) public isXLauncher;
-    mapping(address => bool) public isAcpSkillLauncher;
+    /// @notice Backend allowlist (BondingV5): preLaunch for X_LAUNCH & ACP_SKILL; launch() for X_LAUNCH, ACP_SKILL, or isProject60days (taxRecipient must be set by backend before launch)
+    mapping(address => bool) public isPrivilegedLauncher;
 
     // Common bonding curve parameters (unified across all launch modes)
     struct BondingCurveParams {
@@ -118,6 +117,7 @@ contract BondingConfig is Initializable, OwnableUpgradeable {
     event CommonParamsUpdated(uint256 initialSupply, address feeTo);
     event BondingCurveParamsUpdated(BondingCurveParams params);
     event ReserveSupplyParamsUpdated(ReserveSupplyParams params);
+    event PrivilegedLauncherUpdated(address indexed launcher, bool allowed);
 
     error InvalidAntiSniperType();
     error InvalidReserveBips();
@@ -252,15 +252,15 @@ contract BondingConfig is Initializable, OwnableUpgradeable {
         emit TeamTokenReservedWalletUpdated(wallet_);
     }
 
-    function setXLauncher(address launcher_, bool allowed_) external onlyOwner {
-        isXLauncher[launcher_] = allowed_;
-    }
-
-    function setAcpSkillLauncher(
-        address launcher_,
-        bool allowed_
-    ) external onlyOwner {
-        isAcpSkillLauncher[launcher_] = allowed_;
+    /**
+     * @notice Authorize or revoke privileged backend wallets for:
+     *         - preLaunch when launch mode is X_LAUNCH or ACP_SKILL (BondingV5)
+     *         - launch() when token is X_LAUNCH, ACP_SKILL, or Project60days (BondingV5), so taxRecipient
+     *           can be updated by the backend before trading starts
+     */
+    function setPrivilegedLauncher(address launcher_, bool allowed_) external onlyOwner {
+        isPrivilegedLauncher[launcher_] = allowed_;
+        emit PrivilegedLauncherUpdated(launcher_, allowed_);
     }
 
     /**
@@ -269,17 +269,6 @@ contract BondingConfig is Initializable, OwnableUpgradeable {
      */
     function getTargetRealVirtual() external view returns (uint256) {
         return bondingCurveParams.targetRealVirtual;
-    }
-
-    /**
-     * @notice Check if launch mode is a special mode requiring authorized launcher
-     * @param launchMode_ The launch mode identifier
-     * @return Whether it's a special launch mode (X_LAUNCH or ACP_SKILL)
-     */
-    function isSpecialMode(uint8 launchMode_) external pure returns (bool) {
-        return
-            launchMode_ == LAUNCH_MODE_X_LAUNCH ||
-            launchMode_ == LAUNCH_MODE_ACP_SKILL;
     }
 
     /**

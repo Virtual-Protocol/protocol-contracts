@@ -99,9 +99,9 @@ Each mode was implemented separately, leading to:
 
 #### Launch Mode Constants
 ```solidity
-uint8 public constant LAUNCH_MODE_NORMAL = 0;    // Open to everyone
-uint8 public constant LAUNCH_MODE_X_LAUNCH = 1;  // Requires isXLauncher authorization
-uint8 public constant LAUNCH_MODE_ACP_SKILL = 2; // Requires isAcpSkillLauncher authorization
+uint8 public constant LAUNCH_MODE_NORMAL = 0;    // Open to everyone (Project60days uses this + flag)
+uint8 public constant LAUNCH_MODE_X_LAUNCH = 1;  // isPrivilegedLauncher on preLaunch + launch() (backend taxRecipient)
+uint8 public constant LAUNCH_MODE_ACP_SKILL = 2; // isPrivilegedLauncher on preLaunch + launch() (backend taxRecipient)
 ```
 
 #### Anti-Sniper Tax Type Constants
@@ -128,8 +128,7 @@ uint8 public constant ACF_RESERVED_PERCENT = 50;       // ACF operations reserve
 | `scheduledLaunchParams` | `struct` | startTimeDelay, normalLaunchFee, acfFee |
 | `deployParams` | `struct` | tbaSalt, tbaImplementation, daoVotingPeriod, daoThreshold |
 | `bondingCurveParams` | `struct` | fakeInitialVirtualLiq, targetRealVirtual |
-| `isXLauncher` | `mapping` | Authorized X-Launch addresses |
-| `isAcpSkillLauncher` | `mapping` | Authorized ACP Skill Launch addresses |
+| `isPrivilegedLauncher` | `mapping` | Backend wallets: X_LAUNCH/ACP `preLaunch`; X_LAUNCH, ACP_SKILL, or Project60days `launch()` (taxRecipient must be updated off-chain before `launch()`) |
 
 #### Key Functions
 
@@ -233,10 +232,14 @@ function preLaunch(
    - Formula: `gradThreshold = y0 * x0 / (targetRealVirtual + y0)`
    - Where: `y0 = fakeInitialVirtualLiq`, `x0 = bondingCurveSupply`
 
+6. **`launch()` and privileged backend (tax recipient):**
+   - X_LAUNCH, ACP_SKILL, and Project60days (`NORMAL` + `isProject60days`) share a requirement that **taxRecipient** (AgentTax / related flows) is configured by the **backend before trading starts**.
+   - `BondingV5.launch()` therefore requires `isPrivilegedLauncher(msg.sender)` for those three cases so only the backend wallet executes `launch()` after off-chain setup.
+
 #### View Functions for External Contracts
 
 ```solidity
-// Used by AgentTax for tax recipient updates
+// Classify token for tax recipient / ops (X_LAUNCH, ACP_SKILL, Project60days need backend taxRecipient before launch())
 function isProject60days(address token_) external view returns (bool);
 function isProjectXLaunch(address token_) external view returns (bool);
 function isAcpSkillLaunch(address token_) external view returns (bool);
@@ -302,8 +305,8 @@ tax = startTax * (duration - timeElapsed) / duration
    - Verify `airdropPercent + ACF_RESERVED_PERCENT` is properly validated
 
 2. **Launch Mode Authorization**
-   - Verify `isXLauncher` and `isAcpSkillLauncher` mappings are only modifiable by owner
-   - Ensure special modes enforce all parameter restrictions
+   - Verify `isPrivilegedLauncher` mapping is only modifiable by owner
+   - Ensure X_LAUNCH / ACP_SKILL parameter restrictions on `preLaunch()` and privileged `launch()` for X_LAUNCH, ACP_SKILL, and Project60days (taxRecipient orchestration)
 
 3. **Graduation Threshold Calculation**
    - Verify per-token `tokenGradThreshold` cannot be manipulated post-launch
@@ -334,7 +337,8 @@ Test file: `test/launchpadv5/bondingV5.js` (2274 lines)
 
 Key test scenarios:
 - Normal launch with various parameter combinations
-- X-Launch and ACP-Skill authorization checks
+- X-Launch and ACP-Skill authorization checks (`preLaunch` + `launch()`)
+- Project60days and privileged `launch()` (backend taxRecipient ordering)
 - Scheduled vs immediate launch fee calculation
 - Anti-sniper tax type validation and decay
 - Graduation threshold calculation with different airdrop/ACF settings

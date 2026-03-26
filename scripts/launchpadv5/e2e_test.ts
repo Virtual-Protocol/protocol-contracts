@@ -19,6 +19,13 @@ const ANTI_SNIPER_NONE = 0;
 const ANTI_SNIPER_60S = 1;
 const ANTI_SNIPER_98M = 2;
 
+function launchModeLabel(mode: number): string {
+  if (mode === LAUNCH_MODE_NORMAL) return "NORMAL";
+  if (mode === LAUNCH_MODE_X_LAUNCH) return "X_LAUNCH";
+  if (mode === LAUNCH_MODE_ACP_SKILL) return "ACP_SKILL";
+  return `UNKNOWN(${mode})`;
+}
+
 /**
  * Wait for a specified number of seconds with progress indicator
  * Works on real networks (Base Sepolia, etc.)
@@ -246,7 +253,7 @@ async function main() {
   // const antiSniperTaxType = ANTI_SNIPER_60S; // 60 seconds anti-sniper
   // const isProject60days = false;
 
-  const launchMode = LAUNCH_MODE_ACP_SKILL;
+  var launchMode = LAUNCH_MODE_ACP_SKILL;
   const airdropBips = 0; // 300 = 3.00% (in bips, 1 bip = 0.01%)
   const needAcf = false; // Test with ACF fee
   const antiSniperTaxType = ANTI_SNIPER_60S; // 60 seconds anti-sniper
@@ -264,11 +271,26 @@ async function main() {
   console.log("Start Time:", startTime, `(${new Date(Number(startTime) * 1000).toISOString()})`);
   console.log("Scheduled Launch Start Time Delay:", startTimeDelayNum, "seconds");
   console.log("Is Scheduled Launch:", isScheduledLaunch, "(expected: false - immediate launch)");
-  console.log("Launch Mode:", launchMode, "(NORMAL)");
+  console.log("Launch Mode:", launchMode, `(${launchModeLabel(launchMode)})`);
   console.log("Airdrop Bips:", airdropBips, "(", airdropBips / 100, "%)");
   console.log("Need ACF:", needAcf);
   console.log("Anti-Sniper Tax Type:", antiSniperTaxType, "(60S)");
   console.log("Is Project 60 Days:", isProject60days);
+
+  // For X_LAUNCH / ACP_SKILL and Project60days launches, BondingV5 requires privileged backend wallet.
+  if (
+    launchMode === LAUNCH_MODE_X_LAUNCH ||
+    launchMode === LAUNCH_MODE_ACP_SKILL ||
+    isProject60days
+  ) {
+    const isPrivilegedLauncher = await bondingConfig.isPrivilegedLauncher(await signer.getAddress());
+    console.log("Signer isPrivilegedLauncher:", isPrivilegedLauncher);
+    if (!isPrivilegedLauncher) {
+      throw new Error(
+        `Signer ${await signer.getAddress()} is not a privileged launcher for ${launchModeLabel(launchMode)} preLaunch/launch flow`
+      );
+    }
+  }
 
   // Get feeTo balance before preLaunch
   const feeToBalanceBefore = await virtualToken.balanceOf(feeTo);

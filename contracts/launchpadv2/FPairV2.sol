@@ -56,6 +56,7 @@ contract FPairV2 is IFPairV2, ReentrancyGuard {
 
     event TimeReset(uint256 oldStartTime, uint256 newStartTime);
     event TaxStartTimeSet(uint256 taxStartTime);
+    event Sync(uint256 reserve0, uint256 reserve1);
 
     modifier onlyRouter() {
         require(router == msg.sender, "Only router can call this function");
@@ -133,6 +134,27 @@ contract FPairV2 is IFPairV2, ReentrancyGuard {
         require(recipient != address(0), "Zero addresses are not allowed.");
 
         IERC20(tokenA).safeTransfer(recipient, amount);
+    }
+
+    /**
+     * @dev Sync reserves after drain operations to maintain state consistency
+     * Should be called after drainPrivatePool to update reserves
+     * @param assetAmount Amount of asset tokens (tokenB) transferred out
+     * @param tokenAmount Amount of agent tokens (tokenA) transferred out
+     */
+    function syncAfterDrain(
+        uint256 assetAmount,
+        uint256 tokenAmount
+    ) public onlyRouter {
+        // Subtract transferred amounts (don't use balanceOf due to virtual liquidity)
+        _pool.reserve0 = _pool.reserve0 >= tokenAmount
+            ? _pool.reserve0 - tokenAmount
+            : 0;
+        _pool.reserve1 = _pool.reserve1 >= assetAmount
+            ? _pool.reserve1 - assetAmount
+            : 0;
+        _pool.k = _pool.reserve0 * _pool.reserve1;
+        emit Sync(_pool.reserve0, _pool.reserve1);
     }
 
     function getReserves() public view returns (uint256, uint256) {

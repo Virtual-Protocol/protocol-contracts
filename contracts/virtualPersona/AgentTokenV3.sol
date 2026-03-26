@@ -986,7 +986,7 @@ contract AgentTokenV3 is
      * accumulated taxes from the contract, with a direct transfer of the ERC20 tokens
      * themselves.
      */
-    function distributeTaxTokens() external {
+    function distributeTaxTokens() external onlyOwnerOrFactory {
         if (projectTaxPendingSwap > 0) {
             uint256 projectDistribution = projectTaxPendingSwap;
             projectTaxPendingSwap = 0;

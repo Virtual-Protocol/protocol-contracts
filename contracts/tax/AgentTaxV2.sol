@@ -291,9 +291,6 @@ contract AgentTaxV2 is Initializable, AccessControlUpgradeable {
         path[0] = taxToken;
         path[1] = assetToken;
 
-        uint256[] memory amountsOut = router.getAmountsOut(amountToSwap, path);
-        require(amountsOut.length > 1, "Failed to fetch token price");
-
         try
             router.swapExactTokensForTokens(
                 amountToSwap,

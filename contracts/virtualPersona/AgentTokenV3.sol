@@ -26,6 +26,12 @@ contract AgentTokenV3 is
     using SafeERC20 for IERC20;
 
     uint256 internal constant BP_DENOM = 10000;
+    /// @dev Autoswap minimum tax balance: `supply * swapThresholdBasisPoints / SWAP_THRESHOLD_DENOMINATOR`.
+    ///      Denominator 1e6 (BP_DENOM * 100) allows sub-1-bp thresholds: e.g. `100` ≈ legacy 1 bp of supply
+    ///      (`supply / 10_000`); `10` ≈ 0.1 bp (`supply / 100_000`). A *lower* threshold is reached with less
+    ///      accumulated tax, so autoswap triggers *earlier / more often* (finding 8: less idle tax for attackers to
+    ///      target), but traders may pay more gas when their transfer runs the autoswap path more frequently.
+    uint256 internal constant SWAP_THRESHOLD_DENOMINATOR = 1000000;
     uint256 internal constant ROUND_DEC = 100000000000;
     uint256 internal constant CALL_GAS_LIMIT = 50000;
     uint256 internal constant MAX_SWAP_THRESHOLD_MULTIPLE = 20;
@@ -38,6 +44,7 @@ contract AgentTokenV3 is
     uint32 public fundedDate;
     uint16 public projectBuyTaxBasisPoints;
     uint16 public projectSellTaxBasisPoints;
+    /// @notice Stored units for autoswap floor; see `SWAP_THRESHOLD_DENOMINATOR` (not plain 1/10000 bps alone).
     uint16 public swapThresholdBasisPoints;
     address public pairToken; // The token used to trade for this token, $Virtual
 
@@ -463,7 +470,7 @@ contract AgentTokenV3 is
      *
      * Allows the manager to set the autoswap threshold
      *
-     * @param swapThresholdBasisPoints_ New swap threshold in basis points
+     * @param swapThresholdBasisPoints_ Units for `supply * x / SWAP_THRESHOLD_DENOMINATOR` (1e6); e.g. 100 ≈ 1 bp of supply
      */
     function setSwapThresholdBasisPoints(
         uint16 swapThresholdBasisPoints_
@@ -855,7 +862,7 @@ contract AgentTokenV3 is
             uint256 swapBalance = contractBalance;
 
             uint256 swapThresholdInTokens = (_totalSupply *
-                swapThresholdBasisPoints) / BP_DENOM;
+                swapThresholdBasisPoints) / SWAP_THRESHOLD_DENOMINATOR;
 
             if (
                 _eligibleForSwap(from_, to_, swapBalance, swapThresholdInTokens)

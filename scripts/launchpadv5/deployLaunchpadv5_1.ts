@@ -211,6 +211,11 @@ const { ethers, upgrades } = require("hardhat");
       await tx5.wait();
       console.log("ADMIN_ROLE of FRouterV3 granted to admin:", admin);
 
+      // Grant ADMIN_ROLE to deployer
+      const tx5_1 = await fRouterV3.grantRole(await fRouterV3.ADMIN_ROLE(), deployerAddress);
+      await tx5_1.wait();
+      console.log("ADMIN_ROLE of FRouterV3 granted to deployer:", deployerAddress);
+
       // Grant DEFAULT_ADMIN_ROLE to admin
       const tx6 = await fRouterV3.grantRole(await fRouterV3.DEFAULT_ADMIN_ROLE(), admin);
       await tx6.wait();

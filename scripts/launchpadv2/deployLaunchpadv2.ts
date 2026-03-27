@@ -111,10 +111,6 @@ const { ethers, upgrades } = require("hardhat");
     if (!uniswapV2Factory) {
       throw new Error("UNISWAP_V2_FACTORY not set in environment");
     }
-    const uniswapV2Router = process.env.UNISWAP_V2_ROUTER;
-    if (!uniswapV2Router) {
-      throw new Error("UNISWAP_V2_ROUTER not set in environment");
-    }
     const agentNftV2 = process.env.AGENT_NFT_V2;
     if (!agentNftV2) {
       throw new Error("AGENT_NFT_V2 not set in environment");
@@ -160,9 +156,9 @@ const { ethers, upgrades } = require("hardhat");
 
 
     const agentTokenTaxManager =
-      process.env.AGENT_TOKEN_TAX_MANAGER;
+      process.env.AGENT_TAX_CONTRACT_ADDRESS;
     if (!agentTokenTaxManager) {
-      throw new Error("AGENT_TOKEN_TAX_MANAGER not set in environment");
+      throw new Error("AGENT_TAX_CONTRACT_ADDRESS not set in environment");
     }
 
     console.log("Deployment arguments loaded:", {

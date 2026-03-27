@@ -1,5 +1,13 @@
 /** @type import('hardhat/config').HardhatUserConfig */
-require("dotenv").config();
+// Load env file: defaults to .env, or specify via ENV_FILE
+// Usage: ENV_FILE=.env.launchpadv5_local npx hardhat run ...
+const envFile = process.env.ENV_FILE;
+if (envFile) {
+  require("dotenv").config({ path: envFile });
+  console.log(`Loaded env file: ${envFile}`);
+} else {
+  require("dotenv").config(); // defaults to .env
+}
 require("@nomicfoundation/hardhat-toolbox");
 require("hardhat-deploy");
 require("@openzeppelin/hardhat-upgrades");
@@ -78,8 +86,16 @@ module.exports = {
     ],
   },
   networks: {
+    eth_mainnet: {
+      url: process.env.ETH_MAINNET_RPC_URL || "https://eth.drpc.org",
+      accounts: [process.env.PRIVATE_KEY],
+    },
     sepolia: {
-      url: "https://sepolia.drpc.org",
+      url: process.env.SEPOLIA_RPC_URL || "https://sepolia.drpc.org",
+      accounts: [process.env.PRIVATE_KEY],
+    },
+    eth_sepolia: {
+      url: process.env.ETH_SEPOLIA_RPC_URL || "https://sepolia.drpc.org",
       accounts: [process.env.PRIVATE_KEY],
     },
     base: {
@@ -117,6 +133,25 @@ module.exports = {
     },
     local: {
       url: "http://127.0.0.1:8545",
+      // For forked node: npx hardhat node --fork <rpc_url> --fork-block-number <block>
+    },
+    // Local fork of base_sepolia for testing with real env
+    hardhat: {
+      forking: {
+        url: process.env.BASE_SEPOLIA_RPC_URL || "https://base-sepolia.drpc.org",
+        enabled: process.env.FORK_ENABLED === "true",
+        blockNumber: process.env.FORK_BLOCK_NUMBER ? parseInt(process.env.FORK_BLOCK_NUMBER) : 
+        39256635,
+      },
+      // Don't restrict accounts for hardhat network - use default 20 test accounts
+      // This ensures tests have enough signers available
+      chains: {
+        84532: {  // base_sepolia chainId
+          hardforkHistory: {
+            cancun: 0,
+          },
+        },
+      },
     },
     polygon: {
       url: "https://rpc-mainnet.maticvigil.com/",

@@ -159,8 +159,9 @@ contract AgentTaxV2 is Initializable, AccessControlUpgradeable {
      * @param amount The amount of tax being deposited
      */
     function depositTax(address tokenAddress, uint256 amount) external {
-        TaxRecipient memory recipient = tokenRecipients[tokenAddress];
-        require(recipient.creator != address(0), "Token not registered");
+        // allow deposit tax for any token even if not registered yet, we can still update later
+        // TaxRecipient memory recipient = tokenRecipients[tokenAddress];
+        // require(recipient.creator != address(0), "Token not registered");
         require(amount > 0, "Amount must be greater than 0");
 
         IERC20(taxToken).safeTransferFrom(msg.sender, address(this), amount);

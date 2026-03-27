@@ -302,15 +302,15 @@ const { ethers, upgrades } = require("hardhat");
     // ============================================
     console.log("\n--- Configuring AgentFactoryV7 ---");
 
-    // Grant DEFAULT_ADMIN_ROLE to deployer temporarily
-    const txGrantAdmin = await agentFactoryV7.grantRole(
-      await agentFactoryV7.DEFAULT_ADMIN_ROLE(),
-      deployerAddress
-    );
-    await txGrantAdmin.wait();
-    console.log(
-      "DEFAULT_ADMIN_ROLE of AgentFactoryV7 granted to deployer (temporary)"
-    );
+    // // Grant DEFAULT_ADMIN_ROLE to deployer temporarily
+    // const txGrantAdmin = await agentFactoryV7.grantRole(
+    //   await agentFactoryV7.DEFAULT_ADMIN_ROLE(),
+    //   deployerAddress
+    // );
+    // await txGrantAdmin.wait();
+    // console.log(
+    //   "DEFAULT_ADMIN_ROLE of AgentFactoryV7 granted to deployer (temporary)"
+    // );
 
     // Set params
     const txSetParams = await agentFactoryV7.setParams(

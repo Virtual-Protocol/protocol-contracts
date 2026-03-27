@@ -1,0 +1,600 @@
+# Smart Contract Audit Summary V2 - On-Chain Tax Attribution (V5 Suite)
+
+**Branch:** `feat/vp-2173`  
+**Base:** `main` (V4 Suite)  
+**Date:** March 2026
+
+---
+
+## 1. Executive Summary
+
+This document describes the **V5 Suite** - a new contract suite that implements **on-chain tax attribution**, eliminating the need for chain-specific `tax-listener` backend services.
+
+**V5 Suite is a parallel deployment alongside the existing V4 Suite.** The V4 Suite on `main` branch remains unchanged and continues to operate. V5 Suite contracts are evolved versions of V4 contracts with minimal changes to support `depositTax()` calls.
+
+### V4 Suite vs V5 Suite Comparison
+
+| V4 Suite (on `main`) | V5 Suite (NEW) | Relationship | How to Compare |
+|----------------------|----------------|--------------|----------------|
+| `FFactoryV2.sol` | `FFactoryV3.sol` | **Identical code** (separate instance) | `diff FFactoryV2.sol FFactoryV3.sol` |
+| `FRouterV2.sol` | `FRouterV3.sol` | +`depositTax()` calls in buy/sell | `diff FRouterV2.sol FRouterV3.sol` |
+| `AgentTokenV2.sol` | `AgentTokenV3.sol` | +`depositTax()` in `_swapTax()` | `diff AgentTokenV2.sol AgentTokenV3.sol` |
+| `AgentTax.sol` | `AgentTaxV2.sol` | **Simplified rewrite** (~438 vs ~520 lines) | New design, see Section 3 |
+| `BondingV4.sol` | `BondingV5.sol` | +`registerToken()` call in `launch()` | `diff BondingV4.sol BondingV5.sol` |
+| `AgentFactoryV6.sol` | `AgentFactoryV7.sol` | Points to V3 token and AgentTaxV2 | `diff AgentFactoryV6.sol AgentFactoryV7.sol` |
+
+### What's NOT Changed on `main`
+
+- `AgentTax.sol` - **No functional changes** (only added comments for clarity)
+- `FFactoryV2.sol`, `FRouterV2.sol` - Unchanged
+- `AgentTokenV2.sol`, `AgentFactoryV6.sol` - Unchanged
+- `BondingV4.sol`, `BondingConfig.sol` - Unchanged
+
+### V5 Suite New Contracts (relative to `main`)
+
+| Contract | Lines | Description |
+|----------|-------|-------------|
+| `FFactoryV3.sol` | 135 | Copy of FFactoryV2 (separate instance for V5 routing) |
+| `FRouterV3.sol` | 335 | FRouterV2 + `depositTax()` calls (~30 lines added) |
+| `AgentTokenV3.sol` | 1238 | AgentTokenV2 + `depositTax()` in `_swapTax()` (~10 lines added) |
+| `AgentTaxV2.sol` | 438 | Simplified tax contract for V5 (tokenAddress-based) |
+| `AgentFactoryV7.sol` | ~400 | AgentFactoryV6 pointing to V3 implementations |
+| `BondingV5.sol` | 784 | BondingV4 + `registerToken()` call (~20 lines added) |
+
+### Recommended Diff Commands
+
+```bash
+# FFactory: Should be identical (just a separate deployment)
+diff contracts/launchpadv2/FFactoryV2.sol contracts/launchpadv2/FFactoryV3.sol
+
+# FRouter: See depositTax() additions
+diff contracts/launchpadv2/FRouterV2.sol contracts/launchpadv2/FRouterV3.sol
+
+# AgentToken: See depositTax() in _swapTax()
+diff contracts/virtualPersona/AgentTokenV2.sol contracts/virtualPersona/AgentTokenV3.sol
+
+# Bonding: See registerToken() call
+diff contracts/launchpadv2/BondingV4.sol contracts/launchpadv2/BondingV5.sol
+
+# AgentFactory: See implementation pointer changes
+diff contracts/virtualPersona/AgentFactoryV6.sol contracts/virtualPersona/AgentFactoryV7.sol
+```
+
+### Net New Code Summary
+
+| Change Type | Estimated Lines |
+|-------------|-----------------|
+| `depositTax()` calls in FRouterV3 | ~30 lines |
+| `depositTax()` call in AgentTokenV3 | ~10 lines |
+| `registerToken()` call in BondingV5 | ~20 lines |
+| AgentTaxV2 (simplified rewrite) | ~438 lines (but simpler than AgentTax's ~520) |
+
+**The actual net new logic for on-chain tax attribution is approximately ~60 lines across FRouterV3, AgentTokenV3, and BondingV5.** AgentTaxV2 is a standalone simplified contract.
+
+---
+
+## 2. On-Chain Tax Attribution Architecture
+
+For detailed architecture documentation, see: **[OnChainTaxAttribution.md](./OnChainTaxAttribution.md)**
+
+### Summary
+
+The core change is moving tax attribution from off-chain (tax-listener backend) to on-chain:
+
+**Previous Architecture (V4 Suite):**
+```
+Trade → FRouterV2 → direct VIRTUAL transfer → AgentTax
+                                                  ↓
+                                    tax-listener scans events
+                                                  ↓
+                                    Backend: handleAgentTaxes(agentId, txhashes, amounts)
+```
+
+**New Architecture (V5 Suite):**
+```
+Trade → FRouterV3 → AgentTaxV2.depositTax(tokenAddress, amount)
+                                                  ↓
+                               Tax immediately attributed to token
+                                                  ↓
+                               Backend: swapForTokenAddress(tokenAddress, minOutput)
+```
+
+### V5 Suite Components
+
+| Component | Contract | Purpose |
+|-----------|----------|---------|
+| Bonding | `BondingV5` | Launch tokens, calls `registerToken()` on AgentTaxV2 |
+| Factory | `AgentFactoryV7` | Creates AgentTokenV3, points to AgentTaxV2 |
+| Token | `AgentTokenV3` | Calls `depositTax()` in `_swapTax()` |
+| Pair Factory | `FFactoryV3` | Creates pairs with FRouterV3 |
+| Router | `FRouterV3` | Calls `depositTax()` for buy/sell taxes |
+| Tax Contract | `AgentTaxV2` | On-chain tax attribution and distribution |
+
+---
+
+## 3. Security Focus Areas
+
+### 3.1 Fund Safety & Reentrancy Risk
+
+#### AgentTaxV2.sol (~375 lines)
+
+| Function | External Calls | Reentrancy Risk | Mitigation |
+|----------|---------------|-----------------|------------|
+| `depositTax()` | `safeTransferFrom` | Low | State updated after transfer, no callbacks |
+| `swapForTokenAddress()` | Router `swapExactTokensForTokens` | Medium | State update (`amountSwapped`) AFTER swap; uses try-catch |
+| `_swapAndDistribute()` | Router swap + 2x `safeTransfer` | Medium | State updated before distributions |
+
+**Key Observation - `_swapAndDistribute()` Pattern:**
+```solidity
+// Line 259: State update AFTER swap but BEFORE distributions
+amounts.amountSwapped += amountToSwap;
+
+// Then distributions (lines 251-257)
+IERC20(assetToken).safeTransfer(recipient.creator, creatorFee);
+IERC20(assetToken).safeTransfer(treasury, protocolFee);
+```
+
+**Recommendation:** Consider adding `nonReentrant` modifier to `swapForTokenAddress()` and `batchSwapForTokenAddress()` for defense-in-depth.
+
+#### FRouterV3.sol (~335 lines)
+
+| Function | External Calls | Reentrancy Risk | Mitigation |
+|----------|---------------|-----------------|------------|
+| `buy()` | Pair operations + `depositTax()` | Medium | Follows checks-effects-interactions |
+| `sell()` | Pair operations + `depositTax()` | Medium | Follows checks-effects-interactions |
+| `buyV5()` / `sellV5()` | Same pattern | Medium | Same pattern |
+
+**Tax Flow in FRouterV3:**
+```solidity
+// After trade calculation, calls depositTax
+if (taxAmount > 0) {
+    IERC20(taxToken).safeTransferFrom(msg.sender, address(this), taxAmount);
+    IERC20(taxToken).forceApprove(taxVault, taxAmount);
+    IAgentTaxV2(taxVault).depositTax(pair.tokenA(), taxAmount);
+}
+```
+
+#### AgentTokenV3.sol (~1238 lines)
+
+| Function | External Calls | Reentrancy Risk | Mitigation |
+|----------|---------------|-----------------|------------|
+| `_swapTax()` | Router swap + `depositTax()` | Medium | Inherited from AgentTokenV2 pattern |
+
+**Graduated Token Tax Flow:**
+```solidity
+// After Uniswap swap in _swapTax()
+IERC20(taxToken).forceApprove(projectTaxRecipient, taxAmount);
+IAgentTaxV2(projectTaxRecipient).depositTax(address(this), taxAmount);
+```
+
+---
+
+### 3.2 Access Control & Permission Management
+
+#### AgentTaxV2 Roles
+
+| Role | Granted To | Permissions |
+|------|------------|-------------|
+| `DEFAULT_ADMIN_ROLE` | Deployer initially | Can grant/revoke all roles |
+| `ADMIN_ROLE` | Admin wallet | `updateSwapParams`, `updateSwapThresholds`, `updateTreasury`, `withdraw` |
+| `EXECUTOR_ROLE` | BondingV5, Backend wallet | `registerToken`, `swapForTokenAddress`, `batchSwapForTokenAddress` |
+
+#### Deployment Scripts Role Assignment
+
+**deployLaunchpadv5_0.ts (AgentTaxV2):**
+```typescript
+// Roles granted during deployment
+AgentTaxV2.grantRole(ADMIN_ROLE, ADMIN_WALLET);
+AgentTaxV2.grantRole(EXECUTOR_ROLE, BE_OPS_WALLET);  // Backend executor
+// Note: BondingV5 gets EXECUTOR_ROLE in step 3
+```
+
+**deployLaunchpadv5_3.ts (BondingV5):**
+```typescript
+// BondingV5 needs EXECUTOR_ROLE to call registerToken
+AgentTaxV2.grantRole(EXECUTOR_ROLE, BondingV5.address);
+```
+
+**deployLaunchpadv5_4.ts (Role Revocation):**
+```typescript
+// Revoke deployer roles from all contracts
+AgentTaxV2.revokeRole(ADMIN_ROLE, deployer);
+AgentTaxV2.revokeRole(DEFAULT_ADMIN_ROLE, deployer);
+// Similar for other contracts
+```
+
+**Security Note:** The revocation order in `deployLaunchpadv5_4.ts` uses try-catch blocks to handle cases where roles may have already been revoked:
+
+```typescript
+try {
+    await agentTaxV2.revokeRole(ADMIN_ROLE, deployer);
+} catch (e) {
+    console.log("Warning: Could not revoke ADMIN_ROLE (may already be revoked)");
+}
+```
+
+#### FFactoryV3 Roles
+
+| Role | Granted To | Permissions |
+|------|------------|-------------|
+| `DEFAULT_ADMIN_ROLE` | Deployer initially | Can grant/revoke all roles |
+| `ADMIN_ROLE` | Admin wallet | Configuration functions |
+| `CREATOR_ROLE` | BondingV5 | `createPair` |
+
+#### AgentFactoryV7 Roles
+
+| Role | Granted To | Permissions |
+|------|------------|-------------|
+| `DEFAULT_ADMIN_ROLE` | Deployer initially | Can grant/revoke all roles |
+| `BONDING_ROLE` | BondingV5 | Token creation and management |
+
+---
+
+### 3.3 Critical Functions to Audit
+
+#### 1. `AgentTaxV2.registerToken()` - Token Registration
+
+```solidity
+function registerToken(
+    address tokenAddress,
+    address tba,
+    address creator
+) external onlyRole(EXECUTOR_ROLE) {
+    require(tokenAddress != address(0), "Invalid token address");
+    require(creator != address(0), "Invalid creator");
+    
+    // Can overwrite existing registration - is this intended?
+    tokenRecipients[tokenAddress] = TaxRecipient({
+        tba: tba,
+        creator: creator
+    });
+    
+    emit TokenRegistered(tokenAddress, creator, tba);
+}
+```
+
+**Audit Questions:**
+- Should re-registration of the same token be allowed?
+- What prevents malicious registration of arbitrary tokens?
+
+#### 2. `AgentTaxV2.depositTax()` - Tax Deposit
+
+```solidity
+function depositTax(address tokenAddress, uint256 amount) external {
+    TaxRecipient memory recipient = tokenRecipients[tokenAddress];
+    require(recipient.creator != address(0), "Token not registered");
+    require(amount > 0, "Amount must be greater than 0");
+
+    IERC20(taxToken).safeTransferFrom(msg.sender, address(this), amount);
+
+    TaxAmounts storage amounts = tokenTaxAmounts[tokenAddress];
+    amounts.amountCollected += amount;
+
+    emit TaxDeposited(tokenAddress, amount);
+}
+```
+
+**Audit Questions:**
+- No access control - anyone can deposit. Is this intentional?
+- Integer overflow in `amounts.amountCollected` (Solidity 0.8.20 has built-in checks)
+
+#### 3. `AgentTaxV2._swapAndDistribute()` - Tax Distribution
+
+```solidity
+function _swapAndDistribute(...) internal {
+    uint256 amountToSwap = amounts.amountCollected - amounts.amountSwapped;
+    
+    if (amountToSwap < minSwapThreshold) return;
+    if (amountToSwap > maxSwapThreshold) amountToSwap = maxSwapThreshold;
+    
+    uint256 balance = IERC20(taxToken).balanceOf(address(this));
+    if (balance < amountToSwap) return;  // Silently returns if insufficient balance
+    
+    // Validates price before swap
+    uint256[] memory amountsOut = router.getAmountsOut(amountToSwap, path);
+    require(amountsOut.length > 1, "Failed to fetch token price");
+    
+    try router.swapExactTokensForTokens(...) returns (uint256[] memory swapAmounts) {
+        // Distribution logic
+        amounts.amountSwapped += amountToSwap;  // State update
+        
+        // Distributions
+        IERC20(assetToken).safeTransfer(recipient.creator, creatorFee);
+        IERC20(assetToken).safeTransfer(treasury, protocolFee);
+    } catch {
+        emit SwapFailed(tokenAddress, amountToSwap);
+    }
+}
+```
+
+**Audit Questions:**
+- Silent return on insufficient balance - should this emit an event?
+- State update order relative to external calls
+- `getAmountsOut` validation added (commit 130cf00)
+
+#### 4. `BondingV5.launch()` - Token Launch with Registration
+
+```solidity
+// In launch() after token graduation
+IAgentTaxV2(taxVault).registerToken(
+    token,
+    tba,
+    tokenInfo_[token].creator
+);
+```
+
+---
+
+## 4. Local Deployment & Testing
+
+### Prerequisites
+
+1. Node.js >= 18
+2. Clone repository and install dependencies:
+   ```bash
+   cd protocol-contracts
+   npm install
+   ```
+
+3. Create environment file:
+   ```bash
+   cp .env.launchpadv5_local.example .env.launchpadv5_local
+   # Edit with your BASE_SEPOLIA_RPC_URL and private keys
+   ```
+
+### 4.1 Full Local Deployment
+
+Use the deployment orchestration script:
+
+```bash
+# From protocol-contracts directory
+
+# Full deployment (starts local fork + deploys all contracts)
+./scripts/launchpadv5/run_local_deploy.sh
+
+# Or specify network/env explicitly
+./scripts/launchpadv5/run_local_deploy.sh --network local --env .env.launchpadv5_local
+```
+
+**What it does:**
+1. Kills any existing Hardhat node
+2. Starts local fork of Base Sepolia
+3. Runs deployment scripts 0-3 sequentially
+4. Saves deployed addresses to env file
+
+**Deployment Steps:**
+- Step 0: Deploy AgentNftV2, AgentTaxV2
+- Step 1: Deploy FFactoryV3, FRouterV3
+- Step 2: Deploy AgentTokenV3 impl, AgentVeTokenV2 impl, AgentDAO impl, AgentFactoryV7
+- Step 3: Deploy BondingConfig, BondingV5, configure all roles
+
+**Individual Steps:**
+```bash
+./scripts/launchpadv5/run_local_deploy.sh 0   # Run only step 0
+./scripts/launchpadv5/run_local_deploy.sh 1   # Run only step 1
+./scripts/launchpadv5/run_local_deploy.sh 2   # Run only step 2
+./scripts/launchpadv5/run_local_deploy.sh 3   # Run only step 3
+./scripts/launchpadv5/run_local_deploy.sh 4   # Revoke deployer roles (production)
+```
+
+### 4.2 End-to-End Testing
+
+After deployment, run the comprehensive E2E test:
+
+```bash
+# Local network
+ENV_FILE=.env.launchpadv5_local npx hardhat run scripts/launchpadv5/e2e_test.ts --network local
+
+# Base Sepolia
+ENV_FILE=.env.launchpadv5_dev npx hardhat run scripts/launchpadv5/e2e_test.ts --network base_sepolia
+```
+
+**E2E Test Verifies:**
+1. BondingConfig parameters
+2. FFactoryV3 tax configuration
+3. `preLaunch()` with configurable parameters
+4. On-chain tokenInfo and tokenLaunchParams storage
+5. Anti-sniper tax configuration
+6. `launch()` execution
+7. `buy()` during and after anti-sniper period
+8. `sell()` with tax collection
+9. Tax recorded in AgentTaxV2
+10. `batchSwapForTokenAddress()` tax distribution
+
+### 4.3 Batch Swap Tax Script
+
+Test or execute tax distribution manually:
+
+```bash
+# Edit TOKEN_ADDRESSES in the script first
+ENV_FILE=.env.launchpadv5_local npx hardhat run scripts/launchpadv5/batch_swap_tax.ts --network local
+
+# Or for testnet
+ENV_FILE=.env.launchpadv5_dev npx hardhat run scripts/launchpadv5/batch_swap_tax.ts --network base_sepolia
+```
+
+**Script Configuration (edit in file):**
+```typescript
+const TOKEN_ADDRESSES: string[] = [
+  "0x...",  // Token addresses to swap tax for
+];
+
+const MIN_OUTPUTS: bigint[] = [
+  0n,  // Use 0 for no slippage protection (testing only!)
+];
+```
+
+**Script Functions:**
+- Reads pending tax from AgentTaxV2
+- Validates EXECUTOR_ROLE
+- Executes `batchSwapForTokenAddress()`
+- Reports SwapExecuted/SwapFailed events
+
+### 4.4 Network Options
+
+| Network | Command | Description |
+|---------|---------|-------------|
+| local | `--network local` | Fork of Base Sepolia |
+| base_sepolia | `--network base_sepolia` | Base Sepolia testnet |
+| base | `--network base` | Base mainnet (use with caution) |
+
+---
+
+## 5. Audit Checklist
+
+### Fund Safety
+
+- [ ] `AgentTaxV2._swapAndDistribute()` state update ordering
+- [ ] Reentrancy protection in swap functions
+- [ ] Integer overflow/underflow (Solidity 0.8.20 built-in)
+- [ ] Silent failures in `_swapAndDistribute()` (insufficient balance)
+- [ ] Token approval patterns (`forceApprove` vs `approve`)
+
+### Access Control
+
+- [ ] `EXECUTOR_ROLE` assignment to BondingV5 and backend wallet
+- [ ] Role revocation in `deployLaunchpadv5_4.ts`
+- [ ] `registerToken()` - can overwrite existing registrations?
+- [ ] `updateCreator()` - only creator or admin can update
+
+### External Calls
+
+- [ ] Router interaction in `_swapAndDistribute()`
+- [ ] `depositTax()` call from FRouterV3 and AgentTokenV3
+- [ ] `getAmountsOut()` validation before swap
+- [ ] Try-catch around swap operations
+
+### Configuration
+
+- [ ] `minSwapThreshold` / `maxSwapThreshold` validation
+- [ ] `feeRate` bounds check (≤ 10000)
+- [ ] Treasury address non-zero validation
+
+### Integration
+
+- [ ] BondingV5 → AgentTaxV2 `registerToken()` flow
+- [ ] FRouterV3 → AgentTaxV2 `depositTax()` flow
+- [ ] AgentTokenV3 → AgentTaxV2 `depositTax()` flow (graduated tokens)
+
+---
+
+## 6. E2E Example Transactions (Base Sepolia)
+
+The following transactions demonstrate a complete token lifecycle on Base Sepolia testnet, showing the on-chain tax attribution flow:
+
+### Token: E2E Test Token (E2E229)
+- **Token Address:** `0xeb7e0463ACb5672C318eb34dFaB4082E1592C188`
+- **Pair Address:** `0x9a7819E356EB91E755a7971a03E7fF0C2B19E11E`
+- **AgentTaxV2:** `0xC7475Af17c2041f4e3a027F9840623054ae5FC36`
+
+### Transaction Flow
+
+| Step | Action | Transaction | Key Events |
+|------|--------|-------------|------------|
+| 1 | **preLaunch** | [0x1f081c8c...](https://sepolia.basescan.org/tx/0x1f081c8cd075866ec8ba09079f5bd322eb7a8b41bc07bffecc1b9d1fdba51d83) | Token created, pair created |
+| 2 | **launch** | [0xd41613c2...](https://sepolia.basescan.org/tx/0xd41613c228472a54897938925a21f939128f27a6ad7d346db8d313db0de78ddf) | `TokenRegistered`, `TaxDeposited`, `Launched` |
+| 3 | **buy (1)** | [0x680da80e...](https://sepolia.basescan.org/tx/0x680da80ee92f2408e3cb1ea83c16a5dbd9b02286fe8c18ae843aed9675333356) | `TaxDeposited` (1 VIRTUAL tax) |
+| 4 | **buy (2)** | [0x4981d1f8...](https://sepolia.basescan.org/tx/0x4981d1f89dec87fe1ced02e69584e6981df19885686ac3fda975b6dcd7717089) | `TaxDeposited` |
+| 5 | **sell** | [0x1a3cf565...](https://sepolia.basescan.org/tx/0x1a3cf565aa5ca98e2356cebfb0de56c4bf41013cdc21b1c3627164afddccb7b1) | `TaxDeposited` (0.142 VIRTUAL tax) |
+| 6 | **batchSwapForTokenAddress** | [0x91c4fa80...](https://sepolia.basescan.org/tx/0x91c4fa807a74ae91437704420827a03ea64e1db053379c16931b0239616cb886) | `SwapExecuted` |
+
+### Key Event Analysis
+
+#### 1. TokenRegistered (during launch)
+
+```
+Event: TokenRegistered
+Address: 0xC7475Af17c2041f4e3a027F9840623054ae5FC36 (AgentTaxV2)
+Topics:
+  - tokenAddress: 0xeb7e0463ACb5672C318eb34dFaB4082E1592C188
+  - creator: 0x046308A74968E199C274Ae784c93a0ee18aF1aBF
+Data:
+  - tba: 0x046308A74968E199C274Ae784c93a0ee18aF1aBF
+```
+
+This event is emitted when `BondingV5.launch()` calls `AgentTaxV2.registerToken()`, registering the token with its creator for tax distribution.
+
+#### 2. TaxDeposited (during buy/sell)
+
+```
+Event: TaxDeposited
+Address: 0xC7475Af17c2041f4e3a027F9840623054ae5FC36 (AgentTaxV2)
+Topics:
+  - tokenAddress: 0xeb7e0463ACb5672C318eb34dFaB4082E1592C188
+Data:
+  - amount: 1000000000000000000 (1 VIRTUAL)
+```
+
+This event is emitted during each trade when `FRouterV3` (for prototype trades) or `AgentTokenV3` (for graduated trades) calls `AgentTaxV2.depositTax()`.
+
+#### 3. SwapExecuted (during batchSwapForTokenAddress)
+
+```
+Event: SwapExecuted
+Address: 0xC7475Af17c2041f4e3a027F9840623054ae5FC36 (AgentTaxV2)
+Topics:
+  - tokenAddress: 0xeb7e0463ACb5672C318eb34dFaB4082E1592C188
+Data:
+  - taxTokenAmount: accumulated VIRTUAL tax
+  - assetTokenAmount: received asset tokens (distributed to creator and treasury)
+```
+
+This event is emitted when the backend calls `AgentTaxV2.batchSwapForTokenAddress()` to swap accumulated tax and distribute to the creator and treasury.
+
+### Tax Flow Diagram
+
+```
+User Buy (100 VIRTUAL)
+    │
+    ├─► 7 VIRTUAL → Pair (swap for tokens)
+    ├─► 1 VIRTUAL → FRouterV3 → AgentTaxV2.depositTax()  ✓ TaxDeposited
+    └─► 92 VIRTUAL → Anti-sniper vault (during anti-sniper period)
+
+User Sell (tokens)
+    │
+    ├─► Pair returns 14.21 VIRTUAL
+    ├─► 14.07 VIRTUAL → User
+    └─► 0.142 VIRTUAL → FRouterV3 → AgentTaxV2.depositTax()  ✓ TaxDeposited
+
+Backend (hourly)
+    │
+    └─► AgentTaxV2.batchSwapForTokenAddress([token], [minOutput])
+        ├─► Swap accumulated VIRTUAL → Asset token
+        ├─► 70% → Creator
+        └─► 30% → Treasury
+```
+
+---
+
+## 7. Contract Addresses (Base Sepolia - Development)
+
+### Deployed Addresses (from E2E test)
+
+| Contract | Address |
+|----------|---------|
+| BondingV5 | `0x2eB4313e3047845FD07315A51003F1f440780cdD` |
+| AgentTaxV2 | `0xC7475Af17c2041f4e3a027F9840623054ae5FC36` |
+| FRouterV3 | `0x2c224aC500927B8a583799bfe1e35AA68983CE10` |
+| VIRTUAL Token | `0xbfAB80ccc15DF6fb7185f9498d6039317331846a` |
+| Anti-Sniper Vault | `0x6EB12855a21564A1aC4aD0674e032A88e757570C` |
+
+### Environment File Template
+
+After deployment, addresses are saved to the env file:
+
+```bash
+AGENT_NFT_V2_ADDRESS=0x...
+AGENT_TAX_V2_CONTRACT_ADDRESS=0xC7475Af17c2041f4e3a027F9840623054ae5FC36
+FFactoryV3_ADDRESS=0x...
+FRouterV3_ADDRESS=0x2c224aC500927B8a583799bfe1e35AA68983CE10
+AGENT_TOKEN_V3_IMPLEMENTATION=0x...
+AGENT_FACTORY_V7_ADDRESS=0x...
+BONDING_CONFIG_ADDRESS=0x...
+BONDING_V5_ADDRESS=0x2eB4313e3047845FD07315A51003F1f440780cdD
+```
+
+---
+
+## 8. Contact
+
+For questions about this audit scope, please contact the Virtuals Protocol team.

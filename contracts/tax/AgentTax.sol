@@ -86,7 +86,7 @@ contract AgentTax is Initializable, AccessControlUpgradeable {
     );
 
     mapping(uint256 agentId => TaxRecipient) private _agentRecipients;
-    uint16 public creatorFeeRate;
+    uint16 public creatorFeeRate; // actually this variable is not used
 
     event CreatorUpdated(
         uint256 agentId,
@@ -94,7 +94,7 @@ contract AgentTax is Initializable, AccessControlUpgradeable {
         address newCreator
     );
 
-    ITBABonus public tbaBonus;
+    ITBABonus public tbaBonus; // deprecated
     IBondingV2ForTax public bondingV2;
     IBondingV4ForTax public bondingV4;
 
@@ -335,6 +335,24 @@ contract AgentTax is Initializable, AccessControlUpgradeable {
         emit CreatorUpdated(agentId, oldCreator, creator);
     }
 
+/**
+     * @notice Update tax recipient for prototype V2 agents before launch
+     * @dev Called by backend RIGHT BEFORE bondingv2/v4.launch() because on-chain virtualId
+     *      is not minted yet. The tax-listener needs this mapping to attribute taxes correctly.
+     * 
+     *      agentId = dbVirtuals.id + 10^12 (fake prototypeV2OnchainVirtualId)
+     *      tba = dbVirtuals.walletAddress (always the same)
+     * 
+     *      Use cases:
+     *        - Project60days: creator = dbVibesInfo.vaultAddress
+     *          (later updated via updateCreatorForProject60daysAgents on COMMIT)
+     *        - X_LAUNCH / ACP_SKILL: creator = dbVirtuals.taxRecipient
+     *        - Normal projects: creator = dbVirtuals.walletAddress
+     * 
+     * @param agentId The fake agentId (dbVirtuals.id + 10^12)
+     * @param tba The Token Bound Address (dbVirtuals.walletAddress)
+     * @param creator The creator address that will receive tax rewards
+     */
     function updateCreatorForPrototypeV2Agents(
         uint256 agentId,
         address tba,
@@ -372,10 +390,19 @@ contract AgentTax is Initializable, AccessControlUpgradeable {
         bondingV2 = IBondingV2ForTax(bondingV2_);
     }
 
-    /**
-     * @notice Update tax recipient for new feature agents launched via BondingV2
-     * @param agentId The agentId (virtualId) of the agent
-     * @param tba The Token Bound Address for the agent
+/**
+     * @notice Update tax recipient for Project60days agents launched via BondingV2
+     * @dev Called by backend for graduated Project60days tokens:
+     * 
+     *      agentId = on-chain virtualId (minted after graduation)
+     *      tba = dbVirtuals.walletAddress (always the same)
+     * 
+     *      Use cases:
+     *        - After graduation: creator = dbVibesInfo.vaultAddress (60-day lock period)
+     *        - After COMMIT: creator = dbVirtuals.walletAddress (creator receives tax)
+     * 
+     * @param agentId The agentId (on-chain virtualId) of the agent
+     * @param tba The Token Bound Address (dbVirtuals.walletAddress)
      * @param creator The creator address that will receive tax rewards
      */
     function updateCreatorForProject60daysAgents(
@@ -415,10 +442,18 @@ contract AgentTax is Initializable, AccessControlUpgradeable {
         bondingV4 = IBondingV4ForTax(bondingV4_);
     }
 
-    /**
+/**
      * @notice Update tax recipient for special launch mode agents (X_LAUNCH or ACP_SKILL) via BondingV4
-     * @param agentId The agentId (virtualId) of the agent
-     * @param tba The Token Bound Address for the agent
+     * @dev Called by backend for X_LAUNCH or ACP_SKILL tokens:
+     * 
+     *      agentId = on-chain virtualId (minted after graduation)
+     *      tba = dbVirtuals.walletAddress (always the same)
+     * 
+     *      Use case:
+     *        - Before launch: creator = dbVirtuals.taxRecipient (partner address)
+     * 
+     * @param agentId The agentId (on-chain virtualId) of the agent
+     * @param tba The Token Bound Address (dbVirtuals.walletAddress)
      * @param creator The creator address that will receive tax rewards
      */
     function updateCreatorForProjectXLaunchAgents(

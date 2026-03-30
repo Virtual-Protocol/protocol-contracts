@@ -410,6 +410,7 @@ contract BondingV5 is
             );
         }
 
+        uint256 initialPurchase = tokenRef.initialPurchase; // record real initialPurchase for event
         tokenRef.initialPurchase = 0; // prevent duplicate transfer initialPurchase back to the creator
         tokenRef.trading = false; // disable trading for cancelled tokens
         tokenRef.launchExecuted = true; // pretend it has been launched (cancelled) and prevent duplicate launch
@@ -418,7 +419,7 @@ contract BondingV5 is
             tokenAddress_,
             tokenRef.pair,
             tokenInfo[tokenAddress_].virtualId,
-            tokenRef.initialPurchase
+            initialPurchase
         );
     }
 

@@ -207,21 +207,6 @@ const { ethers } = require("hardhat");
       console.log("⏭️  Deployer has no ADMIN_ROLE on AgentNftV2 (skip)");
     }
 
-    const agentNftDefaultAdminRole = await agentNftV2.DEFAULT_ADMIN_ROLE();
-    if (await agentNftV2.hasRole(agentNftDefaultAdminRole, deployerAddress)) {
-      await (
-        await agentNftV2.revokeRole(agentNftDefaultAdminRole, deployerAddress)
-      ).wait();
-      console.log(
-        "✅ DEFAULT_ADMIN_ROLE of AgentNftV2 revoked from deployer:",
-        deployerAddress
-      );
-    } else {
-      console.log(
-        "⏭️  Deployer has no DEFAULT_ADMIN_ROLE on AgentNftV2 (skip)"
-      );
-    }
-
     const agentNftValidatorAdminRole = await agentNftV2.VALIDATOR_ADMIN_ROLE();
     if (await agentNftV2.hasRole(agentNftValidatorAdminRole, deployerAddress)) {
       await (
@@ -234,6 +219,21 @@ const { ethers } = require("hardhat");
     } else {
       console.log(
         "⏭️  Deployer has no VALIDATOR_ADMIN_ROLE on AgentNftV2 (skip)"
+      );
+    }
+
+    const agentNftDefaultAdminRole = await agentNftV2.DEFAULT_ADMIN_ROLE();
+    if (await agentNftV2.hasRole(agentNftDefaultAdminRole, deployerAddress)) {
+      await (
+        await agentNftV2.revokeRole(agentNftDefaultAdminRole, deployerAddress)
+      ).wait();
+      console.log(
+        "✅ DEFAULT_ADMIN_ROLE of AgentNftV2 revoked from deployer:",
+        deployerAddress
+      );
+    } else {
+      console.log(
+        "⏭️  Deployer has no DEFAULT_ADMIN_ROLE on AgentNftV2 (skip)"
       );
     }
 
@@ -315,36 +315,60 @@ const { ethers } = require("hardhat");
     );
     console.log(`- AgentDAO Impl: ${process.env.AGENT_DAO_IMPLEMENTATION}`);
     console.log(`- AgentNftV2: ${process.env.AGENT_NFT_V2_ADDRESS}`);
-    console.log(`- AgentTaxV2: ${process.env.AGENT_TAX_V2_ADDRESS}`);
+    console.log(`- AgentTaxV2: ${process.env.AGENT_TAX_V2_CONTRACT_ADDRESS}`);
     console.log(`- BondingConfig: ${process.env.BONDING_CONFIG_ADDRESS}`);
     console.log(`- BondingV5: ${process.env.BONDING_V5_ADDRESS}`);
     console.log(`- Virtual Token: ${process.env.VIRTUAL_TOKEN_ADDRESS}`);
+    console.log(`- UNISWAP_V2_ROUTER: ${process.env.UNISWAP_V2_ROUTER}`);
+    console.log(`- AGENT_TAX_ASSET_TOKEN: ${process.env.AGENT_TAX_ASSET_TOKEN}`);
 
     console.log("\n--- V5 Suite Architecture ---");
-    console.log(
-      "┌─────────────────────────────────────────────────────────────┐"
+    const _v5w = 76;
+    const _v5row = (s: string) =>
+      console.log(
+        "│ " +
+          (s.length > _v5w ? s.slice(0, _v5w) : s.padEnd(_v5w, " ")) +
+          " │"
+      );
+    const _v5top = () => console.log("┌" + "─".repeat(78) + "┐");
+    const _v5mid = () => console.log("├" + "─".repeat(78) + "┤");
+    const _v5bot = () => console.log("└" + "─".repeat(78) + "┘");
+
+    _v5top();
+    _v5row("  V5 Suite (NEW)");
+    _v5mid();
+    _v5row("  Virtual + tax TOKEN (bonding / tax leg)");
+    _v5row("  env: VIRTUAL_TOKEN_ADDRESS · AGENT_TAX_TAX_TOKEN");
+    _v5row("");
+    _v5row("  DEX + stable (AgentTax swap path pins)");
+    _v5row(
+      "  env: UNISWAP_V2_ROUTER · AGENT_TAX_DEX_ROUTER · AGENT_TAX_ASSET_TOKEN"
     );
-    console.log(
-      "│                     V5 Suite (NEW)                          │"
+    _v5mid();
+    _v5row("  BondingV5 → FFactoryV3 → FRouterV3 → AgentTaxV2.depositTax()");
+    _v5row(
+      "  env: BONDING_V5_ADDRESS → FFactoryV3_ADDRESS → FRouterV3_ADDRESS →"
     );
-    console.log(
-      "├─────────────────────────────────────────────────────────────┤"
+    _v5row("        AGENT_TAX_V2_CONTRACT_ADDRESS");
+    _v5row("        BONDING_CONFIG_ADDRESS (paired in FRouter.setBondingV5)");
+    _v5row("");
+    _v5row("  BondingV5.launch() → AgentFactoryV7 → AgentTokenV3 (+ NFT)");
+    _v5row(
+      "  env: AGENT_FACTORY_V7_ADDRESS · AGENT_NFT_V2_ADDRESS ·"
     );
-    console.log(
-      "│ BondingV5 → FFactoryV3 → FRouterV3 → AgentTaxV2.depositTax()│"
+    _v5row(
+      "        AGENT_TOKEN_V3_IMPLEMENTATION · AGENT_VE_TOKEN_V2_IMPLEMENTATION ·"
     );
-    console.log(
-      "│ BondingV5.launch() → AgentFactoryV7 → AgentTokenV3          │"
+    _v5row("        AGENT_DAO_IMPLEMENTATION");
+    _v5row("");
+    _v5row("  AgentTokenV3._swapTax() → AgentTaxV2.depositTax()");
+    _v5row("  env: AGENT_TAX_V2_CONTRACT_ADDRESS (same vault as above)");
+    _v5row("");
+    _v5row("  Backend → AgentTaxV2.swapForTokenAddress() → distribute");
+    _v5row(
+      "  env: BE_TAX_OPS_WALLETS · AGENT_TAX_V2_EXECUTOR_WALLETS (wallet lists)"
     );
-    console.log(
-      "│ AgentTokenV3._swapTax() → AgentTaxV2.depositTax()           │"
-    );
-    console.log(
-      "│ Backend → AgentTaxV2.swapForTokenAddress() → Distribute     │"
-    );
-    console.log(
-      "└─────────────────────────────────────────────────────────────┘"
-    );
+    _v5bot();
     console.log("");
     console.log("Key Benefits:");
     console.log(

@@ -21,6 +21,8 @@ const { ethers, upgrades } = require("hardhat");
  * - AgentNftV2, AgentTaxV2 (from deployLaunchpadv5_0.ts)
  * - FFactoryV3, FRouterV3 (from deployLaunchpadv5_1.ts)
  * - AgentFactoryV7 (from deployLaunchpadv5_2.ts)
+ *
+ * Optional: set BONDING_CONFIG_ADDRESS and/or BONDING_V5_ADDRESS to skip deploying that contract (still runs role grants).
  * 
  * V5 Suite Architecture:
  * - BondingV5 → FFactoryV3 → FRouterV3 → AgentTaxV2.depositTax()
@@ -64,6 +66,57 @@ const { ethers, upgrades } = require("hardhat");
       throw new Error("AGENT_TAX_V2_CONTRACT_ADDRESS not set - run deployLaunchpadv5_0.ts first");
     }
 
+    const existingBondingConfig = process.env.BONDING_CONFIG_ADDRESS?.trim();
+    const existingBondingV5 = process.env.BONDING_V5_ADDRESS?.trim();
+    if (existingBondingV5 && !existingBondingConfig) {
+      throw new Error(
+        "BONDING_V5_ADDRESS is set but BONDING_CONFIG_ADDRESS is not — inconsistent env"
+      );
+    }
+
+    const mustBeContract = async (label: string, addr: string) => {
+      const code = await ethers.provider.getCode(addr);
+      if (code === "0x") {
+        throw new Error(
+          `${label} (${addr}) has no contract code on this network. ` +
+            "Fix .env: addresses must match this chain/fork (e.g. FFactoryV3 from step 1 on the same fork)."
+        );
+      }
+    };
+    await mustBeContract("FFactoryV3_ADDRESS", fFactoryV3Address);
+    await mustBeContract("FRouterV3_ADDRESS", fRouterV3Address);
+    await mustBeContract("AGENT_FACTORY_V7_ADDRESS", agentFactoryV7Address);
+    await mustBeContract("AGENT_TAX_V2_CONTRACT_ADDRESS", agentTaxV2Address);
+
+    /** Populated only when we deploy BondingConfig (for summary). */
+    let bondConfigDeploySummary: {
+      initialSupply: string;
+      startTimeDelay: string;
+      normalLaunchFee: string;
+      acfFee: string;
+      teamTokenReservedWallet: string;
+      fakeInitialVirtualLiq: string;
+      targetRealVirtual: string;
+      maxAirdropBips: string;
+      maxTotalReservedBips: string;
+      acfReservedBips: string;
+    } | null = null;
+
+    let bondingConfig: any;
+    let bondingConfigAddress: string;
+    let bondingV5: any;
+    let bondingV5Address: string;
+
+    // ============================================
+    // 1. BondingConfig (deploy or reuse)
+    // ============================================
+    if (existingBondingConfig) {
+      await mustBeContract("BONDING_CONFIG_ADDRESS", existingBondingConfig);
+      console.log("\n--- BondingConfig: skip deploy (BONDING_CONFIG_ADDRESS set) ---");
+      bondingConfig = await ethers.getContractAt("BondingConfig", existingBondingConfig, deployer);
+      bondingConfigAddress = existingBondingConfig;
+      console.log("Using BondingConfig at:", bondingConfigAddress);
+    } else {
     // BondingConfig parameters
     const creationFeeToAddress = process.env.LAUNCHPAD_V5_CREATION_FEE_TO_ADDRESS;
     if (!creationFeeToAddress) {
@@ -158,122 +211,149 @@ const { ethers, upgrades } = require("hardhat");
       privilegedLauncherAddresses,
     });
 
-    // ============================================
-    // 1. Deploy BondingConfig
-    // ============================================
-    console.log("\n--- Deploying BondingConfig ---");
-    const BondingConfig = await ethers.getContractFactory("BondingConfig");
-    
-    const reserveSupplyParams = {
-      maxAirdropBips: maxAirdropBips,
-      maxTotalReservedBips: maxTotalReservedBips,
-      acfReservedBips: acfReservedBips,
-    };
+      // ============================================
+      // 1b. Deploy BondingConfig
+      // ============================================
+      console.log("\n--- Deploying BondingConfig ---");
+      const BondingConfig = await ethers.getContractFactory("BondingConfig");
 
-    const scheduledLaunchParams = {
-      startTimeDelay: startTimeDelay,
-      normalLaunchFee: parseEther(normalLaunchFee).toString(),
-      acfFee: parseEther(acfFee).toString(),
-    };
-    
-    const deployParams = {
-      tbaSalt: tbaSalt,
-      tbaImplementation: tbaImplementation,
-      daoVotingPeriod: daoVotingPeriod,
-      daoThreshold: daoThreshold,
-    };
-    
-    const bondingCurveParams = {
-      fakeInitialVirtualLiq: parseEther(fakeInitialVirtualLiq).toString(),
-      targetRealVirtual: parseEther(targetRealVirtual).toString(),
-    };
-    
-    const bondingConfig = await upgrades.deployProxy(
-      BondingConfig,
-      [
+      const reserveSupplyParams = {
+        maxAirdropBips: maxAirdropBips,
+        maxTotalReservedBips: maxTotalReservedBips,
+        acfReservedBips: acfReservedBips,
+      };
+
+      const scheduledLaunchParams = {
+        startTimeDelay: startTimeDelay,
+        normalLaunchFee: parseEther(normalLaunchFee).toString(),
+        acfFee: parseEther(acfFee).toString(),
+      };
+
+      const deployParams = {
+        tbaSalt: tbaSalt,
+        tbaImplementation: tbaImplementation,
+        daoVotingPeriod: daoVotingPeriod,
+        daoThreshold: daoThreshold,
+      };
+
+      const bondingCurveParams = {
+        fakeInitialVirtualLiq: parseEther(fakeInitialVirtualLiq).toString(),
+        targetRealVirtual: parseEther(targetRealVirtual).toString(),
+      };
+
+      bondingConfig = await upgrades.deployProxy(
+        BondingConfig,
+        [
+          initialSupply,
+          creationFeeToAddress,
+          teamTokenReservedWallet,
+          reserveSupplyParams,
+          scheduledLaunchParams,
+          deployParams,
+          bondingCurveParams,
+        ],
+        {
+          initializer: "initialize",
+          initialOwner: contractController,
+        }
+      );
+      await bondingConfig.waitForDeployment();
+      bondingConfigAddress = await bondingConfig.getAddress();
+      console.log("BondingConfig deployed at:", bondingConfigAddress);
+
+      await verifyContract(bondingConfigAddress);
+
+      bondConfigDeploySummary = {
         initialSupply,
-        creationFeeToAddress,
+        startTimeDelay,
+        normalLaunchFee,
+        acfFee,
         teamTokenReservedWallet,
-        reserveSupplyParams,
-        scheduledLaunchParams,
-        deployParams,
-        bondingCurveParams,
-      ],
-      {
-        initializer: "initialize",
-        initialOwner: contractController,
+        fakeInitialVirtualLiq,
+        targetRealVirtual,
+        maxAirdropBips,
+        maxTotalReservedBips,
+        acfReservedBips,
+      };
+
+      // Privileged launchers: preLaunch X/ACP + launch() Project60days (comma-separated)
+      const privilegedLauncherAddressList = privilegedLauncherAddresses
+        .split(",")
+        .map((addr) => addr.trim())
+        .filter((addr) => addr);
+      console.log("\n--- Setting privileged launchers in BondingConfig (setPrivilegedLauncher) ---");
+      for (const addr of privilegedLauncherAddressList) {
+        const tx = await bondingConfig.setPrivilegedLauncher(addr, true);
+        await tx.wait();
+        console.log("BondingConfig.setPrivilegedLauncher(true):", addr);
       }
-    );
-    await bondingConfig.waitForDeployment();
-    const bondingConfigAddress = await bondingConfig.getAddress();
-    console.log("BondingConfig deployed at:", bondingConfigAddress);
 
-    await verifyContract(bondingConfigAddress);
-
-    // Privileged launchers: preLaunch X/ACP + launch() Project60days (comma-separated)
-    const privilegedLauncherAddressList = privilegedLauncherAddresses.split(",").map((addr) => addr.trim()).filter((addr) => addr);
-    console.log("\n--- Setting privileged launchers in BondingConfig (setPrivilegedLauncher) ---");
-    for (const addr of privilegedLauncherAddressList) {
-      const tx = await bondingConfig.setPrivilegedLauncher(addr, true);
-      await tx.wait();
-      console.log("BondingConfig.setPrivilegedLauncher(true):", addr);
+      const txOwnCfg = await bondingConfig.transferOwnership(contractController);
+      await txOwnCfg.wait();
+      console.log("BondingConfig ownership transferred to CONTRACT_CONTROLLER:", contractController);
     }
 
     // ============================================
-    // 2. Deploy BondingV5 (uses V5 Suite contracts)
+    // 2. BondingV5 (deploy or reuse)
     // ============================================
-    console.log("\n--- Deploying BondingV5 (V5 Suite) ---");
-    const BondingV5 = await ethers.getContractFactory("BondingV5");
-    const bondingV5 = await upgrades.deployProxy(
-      BondingV5,
-      [
-        fFactoryV3Address,       // FFactoryV3 (NOT FFactoryV2!)
-        fRouterV3Address,        // FRouterV3 (NOT FRouterV2!)
-        agentFactoryV7Address,   // AgentFactoryV7 (NOT AgentFactoryV6!)
-        bondingConfigAddress,
-      ],
-      {
-        initializer: "initialize",
-        initialOwner: contractController,
-      }
-    );
-    await bondingV5.waitForDeployment();
-    const bondingV5Address = await bondingV5.getAddress();
-    console.log("BondingV5 deployed at:", bondingV5Address);
+    if (existingBondingV5) {
+      await mustBeContract("BONDING_V5_ADDRESS", existingBondingV5);
+      console.log("\n--- BondingV5: skip deploy (BONDING_V5_ADDRESS set) ---");
+      bondingV5 = await ethers.getContractAt("BondingV5", existingBondingV5, deployer);
+      bondingV5Address = existingBondingV5;
+      console.log("Using BondingV5 at:", bondingV5Address);
+    } else {
+      console.log("\n--- Deploying BondingV5 (V5 Suite) ---");
+      const BondingV5 = await ethers.getContractFactory("BondingV5");
+      bondingV5 = await upgrades.deployProxy(
+        BondingV5,
+        [
+          fFactoryV3Address, // FFactoryV3 (NOT FFactoryV2!)
+          fRouterV3Address, // FRouterV3 (NOT FRouterV2!)
+          agentFactoryV7Address, // AgentFactoryV7 (NOT AgentFactoryV6!)
+          bondingConfigAddress,
+        ],
+        {
+          initializer: "initialize",
+          initialOwner: contractController,
+        }
+      );
+      await bondingV5.waitForDeployment();
+      bondingV5Address = await bondingV5.getAddress();
+      console.log("BondingV5 deployed at:", bondingV5Address);
 
-    await verifyContract(bondingV5Address);
+      await verifyContract(bondingV5Address);
+
+      const txOwnBv5 = await bondingV5.transferOwnership(contractController);
+      await txOwnBv5.wait();
+      console.log("BondingV5 ownership transferred to CONTRACT_CONTROLLER:", contractController);
+    }
 
     // ============================================
-    // 3. Transfer Ownership
-    // ============================================
-    console.log("\n--- Transferring ownership ---");
-
-    const tx5 = await bondingV5.transferOwnership(contractController);
-    await tx5.wait();
-    console.log("BondingV5 ownership transferred to CONTRACT_CONTROLLER:", contractController);
-
-    const tx6 = await bondingConfig.transferOwnership(contractController);
-    await tx6.wait();
-    console.log("BondingConfig ownership transferred to CONTRACT_CONTROLLER:", contractController);
-
-    // ============================================
-    // 4. Grant Roles and Configure Contracts
+    // 3. Grant Roles and Configure Contracts
     // ============================================
     console.log("\n--- Granting roles and configuring contracts ---");
-    
-    let fFactoryV3 = await ethers.getContractAt("FFactoryV3", fFactoryV3Address);
-    let fRouterV3 = await ethers.getContractAt("FRouterV3", fRouterV3Address);
-    let agentFactoryV7 = await ethers.getContractAt("AgentFactoryV7", agentFactoryV7Address);
-    let agentTaxV2 = await ethers.getContractAt("AgentTaxV2", agentTaxV2Address);
-    
-    const adminPrivateKey = process.env.ADMIN_PRIVATE_KEY;
-    if (adminPrivateKey) { // If ADMIN_PRIVATE_KEY is set, use it to grant roles, easier for testnet
-      const adminSigner = new ethers.Wallet(adminPrivateKey, ethers.provider);
-      fFactoryV3 = await ethers.getContractAt("FFactoryV3", fFactoryV3Address, adminSigner);
-      fRouterV3 = await ethers.getContractAt("FRouterV3", fRouterV3Address, adminSigner);
-      agentFactoryV7 = await ethers.getContractAt("AgentFactoryV7", agentFactoryV7Address, adminSigner);
-      agentTaxV2 = await ethers.getContractAt("AgentTaxV2", agentTaxV2Address, adminSigner);
-    }
+    // Same deployer as steps 0–2: initializer + setup left deployer with role admins needed to grant here.
+    const fFactoryV3 = await ethers.getContractAt(
+      "FFactoryV3",
+      fFactoryV3Address,
+      deployer
+    );
+    const fRouterV3 = await ethers.getContractAt(
+      "FRouterV3",
+      fRouterV3Address,
+      deployer
+    );
+    const agentFactoryV7 = await ethers.getContractAt(
+      "AgentFactoryV7",
+      agentFactoryV7Address,
+      deployer
+    );
+    const agentTaxV2 = await ethers.getContractAt(
+      "AgentTaxV2",
+      agentTaxV2Address,
+      deployer
+    );
 
     // Grant CREATOR_ROLE of FFactoryV3 to BondingV5
     const creatorRole = await fFactoryV3.CREATOR_ROLE();
@@ -308,7 +388,7 @@ const { ethers, upgrades } = require("hardhat");
     console.log("\n✅ All role grants and configurations completed!");
 
     // ============================================
-    // 5. Print Deployment Summary
+    // 4. Print Deployment Summary
     // ============================================
     console.log("\n" + "=".repeat(80));
     console.log("  Deployment Summary");
@@ -320,22 +400,31 @@ const { ethers, upgrades } = require("hardhat");
     console.log(`- AgentFactoryV7: ${agentFactoryV7Address}`);
     console.log(`- AgentTaxV2: ${agentTaxV2Address}`);
 
-    console.log("\n--- Newly Deployed Contracts ---");
-    console.log(`- BondingConfig: ${bondingConfigAddress}`);
-    console.log(`- BondingV5: ${bondingV5Address}`);
+    console.log("\n--- BondingConfig & BondingV5 ---");
+    console.log(
+      `- BondingConfig: ${bondingConfigAddress}${existingBondingConfig ? " (existing)" : " (deployed this run)"}`
+    );
+    console.log(
+      `- BondingV5: ${bondingV5Address}${existingBondingV5 ? " (existing)" : " (deployed this run)"}`
+    );
 
     console.log("\n--- Configuration ---");
-    console.log("- Initial Supply:", initialSupply);
-    console.log("- Reserve Supply Params (in bips, 1 bip = 0.01%):");
-    console.log("  - Max Airdrop Bips:", maxAirdropBips, "(", Number(maxAirdropBips) / 100, "%)");
-    console.log("  - Max Total Reserved Bips:", maxTotalReservedBips, "(", Number(maxTotalReservedBips) / 100, "%)");
-    console.log("  - ACF Reserved Bips:", acfReservedBips, "(", Number(acfReservedBips) / 100, "%)");
-    console.log("- Start Time Delay:", startTimeDelay, "seconds");
-    console.log("- Normal Launch Fee:", normalLaunchFee, "VIRTUAL (scheduled/marketing)");
-    console.log("- ACF Fee:", acfFee, "VIRTUAL (extra fee when needAcf = true)");
-    console.log("- Team Token Reserved Wallet:", teamTokenReservedWallet);
-    console.log("- Fake Initial Virtual Liq:", fakeInitialVirtualLiq);
-    console.log("- Target Real Virtual:", targetRealVirtual);
+    if (bondConfigDeploySummary) {
+      const s = bondConfigDeploySummary;
+      console.log("- Initial Supply:", s.initialSupply);
+      console.log("- Reserve Supply Params (in bips, 1 bip = 0.01%):");
+      console.log("  - Max Airdrop Bips:", s.maxAirdropBips, "(", Number(s.maxAirdropBips) / 100, "%)");
+      console.log("  - Max Total Reserved Bips:", s.maxTotalReservedBips, "(", Number(s.maxTotalReservedBips) / 100, "%)");
+      console.log("  - ACF Reserved Bips:", s.acfReservedBips, "(", Number(s.acfReservedBips) / 100, "%)");
+      console.log("- Start Time Delay:", s.startTimeDelay, "seconds");
+      console.log("- Normal Launch Fee:", s.normalLaunchFee, "VIRTUAL (scheduled/marketing)");
+      console.log("- ACF Fee:", s.acfFee, "VIRTUAL (extra fee when needAcf = true)");
+      console.log("- Team Token Reserved Wallet:", s.teamTokenReservedWallet);
+      console.log("- Fake Initial Virtual Liq:", s.fakeInitialVirtualLiq);
+      console.log("- Target Real Virtual:", s.targetRealVirtual);
+    } else {
+      console.log("(BondingConfig was reused — deploy-time params not printed.)");
+    }
 
     console.log("\n--- Role Grants Completed ---");
     console.log("- FFactoryV3.CREATOR_ROLE → BondingV5 (create preToken pairs)");

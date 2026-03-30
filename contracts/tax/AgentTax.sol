@@ -42,6 +42,13 @@ contract AgentTax is Initializable, AccessControlUpgradeable {
 
     address public assetToken;
     address public taxToken;
+    /// @dev DEX router implementing `IRouter`. Same function name as Aerodrome, different signature (different selector):
+    /// - This contract calls UniV2-style:
+    ///   `swapExactTokensForTokens(uint256,uint256,address[] calldata path,address,uint256)`
+    /// - Aerodrome `Router` exposes:
+    ///   `swapExactTokensForTokens(uint256,uint256,Route[] calldata routes,address,uint256)`
+    /// So you cannot point `router` at Aerodrome directly; Base prod uses an adaptor (bridges `path` → `Route[]`).
+    /// Liquidity example: VIRTUAL/cbBTC on Aerodrome, not UniV2. Adaptor: https://basescan.org/address/0x579e9c2cF23362F5aC74d876E600C5bCAD5aA33A#code
     IRouter public router;
     address public treasury;
     uint16 public feeRate;

@@ -4,7 +4,10 @@ const { run } = require("hardhat");
  * Verify a contract on Etherscan/Basescan
  * Handles "Already Verified" errors gracefully
  */
-export async function verifyContract(address: string, constructorArguments: any[] = []) {
+export async function verifyContract(
+  address: string,
+  constructorArguments: any[] = []
+) {
   console.log(`\n--- Verifying contract at ${address} ---`);
   try {
     await run("verify:verify", {

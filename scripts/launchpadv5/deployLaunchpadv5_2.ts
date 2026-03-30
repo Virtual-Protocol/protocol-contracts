@@ -368,6 +368,17 @@ const { ethers, upgrades } = require("hardhat");
       admin
     );
 
+    // Grant REMOVE_LIQUIDITY_ROLE to FRouterV3
+    const txGrantRemoveLiqToFRouterV3 = await agentFactoryV7.grantRole(
+      agentFactoryV7RemoveLiqRole,
+      fRouterV3Address
+    );
+    await txGrantRemoveLiqToFRouterV3.wait();
+    console.log(
+      "REMOVE_LIQUIDITY_ROLE of AgentFactoryV7 granted to FRouterV3:",
+      fRouterV3Address
+    );
+
     // Grant WITHDRAW_ROLE to admin
     const agentFactoryV7WithdrawRole = await agentFactoryV7.WITHDRAW_ROLE();
     const txGrantWithdraw = await agentFactoryV7.grantRole(

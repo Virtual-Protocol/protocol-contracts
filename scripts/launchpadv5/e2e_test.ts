@@ -8,54 +8,19 @@
  */
 import { parseEther, formatEther } from "ethers";
 import { executeBatchSwap } from "./batch_swap_tax";
+import {
+  waitWithProgress,
+  executePreLaunch,
+  waitForPairStartTimeThenLaunch,
+  LAUNCH_MODE_NORMAL,
+  LAUNCH_MODE_X_LAUNCH,
+  LAUNCH_MODE_ACP_SKILL,
+  ANTI_SNIPER_NONE,
+  ANTI_SNIPER_60S,
+  ANTI_SNIPER_98M,
+  launchModeLabel,
+} from "./launchpadv5Common";
 const { ethers } = require("hardhat");
-
-// Constants for launch modes and anti-sniper types
-const LAUNCH_MODE_NORMAL = 0;
-const LAUNCH_MODE_X_LAUNCH = 1;
-const LAUNCH_MODE_ACP_SKILL = 2;
-
-const ANTI_SNIPER_NONE = 0;
-const ANTI_SNIPER_60S = 1;
-const ANTI_SNIPER_98M = 2;
-
-function launchModeLabel(mode: number): string {
-  if (mode === LAUNCH_MODE_NORMAL) return "NORMAL";
-  if (mode === LAUNCH_MODE_X_LAUNCH) return "X_LAUNCH";
-  if (mode === LAUNCH_MODE_ACP_SKILL) return "ACP_SKILL";
-  return `UNKNOWN(${mode})`;
-}
-
-/**
- * Wait for a specified number of seconds with progress indicator
- * Works on real networks (Base Sepolia, etc.)
- */
-async function waitWithProgress(seconds: number, message: string): Promise<void> {
-  console.log(`\n⏳ ${message}`);
-  console.log(`   Waiting ${seconds} seconds...`);
-  
-  const startTime = Date.now();
-  const endTime = startTime + (seconds * 1000);
-  
-  // Show progress every 10 seconds or 10% of total time, whichever is greater
-  const progressInterval = Math.max(10, Math.floor(seconds / 10));
-  let lastProgress = 0;
-  
-  while (Date.now() < endTime) {
-    const elapsed = Math.floor((Date.now() - startTime) / 1000);
-    const remaining = seconds - elapsed;
-    
-    if (elapsed - lastProgress >= progressInterval || remaining <= 5) {
-      console.log(`   ⏱️  ${elapsed}s elapsed, ${remaining}s remaining...`);
-      lastProgress = elapsed;
-    }
-    
-    // Wait 1 second before next check
-    await new Promise(resolve => setTimeout(resolve, 1000));
-  }
-  
-  console.log(`   ✅ Wait complete!`);
-}
 
 interface TestConfig {
   bondingV5Address: string;
@@ -259,8 +224,8 @@ async function main() {
   const antiSniperTaxType = ANTI_SNIPER_60S; // 60 seconds anti-sniper
   const isProject60days = false;
 
-  // Check if this is scheduled or immediate launch
-  const isScheduledLaunch = startTime >= currentTimestamp + startTimeDelayNum;
+  const isScheduledLaunchPreview =
+    startTime >= currentTimestamp + startTimeDelayNum;
 
   console.log("\n--- preLaunch Parameters ---");
   console.log("Token Name:", tokenName);
@@ -270,7 +235,7 @@ async function main() {
   console.log("Current Block Timestamp:", currentTimestamp);
   console.log("Start Time:", startTime, `(${new Date(Number(startTime) * 1000).toISOString()})`);
   console.log("Scheduled Launch Start Time Delay:", startTimeDelayNum, "seconds");
-  console.log("Is Scheduled Launch:", isScheduledLaunch, "(expected: false - immediate launch)");
+  console.log("Is Scheduled Launch (preview):", isScheduledLaunchPreview, "(expected: false - immediate launch)");
   console.log("Launch Mode:", launchMode, `(${launchModeLabel(launchMode)})`);
   console.log("Airdrop Bips:", airdropBips, "(", airdropBips / 100, "%)");
   console.log("Need ACF:", needAcf);
@@ -297,11 +262,10 @@ async function main() {
 
   console.log("\n--- Executing preLaunch ---");
 
-  // Get fresh block timestamp right before the call to ensure accurate comparison
   const freshBlock = await ethers.provider.getBlock("latest");
   const freshTimestamp = Number(freshBlock!.timestamp);
   const scheduledThreshold = freshTimestamp + startTimeDelayNum;
-  
+
   console.log("\n--- Time Diagnostics (Fresh) ---");
   console.log("Fresh Block Number:", freshBlock!.number);
   console.log("Fresh Block Timestamp:", freshTimestamp, `(${new Date(freshTimestamp * 1000).toISOString()})`);
@@ -310,70 +274,11 @@ async function main() {
   console.log("startTime < scheduledThreshold?", startTime < scheduledThreshold, "(should be true for immediate launch)");
   console.log("Difference:", startTime - freshTimestamp, "seconds from now");
 
-  // First, try staticCall to get the revert reason if any
-  try {
-    console.log("\n--- Running staticCall to check for errors ---");
-    await bondingV5.preLaunch.staticCall(
-      tokenName,
-      tokenTicker,
-      cores,
-      description,
-      image,
-      urls,
-      purchaseAmount,
-      startTime,
-      launchMode,
-      airdropBips,
-      needAcf,
-      antiSniperTaxType,
-      isProject60days
-    );
-    console.log("✅ staticCall passed, proceeding with actual transaction...");
-  } catch (staticCallError: any) {
-    console.error("\n❌ staticCall failed - this will likely fail on-chain too:");
-    console.error("Error:", staticCallError.message);
-    if (staticCallError.reason) {
-      console.error("Reason:", staticCallError.reason);
-    }
-    if (staticCallError.revert) {
-      console.error("Revert:", staticCallError.revert);
-    }
-    if (staticCallError.data) {
-      console.error("Data:", staticCallError.data);
-    }
-    // Try to decode custom error
-    try {
-      const errorData = staticCallError.data;
-      if (errorData && errorData !== "0x") {
-        console.error("Error Selector:", errorData.slice(0, 10));
-      }
-    } catch {}
-    throw staticCallError;
-  }
-
-  // Estimate gas first to see what's needed
-  const estimatedGas = await bondingV5.preLaunch.estimateGas(
-    tokenName,
-    tokenTicker,
-    cores,
-    description,
-    image,
-    urls,
-    purchaseAmount,
-    startTime,
-    launchMode,
-    airdropBips,
-    needAcf,
-    antiSniperTaxType,
-    isProject60days
-  );
-  console.log("Estimated Gas:", estimatedGas.toString());
-  
-  // Use 150% of estimated gas as limit
-  const gasLimit = (estimatedGas * 150n) / 100n;
-  console.log("Using Gas Limit:", gasLimit.toString());
-
-  const preLaunchTx = await bondingV5.preLaunch(
+  const pre = await executePreLaunch({
+    bondingV5,
+    virtualToken,
+    signer,
+    bondingV5Address: config.bondingV5Address,
     tokenName,
     tokenTicker,
     cores,
@@ -387,33 +292,15 @@ async function main() {
     needAcf,
     antiSniperTaxType,
     isProject60days,
-    { gasLimit }
-  );
-
-  const preLaunchReceipt = await preLaunchTx.wait();
-  console.log("✅ preLaunch transaction successful!");
-  console.log("Gas Used:", preLaunchReceipt.gasUsed.toString());
-
-  // Parse PreLaunched event
-  const preLaunchedEvent = preLaunchReceipt.logs.find((log: any) => {
-    try {
-      const parsed = bondingV5.interface.parseLog(log);
-      return parsed?.name === "PreLaunched";
-    } catch {
-      return false;
-    }
+    runDiagnostics: true,
   });
 
-  if (!preLaunchedEvent) {
-    throw new Error("PreLaunched event not found");
-  }
-
-  const parsedEvent = bondingV5.interface.parseLog(preLaunchedEvent);
-  const tokenAddress = parsedEvent.args.token;
-  const pairAddress = parsedEvent.args.pair;
-  const virtualId = parsedEvent.args.virtualId;
-  const initialPurchase = parsedEvent.args.initialPurchase;
-  const eventLaunchParams = parsedEvent.args.launchParams;
+  const tokenAddress = pre.tokenAddress;
+  const pairAddress = pre.pairAddress;
+  const virtualId = pre.virtualId;
+  const initialPurchase = pre.initialPurchase;
+  const eventLaunchParams = pre.eventLaunchParams;
+  const isScheduledLaunch = pre.isScheduledLaunch;
 
   console.log("\n--- PreLaunched Event Data ---");
   console.log("Token Address:", tokenAddress);
@@ -421,11 +308,11 @@ async function main() {
   console.log("Virtual ID:", virtualId.toString());
   console.log("Initial Purchase:", formatEther(initialPurchase), "VIRTUAL");
   console.log("LaunchParams from Event:", {
-    launchMode: eventLaunchParams.launchMode,
-    airdropBips: eventLaunchParams.airdropBips,
-    needAcf: eventLaunchParams.needAcf,
-    antiSniperTaxType: eventLaunchParams.antiSniperTaxType,
-    isProject60days: eventLaunchParams.isProject60days,
+    launchMode: (eventLaunchParams as { launchMode: number }).launchMode,
+    airdropBips: (eventLaunchParams as { airdropBips: number }).airdropBips,
+    needAcf: (eventLaunchParams as { needAcf: boolean }).needAcf,
+    antiSniperTaxType: (eventLaunchParams as { antiSniperTaxType: number }).antiSniperTaxType,
+    isProject60days: (eventLaunchParams as { isProject60days: boolean }).isProject60days,
   });
 
   // ============================================
@@ -516,45 +403,10 @@ async function main() {
   console.log("  Step 6: Wait for Start Time and Launch");
   console.log("=".repeat(80));
 
-  // Get pair start time
+  await waitForPairStartTimeThenLaunch(bondingV5, pairAddress, tokenAddress, signer);
+
   const pair = await ethers.getContractAt("IFPairV2", pairAddress);
-  const pairStartTime = await pair.startTime();
-  console.log("Pair Start Time:", new Date(Number(pairStartTime) * 1000).toISOString());
 
-  // Calculate wait time
-  const currentTime = Math.floor(Date.now() / 1000);
-  const waitTime = Number(pairStartTime) - currentTime;
-  
-  if (waitTime > 0) {
-    await waitWithProgress(waitTime + 2, "Waiting for pair start time to be reached...");
-  } else {
-    console.log("✅ Start time already passed, can proceed with launch");
-  }
-
-  console.log("\n--- Executing launch ---");
-  const launchTx = await bondingV5.launch(tokenAddress, { gasLimit: 3000000 });
-  const launchReceipt = await launchTx.wait();
-  console.log("✅ launch() transaction successful!");
-  console.log("Gas Used:", launchReceipt.gasUsed.toString());
-
-  // Parse Launched event
-  const launchedEvent = launchReceipt.logs.find((log: any) => {
-    try {
-      const parsed = bondingV5.interface.parseLog(log);
-      return parsed?.name === "Launched";
-    } catch {
-      return false;
-    }
-  });
-
-  if (launchedEvent) {
-    const parsedLaunchedEvent = bondingV5.interface.parseLog(launchedEvent);
-    console.log("\n--- Launched Event Data ---");
-    console.log("Initial Purchase Amount:", formatEther(parsedLaunchedEvent.args.initialPurchase), "VIRTUAL");
-    console.log("Initial Purchased Amount:", formatEther(parsedLaunchedEvent.args.initialPurchasedAmount), "tokens");
-  }
-
-  // Verify token status after launch
   const tokenInfoAfterLaunch = await bondingV5.tokenInfo(tokenAddress);
   console.log("\n--- Token Status After Launch ---");
   console.log("Launch Executed:", tokenInfoAfterLaunch.launchExecuted);

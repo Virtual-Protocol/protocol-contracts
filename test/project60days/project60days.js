@@ -291,7 +291,7 @@ describe("Project60days - AgentTax Integration", function () {
 
       // Find agentId from agentNft
       const nextVirtualId = await agentNftV2.nextVirtualId();
-      for (let i = 1; i < nextVirtualId; i++) {
+      for (let i = Number(nextVirtualId); i > 0; i--) {
         try {
           const virtualInfo = await agentNftV2.virtualInfo(i);
           const tokenInfo = await bondingV2.tokenInfo(tokenAddress);
@@ -424,7 +424,7 @@ describe("Project60days - AgentTax Integration", function () {
       // Find agentId
       let regularAgentId;
       const nextVirtualId = await agentNftV2.nextVirtualId();
-      for (let i = 1; i < nextVirtualId; i++) {
+      for (let i = Number(nextVirtualId); i > 0; i--) {
         try {
           const virtualInfo = await agentNftV2.virtualInfo(i);
           const tokenInfo = await bondingV2.tokenInfo(regularTokenAddress);

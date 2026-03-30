@@ -461,7 +461,7 @@ describe("Project60days - Drain Liquidity", function () {
 
       // Find the veToken from agentNft
       const nextVirtualId = await agentNftV2.nextVirtualId();
-      for (let i = 1; i < nextVirtualId; i++) {
+      for (let i = Number(nextVirtualId); i > 0; i--) {
         try {
           const virtualInfo = await agentNftV2.virtualInfo(i);
           if (virtualInfo.token === agentToken) {
@@ -624,7 +624,7 @@ describe("Project60days - Drain Liquidity", function () {
       // Find veToken
       let regularVeToken;
       const nextVirtualId = await agentNftV2.nextVirtualId();
-      for (let i = 1; i < nextVirtualId; i++) {
+      for (let i = Number(nextVirtualId); i > 0; i--) {
         try {
           const virtualInfo = await agentNftV2.virtualInfo(i);
           if (virtualInfo.token === regularAgentToken) {

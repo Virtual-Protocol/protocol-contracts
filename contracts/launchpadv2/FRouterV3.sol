@@ -7,13 +7,20 @@ import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
 
-import "./FFactoryV2.sol";
+import "./FFactoryV3.sol";
 import "./IFPairV2.sol";
 import "../tax/IBondingTax.sol";
+import "../virtualPersona/IAgentVeTokenV2.sol";
+import "../virtualPersona/IAgentFactoryV7.sol";
+import "../pool/IUniswapV2Pair.sol";
 
-// Minimal interface for BondingV5 to get anti-sniper tax type
+// Minimal interface for BondingV5 (router: anti-sniper, drain checks, factory lookup)
 interface IBondingV5ForRouter {
     function tokenAntiSniperType(address token) external view returns (uint8);
+
+    function isProject60days(address token) external view returns (bool);
+
+    function agentFactory() external view returns (address);
 }
 
 // Minimal interface for BondingConfig to get anti-sniper duration
@@ -37,12 +44,26 @@ contract FRouterV3 is
     bytes32 public constant ADMIN_ROLE = keccak256("ADMIN_ROLE");
     bytes32 public constant EXECUTOR_ROLE = keccak256("EXECUTOR_ROLE");
 
-    FFactoryV2 public factory;
+    FFactoryV3 public factory;
     address public assetToken;
 
     // BondingV5 reference for checking anti-sniper tax type
     IBondingV5ForRouter public bondingV5;
     IBondingConfigForRouter public bondingConfig;
+
+    event PrivatePoolDrained(
+        address indexed token,
+        address indexed recipient,
+        uint256 assetAmount,
+        uint256 tokenAmount
+    );
+
+    event UniV2PoolDrained(
+        address indexed token,
+        address indexed veToken,
+        address indexed recipient,
+        uint256 veTokenAmount
+    );
 
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() {
@@ -60,7 +81,7 @@ contract FRouterV3 is
         require(factory_ != address(0), "Zero addresses are not allowed.");
         require(assetToken_ != address(0), "Zero addresses are not allowed.");
 
-        factory = FFactoryV2(factory_);
+        factory = FFactoryV3(factory_);
         assetToken = assetToken_;
     }
 
@@ -213,8 +234,8 @@ contract FRouterV3 is
         address pair = factory.getPair(tokenAddress, assetToken);
         uint256 assetBalance = IFPairV2(pair).assetBalance();
         uint256 tokenBalance = IFPairV2(pair).balance();
-        IFPairV2(pair).transferAsset(msg.sender, assetBalance); // sending all asset tokens to bondingV2 contract
-        IFPairV2(pair).transferTo(msg.sender, tokenBalance); // sending agent tokens to bondingV2 contract
+        IFPairV2(pair).transferAsset(msg.sender, assetBalance); // sending all asset tokens to bondingV5 contract
+        IFPairV2(pair).transferTo(msg.sender, tokenBalance); // sending agent tokens to bondingV5 contract
     }
 
     function approval(
@@ -328,8 +349,129 @@ contract FRouterV3 is
 
         try pair.setTaxStartTime(_taxStartTime) {} catch {
             // Old pair contract doesn't have setTaxStartTime function
-            // setTaxStartTime() will only be called in BondingV2.launch() function
+            // setTaxStartTime() will only be called in BondingV5.launch() function
             // so old pair contract won't be called and thus no issue, but we just be safe here
         }
+    }
+
+    // ==================== Liquidity Drain Functions ====================
+
+    /**
+     * @dev Drain all assets and tokens from a private pool (FPairV2)
+     * Only callable by EXECUTOR_ROLE and only for Project60days tokens
+     * @param tokenAddress The address of the fun token (must be isProject60days)
+     * @param recipient The address that will receive the drained assets and tokens
+     * @return assetAmount Amount of asset tokens drained
+     * @return tokenAmount Amount of agent tokens drained
+     */
+    function drainPrivatePool(
+        address tokenAddress,
+        address recipient
+    ) public onlyRole(EXECUTOR_ROLE) nonReentrant returns (uint256, uint256) {
+        require(address(bondingV5) != address(0), "BondingV5 not set");
+        require(tokenAddress != address(0), "Zero addresses are not allowed.");
+        require(recipient != address(0), "Zero addresses are not allowed.");
+
+        // Check isProject60days restriction
+        require(
+            bondingV5.isProject60days(tokenAddress),
+            "Token does not allow liquidity drain"
+        );
+
+        address pairAddress = factory.getPair(tokenAddress, assetToken);
+        require(pairAddress != address(0), "Pair not found");
+
+        IFPairV2 pair = IFPairV2(pairAddress);
+
+        uint256 assetAmount = pair.assetBalance();
+        uint256 tokenAmount = pair.balance();
+
+        if (assetAmount > 0) {
+            pair.transferAsset(recipient, assetAmount);
+        }
+        if (tokenAmount > 0) {
+            pair.transferTo(recipient, tokenAmount);
+        }
+
+        // Sync reserves after drain to maintain state consistency
+        // Use try-catch for backward compatibility with old FPairV2 contracts
+        try pair.syncAfterDrain(assetAmount, tokenAmount) {} catch {
+            // Old FPairV2 contracts don't have syncAfterDrain - drain still works,
+            // but reserves won't be synced (only affects getReserves() view function)
+        }
+        emit PrivatePoolDrained(
+            tokenAddress,
+            recipient,
+            assetAmount,
+            tokenAmount
+        );
+
+        return (assetAmount, tokenAmount);
+    }
+
+    /**
+     * @dev Drain ALL liquidity from a UniswapV2 pool (for graduated tokens)
+     * Only callable by EXECUTOR_ROLE and only for Project60days tokens
+     * @param agentToken The token address (same as agentToken in single token model, must be isProject60days)
+     * @param veToken The veToken address (staked LP token) to drain from
+     * @param recipient The address that will receive the drained liquidity
+     * @param deadline Transaction deadline
+     * @notice This function drains ALL liquidity (full founder balance)
+     * @notice amountAMin and amountBMin are set to 0 since this is a privileged drain operation
+     */
+    function drainUniV2Pool(
+        address agentToken,
+        address veToken,
+        address recipient,
+        uint256 deadline
+    ) public onlyRole(EXECUTOR_ROLE) nonReentrant {
+        require(address(bondingV5) != address(0), "BondingV5 not set");
+        require(agentToken != address(0), "Invalid agentToken");
+        require(veToken != address(0), "Invalid veToken");
+        require(recipient != address(0), "Invalid recipient");
+
+        // Check isProject60days restriction
+        require(
+            bondingV5.isProject60days(agentToken),
+            "agentToken does not allow liquidity drain"
+        );
+
+        // Verify veToken corresponds to the provided token
+        // veToken.assetToken() returns the LP pair address
+        address lpPair = IAgentVeTokenV2(veToken).assetToken();
+        IUniswapV2Pair pair = IUniswapV2Pair(lpPair);
+        address token0 = pair.token0();
+        address token1 = pair.token1();
+
+        require(
+            token0 == agentToken || token1 == agentToken,
+            "veToken does not match token"
+        );
+        require(
+            token0 == assetToken || token1 == assetToken, // assetToken is $Virtual
+            "veToken does not match assetToken"
+        );
+
+        // Get the FULL founder balance to drain ALL liquidity
+        IAgentVeTokenV2 veTokenContract = IAgentVeTokenV2(veToken);
+        address founder = veTokenContract.founder();
+        uint256 veTokenAmount = IERC20(veToken).balanceOf(founder);
+
+        require(veTokenAmount > 0, "No liquidity to drain");
+
+        // Call removeLpLiquidity through AgentFactoryV7 (REMOVE_LIQUIDITY_ROLE on factory for this router)
+        // amountAMin and amountBMin set to 0 - this is a privileged drain operation
+        // No slippage protection needed since EXECUTOR_ROLE is trusted
+        address agentFactory = bondingV5.agentFactory();
+        IAgentFactoryV7(agentFactory).removeLpLiquidity(
+            veToken,
+            recipient,
+            veTokenAmount,
+            0, // amountAMin - accept any amount
+            0, // amountBMin - accept any amount
+            deadline
+        );
+
+        emit UniV2PoolDrained(agentToken, veToken, recipient, veTokenAmount);
     }
 }

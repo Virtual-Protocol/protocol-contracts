@@ -572,7 +572,8 @@ contract BondingV5 is
             isInitialPurchase_
         );
 
-        if (amount0Out < amountOutMin_) {
+        // Match BondingV2: reject zero output even when amountOutMin_ is 0 (drained pool / forced grad)
+        if (amount0Out == 0 || amount0Out < amountOutMin_) {
             revert SlippageTooHigh();
         }
 

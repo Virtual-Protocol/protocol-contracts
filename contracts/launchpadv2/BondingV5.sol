@@ -519,9 +519,14 @@ contract BondingV5 is
             revert InvalidInput();
         }
 
-        // X_LAUNCH, ACP_SKILL, and Project60days: taxRecipient (AgentTax) must be updated by the backend
+        // X_LAUNCH, ACP_SKILL, Project60days, and Fee Delegation: taxRecipient (AgentTax) must be updated by the backend
         // before trading starts; only privileged backend wallets may call launch() so that ordering is enforced.
-        if (isProject60days(tokenAddress_) || isProjectXLaunch(tokenAddress_) || isAcpSkillLaunch(tokenAddress_)) {
+        if (
+            isProject60days(tokenAddress_) ||
+            isProjectXLaunch(tokenAddress_) ||
+            isAcpSkillLaunch(tokenAddress_) ||
+            isFeeDelegation[tokenAddress_]
+        ) {
             if (!bondingConfig.isPrivilegedLauncher(msg.sender)) {
                 revert UnauthorizedLauncher();
             }

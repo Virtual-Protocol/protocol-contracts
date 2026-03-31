@@ -14,6 +14,7 @@ interface IBondingV5ForTaxV2 {
     function isProject60days(address token) external view returns (bool);
     function isProjectXLaunch(address token) external view returns (bool);
     function isAcpSkillLaunch(address token) external view returns (bool);
+    function isFeeDelegation(address token) external view returns (bool);
 }
 
 /**
@@ -248,7 +249,8 @@ contract AgentTaxV2 is Initializable, AccessControlUpgradeable {
 
         bool isSpecialLaunch = bondingV5.isProject60days(tokenAddress) ||
             bondingV5.isProjectXLaunch(tokenAddress) ||
-            bondingV5.isAcpSkillLaunch(tokenAddress);
+            bondingV5.isAcpSkillLaunch(tokenAddress) ||
+            bondingV5.isFeeDelegation(tokenAddress);
 
         require(isSpecialLaunch, "Token is not a special launch type");
 

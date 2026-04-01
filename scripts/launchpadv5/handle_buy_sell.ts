@@ -1,31 +1,94 @@
 import { parseEther, formatEther } from "ethers";
-const { ethers } = require("hardhat");
+const hre = require("hardhat");
+const { ethers } = hre;
+
+// USAGE:
+// ENV_FILE=.env.launchpadv5_dev npx hardhat run ./scripts/launchpadv5/handle_buy_sell.ts --network base_sepolia
+// ENV_FILE=.env.launchpadv5_dev_eth_sepolia npx hardhat run ./scripts/launchpadv5/handle_buy_sell.ts --network eth_sepolia
+// ENV_FILE=.env.launchpadv5_dev_bsc_testnet npx hardhat run ./scripts/launchpadv5/handle_buy_sell.ts --network bsc_testnet
 
 // ============================================
 // Configuration - Modify these values
 // ============================================
+const TOKEN_ADDRESS_BY_NETWORK: Record<string, string> = {
+  base_sepolia: "0xF940345C0e54DfB1474137c45b4D50C336C95a4d",
+  eth_sepolia: "0x02b6d8a16f9D79Cb9E8eD685492a1cD64fF627c3",
+  bsc_testnet: "0x6B9048DFF2fA0ACd74fC9b195dC4768E1d541FBf",
+};
+
+function resolveTokenAddress(): string {
+  const networkName = String(hre.network?.name || "").trim();
+  const defaultByNetwork = TOKEN_ADDRESS_BY_NETWORK[networkName];
+
+  return defaultByNetwork;
+}
+
 const CONFIG = {
-  // Token address to buy/sell
-  // tokenAddress: "0x0Ee7F7450C639736d7D9A252D5f21BA4cA1379d3", // TODO: Set your token address
-  tokenAddress: "0xF940345C0e54DfB1474137c45b4D50C336C95a4d", // TODO: Set your token address
+  // Token address auto-resolves by network (see resolveTokenAddress()).
+  tokenAddress: resolveTokenAddress(),
   
   // Amount of VIRTUAL to spend on buy
   buyAmount: "10", // 1 VIRTUAL
   
   // Contract addresses (from environment or hardcode)
   bondingV5Address: process.env.BONDING_V5_ADDRESS || "",
-  fRouterV3Address: process.env.FRouterV3_ADDRESS || "",
+  fRouterV3Address: process.env.FRouterV3_ADDRESS || process.env.FRouterV2_ADDRESS || "",
   virtualTokenAddress: process.env.VIRTUAL_TOKEN_ADDRESS || "",
+  txConfirmTimeoutMs: Number(process.env.TX_CONFIRM_TIMEOUT_MS || "180000"),
 };
+
+async function waitWithProgress(txHash: string, label: string, timeoutMs: number) {
+  const startedAt = Date.now();
+  while (true) {
+    const receipt = await ethers.provider.getTransactionReceipt(txHash);
+    if (receipt) return receipt;
+    const elapsed = Date.now() - startedAt;
+    if (elapsed > timeoutMs) {
+      throw new Error(
+        `${label} tx still pending after ${Math.floor(timeoutMs / 1000)}s, txHash=${txHash}`
+      );
+    }
+    console.log(
+      `⏳ ${label} pending... ${Math.floor(elapsed / 1000)}s elapsed, txHash=${txHash}`
+    );
+    await new Promise((resolve) => setTimeout(resolve, 5000));
+  }
+}
 
 async function main() {
   console.log("\n" + "=".repeat(60));
   console.log("  Buy and Sell Script");
   console.log("=".repeat(60));
+  console.log("Network:", hre.network.name);
 
   // Validate config
-  if (CONFIG.tokenAddress === "0x..." || !CONFIG.tokenAddress) {
-    throw new Error("Please set tokenAddress in CONFIG");
+  if (!CONFIG.tokenAddress) {
+    throw new Error(
+      `Token address is empty for network=${hre.network.name}. ` +
+      `Set TOKEN_ADDRESS_${hre.network.name.toUpperCase()} or TOKEN_ADDRESS, ` +
+      `or add default in TOKEN_ADDRESS_BY_NETWORK`
+    );
+  }
+  if (!ethers.isAddress(CONFIG.bondingV5Address)) {
+    throw new Error(
+      `Invalid BONDING_V5_ADDRESS: "${CONFIG.bondingV5Address}". Please set a valid 0x address in ENV_FILE.`
+    );
+  }
+  if (!ethers.isAddress(CONFIG.fRouterV3Address)) {
+    throw new Error(
+      `Invalid FRouterV3 address: "${CONFIG.fRouterV3Address}". ` +
+      `Set FRouterV3_ADDRESS (or legacy FRouterV2_ADDRESS) in ENV_FILE.`
+    );
+  }
+  if (!ethers.isAddress(CONFIG.virtualTokenAddress)) {
+    throw new Error(
+      `Invalid VIRTUAL_TOKEN_ADDRESS: "${CONFIG.virtualTokenAddress}". Please set a valid 0x address in ENV_FILE.`
+    );
+  }
+  if (!ethers.isAddress(CONFIG.tokenAddress)) {
+    throw new Error(
+      `Invalid tokenAddress for network=${hre.network.name}: "${CONFIG.tokenAddress}".`
+    );
   }
 
   // Get signer
@@ -88,10 +151,10 @@ async function main() {
   }
 
   if (routerAllowance < buyAmountWei) {
-    console.log("Approving VIRTUAL to FRouterV2...");
+    console.log("Approving VIRTUAL to FRouterV3...");
     const approveTx2 = await virtualToken.approve(CONFIG.fRouterV3Address, ethers.MaxUint256);
     await approveTx2.wait();
-    console.log("✅ Approved to FRouterV2");
+    console.log("✅ Approved to FRouterV3");
   }
 
   console.log("\nBuying with", CONFIG.buyAmount, "VIRTUAL...");
@@ -102,7 +165,12 @@ async function main() {
     deadline,
     { gasLimit: 500000 }
   );
-  const buyReceipt = await buyTx.wait();
+  console.log("Buy tx submitted:", buyTx.hash);
+  const buyReceipt = await waitWithProgress(
+    buyTx.hash,
+    "Buy",
+    CONFIG.txConfirmTimeoutMs
+  );
   console.log("✅ Buy successful!");
   console.log("Gas Used:", buyReceipt.gasUsed.toString());
 
@@ -130,13 +198,13 @@ async function main() {
     return;
   }
 
-  // Approve agent token to FRouterV2 for sell
+  // Approve agent token to FRouterV3 for sell
   const agentTokenAllowance = await agentToken.allowance(signerAddress, CONFIG.fRouterV3Address);
   if (agentTokenAllowance < sellAmount) {
-    console.log("Approving Agent Token to FRouterV2...");
+    console.log("Approving Agent Token to FRouterV3...");
     const approveAgentTx = await agentToken.approve(CONFIG.fRouterV3Address, ethers.MaxUint256);
     await approveAgentTx.wait();
-    console.log("✅ Approved Agent Token to FRouterV2");
+    console.log("✅ Approved Agent Token to FRouterV3");
   }
 
   console.log("\nSelling", formatEther(sellAmount), "tokens...");
@@ -148,7 +216,12 @@ async function main() {
     sellDeadline,
     { gasLimit: 500000 }
   );
-  const sellReceipt = await sellTx.wait();
+  console.log("Sell tx submitted:", sellTx.hash);
+  const sellReceipt = await waitWithProgress(
+    sellTx.hash,
+    "Sell",
+    CONFIG.txConfirmTimeoutMs
+  );
   console.log("✅ Sell successful!");
   console.log("Gas Used:", sellReceipt.gasUsed.toString());
 

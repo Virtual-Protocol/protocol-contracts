@@ -39,7 +39,6 @@ contract FRouterV2 is
     address public assetToken;
     address public taxManager; // deprecated
     address public antiSniperTaxManager; // deprecated
-    IBondingV2ForRouter public bondingV2;
 
     event PrivatePoolDrained(
         address indexed token,
@@ -57,6 +56,7 @@ contract FRouterV2 is
 
     // BondingV4 reference for checking X_LAUNCH tokens
     IBondingV4ForRouter public bondingV4;
+    IBondingV2ForRouter public bondingV2;
 
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() {

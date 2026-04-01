@@ -171,6 +171,7 @@ contract Bonding is
         string[4] memory urls,
         uint256 purchaseAmount
     ) public nonReentrant returns (address, address, uint) {
+        revert("Not implemented");
         if (purchaseAmount <= fee || cores.length <= 0) {
             revert InvalidInput();
         }

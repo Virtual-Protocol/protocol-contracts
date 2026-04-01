@@ -202,6 +202,7 @@ contract BondingV3 is
         uint256 purchaseAmount,
         uint256 startTime
     ) public nonReentrant returns (address, address, uint, uint256) {
+        revert("Not implemented");
         if (purchaseAmount < fee || cores.length <= 0) {
             revert InvalidInput();
         }

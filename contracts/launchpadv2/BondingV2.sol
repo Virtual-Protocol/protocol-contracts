@@ -261,6 +261,7 @@ contract BondingV2 is
         uint256 startTime,
         bool isProject60days_
     ) internal returns (address, address, uint, uint256) {
+        revert("Not implemented");
         uint256 launchFee = isProject60days_ ? project60daysLaunchFee : fee;
         if (purchaseAmount < launchFee || cores.length <= 0) {
             revert InvalidInput();

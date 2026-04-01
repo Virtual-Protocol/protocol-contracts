@@ -255,6 +255,7 @@ contract BondingV4 is
         uint256 startTime,
         uint8 launchMode_
     ) public nonReentrant returns (address, address, uint, uint256) {
+        revert("Not implemented");
         // X_LAUNCH and ACP_SKILL launch modes require authorized launcher
         if (launchMode_ == LAUNCH_MODE_X_LAUNCH && !isXLauncher[msg.sender]) {
             revert UnauthorizedLauncher();

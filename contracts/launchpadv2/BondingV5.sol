@@ -531,7 +531,7 @@ contract BondingV5 is
             msg.sender
         );
 
-        if (amount1Out < amountOutMin_) {
+        if (amount1Out == 0 || amount1Out < amountOutMin_) {
             revert SlippageTooHigh();
         }
 

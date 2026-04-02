@@ -598,7 +598,56 @@ contract AgentFactoryV4 is
                 tbaSalt,
                 tbaImplementation,
                 daoVotingPeriod,
-                daoThreshold
+                daoThreshold,
+                applicationThreshold
+            );
+    }
+
+    // Bootstrap Agent with existing ERC20 tokens, with custom application amount
+    function initFromTokenWithApplicationAmt(
+        address tokenAddr,
+        uint8[] memory cores,
+        bytes32 tbaSalt,
+        address tbaImplementation,
+        uint32 daoVotingPeriod,
+        uint256 daoThreshold,
+        uint256 initialLP,
+        uint256 applicationAmt
+    ) public whenNotPaused returns (uint256) {
+        address sender = _msgSender();
+        require(_tokenApplication[tokenAddr] == 0, "Token already exists");
+
+        require(isCompatibleToken(tokenAddr), "Unsupported token");
+
+        require(tokenAddr != assetToken, "Asset token cannot be used");
+
+        require(
+            IERC20(assetToken).balanceOf(sender) >= applicationAmt,
+            "Insufficient asset token"
+        );
+
+        require(
+            IERC20(assetToken).allowance(sender, address(this)) >=
+                applicationAmt,
+            "Insufficient asset token allowance"
+        );
+
+        require(cores.length > 0, "Cores must be provided");
+
+        require(initialLP > 0, "InitialLP must be greater than 0");
+
+        IERC20(tokenAddr).safeTransferFrom(sender, address(this), initialLP);
+
+        return
+            _initFromToken(
+                sender,
+                tokenAddr,
+                cores,
+                tbaSalt,
+                tbaImplementation,
+                daoVotingPeriod,
+                daoThreshold,
+                applicationAmt
             );
     }
 
@@ -633,7 +682,8 @@ contract AgentFactoryV4 is
             tbaSalt,
             tbaImplementation,
             daoVotingPeriod,
-            daoThreshold
+            daoThreshold,
+            applicationThreshold
         );
 
         _applicationLP[id] = lpAddress;
@@ -648,12 +698,13 @@ contract AgentFactoryV4 is
         bytes32 tbaSalt,
         address tbaImplementation,
         uint32 daoVotingPeriod,
-        uint256 daoThreshold
+        uint256 daoThreshold,
+        uint256 applicationAmt
     ) internal returns (uint256) {
         IERC20(assetToken).safeTransferFrom(
             sender,
             address(this),
-            applicationThreshold
+            applicationAmt
         );
 
         uint256 id = _nextId++;
@@ -665,7 +716,7 @@ contract AgentFactoryV4 is
             IAgentToken(tokenAddr).symbol(),
             "",
             ApplicationStatus.Active,
-            applicationThreshold,
+            applicationAmt,
             sender,
             cores,
             block.number,

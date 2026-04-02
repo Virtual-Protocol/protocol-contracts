@@ -50031,7 +50031,7 @@
             "label": "factory",
             "offset": 0,
             "slot": "0",
-            "type": "t_contract(FFactoryV2)7693",
+            "type": "t_contract(FFactoryV2)18486",
             "contract": "FRouterV3",
             "src": "contracts/launchpadv2/FRouterV3.sol:40"
           },
@@ -50047,7 +50047,7 @@
             "label": "bondingV5",
             "offset": 0,
             "slot": "2",
-            "type": "t_contract(IBondingV5ForRouter)8212",
+            "type": "t_contract(IBondingV5ForRouter)20724",
             "contract": "FRouterV3",
             "src": "contracts/launchpadv2/FRouterV3.sol:44"
           },
@@ -50055,7 +50055,7 @@
             "label": "bondingConfig",
             "offset": 0,
             "slot": "3",
-            "type": "t_contract(IBondingConfigForRouter)8225",
+            "type": "t_contract(IBondingConfigForRouter)20737",
             "contract": "FRouterV3",
             "src": "contracts/launchpadv2/FRouterV3.sol:45"
           }
@@ -50093,7 +50093,7 @@
             ],
             "numberOfBytes": "32"
           },
-          "t_struct(InitializableStorage)266_storage": {
+          "t_struct(InitializableStorage)498_storage": {
             "label": "struct Initializable.InitializableStorage",
             "members": [
               {
@@ -50111,7 +50111,7 @@
             ],
             "numberOfBytes": "32"
           },
-          "t_struct(ReentrancyGuardStorage)413_storage": {
+          "t_struct(ReentrancyGuardStorage)957_storage": {
             "label": "struct ReentrancyGuardUpgradeable.ReentrancyGuardStorage",
             "members": [
               {
@@ -50149,15 +50149,15 @@
             "label": "uint64",
             "numberOfBytes": "8"
           },
-          "t_contract(FFactoryV2)7693": {
+          "t_contract(FFactoryV2)18486": {
             "label": "contract FFactoryV2",
             "numberOfBytes": "20"
           },
-          "t_contract(IBondingConfigForRouter)8225": {
+          "t_contract(IBondingConfigForRouter)20737": {
             "label": "contract IBondingConfigForRouter",
             "numberOfBytes": "20"
           },
-          "t_contract(IBondingV5ForRouter)8212": {
+          "t_contract(IBondingV5ForRouter)20724": {
             "label": "contract IBondingV5ForRouter",
             "numberOfBytes": "20"
           }
@@ -52735,6 +52735,189 @@
               "label": "_status",
               "type": "t_uint256",
               "src": "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol:40",
+              "offset": 0,
+              "slot": "0"
+            }
+          ],
+          "erc7201:openzeppelin.storage.Initializable": [
+            {
+              "contract": "Initializable",
+              "label": "_initialized",
+              "type": "t_uint64",
+              "src": "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol:69",
+              "offset": 0,
+              "slot": "0"
+            },
+            {
+              "contract": "Initializable",
+              "label": "_initializing",
+              "type": "t_bool",
+              "src": "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol:73",
+              "offset": 8,
+              "slot": "0"
+            }
+          ]
+        }
+      }
+    },
+    "2561f94e611bf0dd46f62698d1b2fd9bd52d1a6c8f8927af9770c14e8b0017a9": {
+      "address": "0x067f2827ce89C76d4008BD2a83D6d387022F2001",
+      "txHash": "0x5fd9632cc23360eb0aa70fdf049148058ee29e2c3daf71a04836f99c71edfd38",
+      "layout": {
+        "solcVersion": "0.8.26",
+        "storage": [
+          {
+            "label": "factory",
+            "offset": 0,
+            "slot": "0",
+            "type": "t_contract(FFactoryV2)2447",
+            "contract": "FRouterV3",
+            "src": "contracts/launchpadv2/FRouterV3.sol:47"
+          },
+          {
+            "label": "assetToken",
+            "offset": 0,
+            "slot": "1",
+            "type": "t_address",
+            "contract": "FRouterV3",
+            "src": "contracts/launchpadv2/FRouterV3.sol:48"
+          },
+          {
+            "label": "bondingV5",
+            "offset": 0,
+            "slot": "2",
+            "type": "t_contract(IBondingV5ForRouter)3045",
+            "contract": "FRouterV3",
+            "src": "contracts/launchpadv2/FRouterV3.sol:51"
+          },
+          {
+            "label": "bondingConfig",
+            "offset": 0,
+            "slot": "3",
+            "type": "t_contract(IBondingConfigForRouter)3058",
+            "contract": "FRouterV3",
+            "src": "contracts/launchpadv2/FRouterV3.sol:52"
+          }
+        ],
+        "types": {
+          "t_address": {
+            "label": "address",
+            "numberOfBytes": "20"
+          },
+          "t_bool": {
+            "label": "bool",
+            "numberOfBytes": "1"
+          },
+          "t_bytes32": {
+            "label": "bytes32",
+            "numberOfBytes": "32"
+          },
+          "t_mapping(t_address,t_bool)": {
+            "label": "mapping(address => bool)",
+            "numberOfBytes": "32"
+          },
+          "t_mapping(t_bytes32,t_struct(RoleData)24_storage)": {
+            "label": "mapping(bytes32 => struct AccessControlUpgradeable.RoleData)",
+            "numberOfBytes": "32"
+          },
+          "t_struct(AccessControlStorage)34_storage": {
+            "label": "struct AccessControlUpgradeable.AccessControlStorage",
+            "members": [
+              {
+                "label": "_roles",
+                "type": "t_mapping(t_bytes32,t_struct(RoleData)24_storage)",
+                "offset": 0,
+                "slot": "0"
+              }
+            ],
+            "numberOfBytes": "32"
+          },
+          "t_struct(InitializableStorage)145_storage": {
+            "label": "struct Initializable.InitializableStorage",
+            "members": [
+              {
+                "label": "_initialized",
+                "type": "t_uint64",
+                "offset": 0,
+                "slot": "0"
+              },
+              {
+                "label": "_initializing",
+                "type": "t_bool",
+                "offset": 8,
+                "slot": "0"
+              }
+            ],
+            "numberOfBytes": "32"
+          },
+          "t_struct(ReentrancyGuardStorage)230_storage": {
+            "label": "struct ReentrancyGuardUpgradeable.ReentrancyGuardStorage",
+            "members": [
+              {
+                "label": "_status",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "0"
+              }
+            ],
+            "numberOfBytes": "32"
+          },
+          "t_struct(RoleData)24_storage": {
+            "label": "struct AccessControlUpgradeable.RoleData",
+            "members": [
+              {
+                "label": "hasRole",
+                "type": "t_mapping(t_address,t_bool)",
+                "offset": 0,
+                "slot": "0"
+              },
+              {
+                "label": "adminRole",
+                "type": "t_bytes32",
+                "offset": 0,
+                "slot": "1"
+              }
+            ],
+            "numberOfBytes": "64"
+          },
+          "t_uint256": {
+            "label": "uint256",
+            "numberOfBytes": "32"
+          },
+          "t_uint64": {
+            "label": "uint64",
+            "numberOfBytes": "8"
+          },
+          "t_contract(FFactoryV2)2447": {
+            "label": "contract FFactoryV2",
+            "numberOfBytes": "20"
+          },
+          "t_contract(IBondingConfigForRouter)3058": {
+            "label": "contract IBondingConfigForRouter",
+            "numberOfBytes": "20"
+          },
+          "t_contract(IBondingV5ForRouter)3045": {
+            "label": "contract IBondingV5ForRouter",
+            "numberOfBytes": "20"
+          }
+        },
+        "namespaces": {
+          "erc7201:openzeppelin.storage.ReentrancyGuard": [
+            {
+              "contract": "ReentrancyGuardUpgradeable",
+              "label": "_status",
+              "type": "t_uint256",
+              "src": "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol:40",
+              "offset": 0,
+              "slot": "0"
+            }
+          ],
+          "erc7201:openzeppelin.storage.AccessControl": [
+            {
+              "contract": "AccessControlUpgradeable",
+              "label": "_roles",
+              "type": "t_mapping(t_bytes32,t_struct(RoleData)24_storage)",
+              "src": "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol:61",
               "offset": 0,
               "slot": "0"
             }

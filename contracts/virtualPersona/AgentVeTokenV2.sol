@@ -61,6 +61,7 @@ contract AgentVeTokenV2 is
      * @dev {onlyOwnerOrFactory}
      *
      * Throws if called by any account other than the owner, factory or pool.
+     * owner has not been set yet, _factory = agentFactoryV6
      */
     modifier onlyOwnerOrFactory() {
         if (owner() != _msgSender() && address(_factory) != _msgSender()) {
@@ -161,7 +162,7 @@ contract AgentVeTokenV2 is
 
     /**
      * @dev Removes liquidity from Uniswap V2 pair and burns corresponding staked LP tokens
-     * Only callable by admin
+     * Only callable by admin, draining rugged Project60days (intentionally BYPASSES matureAt)
      *
      * @param uniswapRouter The address of the Uniswap V2 router
      * @param veTokenAmount The amount of veToken (underlying lpToken) to remove liquidity for

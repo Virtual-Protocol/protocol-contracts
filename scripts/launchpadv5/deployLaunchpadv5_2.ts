@@ -368,6 +368,17 @@ const { ethers, upgrades } = require("hardhat");
       admin
     );
 
+    // Grant REMOVE_LIQUIDITY_ROLE to FRouterV3
+    const txGrantRemoveLiqToFRouterV3 = await agentFactoryV7.grantRole(
+      agentFactoryV7RemoveLiqRole,
+      fRouterV3Address
+    );
+    await txGrantRemoveLiqToFRouterV3.wait();
+    console.log(
+      "REMOVE_LIQUIDITY_ROLE of AgentFactoryV7 granted to FRouterV3:",
+      fRouterV3Address
+    );
+
     // Grant WITHDRAW_ROLE to admin
     const agentFactoryV7WithdrawRole = await agentFactoryV7.WITHDRAW_ROLE();
     const txGrantWithdraw = await agentFactoryV7.grantRole(
@@ -382,66 +393,67 @@ const { ethers, upgrades } = require("hardhat");
     // ============================================
     console.log("\n--- Configuring AgentNftV2 roles ---");
 
-    // Skip if SKIP_AGENT_NFT_V2_ROLE is set (for local testing with forked network)
-    if (process.env.SKIP_AGENT_NFT_V2_ROLE === "true") {
-      console.log(
-        "⚠️  Skipping AgentNftV2 MINTER_ROLE grant (SKIP_AGENT_NFT_V2_ROLE=true)"
+    const agentNftV2Read = await ethers.getContractAt(
+      "AgentNftV2",
+      agentNftV2Address,
+      ethers.provider
+    );
+    const minterRole = await agentNftV2Read.MINTER_ROLE();
+    const minterRoleAdmin = await agentNftV2Read.getRoleAdmin(minterRole);
+    const deployerCanGrant = await agentNftV2Read.hasRole(
+      minterRoleAdmin,
+      deployerAddress
+    );
+
+    let agentNftV2ForGrant;
+    if (deployerCanGrant) {
+      agentNftV2ForGrant = await ethers.getContractAt(
+        "AgentNftV2",
+        agentNftV2Address,
+        deployer
       );
       console.log(
-        "   You must manually grant MINTER_ROLE to AgentFactoryV7 on the real network:"
-      );
-      console.log(
-        `   AgentNftV2.grantRole(MINTER_ROLE, ${agentFactoryV7Address})`
+        "Deployer has the role admin for MINTER_ROLE; granting with deployer"
       );
     } else {
-      try {
-        // Use adminSigner if ADMIN_PRIVATE_KEY is provided (for existing AgentNftV2)
-        const adminPrivateKey = process.env.ADMIN_PRIVATE_KEY;
-        let agentNftV2Contract;
-        if (adminPrivateKey) {
-          const adminSigner = new ethers.Wallet(
-            adminPrivateKey,
-            ethers.provider
-          );
-          agentNftV2Contract = await ethers.getContractAt(
-            "AgentNftV2",
-            agentNftV2Address,
-            adminSigner
-          );
-          console.log("Using adminSigner for AgentNftV2 role grant");
-        } else {
-          agentNftV2Contract = await ethers.getContractAt(
-            "AgentNftV2",
-            agentNftV2Address
-          );
-          console.log(
-            "Using deployer for AgentNftV2 role grant (must have DEFAULT_ADMIN_ROLE)"
-          );
-        }
-
-        const minterRole = await agentNftV2Contract.MINTER_ROLE();
-        const tx = await agentNftV2Contract.grantRole(
-          minterRole,
-          agentFactoryV7Address
-        );
-        await tx.wait();
-        console.log(
-          "MINTER_ROLE of AgentNftV2 granted to AgentFactoryV7:",
-          agentFactoryV7Address
-        );
-      } catch (error: any) {
-        console.log(
-          "⚠️  Failed to grant MINTER_ROLE on AgentNftV2:",
-          error.message
-        );
-        console.log(
-          "   This may happen on forked networks. You must manually grant on the real network:"
-        );
-        console.log(
-          `   AgentNftV2.grantRole(MINTER_ROLE, ${agentFactoryV7Address})`
+      const adminPrivateKey = process.env.ADMIN_PRIVATE_KEY?.trim();
+      if (!adminPrivateKey) {
+        throw new Error(
+          `AgentNftV2: deployer ${deployerAddress} cannot grant MINTER_ROLE (lacks role admin ${minterRoleAdmin} for MINTER_ROLE), and ADMIN_PRIVATE_KEY is not set. ` +
+            `Grant that admin role to the deployer, or set ADMIN_PRIVATE_KEY for an account that has it.`
         );
       }
+      const adminSigner = new ethers.Wallet(adminPrivateKey, ethers.provider);
+      const adminAddress = await adminSigner.getAddress();
+      const adminCanGrant = await agentNftV2Read.hasRole(
+        minterRoleAdmin,
+        adminAddress
+      );
+      if (!adminCanGrant) {
+        throw new Error(
+          `AgentNftV2: ADMIN wallet ${adminAddress} cannot grant MINTER_ROLE (lacks role admin ${minterRoleAdmin}).`
+        );
+      }
+      agentNftV2ForGrant = await ethers.getContractAt(
+        "AgentNftV2",
+        agentNftV2Address,
+        adminSigner
+      );
+      console.log(
+        "Using ADMIN_PRIVATE_KEY wallet for AgentNftV2 MINTER_ROLE grant:",
+        adminAddress
+      );
     }
+
+    const txMint = await agentNftV2ForGrant.grantRole(
+      minterRole,
+      agentFactoryV7Address
+    );
+    await txMint.wait();
+    console.log(
+      "MINTER_ROLE of AgentNftV2 granted to AgentFactoryV7:",
+      agentFactoryV7Address
+    );
 
     // ============================================
     // 8. Print Deployment Summary

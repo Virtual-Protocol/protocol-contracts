@@ -255,6 +255,7 @@ contract BondingV4 is
         uint256 startTime,
         uint8 launchMode_
     ) public nonReentrant returns (address, address, uint, uint256) {
+        revert("Not implemented");
         // X_LAUNCH and ACP_SKILL launch modes require authorized launcher
         if (launchMode_ == LAUNCH_MODE_X_LAUNCH && !isXLauncher[msg.sender]) {
             revert UnauthorizedLauncher();
@@ -524,7 +525,7 @@ contract BondingV4 is
             msg.sender
         );
 
-        if (amount1Out < amountOutMin) {
+        if (amount1Out == 0 || amount1Out < amountOutMin) {
             revert SlippageTooHigh();
         }
 
@@ -565,7 +566,7 @@ contract BondingV4 is
             isInitialPurchase
         );
 
-        if (amount0Out < amountOutMin) {
+        if (amount0Out == 0 || amount0Out < amountOutMin) {
             revert SlippageTooHigh();
         }
 

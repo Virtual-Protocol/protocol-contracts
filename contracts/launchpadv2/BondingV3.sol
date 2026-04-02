@@ -202,6 +202,7 @@ contract BondingV3 is
         uint256 purchaseAmount,
         uint256 startTime
     ) public nonReentrant returns (address, address, uint, uint256) {
+        revert("Not implemented");
         if (purchaseAmount < fee || cores.length <= 0) {
             revert InvalidInput();
         }
@@ -452,7 +453,7 @@ contract BondingV3 is
             msg.sender
         );
 
-        if (amount1Out < amountOutMin) {
+        if (amount1Out == 0 || amount1Out < amountOutMin) {
             revert SlippageTooHigh();
         }
 
@@ -493,7 +494,7 @@ contract BondingV3 is
             isInitialPurchase
         );
 
-        if (amount0Out < amountOutMin) {
+        if (amount0Out == 0 || amount0Out < amountOutMin) {
             revert SlippageTooHigh();
         }
 

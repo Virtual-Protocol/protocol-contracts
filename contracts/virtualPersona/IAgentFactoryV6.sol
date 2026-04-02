@@ -55,4 +55,13 @@ interface IAgentFactoryV6 {
     function addBlacklistAddress(address token, address blacklistAddress) external;
 
     function removeBlacklistAddress(address token, address blacklistAddress) external;
+
+    function removeLpLiquidity(
+        address veToken,
+        address recipient,
+        uint256 veTokenAmount,
+        uint256 amountAMin,
+        uint256 amountBMin,
+        uint256 deadline
+    ) external;
 }

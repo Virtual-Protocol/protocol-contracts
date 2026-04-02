@@ -410,6 +410,7 @@ contract BondingV5 is
             );
         }
 
+        uint256 initialPurchase = tokenRef.initialPurchase; // record real initialPurchase for event
         tokenRef.initialPurchase = 0; // prevent duplicate transfer initialPurchase back to the creator
         tokenRef.trading = false; // disable trading for cancelled tokens
         tokenRef.launchExecuted = true; // pretend it has been launched (cancelled) and prevent duplicate launch
@@ -418,7 +419,7 @@ contract BondingV5 is
             tokenAddress_,
             tokenRef.pair,
             tokenInfo[tokenAddress_].virtualId,
-            tokenRef.initialPurchase
+            initialPurchase
         );
     }
 
@@ -530,7 +531,7 @@ contract BondingV5 is
             msg.sender
         );
 
-        if (amount1Out < amountOutMin_) {
+        if (amount1Out == 0 || amount1Out < amountOutMin_) {
             revert SlippageTooHigh();
         }
 
@@ -571,7 +572,8 @@ contract BondingV5 is
             isInitialPurchase_
         );
 
-        if (amount0Out < amountOutMin_) {
+        // Match BondingV2: reject zero output even when amountOutMin_ is 0 (drained pool / forced grad)
+        if (amount0Out == 0 || amount0Out < amountOutMin_) {
             revert SlippageTooHigh();
         }
 

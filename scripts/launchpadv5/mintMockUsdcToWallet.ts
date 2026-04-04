@@ -24,11 +24,10 @@ const ERC20_MINTABLE_ABI = [
 ] as const;
 
 async function ensureMintFunctionExists(tokenAddress: string, caller: string) {
-  const iface = new ethers.Interface(["function mint(address to, uint256 amount)"]);
-  const probeData = iface.encodeFunctionData("mint", [
-    caller,
-    0n,
+  const iface = new ethers.Interface([
+    "function mint(address to, uint256 amount)",
   ]);
+  const probeData = iface.encodeFunctionData("mint", [caller, 0n]);
 
   try {
     // Pure existence probe: static eth_call to detect selector support before sending tx.
@@ -74,7 +73,9 @@ function mustAddress(name: string, value?: string): string {
     );
     await ensureMintFunctionExists(tokenAddress, signerAddress);
     const to = mustAddress("MINT_TO", process.env.MINT_TO || signerAddress);
-    const humanAmount = (process.env.MINT_MOCK_USDC_AMOUNT || "10000000").trim();
+    const humanAmount = (
+      process.env.MINT_MOCK_USDC_AMOUNT || "10000000"
+    ).trim();
 
     const token = new ethers.Contract(tokenAddress, ERC20_MINTABLE_ABI, signer);
     const decimals = Number(await token.decimals());

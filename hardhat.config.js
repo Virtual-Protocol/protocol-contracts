@@ -100,6 +100,16 @@ module.exports = {
         viaIR: false,
       },
     },
+    "contracts/launchpadv2/BondingV5.sol": {
+      version: "0.8.26",
+      settings: {
+        optimizer: {
+          enabled: true,
+          runs: 200,
+        },
+        viaIR: false,
+      },
+    },
   },
   namedAccounts: {
     deployer: `privatekey://${process.env.PRIVATE_KEY}`,
@@ -183,7 +193,9 @@ module.exports = {
       url: "http://127.0.0.1:8545",
       // Forked `hardhat node`: use PRIVATE_KEY so deployer matches the address that holds
       // tokens on the forked chain (default Hardhat account #0 is usually empty on real forks).
-      ...(process.env.PRIVATE_KEY ? { accounts: [process.env.PRIVATE_KEY] } : {}),
+      ...(process.env.PRIVATE_KEY
+        ? { accounts: [process.env.PRIVATE_KEY] }
+        : {}),
       // For forked node: npx hardhat node --fork <rpc_url> [--fork-block-number <n>]
     },
     // Fork RPC:
@@ -191,6 +203,9 @@ module.exports = {
     // - `npx hardhat test --network hardhat` with FORK_ENABLED=true: uses `forking.url` here
     //   (no separate node; no --fork on the CLI).
     hardhat: {
+      // Test-only: BondingV5 implementation currently exceeds EIP-170 size limit.
+      // Keep production networks constrained; only relax in local hardhat runtime.
+      allowUnlimitedContractSize: true,
       forking: {
         // Prefer FORK_RPC_URL when set. `run_local_deploy.sh --network local` requires FORK_RPC_URL in the env file.
         url:

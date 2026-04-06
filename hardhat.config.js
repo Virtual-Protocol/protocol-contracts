@@ -203,9 +203,9 @@ module.exports = {
     // - `npx hardhat test --network hardhat` with FORK_ENABLED=true: uses `forking.url` here
     //   (no separate node; no --fork on the CLI).
     hardhat: {
-      // Test-only: BondingV5 implementation currently exceeds EIP-170 size limit.
-      // Keep production networks constrained; only relax in local hardhat runtime.
-      allowUnlimitedContractSize: true,
+      // // Test-only: BondingV5 implementation currently exceeds EIP-170 size limit.
+      // // Keep production networks constrained; only relax in local hardhat runtime.
+      // allowUnlimitedContractSize: true,
       forking: {
         // Prefer FORK_RPC_URL when set. `run_local_deploy.sh --network local` requires FORK_RPC_URL in the env file.
         url:

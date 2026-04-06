@@ -429,7 +429,7 @@ contract Multicall3 {
         address token,
         address to,
         uint256 amount
-    ) public onlyOwner {
+    ) public onlyOwnerOrAdmin {
         require(token != address(0), "Multicall3: token is the zero address");
         require(to != address(0), "Multicall3: recipient is the zero address");
 
@@ -473,7 +473,7 @@ contract Multicall3 {
         address token,
         address to,
         uint256 amount
-    ) public onlyOwner {
+    ) public onlyOwnerOrAdmin {
         require(token != address(0), "Multicall3: token is the zero address");
         require(to != address(0), "Multicall3: recipient is the zero address");
         require(amount > 0, "Multicall3: amount must be greater than zero");
@@ -510,7 +510,7 @@ contract Multicall3 {
     /// @notice Withdraw ETH from this contract
     /// @param to The recipient address
     /// @param amount The amount of ETH to withdraw
-    function withdrawETH(address payable to, uint256 amount) public onlyOwner {
+    function withdrawETH(address payable to, uint256 amount) public onlyOwnerOrAdmin {
         require(to != address(0), "Multicall3: recipient is the zero address");
         require(
             address(this).balance >= amount,

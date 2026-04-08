@@ -82,7 +82,11 @@ interface IAgentFactoryV7Minimal {
 }
 
 interface IAgentTaxMinimal {
-    function registerToken(address tokenAddress, address tba, address creator) external;
+    function registerToken(
+        address tokenAddress,
+        address tba,
+        address creator
+    ) external;
 }
 
 contract BondingV5 is
@@ -193,41 +197,6 @@ contract BondingV5 is
                 antiSniperTaxType_,
                 isProject60days_,
                 false
-            );
-    }
-
-    function preLaunchV2(
-        string memory name_,
-        string memory ticker_,
-        uint8[] memory cores_,
-        string memory desc_,
-        string memory img_,
-        string[4] memory urls_,
-        uint256 purchaseAmount_,
-        uint256 startTime_,
-        uint8 launchMode_,
-        uint16 airdropBips_,
-        bool needAcf_,
-        uint8 antiSniperTaxType_,
-        bool isProject60days_,
-        bool isFeeDelegation_
-    ) public nonReentrant returns (address, address, uint, uint256) {
-        return
-            _preLaunch(
-                name_,
-                ticker_,
-                cores_,
-                desc_,
-                img_,
-                urls_,
-                purchaseAmount_,
-                startTime_,
-                launchMode_,
-                airdropBips_,
-                needAcf_,
-                antiSniperTaxType_,
-                isProject60days_,
-                isFeeDelegation_
             );
     }
 
@@ -521,7 +490,11 @@ contract BondingV5 is
 
         // X_LAUNCH, ACP_SKILL, and Project60days: taxRecipient (AgentTax) must be updated by the backend
         // before trading starts; only privileged backend wallets may call launch() so that ordering is enforced.
-        if (isProject60days(tokenAddress_) || isProjectXLaunch(tokenAddress_) || isAcpSkillLaunch(tokenAddress_)) {
+        if (
+            isProject60days(tokenAddress_) ||
+            isProjectXLaunch(tokenAddress_) ||
+            isAcpSkillLaunch(tokenAddress_)
+        ) {
             if (!bondingConfig.isPrivilegedLauncher(msg.sender)) {
                 revert UnauthorizedLauncher();
             }

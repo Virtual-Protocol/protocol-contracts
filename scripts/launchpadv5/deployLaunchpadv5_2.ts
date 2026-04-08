@@ -7,8 +7,10 @@
  *   ENV_FILE=.env.launchpadv5_prod npx hardhat run scripts/launchpadv5/deployLaunchpadv5_2.ts --network base
  */
 import { parseEther } from "ethers";
-import { verifyContract } from "./utils";
+import { launchpadHeavyTxGasLimit, verifyContract } from "./utils";
 const { ethers, upgrades } = require("hardhat");
+
+const IMPL_DEPLOY_GAS_LIMIT = launchpadHeavyTxGasLimit();
 
 /**
  * V5 Suite - Step 2: Deploy AgentFactoryV7 and AgentTokenV3
@@ -185,7 +187,9 @@ const { ethers, upgrades } = require("hardhat");
         "\n--- Deploying AgentTokenV3 implementation (NEW for V5 Suite) ---"
       );
       const AgentTokenV3 = await ethers.getContractFactory("AgentTokenV3");
-      const agentTokenV3 = await AgentTokenV3.deploy();
+      const agentTokenV3 = await AgentTokenV3.deploy({
+        gasLimit: IMPL_DEPLOY_GAS_LIMIT,
+      });
       await agentTokenV3.waitForDeployment();
       agentTokenV3ImplAddress = await agentTokenV3.getAddress();
       deployedContracts.AgentTokenV3Impl = agentTokenV3ImplAddress;
@@ -214,7 +218,9 @@ const { ethers, upgrades } = require("hardhat");
         "\n--- Deploying AgentVeTokenV2 implementation (shared with V4 suite) ---"
       );
       const AgentVeTokenV2 = await ethers.getContractFactory("AgentVeTokenV2");
-      const agentVeTokenV2 = await AgentVeTokenV2.deploy();
+      const agentVeTokenV2 = await AgentVeTokenV2.deploy({
+        gasLimit: IMPL_DEPLOY_GAS_LIMIT,
+      });
       await agentVeTokenV2.waitForDeployment();
       agentVeTokenV2ImplAddress = await agentVeTokenV2.getAddress();
       deployedContracts.AgentVeTokenV2Impl = agentVeTokenV2ImplAddress;
@@ -243,7 +249,9 @@ const { ethers, upgrades } = require("hardhat");
         "\n--- Deploying AgentDAO implementation (shared with V4 suite) ---"
       );
       const AgentDAO = await ethers.getContractFactory("AgentDAO");
-      const agentDAO = await AgentDAO.deploy();
+      const agentDAO = await AgentDAO.deploy({
+        gasLimit: IMPL_DEPLOY_GAS_LIMIT,
+      });
       await agentDAO.waitForDeployment();
       agentDAOImplAddress = await agentDAO.getAddress();
       deployedContracts.AgentDAOImpl = agentDAOImplAddress;

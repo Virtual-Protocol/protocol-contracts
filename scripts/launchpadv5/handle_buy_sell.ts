@@ -1,4 +1,5 @@
 import { parseEther, formatEther } from "ethers";
+import { launchpadDefaultTxGasLimit } from "./utils";
 const hre = require("hardhat");
 const { ethers } = hre;
 
@@ -163,7 +164,7 @@ async function main() {
     CONFIG.tokenAddress,
     0, // minAmountOut (0 for no slippage protection)
     deadline,
-    { gasLimit: 500000 }
+    { gasLimit: launchpadDefaultTxGasLimit() }
   );
   console.log("Buy tx submitted:", buyTx.hash);
   const buyReceipt = await waitWithProgress(
@@ -214,7 +215,7 @@ async function main() {
     CONFIG.tokenAddress,
     0, // minAmountOut (0 for no slippage protection)
     sellDeadline,
-    { gasLimit: 500000 }
+    { gasLimit: launchpadDefaultTxGasLimit() }
   );
   console.log("Sell tx submitted:", sellTx.hash);
   const sellReceipt = await waitWithProgress(

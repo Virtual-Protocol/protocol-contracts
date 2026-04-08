@@ -1,9 +1,11 @@
 /** @type import('hardhat/config').HardhatUserConfig */
-// Env loading:
+// Env loading (runs before `networks` — independent of `--network`):
 // - If process.env.ENV_FILE is set (shell), only that file is loaded into process.env.
 // - Else if root `.env` exists and defines ENV_FILE=..., only that target file is loaded
 //   (`.env` is parsed for ENV_FILE only — other keys in `.env` are NOT applied).
 // - Else load default `.env` as usual.
+// `--network abstract_testnet` does NOT switch ENV_FILE; root `.env` may still point at e.g. bsc_testnet.
+// Override per command: ENV_FILE=.env.launchpadv5_dev_abstract_testnet npx hardhat verify ... --network abstract_testnet
 // Usage: put `ENV_FILE=.env.launchpadv5_local` in `.env`, or `ENV_FILE=.env.launchpadv5_local npx hardhat ...`
 const fs = require("fs");
 const path = require("path");
@@ -115,6 +117,7 @@ module.exports = {
     deployer: `privatekey://${process.env.PRIVATE_KEY}`,
   },
   etherscan: {
+    // Etherscan.io API keys work for v2 multi-chain verification (incl. Abscan-backed chains).
     apiKey: process.env.ETHERSCAN_API_KEY,
     customChains: [
       {
@@ -125,7 +128,48 @@ module.exports = {
           browserURL: "https://sepolia.basescan.org/",
         },
       },
+      // Abstract L2 — https://docs.abs.xyz/build-on-abstract/smart-contracts/hardhat/verifying-contracts
+      {
+        network: "abstract_testnet",
+        chainId: 11124,
+        urls: {
+          apiURL: "https://api.etherscan.io/v2/api",
+          browserURL: "https://sepolia.abscan.org/",
+        },
+      },
+      {
+        network: "abstract_mainnet",
+        chainId: 2741,
+        urls: {
+          apiURL: "https://api.etherscan.io/v2/api",
+          browserURL: "https://abscan.org/",
+        },
+      },
+      // Monad — https://docs.monad.xyz/guides/verify-smart-contract/hardhat
+      // MonadScan uses Etherscan v2 (api.etherscan.io; Hardhat passes chainid). Monad Vision uses Sourcify
+      // (see scripts/launchpadv5/utils.ts verifyContract for monad_* networks).
+      {
+        network: "monad_testnet",
+        chainId: 10143,
+        urls: {
+          apiURL: "https://api.etherscan.io/v2/api",
+          browserURL: "https://testnet.monadscan.com/",
+        },
+      },
+      {
+        network: "monad_mainnet",
+        chainId: 143,
+        urls: {
+          apiURL: "https://api.etherscan.io/v2/api",
+          browserURL: "https://monadscan.com/",
+        },
+      }
     ],
+  },
+  // Do not set a global Monad Sourcify URL here: `verify` would send every chain’s chainId to that server.
+  // Monad Sourcify is applied only in `scripts/launchpadv5/utils.ts` when network is monad_*.
+  sourcify: {
+    enabled: false,
   },
   networks: {
     eth_mainnet: {
@@ -155,6 +199,40 @@ module.exports = {
         "https://bsc-testnet.drpc.org",
       accounts: [process.env.PRIVATE_KEY],
       chainId: 97,
+    },
+    // Abstract L2 testnet (see https://docs.abs.xyz/connect-to-abstract)
+    abstract_testnet: {
+      url:
+        process.env.ABSTRACT_TESTNET_RPC_URL ||
+        process.env.RPC_URL ||
+        "https://api.testnet.abs.xyz",
+      accounts: [process.env.PRIVATE_KEY],
+      chainId: 11124,
+    },
+    // Abstract L2 mainnet (see https://docs.abs.xyz/connect-to-abstract)
+    abstract_mainnet: {
+      url:
+        process.env.ABSTRACT_MAINNET_RPC_URL ||
+        process.env.RPC_URL ||
+        "https://api.mainnet.abs.xyz",
+      accounts: [process.env.PRIVATE_KEY],
+      chainId: 2741,
+    },
+    monad_testnet: {
+      url:
+        process.env.MONAD_TESTNET_RPC_URL ||
+        process.env.RPC_URL ||
+        "https://testnet-rpc.monad.xyz",
+      accounts: [process.env.PRIVATE_KEY],
+      chainId: 10143,
+    },
+    monad_mainnet: {
+      url:
+        process.env.MONAD_MAINNET_RPC_URL ||
+        process.env.RPC_URL ||
+        "https://mainnet.monad.xyz",
+      accounts: [process.env.PRIVATE_KEY],
+      chainId: 143,
     },
     base: {
       url:
@@ -231,6 +309,21 @@ module.exports = {
           },
         },
         97: {
+          hardforkHistory: {
+            cancun: 0,
+          },
+        },
+        11124: {
+          hardforkHistory: {
+            cancun: 0,
+          },
+        },
+        2741: {
+          hardforkHistory: {
+            cancun: 0,
+          },
+        },
+        10143: {
           hardforkHistory: {
             cancun: 0,
           },

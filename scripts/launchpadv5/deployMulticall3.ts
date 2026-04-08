@@ -1,3 +1,5 @@
+import { verifyContract } from "./utils";
+
 const { ethers } = require("hardhat");
 
 async function main() {
@@ -77,6 +79,7 @@ async function main() {
     );
 
     console.log("\n=== Deployment Complete ===");
+    await verifyContract(multicall3Address);
 
     return {
       multicall3: multicall3Address,

@@ -19,8 +19,12 @@
  *   V3_FEE                         (default "3000")
  *   TX_CONFIRM_TIMEOUT_MS          (default "240000")
  *   VERIFY_CONTRACTS=true          (auto verify on explorer when possible)
+ *
+ * Monad: fees scale with gas_limit (not gas_used). Script uses {@link launchpadHeavyTxGasLimit}.
+ * Large deploys may take minutes to confirm — progress is logged before each step.
  */
 import { parseUnits } from "ethers";
+import { launchpadHeavyTxGasLimit } from "./utils";
 import FactoryArtifact from "@uniswap/v3-core/artifacts/contracts/UniswapV3Factory.sol/UniswapV3Factory.json";
 import SwapRouterArtifact from "@uniswap/v3-periphery/artifacts/contracts/SwapRouter.sol/SwapRouter.json";
 import PositionManagerArtifact from "@uniswap/v3-periphery/artifacts/contracts/NonfungiblePositionManager.sol/NonfungiblePositionManager.json";
@@ -47,6 +51,8 @@ const POOL_ABI = [
 ] as const;
 
 const Q96 = 2n ** 96n;
+
+/** Capped via {@link launchpadHeavyTxGasLimit} (env: LAUNCHPAD_HEAVY_TX_GAS_LIMIT). */
 
 function mustAddress(name: string, value?: string): string {
   const v = String(value || "").trim();
@@ -96,9 +102,14 @@ async function tryVerify(address: string, ctorArgs: any[]) {
     const liquidityHuman = process.env.LIQUIDITY_AMOUNT?.trim() || "10";
     const swapVirtualHuman = process.env.SWAP_TEST_VIRTUAL_AMOUNT?.trim() || "1";
 
+    const MAX_SIGNER_GAS_LIMIT = launchpadHeavyTxGasLimit();
+
     console.log("\n=== Deploy Uniswap V3 + Liquidity + Buy/Sell ===");
     console.log("Network:", hre.network.name, "chainId:", chainId.toString());
     console.log("Deployer:", deployerAddress);
+    console.log(
+      "(If this line is the last for several minutes: RPC is slow, or a deploy tx is pending — check explorer / RPC.)"
+    );
 
     let virtualAddr = (process.env.VIRTUAL_TOKEN_ADDRESS || "").trim();
     const hardhatNeedsMockVirtual =
@@ -113,7 +124,8 @@ async function tryVerify(address: string, ctorArgs: any[]) {
         "mVIRTUAL",
         18,
         deployerAddress,
-        parseUnits("1000000", 18)
+        parseUnits("1000000", 18),
+        { gasLimit: MAX_SIGNER_GAS_LIMIT }
       );
       await m.waitForDeployment();
       virtualAddr = await m.getAddress();
@@ -134,7 +146,8 @@ async function tryVerify(address: string, ctorArgs: any[]) {
         "mUSDC",
         6,
         deployerAddress,
-        parseUnits("1000000", 6)
+        parseUnits("1000000", 6),
+        { gasLimit: MAX_SIGNER_GAS_LIMIT }
       );
       await s.waitForDeployment();
       stableAddr = await s.getAddress();
@@ -143,41 +156,62 @@ async function tryVerify(address: string, ctorArgs: any[]) {
 
     const virtual = new ethers.Contract(virtualAddr, ERC20_ABI, deployer);
     const stable = new ethers.Contract(stableAddr, ERC20_ABI, deployer);
+    console.log("Reading token decimals (eth_call)...");
     const virtualDecimals = Number(await virtual.decimals());
     const stableDecimals = Number(await stable.decimals());
+    console.log(
+      `Token decimals: VIRTUAL=${virtualDecimals}, stable=${stableDecimals}`
+    );
     const amountVirtual = parseUnits(liquidityHuman, virtualDecimals);
     const amountStable = parseUnits(liquidityHuman, stableDecimals);
     const amountSwapIn = parseUnits(swapVirtualHuman, virtualDecimals);
 
     // Deploy v3 core/periphery minimal set
     const Factory = new ethers.ContractFactory(FactoryArtifact.abi, FactoryArtifact.bytecode, deployer);
-    const factory = await Factory.deploy();
+    console.log("\n1/5 Deploying UniswapV3Factory...");
+    const factory = await Factory.deploy({ gasLimit: MAX_SIGNER_GAS_LIMIT });
+    console.log("  tx:", factory.deploymentTransaction()?.hash ?? "(unknown)");
     await factory.waitForDeployment();
     const factoryAddr = await factory.getAddress();
+    console.log("  confirmed:", factoryAddr);
 
     const Weth = new ethers.ContractFactory(WethArtifact.abi, WethArtifact.bytecode, deployer);
-    const weth = await Weth.deploy();
+    console.log("2/5 Deploying WETH9...");
+    const weth = await Weth.deploy({ gasLimit: MAX_SIGNER_GAS_LIMIT });
+    console.log("  tx:", weth.deploymentTransaction()?.hash ?? "(unknown)");
     await weth.waitForDeployment();
     const wethAddr = await weth.getAddress();
+    console.log("  confirmed:", wethAddr);
 
     const Descriptor = await ethers.getContractFactory("MockPositionDescriptor");
-    const descriptor = await Descriptor.deploy();
+    console.log("3/5 Deploying MockPositionDescriptor...");
+    const descriptor = await Descriptor.deploy({ gasLimit: MAX_SIGNER_GAS_LIMIT });
+    console.log("  tx:", descriptor.deploymentTransaction()?.hash ?? "(unknown)");
     await descriptor.waitForDeployment();
     const descriptorAddr = await descriptor.getAddress();
+    console.log("  confirmed:", descriptorAddr);
 
     const Router = new ethers.ContractFactory(SwapRouterArtifact.abi, SwapRouterArtifact.bytecode, deployer);
-    const router = await Router.deploy(factoryAddr, wethAddr);
+    console.log("4/5 Deploying SwapRouter...");
+    const router = await Router.deploy(factoryAddr, wethAddr, { gasLimit: MAX_SIGNER_GAS_LIMIT });
+    console.log("  tx:", router.deploymentTransaction()?.hash ?? "(unknown)");
     await router.waitForDeployment();
     const routerAddr = await router.getAddress();
+    console.log("  confirmed:", routerAddr);
 
     const PositionManager = new ethers.ContractFactory(
       PositionManagerArtifact.abi,
       PositionManagerArtifact.bytecode,
       deployer
     );
-    const positionManager = await PositionManager.deploy(factoryAddr, wethAddr, descriptorAddr);
+    console.log("5/5 Deploying NonfungiblePositionManager (largest bytecode)...");
+    const positionManager = await PositionManager.deploy(factoryAddr, wethAddr, descriptorAddr, {
+      gasLimit: MAX_SIGNER_GAS_LIMIT,
+    });
+    console.log("  tx:", positionManager.deploymentTransaction()?.hash ?? "(unknown)");
     await positionManager.waitForDeployment();
     const positionManagerAddr = await positionManager.getAddress();
+    console.log("  confirmed:", positionManagerAddr);
 
     console.log("UniswapV3Factory:", factoryAddr);
     console.log("WETH9:", wethAddr);
@@ -189,7 +223,9 @@ async function tryVerify(address: string, ctorArgs: any[]) {
     const factoryRW = new ethers.Contract(factoryAddr, V3_FACTORY_ABI, deployer);
     let poolAddr = await factoryRW.getPool(virtualAddr, stableAddr, fee);
     if (poolAddr === ethers.ZeroAddress) {
-      const txCreate = await factoryRW.createPool(virtualAddr, stableAddr, fee);
+      const txCreate = await factoryRW.createPool(virtualAddr, stableAddr, fee, {
+        gasLimit: MAX_SIGNER_GAS_LIMIT,
+      });
       const r = await waitTx(txCreate.hash, timeoutMs);
       console.log("createPool tx:", r.hash);
       poolAddr = await factoryRW.getPool(virtualAddr, stableAddr, fee);
@@ -198,7 +234,7 @@ async function tryVerify(address: string, ctorArgs: any[]) {
     const pool = new ethers.Contract(poolAddr, POOL_ABI, deployer);
     const slot0 = await pool.slot0().catch(() => null);
     if (!slot0 || slot0[0] === 0n) {
-      const txInit = await pool.initialize(Q96);
+      const txInit = await pool.initialize(Q96, { gasLimit: MAX_SIGNER_GAS_LIMIT });
       const r = await waitTx(txInit.hash, timeoutMs);
       console.log("initialize pool tx:", r.hash);
     }
@@ -232,7 +268,7 @@ async function tryVerify(address: string, ctorArgs: any[]) {
       recipient: deployerAddress,
       deadline: deadlineSec(),
     };
-    const txMint = await positionManager.mint(mintParams);
+    const txMint = await positionManager.mint(mintParams, { gasLimit: MAX_SIGNER_GAS_LIMIT });
     const rcMint = await waitTx(txMint.hash, timeoutMs);
     console.log("mint liquidity tx:", rcMint.hash);
 
@@ -250,7 +286,7 @@ async function tryVerify(address: string, ctorArgs: any[]) {
       amountOutMinimum: 0n,
       sqrtPriceLimitX96: 0n,
     };
-    const txBuy = await router.exactInputSingle(buyParams);
+    const txBuy = await router.exactInputSingle(buyParams, { gasLimit: MAX_SIGNER_GAS_LIMIT });
     const rcBuy = await waitTx(txBuy.hash, timeoutMs);
     console.log("buy swap tx:", rcBuy.hash);
 
@@ -269,7 +305,7 @@ async function tryVerify(address: string, ctorArgs: any[]) {
       amountOutMinimum: 0n,
       sqrtPriceLimitX96: 0n,
     };
-    const txSell = await router.exactInputSingle(sellParams);
+    const txSell = await router.exactInputSingle(sellParams, { gasLimit: MAX_SIGNER_GAS_LIMIT });
     const rcSell = await waitTx(txSell.hash, timeoutMs);
     console.log("sell swap tx:", rcSell.hash);
 

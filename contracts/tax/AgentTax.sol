@@ -211,6 +211,15 @@ contract AgentTax is Initializable, AccessControlUpgradeable {
         emit TreasuryUpdated(oldTreasury, treasury_);
     }
 
+    /**
+     * @notice Returns TBA and creator addresses used for tax attribution for `agentId`.
+     */
+    function getAgentRecipients(
+        uint256 agentId
+    ) external view returns (TaxRecipient memory) {
+        return _agentRecipients[agentId];
+    }
+
     function withdraw(address token) external onlyRole(ADMIN_ROLE) {
         IERC20(token).safeTransfer(
             treasury,

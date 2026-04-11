@@ -1,5 +1,5 @@
 const { expect } = require("chai");
-const { ethers } = require("hardhat");
+const { ethers, upgrades } = require("hardhat");
 const { time } = require("@nomicfoundation/hardhat-network-helpers");
 const {
   loadFixture,
@@ -35,7 +35,9 @@ describe("TaxAccountingAdapter E2E (BondingV5 + AgentTokenV3)", function () {
     await ethers.provider.send("hardhat_setBalance", [await mockAgent.getAddress(), "0x10000000000000000"]);
 
     const TaxAccountingAdapter = await ethers.getContractFactory("TaxAccountingAdapter");
-    const taxAdapter = await TaxAccountingAdapter.deploy();
+    const taxAdapter = await upgrades.deployProxy(TaxAccountingAdapter, [owner.address], {
+      initializer: "initialize",
+    });
     await taxAdapter.waitForDeployment();
 
     await virtualToken.mint(await mockUniswapRouter.getAddress(), ethers.parseEther("1000000"));
@@ -129,7 +131,9 @@ describe("TaxAccountingAdapter E2E (BondingV5 + AgentTokenV3)", function () {
     await bondingV5.connect(user2).launch(tokenAddress);
 
     const TaxAccountingAdapter = await ethers.getContractFactory("TaxAccountingAdapter");
-    const taxAdapter = await TaxAccountingAdapter.deploy();
+    const taxAdapter = await upgrades.deployProxy(TaxAccountingAdapter, [owner.address], {
+      initializer: "initialize",
+    });
     await taxAdapter.waitForDeployment();
 
     const v3Token = await ethers.getContractAt("AgentTokenV3", tokenAddress);

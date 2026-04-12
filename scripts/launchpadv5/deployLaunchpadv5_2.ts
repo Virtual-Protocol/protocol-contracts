@@ -1,19 +1,22 @@
 /**
- * V5 Suite - Step 2: Deploy AgentFactoryV7 and AgentTokenV4
+ * V5 Suite - Step 2: Deploy AgentFactoryV7, TaxAccountingAdapter proxy, and AgentTokenV4 impl
  *
  * Usage:
  *   ENV_FILE=.env.launchpadv5_local npx hardhat run scripts/launchpadv5/deployLaunchpadv5_2.ts --network local
  *   ENV_FILE=.env.launchpadv5_dev npx hardhat run scripts/launchpadv5/deployLaunchpadv5_2.ts --network base_sepolia
  *   ENV_FILE=.env.launchpadv5_prod npx hardhat run scripts/launchpadv5/deployLaunchpadv5_2.ts --network base
+ *
+ * If TAX_ACCOUNTING_ADAPTER_ADDRESS is set, that proxy is reused (no new deploy).
  */
 import { parseEther } from "ethers";
-import { verifyContract } from "./utils";
+import { verifyContract, upsertLaunchpadEnvFile } from "./utils";
 const { ethers, upgrades } = require("hardhat");
 
 /**
  * V5 Suite - Step 2: Deploy AgentFactoryV7 and AgentTokenV4
  *
  * Deploys:
+ * - TaxAccountingAdapter proxy (NEW unless TAX_ACCOUNTING_ADAPTER_ADDRESS already set)
  * - AgentTokenV4 implementation (NEW - TaxAccountingAdapter + AgentTaxV2 attribution)
  * - AgentVeTokenV2 implementation (REUSE - same as V4 suite)
  * - AgentDAO implementation (REUSE - same as V4 suite)
@@ -36,20 +39,6 @@ const { ethers, upgrades } = require("hardhat");
     console.log(
       "Prerequisites: AgentNftV2, AgentTaxV2, FFactoryV3, FRouterV3 must already be deployed"
     );
-
-    // Check if AgentFactoryV7 already exists
-    const existingAgentFactoryV7 = process.env.AGENT_FACTORY_V7_ADDRESS;
-    if (existingAgentFactoryV7) {
-      console.log(
-        "\n=== AgentFactoryV7 already exists, skipping deployment ==="
-      );
-      console.log("AGENT_FACTORY_V7_ADDRESS:", existingAgentFactoryV7);
-      console.log("\nNo changes made. Proceed to next deployment step:");
-      console.log(
-        "Run: npx hardhat run scripts/launchpadv5/deployLaunchpadv5_3.ts --network <network>"
-      );
-      return;
-    }
 
     const [deployer] = await ethers.getSigners();
     const deployerAddress = await deployer.getAddress();
@@ -111,12 +100,6 @@ const { ethers, upgrades } = require("hardhat");
       );
     }
 
-    // Implementation addresses (optional - will deploy if not provided)
-    const agentTokenV4Impl =
-      process.env.AGENT_TOKEN_V4_IMPLEMENTATION;
-    const agentVeTokenV2Impl = process.env.AGENT_VE_TOKEN_V2_IMPLEMENTATION; // Reuse
-    const agentDAOImpl = process.env.AGENT_DAO_IMPLEMENTATION; // Reuse
-
     // Required external contract addresses
     const tbaRegistry = process.env.TBA_REGISTRY;
     if (!tbaRegistry) {
@@ -152,6 +135,13 @@ const { ethers, upgrades } = require("hardhat");
       );
     }
 
+    // Implementation addresses (optional - will deploy if not provided)
+    const agentTokenV4Impl =
+    process.env.AGENT_TOKEN_V4_IMPLEMENTATION;
+    const agentVeTokenV2Impl = process.env.AGENT_VE_TOKEN_V2_IMPLEMENTATION;
+    const agentDAOImpl = process.env.AGENT_DAO_IMPLEMENTATION;
+    const taxAccountingAdapter = process.env.TAX_ACCOUNTING_ADAPTER_ADDRESS;
+
     console.log("\nDeployment arguments loaded:", {
       contractController,
       admin,
@@ -161,6 +151,7 @@ const { ethers, upgrades } = require("hardhat");
       sentientBuyTax,
       sentientSellTax,
       agentTaxV2Address,
+      taxAccountingAdapter: taxAccountingAdapter || "(will deploy)",
       agentTokenV4Impl: agentTokenV4Impl || "(will deploy)",
       agentVeTokenV2Impl: agentVeTokenV2Impl || "(will deploy)",
       agentDAOImpl: agentDAOImpl || "(will deploy)",
@@ -178,7 +169,53 @@ const { ethers, upgrades } = require("hardhat");
     const reusedContracts: { [key: string]: string } = {};
 
     // ============================================
-    // 1. Deploy AgentTokenV4 implementation (NEW)
+    // 1. Deploy or reuse TaxAccountingAdapter (transparent proxy)
+    // ============================================
+    let taxAccountingAdapterAddress: string;
+    if (!taxAccountingAdapter) {
+      console.log(
+        "\n--- Deploying TaxAccountingAdapter (transparent proxy) ---"
+      );
+      const TaxAccountingAdapterFactory = await ethers.getContractFactory(
+        "TaxAccountingAdapter"
+      );
+      const taxAdapterProxy = await upgrades.deployProxy(
+        TaxAccountingAdapterFactory,
+        [contractController],
+        {
+          initializer: "initialize",
+          initialOwner: contractController,
+        }
+      );
+      await taxAdapterProxy.waitForDeployment();
+      taxAccountingAdapterAddress = await taxAdapterProxy.getAddress();
+      deployedContracts.TaxAccountingAdapter = taxAccountingAdapterAddress;
+
+      await verifyContract(taxAccountingAdapterAddress);
+      upsertLaunchpadEnvFile(
+        process.env.ENV_FILE?.trim(),
+        "TAX_ACCOUNTING_ADAPTER_ADDRESS",
+        taxAccountingAdapterAddress
+      );
+      console.log(
+        "\n--- TaxAccountingAdapter deployed at:",
+        taxAccountingAdapterAddress,
+        "---"
+      );
+      console.log("\n--- Paste into .env ---");
+      console.log(`TAX_ACCOUNTING_ADAPTER_ADDRESS=${taxAccountingAdapterAddress}`);
+    } else {
+      taxAccountingAdapterAddress = taxAccountingAdapter;
+      reusedContracts.TaxAccountingAdapter = taxAccountingAdapterAddress;
+      console.log(
+        "\n--- Reusing TaxAccountingAdapter:",
+        taxAccountingAdapterAddress,
+        "---"
+      );
+    }
+
+    // ============================================
+    // 2. Deploy AgentTokenV4 implementation (NEW)
     // ============================================
     let agentTokenV4ImplAddress: string;
     if (!agentTokenV4Impl) {
@@ -207,7 +244,7 @@ const { ethers, upgrades } = require("hardhat");
     }
 
     // ============================================
-    // 2. Deploy or Reuse AgentVeTokenV2 implementation (REUSE)
+    // 3. Deploy or Reuse AgentVeTokenV2 implementation (REUSE)
     // ============================================
     let agentVeTokenV2ImplAddress: string;
     if (!agentVeTokenV2Impl) {
@@ -236,7 +273,7 @@ const { ethers, upgrades } = require("hardhat");
     }
 
     // ============================================
-    // 3. Deploy or Reuse AgentDAO implementation (REUSE)
+    // 4. Deploy or Reuse AgentDAO implementation (REUSE)
     // ============================================
     let agentDAOImplAddress: string;
     if (!agentDAOImpl) {
@@ -262,7 +299,7 @@ const { ethers, upgrades } = require("hardhat");
     }
 
     // ============================================
-    // 4. Log external contracts being used
+    // 5. Log external contracts being used
     // ============================================
     console.log("\n--- Using External Contracts ---");
     console.log("TBA Registry:", tbaRegistry);
@@ -270,142 +307,138 @@ const { ethers, upgrades } = require("hardhat");
     console.log("UniswapV2Router:", uniswapV2RouterAddress);
 
     // ============================================
-    // 5. Deploy AgentFactoryV7 (NEW for V5 Suite)
+    // 6. Deploy AgentFactoryV7 (NEW for V5 Suite)
     // ============================================
-    console.log("\n--- Deploying AgentFactoryV7 (NEW for V5 Suite) ---");
-    const AgentFactoryV7 = await ethers.getContractFactory("AgentFactoryV7");
-    const agentFactoryV7 = await upgrades.deployProxy(
-      AgentFactoryV7,
-      [
-        agentTokenV4ImplAddress, // tokenImplementation_ (AgentTokenV4)
-        agentVeTokenV2ImplAddress, // veTokenImplementation_ (reuse)
-        agentDAOImplAddress, // daoImplementation_ (reuse)
-        tbaRegistry, // tbaRegistry_
-        virtualTokenAddress, // assetToken_
-        agentNftV2Address, // nft_ (deployed in _0.ts)
-        agentFactoryV7Vault, // vault_
-        agentFactoryV7NextId, // nextId_
-      ],
-      {
-        initializer: "initialize",
-        initialOwner: contractController,
-      }
-    );
-    await agentFactoryV7.waitForDeployment();
-    const agentFactoryV7Address = await agentFactoryV7.getAddress();
-    deployedContracts.AgentFactoryV7 = agentFactoryV7Address;
-    console.log("AgentFactoryV7 deployed at:", agentFactoryV7Address);
-
-    await verifyContract(agentFactoryV7Address);
-
-    // ============================================
-    // 6. Configure AgentFactoryV7
-    // ============================================
-    console.log("\n--- Configuring AgentFactoryV7 ---");
-
-    // // Grant DEFAULT_ADMIN_ROLE to deployer temporarily
-    // const txGrantAdmin = await agentFactoryV7.grantRole(
-    //   await agentFactoryV7.DEFAULT_ADMIN_ROLE(),
-    //   deployerAddress
-    // );
-    // await txGrantAdmin.wait();
-    // console.log(
-    //   "DEFAULT_ADMIN_ROLE of AgentFactoryV7 granted to deployer (temporary)"
-    // );
-
-    // Set params
-    const txSetParams = await agentFactoryV7.setParams(
-      agentFactoryV7MaturityDuration,
-      uniswapV2RouterAddress,
-      admin, // defaultDelegatee
-      admin // tokenAdmin
-    );
-    await txSetParams.wait();
-    console.log("AgentFactoryV7.setParams() called:", {
-      maturityDuration: agentFactoryV7MaturityDuration,
-      uniswapRouter: uniswapV2RouterAddress,
-      defaultDelegatee: admin,
-      tokenAdmin: admin,
-    });
-
-    // Set token params (projectTaxRecipient = AgentTaxV2)
-    const txSetTokenParams = await agentFactoryV7.setTokenParams(
-      sentientBuyTax,
-      sentientSellTax,
-      taxSwapThresholdBasisPoints,
-      agentTaxV2Address // projectTaxRecipient = AgentTaxV2 (NOT legacy AgentTax!)
-    );
-    await txSetTokenParams.wait();
-    console.log("AgentFactoryV7.setTokenParams() called:", {
-      buyTax: sentientBuyTax,
-      sellTax: sentientSellTax,
-      taxSwapThreshold: taxSwapThresholdBasisPoints,
-      projectTaxRecipient: agentTaxV2Address,
-    });
-
-    const taxAccountingAdapterAddress =
-      process.env.TAX_ACCOUNTING_ADAPTER_ADDRESS;
-    if (!process.env.TAX_ACCOUNTING_ADAPTER_ADDRESS) {
-      console.warn(
-        "TAX_ACCOUNTING_ADAPTER_ADDRESS not set; adapter left zero (call setTaxAccountingAdapter before production launches)."
+    // Check if AgentFactoryV7 already exists
+    const agentFactoryV7Address = process.env.AGENT_FACTORY_V7_ADDRESS;
+    if (agentFactoryV7Address) {
+      console.log(
+        "\n=== AgentFactoryV7 already exists, skipping deployment ==="
       );
+      console.log("AGENT_FACTORY_V7_ADDRESS:", agentFactoryV7Address);
+      console.log("\nNo changes made. Proceed to next deployment step:");
+      console.log(
+        "Run: npx hardhat run scripts/launchpadv5/deployLaunchpadv5_3.ts --network <network>"
+      );
+    } else {
+      console.log("\n--- Deploying AgentFactoryV7 ---");
+      const AgentFactoryV7 = await ethers.getContractFactory("AgentFactoryV7");
+      const agentFactoryV7 = await upgrades.deployProxy(
+        AgentFactoryV7,
+        [
+          agentTokenV4ImplAddress, // tokenImplementation_ (AgentTokenV4)
+          agentVeTokenV2ImplAddress, // veTokenImplementation_ (reuse)
+          agentDAOImplAddress, // daoImplementation_ (reuse)
+          tbaRegistry, // tbaRegistry_
+          virtualTokenAddress, // assetToken_
+          agentNftV2Address, // nft_ (deployed in _0.ts)
+          agentFactoryV7Vault, // vault_
+          agentFactoryV7NextId, // nextId_
+        ],
+        {
+          initializer: "initialize",
+          initialOwner: contractController,
+        }
+      );
+      await agentFactoryV7.waitForDeployment();
+      const agentFactoryV7Address = await agentFactoryV7.getAddress();
+      deployedContracts.AgentFactoryV7 = agentFactoryV7Address;
+      console.log("AgentFactoryV7 deployed at:", agentFactoryV7Address);
+
+      await verifyContract(agentFactoryV7Address);
+
+      // ============================================
+      // 7. Configure AgentFactoryV7
+      // ============================================
+      console.log("\n--- Configuring AgentFactoryV7 ---");
+
+      // Set params
+      const txSetParams = await agentFactoryV7.setParams(
+        agentFactoryV7MaturityDuration,
+        uniswapV2RouterAddress,
+        admin, // defaultDelegatee
+        admin // tokenAdmin
+      );
+      await txSetParams.wait();
+      console.log("AgentFactoryV7.setParams() called:", {
+        maturityDuration: agentFactoryV7MaturityDuration,
+        uniswapRouter: uniswapV2RouterAddress,
+        defaultDelegatee: admin,
+        tokenAdmin: admin,
+      });
+
+      // Set token params (projectTaxRecipient = AgentTaxV2)
+      const txSetTokenParams = await agentFactoryV7.setTokenParams(
+        sentientBuyTax,
+        sentientSellTax,
+        taxSwapThresholdBasisPoints,
+        agentTaxV2Address // projectTaxRecipient = AgentTaxV2 (NOT legacy AgentTax!)
+      );
+      await txSetTokenParams.wait();
+      console.log("AgentFactoryV7.setTokenParams() called:", {
+        buyTax: sentientBuyTax,
+        sellTax: sentientSellTax,
+        taxSwapThreshold: taxSwapThresholdBasisPoints,
+        projectTaxRecipient: agentTaxV2Address,
+      });
+
+      const txSetTaxAdapter = await agentFactoryV7.setTaxAccountingAdapter(
+        taxAccountingAdapterAddress
+      );
+      await txSetTaxAdapter.wait();
+      console.log("AgentFactoryV7.setTaxAccountingAdapter() called:", {
+        taxAccountingAdapter: taxAccountingAdapterAddress,
+      });
+
+      // Grant DEFAULT_ADMIN_ROLE to admin
+      const agentFactoryV7DefaultAdminRole =
+        await agentFactoryV7.DEFAULT_ADMIN_ROLE();
+      const txGrantAdminToAdmin = await agentFactoryV7.grantRole(
+        agentFactoryV7DefaultAdminRole,
+        admin
+      );
+      await txGrantAdminToAdmin.wait();
+      console.log(
+        "DEFAULT_ADMIN_ROLE of AgentFactoryV7 granted to admin:",
+        admin
+      );
+
+      // Grant REMOVE_LIQUIDITY_ROLE to admin
+      const agentFactoryV7RemoveLiqRole =
+        await agentFactoryV7.REMOVE_LIQUIDITY_ROLE();
+      const txGrantRemoveLiq = await agentFactoryV7.grantRole(
+        agentFactoryV7RemoveLiqRole,
+        admin
+      );
+      await txGrantRemoveLiq.wait();
+      console.log(
+        "REMOVE_LIQUIDITY_ROLE of AgentFactoryV7 granted to admin:",
+        admin
+      );
+
+      // Grant REMOVE_LIQUIDITY_ROLE to FRouterV3
+      const txGrantRemoveLiqToFRouterV3 = await agentFactoryV7.grantRole(
+        agentFactoryV7RemoveLiqRole,
+        fRouterV3Address
+      );
+      await txGrantRemoveLiqToFRouterV3.wait();
+      console.log(
+        "REMOVE_LIQUIDITY_ROLE of AgentFactoryV7 granted to FRouterV3:",
+        fRouterV3Address
+      );
+
+      // Grant WITHDRAW_ROLE to admin
+      const agentFactoryV7WithdrawRole = await agentFactoryV7.WITHDRAW_ROLE();
+      const txGrantWithdraw = await agentFactoryV7.grantRole(
+        agentFactoryV7WithdrawRole,
+        admin
+      );
+      await txGrantWithdraw.wait();
+      console.log("WITHDRAW_ROLE of AgentFactoryV7 granted to admin:", admin);
     }
-    const txSetTaxAdapter = await agentFactoryV7.setTaxAccountingAdapter(
-      taxAccountingAdapterAddress
-    );
-    await txSetTaxAdapter.wait();
-    console.log("AgentFactoryV7.setTaxAccountingAdapter() called:", {
-      taxAccountingAdapter: taxAccountingAdapterAddress,
-    });
-
-    // Grant DEFAULT_ADMIN_ROLE to admin
-    const agentFactoryV7DefaultAdminRole =
-      await agentFactoryV7.DEFAULT_ADMIN_ROLE();
-    const txGrantAdminToAdmin = await agentFactoryV7.grantRole(
-      agentFactoryV7DefaultAdminRole,
-      admin
-    );
-    await txGrantAdminToAdmin.wait();
-    console.log(
-      "DEFAULT_ADMIN_ROLE of AgentFactoryV7 granted to admin:",
-      admin
-    );
-
-    // Grant REMOVE_LIQUIDITY_ROLE to admin
-    const agentFactoryV7RemoveLiqRole =
-      await agentFactoryV7.REMOVE_LIQUIDITY_ROLE();
-    const txGrantRemoveLiq = await agentFactoryV7.grantRole(
-      agentFactoryV7RemoveLiqRole,
-      admin
-    );
-    await txGrantRemoveLiq.wait();
-    console.log(
-      "REMOVE_LIQUIDITY_ROLE of AgentFactoryV7 granted to admin:",
-      admin
-    );
-
-    // Grant REMOVE_LIQUIDITY_ROLE to FRouterV3
-    const txGrantRemoveLiqToFRouterV3 = await agentFactoryV7.grantRole(
-      agentFactoryV7RemoveLiqRole,
-      fRouterV3Address
-    );
-    await txGrantRemoveLiqToFRouterV3.wait();
-    console.log(
-      "REMOVE_LIQUIDITY_ROLE of AgentFactoryV7 granted to FRouterV3:",
-      fRouterV3Address
-    );
-
-    // Grant WITHDRAW_ROLE to admin
-    const agentFactoryV7WithdrawRole = await agentFactoryV7.WITHDRAW_ROLE();
-    const txGrantWithdraw = await agentFactoryV7.grantRole(
-      agentFactoryV7WithdrawRole,
-      admin
-    );
-    await txGrantWithdraw.wait();
-    console.log("WITHDRAW_ROLE of AgentFactoryV7 granted to admin:", admin);
 
     // ============================================
-    // 7. Grant MINTER_ROLE on AgentNftV2 to AgentFactoryV7
+    // 8. Grant MINTER_ROLE on AgentNftV2 to AgentFactoryV7
     // ============================================
     console.log("\n--- Configuring AgentNftV2 roles ---");
 
@@ -472,7 +505,7 @@ const { ethers, upgrades } = require("hardhat");
     );
 
     // ============================================
-    // 8. Print Deployment Summary
+    // 9. Print Deployment Summary
     // ============================================
     console.log("\n" + "=".repeat(80));
     console.log("  Deployment Summary");
@@ -508,6 +541,11 @@ const { ethers, upgrades } = require("hardhat");
     }
     if (deployedContracts.AgentDAOImpl) {
       console.log(`AGENT_DAO_IMPLEMENTATION=${agentDAOImplAddress}`);
+    }
+    if (deployedContracts.TaxAccountingAdapter) {
+      console.log(
+        `TAX_ACCOUNTING_ADAPTER_ADDRESS=${deployedContracts.TaxAccountingAdapter}`
+      );
     }
 
     console.log("\n--- V5 Suite Configuration ---");

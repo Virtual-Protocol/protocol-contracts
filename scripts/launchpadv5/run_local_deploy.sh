@@ -250,10 +250,6 @@ save_addresses_from_file() {
             addr=$(echo "$line" | grep -oE "0x[a-fA-F0-9]{40}")
             [ -n "$addr" ] && update_env_var "FRouterV3_ADDRESS" "$addr" "$ENV_FILE" && echo "  -> FRouterV3_ADDRESS=$addr"
         fi
-        if echo "$line" | grep -q "AgentTokenV3 implementation deployed at:"; then
-            addr=$(echo "$line" | grep -oE "0x[a-fA-F0-9]{40}")
-            [ -n "$addr" ] && update_env_var "AGENT_TOKEN_V3_IMPLEMENTATION" "$addr" "$ENV_FILE" && echo "  -> AGENT_TOKEN_V3_IMPLEMENTATION=$addr"
-        fi
         if echo "$line" | grep -q "AgentVeTokenV2 implementation deployed at:"; then
             addr=$(echo "$line" | grep -oE "0x[a-fA-F0-9]{40}")
             [ -n "$addr" ] && update_env_var "AGENT_VE_TOKEN_V2_IMPLEMENTATION" "$addr" "$ENV_FILE" && echo "  -> AGENT_VE_TOKEN_V2_IMPLEMENTATION=$addr"
@@ -261,6 +257,14 @@ save_addresses_from_file() {
         if echo "$line" | grep -q "AgentDAO implementation deployed at:"; then
             addr=$(echo "$line" | grep -oE "0x[a-fA-F0-9]{40}")
             [ -n "$addr" ] && update_env_var "AGENT_DAO_IMPLEMENTATION" "$addr" "$ENV_FILE" && echo "  -> AGENT_DAO_IMPLEMENTATION=$addr"
+        fi
+        if echo "$line" | grep -q "TaxAccountingAdapter deployed at:"; then
+            addr=$(echo "$line" | grep -oE "0x[a-fA-F0-9]{40}")
+            [ -n "$addr" ] && update_env_var "TAX_ACCOUNTING_ADAPTER_ADDRESS" "$addr" "$ENV_FILE" && echo "  -> TAX_ACCOUNTING_ADAPTER_ADDRESS=$addr"
+        fi
+        if echo "$line" | grep -q "AgentTokenV4 implementation deployed at:"; then
+            addr=$(echo "$line" | grep -oE "0x[a-fA-F0-9]{40}")
+            [ -n "$addr" ] && update_env_var "AGENT_TOKEN_V4_IMPLEMENTATION" "$addr" "$ENV_FILE" && echo "  -> AGENT_TOKEN_V4_IMPLEMENTATION=$addr"
         fi
         if echo "$line" | grep -q "AgentFactoryV7 deployed at:"; then
             addr=$(echo "$line" | grep -oE "0x[a-fA-F0-9]{40}")
@@ -503,7 +507,7 @@ deploy_all() {
     echo "Deployed addresses saved to: $ENV_FILE"
     echo ""
     echo "Summary:"
-    grep -E "^(UNISWAP_V2_ROUTER|AGENT_TAX_DEX_ROUTER|AGENT_TAX_ASSET_TOKEN|AGENT_NFT_V2_ADDRESS|AGENT_TAX_V2_CONTRACT_ADDRESS|FFactoryV3_ADDRESS|FRouterV3_ADDRESS|AGENT_FACTORY_V7_ADDRESS|BONDING_CONFIG_ADDRESS|BONDING_V5_ADDRESS)=" "$ENV_FILE"
+    grep -E "^(UNISWAP_V2_ROUTER|AGENT_TAX_DEX_ROUTER|AGENT_TAX_ASSET_TOKEN|AGENT_NFT_V2_ADDRESS|AGENT_TAX_V2_CONTRACT_ADDRESS|FFactoryV3_ADDRESS|FRouterV3_ADDRESS|TAX_ACCOUNTING_ADAPTER_ADDRESS|AGENT_TOKEN_V4_IMPLEMENTATION|AGENT_FACTORY_V7_ADDRESS|BONDING_CONFIG_ADDRESS|BONDING_V5_ADDRESS)=" "$ENV_FILE"
 }
 
 # ============================================================================

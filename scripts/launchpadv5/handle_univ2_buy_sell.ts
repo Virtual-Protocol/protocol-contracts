@@ -21,6 +21,12 @@
  *   BUY_VIRTUAL_AMOUNT  — human string, default "0.1"
  *   SKIP_BUY=true         — only sell (you must already hold agent tokens)
  *   SKIP_SELL=true        — only buy
+ *   SELL_GAS_MULTIPLIER_BPS — sell tx gasLimit = eth_estimateGas × (this / 10000); default 15000 (= 1.5×).
+ *                             SELL is heavier (AgentTokenV4 tax + optional autoswap → TaxAccountingAdapter → depositTax).
+ *
+ * Swap paths (AgentToken is fee-on-transfer on sells):
+ *   BUY  — swapExactTokensForTokens (quote → agent)
+ *   SELL — swapExactTokensForTokensSupportingFeeOnTransferTokens (agent → quote)
  */
 import {
   parseUnits,
@@ -29,6 +35,12 @@ import {
   type Contract,
   type FunctionFragment,
 } from "ethers";
+
+type SwapGasStats = {
+  gasEstimated?: bigint;
+  gasLimitSent?: bigint;
+  gasUsed?: bigint;
+};
 import RouterArtifact from "@uniswap/v2-periphery/build/UniswapV2Router02.json";
 
 const { ethers } = require("hardhat");
@@ -37,7 +49,8 @@ const { ethers } = require("hardhat");
 // Edit only this (agent ERC20)
 // ============================================
 const AGENT_TOKEN_ADDRESS =
-  "0x1cD8eD80aA4479920D8C74b62677b161F7eC2F46" as string;
+  "0x663a3622B6568Bd7Eb2413553B869EA742a50902" as string;
+const buyHuman = process.env.BUY_VIRTUAL_AMOUNT?.trim() || "99";
 
 const ERC20_ABI = [
   "function approve(address spender, uint256 amount) external returns (bool)",
@@ -91,9 +104,17 @@ async function main() {
   if (!virtualAddr) throw new Error("VIRTUAL_TOKEN_ADDRESS is required");
   if (!routerAddr) throw new Error("UNISWAP_V2_ROUTER is required");
 
-  const buyHuman = process.env.BUY_VIRTUAL_AMOUNT?.trim() || "0.1";
   const skipBuy = process.env.SKIP_BUY === "true";
   const skipSell = process.env.SKIP_SELL === "true";
+
+  const sellGasMultBps = BigInt(
+    process.env.SELL_GAS_MULTIPLIER_BPS?.trim() || "15000"
+  );
+  if (sellGasMultBps < 10000n) {
+    throw new Error(
+      "SELL_GAS_MULTIPLIER_BPS must be >= 10000 (100% of estimate)"
+    );
+  }
 
   const [signer] = await ethers.getSigners();
   const deployerAddress = await signer.getAddress();
@@ -166,8 +187,9 @@ async function main() {
     label: string,
     amountIn: bigint,
     path: string[],
-    frag: FunctionFragment
-  ): Promise<void> {
+    frag: FunctionFragment,
+    swapRole: "buy" | "sell"
+  ): Promise<SwapGasStats> {
     const deadline = BigInt(Math.floor(Date.now() / 1000) + 600);
     const args: readonly [bigint, bigint, string[], string, bigint] = [
       amountIn,
@@ -189,31 +211,61 @@ async function main() {
     } catch (e) {
       console.warn("eth_call preview reverted:", formatRevertError(e));
     }
+
+    const txReq = { to: routerAddr, from: deployerAddress, data: calldata };
+    let gasEstimated: bigint | undefined;
+    try {
+      gasEstimated = await ethers.provider.estimateGas(txReq);
+    } catch (e) {
+      console.warn("estimateGas failed:", formatRevertError(e));
+    }
+
+    let gasLimitSent: bigint | undefined;
+    if (swapRole === "sell") {
+      if (gasEstimated !== undefined) {
+        gasLimitSent = (gasEstimated * sellGasMultBps + 9999n) / 10000n;
+        console.log(
+          `SELL gasLimit = estimate × ${sellGasMultBps}/10000 → estimate=${gasEstimated} gasLimit=${gasLimitSent}`
+        );
+      } else {
+        console.warn(
+          "SELL: estimateGas missing; sending without explicit gasLimit (not recommended)"
+        );
+      }
+    } else {
+      if (gasEstimated !== undefined) {
+        console.log(`BUY gas estimate (informational; tx uses wallet default cap): ${gasEstimated}`);
+      }
+    }
+
     const tx = await signer.sendTransaction({
       to: routerAddr,
       data: calldata,
+      ...(gasLimitSent !== undefined ? { gasLimit: gasLimitSent } : {}),
     });
     const rc = await tx.wait();
-    console.log("tx:", rc?.hash, "status:", rc?.status);
+    const gasUsed = rc?.gasUsed !== undefined ? BigInt(rc.gasUsed) : undefined;
+    console.log(
+      "tx:",
+      rc?.hash,
+      "status:",
+      rc?.status,
+      "gasUsed:",
+      gasUsed?.toString() ?? "(n/a)"
+    );
+    return { gasEstimated, gasLimitSent, gasUsed };
   }
 
-  async function swapWithFallback(
-    name: string,
+  async function approveRouterIfNeeded(
+    label: string,
     tokenIn: Contract,
-    amountIn: bigint,
-    path: string[]
-  ) {
+    amountIn: bigint
+  ): Promise<void> {
     const allowance = await tokenIn.allowance(deployerAddress, routerAddr);
     if (allowance < amountIn) {
-      console.log(`Approving router for ${name}...`);
+      console.log(`Approving router for ${label}...`);
       const tx = await tokenIn.approve(routerAddr, MaxUint256);
       await tx.wait();
-    }
-    try {
-      await runSwap(name, amountIn, path, fragSwapStandard);
-    } catch (e) {
-      console.warn("Standard swap failed, trying SupportingFeeOnTransfer...", formatRevertError(e));
-      await runSwap(name + " (FOT)", amountIn, path, fragSwapFeeOnTransfer);
     }
   }
 
@@ -225,6 +277,9 @@ async function main() {
   console.log("Agent:  ", formatUnits(agentBefore, ad), aSym);
   console.log("Tax on agent contract (balanceOf(agent)):", tax0.toString());
 
+  let buyGas: SwapGasStats = {};
+  let sellGas: SwapGasStats = {};
+
   if (!skipBuy) {
     const buyIn = parseUnits(buyHuman, vd);
     if (virtualBefore < buyIn) {
@@ -232,11 +287,13 @@ async function main() {
         `Insufficient VIRTUAL: have ${formatUnits(virtualBefore, vd)}, need ${buyHuman}`
       );
     }
-    await swapWithFallback(
+    await approveRouterIfNeeded("BUY (VIRTUAL → agent)", virtual, buyIn);
+    buyGas = await runSwap(
       "BUY (VIRTUAL → agent)",
-      virtual,
       buyIn,
-      [virtualAddr, AGENT_TOKEN_ADDRESS]
+      [virtualAddr, AGENT_TOKEN_ADDRESS],
+      fragSwapStandard,
+      "buy"
     );
   } else {
     console.log("\n(SKIP_BUY=true)");
@@ -253,11 +310,13 @@ async function main() {
     if (bal === 0n) {
       console.log("Nothing to sell (agent balance 0).");
     } else {
-      await swapWithFallback(
+      await approveRouterIfNeeded("SELL (agent → VIRTUAL)", agent, bal);
+      sellGas = await runSwap(
         "SELL (agent → VIRTUAL)",
-        agent,
         bal,
-        [AGENT_TOKEN_ADDRESS, virtualAddr]
+        [AGENT_TOKEN_ADDRESS, virtualAddr],
+        fragSwapFeeOnTransfer,
+        "sell"
       );
     }
   } else {
@@ -276,6 +335,41 @@ async function main() {
     "Tax delta (sell should move project tax onto token → often increases before autoswap):",
     (tax2 - tax1).toString()
   );
+
+  console.log("\n" + "=".repeat(72));
+  console.log("  Gas comparison: BUY vs SELL");
+  console.log("=".repeat(72));
+  console.log(
+    "BUY:  VIRTUAL → agent via swapExactTokensForTokens. Tax path is buy-side (pool → user); no TaxAccountingAdapter."
+  );
+  console.log(
+    "SELL: agent → VIRTUAL via swapExactTokensForTokensSupportingFeeOnTransferTokens. User→pool sell can trigger"
+  );
+  console.log(
+    "      AgentTokenV4 _autoSwap → TaxAccountingAdapter.swapTaxAndDeposit (router swap + AgentTaxV2.depositTax) — heavier."
+  );
+  console.log(`SELL gasLimit uses estimate × ${sellGasMultBps}/10000 (SELL_GAS_MULTIPLIER_BPS).`);
+  if (buyGas.gasUsed !== undefined || buyGas.gasEstimated !== undefined) {
+    console.log(
+      `  BUY  eth_estimateGas: ${buyGas.gasEstimated?.toString() ?? "n/a"}  gasUsed: ${buyGas.gasUsed?.toString() ?? "n/a"}`
+    );
+  }
+  if (sellGas.gasUsed !== undefined || sellGas.gasEstimated !== undefined) {
+    console.log(
+      `  SELL eth_estimateGas: ${sellGas.gasEstimated?.toString() ?? "n/a"}  gasLimit sent: ${sellGas.gasLimitSent?.toString() ?? "n/a"}  gasUsed: ${sellGas.gasUsed?.toString() ?? "n/a"}`
+    );
+  }
+  if (
+    buyGas.gasUsed !== undefined &&
+    sellGas.gasUsed !== undefined &&
+    buyGas.gasUsed > 0n
+  ) {
+    const ratioBps = (sellGas.gasUsed * 10000n) / buyGas.gasUsed;
+    console.log(
+      `  Ratio SELL gasUsed / BUY gasUsed ≈ ${(Number(ratioBps) / 10000).toFixed(4)}× (${sellGas.gasUsed} / ${buyGas.gasUsed})`
+    );
+  }
+  console.log("=".repeat(72));
 }
 
 main()

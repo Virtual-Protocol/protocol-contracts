@@ -106,16 +106,16 @@ describe("V2 vs V3 Tax Attribution Comparison", function () {
     });
   });
 
-  describe("Phase 2: AgentFactoryV7 + AgentTokenV3 via BondingV5", function () {
-    it("Should use AgentFactoryV7 with AgentTokenV3 implementation for BondingV5", async function () {
-      const { agentFactoryV7, agentTokenV3Impl } = contracts;
+  describe("Phase 2: AgentFactoryV7 + AgentTokenV4 via BondingV5", function () {
+    it("Should use AgentFactoryV7 with AgentTokenV4 implementation for BondingV5", async function () {
+      const { agentFactoryV7, agentTokenV4Impl } = contracts;
 
       expect(await agentFactoryV7.tokenImplementation()).to.equal(
-        await agentTokenV3Impl.getAddress()
+        await agentTokenV4Impl.getAddress()
       );
     });
 
-    it("Should create V3 token with AgentTokenV3 implementation", async function () {
+    it("Should create V4 token with AgentTokenV4 implementation", async function () {
       const { bondingV5, virtualToken, fFactoryV3, fRouterV3, agentTax } = contracts;
       const { user2 } = accounts;
 
@@ -321,8 +321,8 @@ describe("V2 vs V3 Tax Attribution Comparison", function () {
       await virtualToken.connect(user1).approve(await fRouterV3.getAddress(), ethers.MaxUint256);
       await bondingV5.connect(user1).buy(ethers.parseEther("1000"), v3TokenAddress, 0, (await time.latest()) + 300);
 
-      // Get token contract and approve for sell (V3 token uses AgentTokenV3)
-      const v3Token = await ethers.getContractAt("AgentTokenV3", v3TokenAddress);
+      // Get token contract and approve for sell (V4 token uses AgentTokenV4)
+      const v3Token = await ethers.getContractAt("AgentTokenV4", v3TokenAddress);
       const tokenBalance = await v3Token.balanceOf(user1.address);
       await v3Token.connect(user1).approve(await bondingV5.getAddress(), tokenBalance);
       await v3Token.connect(user1).approve(await fRouterV3.getAddress(), tokenBalance);

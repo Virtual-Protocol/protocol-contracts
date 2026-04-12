@@ -288,13 +288,6 @@ Object.assign(process.env, mockEnv);
     // 10. Set token params for AgentFactoryV6
     console.log("\n--- Setting token params for AgentFactoryV6 ---");
     const tx3 = await agentFactoryV6.connect(contractController).setTokenParams(
-      args[6], // maxSupply (initialSupply)
-      "0", // lpSupply
-      args[6], // vaultSupply (initialSupply)
-      args[6], // maxTokensPerWallet (initialSupply)
-      args[6], // maxTokensPerTxn (initialSupply)
-      0, // botProtectionDurationInSeconds
-      args[4], // vault (fee address)
       args[1], // projectBuyTaxBasisPoints (buyTax)
       args[2], // projectSellTaxBasisPoints (sellTax)
       1000, // taxSwapThresholdBasisPoints

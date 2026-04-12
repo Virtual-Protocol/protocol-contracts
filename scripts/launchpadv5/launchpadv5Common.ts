@@ -3,6 +3,11 @@
  */
 import { formatEther, parseEther } from "ethers";
 import type { Contract, Signer } from "ethers";
+import {
+  launchpadDefaultTxGasLimit,
+  launchpadGasLimitCeilingBigint,
+  preLaunchGasBufferBps,
+} from "./utils";
 const { ethers } = require("hardhat");
 
 // --- Launch modes / anti-sniper (aligned with BondingConfig) ---
@@ -182,9 +187,18 @@ export async function executePreLaunch(
     antiSniperTaxType,
     isProject60days
   );
-  const gasLimit = (estimatedGas * 150n) / 100n;
+  const cap = launchpadGasLimitCeilingBigint();
+  const bps = preLaunchGasBufferBps();
+  let gasLimit = (estimatedGas * bps) / 100n;
+  if (gasLimit > cap) {
+    console.log(
+      `⚠️  Computed gas limit ${gasLimit} exceeds cap ${cap} (Monad charges fee ∝ gas_limit, not gas_used — see utils.ts). Capping. ` +
+        "If the tx reverts with out-of-gas, set LAUNCHPAD_MONAD_GAS_LIMIT_CEILING or LAUNCHPAD_PRELAUNCH_BUFFER_BPS."
+    );
+    gasLimit = cap;
+  }
   console.log("Estimated Gas:", estimatedGas.toString());
-  console.log("Using Gas Limit:", gasLimit.toString());
+  console.log(`Buffer bps: ${bps} → Using Gas Limit:`, gasLimit.toString());
 
   const preLaunchTx = await c.preLaunch(
     tokenName,
@@ -271,7 +285,7 @@ export async function waitForPairStartTimeThenLaunch(
   }
 
   console.log("\n--- Executing launch ---");
-  const gasLimit = options?.gasLimit ?? 3_000_000n;
+  const gasLimit = options?.gasLimit ?? launchpadDefaultTxGasLimit();
   const launchTx = await (bondingV5 as any)
     .connect(launchSigner)
     .launch(tokenAddress, { gasLimit });

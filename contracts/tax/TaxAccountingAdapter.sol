@@ -54,7 +54,7 @@ contract TaxAccountingAdapter is
      */
     function swapTaxAndDeposit(
         address agentToken,
-        address pairToken,
+        address pairToken, // VirtualToken
         address taxRecipient,
         address router,
         uint256 swapAmount,
@@ -67,23 +67,22 @@ contract TaxAccountingAdapter is
             "TaxAccountingAdapter: zero address"
         );
 
-        IERC20 a = IERC20(agentToken);
-        uint256 adapterBalBefore = a.balanceOf(address(this));
-        a.safeTransferFrom(agentToken, address(this), swapAmount);
+        uint256 agentTokenBalanceBefore = IERC20(agentToken).balanceOf(address(this));
+        IERC20(agentToken).safeTransferFrom(agentToken, address(this), swapAmount);
 
         // Use the balance *increase* from this pull, not `swapAmount`: fee-on-transfer / burn on inbound
         // can make received < swapAmount; router must not pull more than actually sits here. Also ignores
         // any ERC20 already on this contract before this call (non-FOT: increase == swapAmount if prior bal was 0).
-        uint256 swapIn = a.balanceOf(address(this)) - adapterBalBefore;
+        uint256 swapIn = IERC20(agentToken).balanceOf(address(this)) - agentTokenBalanceBefore;
         require(swapIn > 0, "TaxAccountingAdapter: zero in");
 
-        a.forceApprove(router, swapIn);
+        IERC20(agentToken).forceApprove(router, swapIn);
 
         address[] memory path = new address[](2);
         path[0] = agentToken;
         path[1] = pairToken;
 
-        uint256 pairBalBefore = IERC20(pairToken).balanceOf(address(this));
+        uint256 pairTokenBalanceBefore = IERC20(pairToken).balanceOf(address(this));
 
         IUniswapV2Router02(router).swapExactTokensForTokensSupportingFeeOnTransferTokens(
             swapIn,
@@ -93,17 +92,17 @@ contract TaxAccountingAdapter is
             deadline
         );
 
-        uint256 received = IERC20(pairToken).balanceOf(address(this)) - pairBalBefore;
+        uint256 received = IERC20(pairToken).balanceOf(address(this)) - pairTokenBalanceBefore;
         if (received > 0) {
             IERC20(pairToken).forceApprove(taxRecipient, received);
             IAgentTaxForToken(taxRecipient).depositTax(agentToken, received);
             emit TaxSwapDeposited(agentToken, taxRecipient, received);
         }
 
-        a.forceApprove(router, 0);
+        IERC20(agentToken).forceApprove(router, 0);
     }
 
-    /// @notice Rescue ERC20 stuck on this adapter. `amount == type(uint256).max` withdraws full balance.
+    /// @notice Rescue ERC20 stuck on this adapter.
     function emergencyWithdrawERC20(
         address token,
         address to,
@@ -111,21 +110,20 @@ contract TaxAccountingAdapter is
     ) external onlyOwner {
         require(to != address(0), "TaxAccountingAdapter: zero to");
         IERC20 t = IERC20(token);
-        uint256 pull = amount == type(uint256).max ? t.balanceOf(address(this)) : amount;
-        require(pull > 0, "TaxAccountingAdapter: zero amount");
-        t.safeTransfer(to, pull);
+        uint256 bal = t.balanceOf(address(this));
+        require(amount <= bal, "TaxAccountingAdapter: amount exceeds balance");
+        t.safeTransfer(to, amount);
     }
 
-    /// @notice Rescue native ETH. `amount == type(uint256).max` sends full balance.
+    /// @notice Rescue native ETH stuck on this adapter.
     function emergencyWithdrawNative(
         address payable to,
         uint256 amount
     ) external onlyOwner {
         require(to != address(0), "TaxAccountingAdapter: zero to");
         uint256 bal = address(this).balance;
-        uint256 sendAmt = amount == type(uint256).max ? bal : amount;
-        require(sendAmt > 0 && sendAmt <= bal, "TaxAccountingAdapter: native amount");
-        (bool ok, ) = to.call{value: sendAmt}("");
+        require(amount <= bal, "TaxAccountingAdapter: amount exceeds balance");
+        (bool ok, ) = to.call{value: amount}("");
         require(ok, "TaxAccountingAdapter: native transfer");
     }
 }

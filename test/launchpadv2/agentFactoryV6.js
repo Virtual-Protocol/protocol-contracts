@@ -711,13 +711,6 @@ describe("AgentFactoryV6", function () {
       const { owner, user1 } = accounts;
       const { agentFactoryV6 } = contracts;
 
-      const maxSupply = "1000000000";
-      const lpSupply = "125000000";
-      const vaultSupply = "875000000";
-      const maxTokensPerWallet = "1000000000";
-      const maxTokensPerTxn = "1000000000";
-      const botProtectionDurationInSeconds = 0;
-      const vault = user1.address;
       const projectBuyTaxBasisPoints = 100;
       const projectSellTaxBasisPoints = 100;
       const taxSwapThresholdBasisPoints = 100;
@@ -726,13 +719,6 @@ describe("AgentFactoryV6", function () {
       await agentFactoryV6
         .connect(owner)
         .setTokenParams(
-          maxSupply,
-          lpSupply,
-          vaultSupply,
-          maxTokensPerWallet,
-          maxTokensPerTxn,
-          botProtectionDurationInSeconds,
-          vault,
           projectBuyTaxBasisPoints,
           projectSellTaxBasisPoints,
           taxSwapThresholdBasisPoints,

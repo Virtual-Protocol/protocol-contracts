@@ -1,5 +1,5 @@
 /**
- * V5 Suite - Step 2: Deploy AgentFactoryV7 and AgentTokenV3
+ * V5 Suite - Step 2: Deploy AgentFactoryV7 and AgentTokenV4
  *
  * Usage:
  *   ENV_FILE=.env.launchpadv5_local npx hardhat run scripts/launchpadv5/deployLaunchpadv5_2.ts --network local
@@ -11,10 +11,10 @@ import { verifyContract } from "./utils";
 const { ethers, upgrades } = require("hardhat");
 
 /**
- * V5 Suite - Step 2: Deploy AgentFactoryV7 and AgentTokenV3
+ * V5 Suite - Step 2: Deploy AgentFactoryV7 and AgentTokenV4
  *
  * Deploys:
- * - AgentTokenV3 implementation (NEW - calls depositTax() on _swapTax)
+ * - AgentTokenV4 implementation (NEW - TaxAccountingAdapter + AgentTaxV2 attribution)
  * - AgentVeTokenV2 implementation (REUSE - same as V4 suite)
  * - AgentDAO implementation (REUSE - same as V4 suite)
  * - AgentFactoryV7 (NEW - separate from AgentFactoryV6 for clean V5 suite)
@@ -24,14 +24,14 @@ const { ethers, upgrades } = require("hardhat");
  * - FFactoryV3, FRouterV3 (from deployLaunchpadv5_1.ts)
  *
  * V5 Suite Architecture:
- * - AgentFactoryV7 uses AgentTokenV3 implementation
- * - AgentTokenV3._swapTax() calls AgentTaxV2.depositTax() for on-chain attribution
+ * - AgentFactoryV7 uses AgentTokenV4 implementation
+ * - AgentTokenV4._swapTax() uses TaxAccountingAdapter then AgentTaxV2.depositTax()
  * - projectTaxRecipient = AgentTaxV2 (not the legacy AgentTax)
  */
 (async () => {
   try {
     console.log("\n" + "=".repeat(80));
-    console.log("  V5 Suite - Step 2: Deploy AgentFactoryV7 & AgentTokenV3");
+    console.log("  V5 Suite - Step 2: Deploy AgentFactoryV7 & AgentTokenV4");
     console.log("=".repeat(80));
     console.log(
       "Prerequisites: AgentNftV2, AgentTaxV2, FFactoryV3, FRouterV3 must already be deployed"
@@ -112,7 +112,8 @@ const { ethers, upgrades } = require("hardhat");
     }
 
     // Implementation addresses (optional - will deploy if not provided)
-    const agentTokenV3Impl = process.env.AGENT_TOKEN_V3_IMPLEMENTATION;
+    const agentTokenV4Impl =
+      process.env.AGENT_TOKEN_V4_IMPLEMENTATION;
     const agentVeTokenV2Impl = process.env.AGENT_VE_TOKEN_V2_IMPLEMENTATION; // Reuse
     const agentDAOImpl = process.env.AGENT_DAO_IMPLEMENTATION; // Reuse
 
@@ -142,7 +143,7 @@ const { ethers, upgrades } = require("hardhat");
         "AGENT_FACTORY_V7_MATURITY_DURATION not set in environment"
       );
     }
-    // AgentTokenV3: min tax before autoswap = totalSupply * N / 1e6. N=100 matches old AgentToken 1 bps of supply; N=10 is 10× lower.
+    // AgentTokenV4: min tax before autoswap = totalSupply * N / 1e6. N=100 matches old AgentToken 1 bps of supply; N=10 is 10× lower.
     const taxSwapThresholdBasisPoints =
       process.env.AGENT_FACTORY_V7_TAX_SWAP_THRESHOLD_BASIS_POINTS;
     if (!taxSwapThresholdBasisPoints) {
@@ -160,7 +161,7 @@ const { ethers, upgrades } = require("hardhat");
       sentientBuyTax,
       sentientSellTax,
       agentTaxV2Address,
-      agentTokenV3Impl: agentTokenV3Impl || "(will deploy)",
+      agentTokenV4Impl: agentTokenV4Impl || "(will deploy)",
       agentVeTokenV2Impl: agentVeTokenV2Impl || "(will deploy)",
       agentDAOImpl: agentDAOImpl || "(will deploy)",
       tbaRegistry,
@@ -177,30 +178,30 @@ const { ethers, upgrades } = require("hardhat");
     const reusedContracts: { [key: string]: string } = {};
 
     // ============================================
-    // 1. Deploy AgentTokenV3 implementation (NEW)
+    // 1. Deploy AgentTokenV4 implementation (NEW)
     // ============================================
-    let agentTokenV3ImplAddress: string;
-    if (!agentTokenV3Impl) {
+    let agentTokenV4ImplAddress: string;
+    if (!agentTokenV4Impl) {
       console.log(
-        "\n--- Deploying AgentTokenV3 implementation (NEW for V5 Suite) ---"
+        "\n--- Deploying AgentTokenV4 implementation (NEW for V5 Suite) ---"
       );
-      const AgentTokenV3 = await ethers.getContractFactory("AgentTokenV3");
-      const agentTokenV3 = await AgentTokenV3.deploy();
-      await agentTokenV3.waitForDeployment();
-      agentTokenV3ImplAddress = await agentTokenV3.getAddress();
-      deployedContracts.AgentTokenV3Impl = agentTokenV3ImplAddress;
+      const AgentTokenV4 = await ethers.getContractFactory("AgentTokenV4");
+      const agentTokenV4 = await AgentTokenV4.deploy();
+      await agentTokenV4.waitForDeployment();
+      agentTokenV4ImplAddress = await agentTokenV4.getAddress();
+      deployedContracts.AgentTokenV4Impl = agentTokenV4ImplAddress;
       console.log(
-        "AgentTokenV3 implementation deployed at:",
-        agentTokenV3ImplAddress
+        "AgentTokenV4 implementation deployed at:",
+        agentTokenV4ImplAddress
       );
 
-      await verifyContract(agentTokenV3ImplAddress);
+      await verifyContract(agentTokenV4ImplAddress);
     } else {
-      agentTokenV3ImplAddress = agentTokenV3Impl;
-      reusedContracts.AgentTokenV3Impl = agentTokenV3ImplAddress;
+      agentTokenV4ImplAddress = agentTokenV4Impl;
+      reusedContracts.AgentTokenV4Impl = agentTokenV4ImplAddress;
       console.log(
-        "\n--- Reusing AgentTokenV3 implementation:",
-        agentTokenV3ImplAddress,
+        "\n--- Reusing AgentTokenV4 implementation:",
+        agentTokenV4ImplAddress,
         "---"
       );
     }
@@ -276,7 +277,7 @@ const { ethers, upgrades } = require("hardhat");
     const agentFactoryV7 = await upgrades.deployProxy(
       AgentFactoryV7,
       [
-        agentTokenV3ImplAddress, // tokenImplementation_ (AgentTokenV3!)
+        agentTokenV4ImplAddress, // tokenImplementation_ (AgentTokenV4)
         agentVeTokenV2ImplAddress, // veTokenImplementation_ (reuse)
         agentDAOImplAddress, // daoImplementation_ (reuse)
         tbaRegistry, // tbaRegistry_
@@ -340,6 +341,21 @@ const { ethers, upgrades } = require("hardhat");
       sellTax: sentientSellTax,
       taxSwapThreshold: taxSwapThresholdBasisPoints,
       projectTaxRecipient: agentTaxV2Address,
+    });
+
+    const taxAccountingAdapterAddress =
+      process.env.TAX_ACCOUNTING_ADAPTER_ADDRESS;
+    if (!process.env.TAX_ACCOUNTING_ADAPTER_ADDRESS) {
+      console.warn(
+        "TAX_ACCOUNTING_ADAPTER_ADDRESS not set; adapter left zero (call setTaxAccountingAdapter before production launches)."
+      );
+    }
+    const txSetTaxAdapter = await agentFactoryV7.setTaxAccountingAdapter(
+      taxAccountingAdapterAddress
+    );
+    await txSetTaxAdapter.wait();
+    console.log("AgentFactoryV7.setTaxAccountingAdapter() called:", {
+      taxAccountingAdapter: taxAccountingAdapterAddress,
     });
 
     // Grant DEFAULT_ADMIN_ROLE to admin
@@ -482,8 +498,8 @@ const { ethers, upgrades } = require("hardhat");
 
     console.log("\n--- Environment Variables for .env file ---");
     console.log(`AGENT_FACTORY_V7_ADDRESS=${agentFactoryV7Address}`);
-    if (deployedContracts.AgentTokenV3Impl) {
-      console.log(`AGENT_TOKEN_V3_IMPLEMENTATION=${agentTokenV3ImplAddress}`);
+    if (deployedContracts.AgentTokenV4Impl) {
+      console.log(`AGENT_TOKEN_V4_IMPLEMENTATION=${agentTokenV4ImplAddress}`);
     }
     if (deployedContracts.AgentVeTokenV2Impl) {
       console.log(
@@ -495,15 +511,17 @@ const { ethers, upgrades } = require("hardhat");
     }
 
     console.log("\n--- V5 Suite Configuration ---");
-    console.log("AgentFactoryV7 uses AgentTokenV3 implementation");
-    console.log("AgentTokenV3._swapTax() calls AgentTaxV2.depositTax()");
+    console.log("AgentFactoryV7 uses AgentTokenV4 implementation");
+    console.log(
+      "AgentTokenV4._swapTax() uses TaxAccountingAdapter + AgentTaxV2.depositTax()"
+    );
     console.log(`projectTaxRecipient = ${agentTaxV2Address} (AgentTaxV2)`);
 
     console.log("\n--- Deployment Order ---");
     console.log("0. ✅ deployLaunchpadv5_0.ts (AgentNftV2, AgentTaxV2) - DONE");
     console.log("1. ✅ deployLaunchpadv5_1.ts (FFactoryV3, FRouterV3) - DONE");
     console.log(
-      "2. ✅ deployLaunchpadv5_2.ts (AgentFactoryV7, AgentTokenV3) - DONE"
+      "2. ✅ deployLaunchpadv5_2.ts (AgentFactoryV7, AgentTokenV4) - DONE"
     );
     console.log("3. ⏳ deployLaunchpadv5_3.ts (BondingConfig, BondingV5)");
     console.log("4. ⏳ deployLaunchpadv5_4.ts (Revoke deployer roles)");

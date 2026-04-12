@@ -445,7 +445,7 @@ describe("BondingV5", function () {
       expect(tx).to.not.be.undefined;
 
       const actualTokenContract = await ethers.getContractAt(
-        "AgentTokenV3",
+        "AgentTokenV4",
         tokenAddress
       );
       const user2AgentTokenBalance = await actualTokenContract.balanceOf(
@@ -517,7 +517,7 @@ describe("BondingV5", function () {
       const { bondingV5, virtualToken } = contracts;
 
       const actualTokenContract = await ethers.getContractAt(
-        "AgentTokenV3",
+        "AgentTokenV4",
         tokenAddress
       );
       const user2AgentTokenBalance = await actualTokenContract.balanceOf(
@@ -3450,7 +3450,7 @@ describe("BondingV5", function () {
 
       // Check that reserved tokens were transferred to teamTokenReservedWallet
       const actualTokenContract = await ethers.getContractAt(
-        "AgentTokenV3",
+        "AgentTokenV4",
         tokenAddress
       );
       const reservedWalletTokenBalance = await actualTokenContract.balanceOf(
@@ -3501,7 +3501,7 @@ describe("BondingV5", function () {
 
       // Check reserved tokens (54% = 4% airdrop + 50% ACF)
       const actualTokenContract = await ethers.getContractAt(
-        "AgentTokenV3",
+        "AgentTokenV4",
         tokenAddress
       );
       const reservedWalletTokenBalance = await actualTokenContract.balanceOf(

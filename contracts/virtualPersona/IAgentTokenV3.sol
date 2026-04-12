@@ -11,6 +11,4 @@ import "./IAgentTokenV2.sol";
 interface IAgentTokenV3 is IAgentTokenV2 {
     // AgentTokenV3 implements IAgentTokenV2 and adds on-chain tax attribution
     // via depositTax() calls in _swapTax(). No additional external functions needed.
-
-    event TaxAccountingAdapterUpdated(address indexed adapter);
 }

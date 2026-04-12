@@ -312,6 +312,4 @@ interface IErrors {
     error VRFCoordinatorCannotBeAddressZero(); //             The VRF coordinator cannot be the zero address (address(0)).
 
     error TransferToBlacklistedAddress(); //                  Cannot transfer to a blacklisted address.
-
-    error TaxAccountingAdapterNotSet(); //                    Autoswap uses {TaxAccountingAdapter}; set before tax swaps can run.
 }

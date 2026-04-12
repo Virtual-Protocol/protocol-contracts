@@ -9,16 +9,26 @@ import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "../pool/IUniswapV2Router02.sol";
 import "../pool/IUniswapV2Factory.sol";
 import "../pool/IUniswapV2Pair.sol";
-import "./IAgentTokenV3.sol";
+import "./IAgentTokenV2.sol";
+import "./IAgentTokenV4.sol";
 import "./IAgentFactory.sol";
 
-interface IAgentTaxForToken {
-    function depositTax(address tokenAddress, uint256 amount) external;
+/// @dev Optional helper: swap with `to = adapter` to satisfy Uniswap V2 Pair `INVALID_TO`, then `depositTax`.
+interface ITaxAccountingAdapter {
+    function swapTaxAndDeposit(
+        address agentToken,
+        address pairToken,
+        address taxRecipient,
+        address router,
+        uint256 swapAmount,
+        uint256 deadline
+    ) external;
 }
 
-contract AgentTokenV3 is
+contract AgentTokenV4 is
     ContextUpgradeable,
-    IAgentTokenV3,
+    IAgentTokenV2,
+    IAgentTokenV4,
     Ownable2StepUpgradeable
 {
     using EnumerableSet for EnumerableSet.AddressSet;
@@ -78,6 +88,9 @@ contract AgentTokenV3 is
 
     mapping(address => bool) public blacklists;
 
+    /// @notice Required for autoswap: pulls tax, swaps with `to = adapter`, then `depositTax` on AgentTax.
+    address public taxAccountingAdapter;
+
     /**
      * @dev {onlyOwnerOrFactory}
      *
@@ -94,12 +107,27 @@ contract AgentTokenV3 is
         _disableInitializers();
     }
 
+    /**
+     * @dev Required by `IAgentTokenV2` (same selector as V2/V3 clones). AgentTokenV4 clones are always initialized
+     *      via the 5-argument overload below; this entrypoint exists only for interface compliance and must not be used.
+     */
+    function initialize(
+        address[3] memory,
+        bytes memory,
+        bytes memory,
+        bytes memory
+    ) external pure override(IAgentTokenV2) {
+        revert();
+    }
+
+    /// @inheritdoc IAgentTokenV4
     function initialize(
         address[3] memory integrationAddresses_,
         bytes memory baseParams_,
         bytes memory supplyParams_,
-        bytes memory taxParams_
-    ) external initializer {
+        bytes memory taxParams_,
+        address taxAccountingAdapter_
+    ) external override(IAgentTokenV4) initializer {
         _decodeBaseParams(integrationAddresses_[0], baseParams_);
         _uniswapRouter = IUniswapV2Router02(integrationAddresses_[1]);
         pairToken = integrationAddresses_[2];
@@ -127,6 +155,7 @@ contract AgentTokenV3 is
             taxParams.taxSwapThresholdBasisPoints
         );
         projectTaxRecipient = taxParams.projectTaxRecipient;
+        taxAccountingAdapter = taxAccountingAdapter_;
 
         _mintBalances(lpSupply, vaultSupply);
 
@@ -463,6 +492,19 @@ contract AgentTokenV3 is
     ) external onlyOwnerOrFactory {
         projectTaxRecipient = projectTaxRecipient_;
         emit ProjectTaxRecipientUpdated(projectTaxRecipient_);
+    }
+
+    /**
+     * @notice Sets the adapter used by `_swapTax` (Uniswap `to` = adapter, not the agent token — avoids Pair INVALID_TO).
+     */
+    function setTaxAccountingAdapter(
+        address adapter_
+    ) external onlyOwnerOrFactory {
+        if (adapter_ == address(0)) {
+            revert CannotSetToZeroAddress();
+        }
+        taxAccountingAdapter = adapter_;
+        emit TaxAccountingAdapterUpdated(adapter_);
     }
 
     /**
@@ -919,57 +961,56 @@ contract AgentTokenV3 is
      * @param contractBalance_ The current accumulated total tax balance
      */
     function _swapTax(uint256 swapBalance_, uint256 contractBalance_) internal {
-        address[] memory path = new address[](2);
-        path[0] = address(this);
-        path[1] = pairToken;
+        // Never revert here: _swapTax runs inside _transfer; an unset adapter must not freeze transfers.
+        // Identifier 6 = adapter missing; identifier 5 = adapter/router/depositTax failed (see try/catch below).
+        if (taxAccountingAdapter == address(0)) {
+            return;
+        }
 
-        uint256 balanceBefore = IERC20(pairToken).balanceOf(address(this));
-
-        // Wrap external calls in try / catch to handle errors
+        IERC20(address(this)).forceApprove(taxAccountingAdapter, swapBalance_);
         try
-            _uniswapRouter
-                .swapExactTokensForTokensSupportingFeeOnTransferTokens(
-                    swapBalance_,
-                    0,
-                    path,
-                    address(this), // Receive to self first for on-chain attribution
-                    block.timestamp + 600
-                )
+            ITaxAccountingAdapter(taxAccountingAdapter).swapTaxAndDeposit(
+                address(this),
+                pairToken,
+                projectTaxRecipient,
+                address(_uniswapRouter),
+                swapBalance_,
+                block.timestamp + 600
+            )
         {
-            uint256 received = IERC20(pairToken).balanceOf(address(this)) - balanceBefore;
-
-            // Deposit tax with on-chain attribution (must succeed)
-            if (received > 0) {
-                IERC20(pairToken).forceApprove(projectTaxRecipient, received);
-                IAgentTaxForToken(projectTaxRecipient).depositTax(address(this), received);
-            }
-
-            // We will not have swapped all tax tokens IF the amount was greater than the max auto swap.
-            // We therefore cannot just set the pending swap counters to 0. Instead, in this scenario,
-            // we must reduce them in proportion to the swap amount vs the remaining balance + swap
-            // amount.
-            //
-            // For example:
-            //  * swap Balance is 250
-            //  * contract balance is 385.
-            //  * projectTaxPendingSwap is 300
-            //
-            // The new total for the projectTaxPendingSwap is:
-            //   = 300 - ((300 * 250) / 385)
-            //   = 300 - 194
-            //   = 106
-
-            if (swapBalance_ < contractBalance_) {
-                projectTaxPendingSwap -= uint128(
-                    (projectTaxPendingSwap * swapBalance_) / contractBalance_
-                );
-            } else {
-                projectTaxPendingSwap = 0;
-            }
+            _applyProjectTaxPendingAfterSwap(swapBalance_, contractBalance_);
         } catch {
-            // Dont allow a failed external call (in this case to uniswap) to stop a transfer.
-            // Emit that this has occured and continue.
+            // Dont allow a failed external call (adapter / uniswap / depositTax) to stop a transfer.
             emit ExternalCallError(5);
+        }
+        IERC20(address(this)).forceApprove(taxAccountingAdapter, 0);
+    }
+
+    function _applyProjectTaxPendingAfterSwap(
+        uint256 swapBalance_,
+        uint256 contractBalance_
+    ) private {
+        // We will not have swapped all tax tokens IF the amount was greater than the max auto swap.
+        // We therefore cannot just set the pending swap counters to 0. Instead, in this scenario,
+        // we must reduce them in proportion to the swap amount vs the remaining balance + swap
+        // amount.
+        //
+        // For example:
+        //  * swap Balance is 250
+        //  * contract balance is 385.
+        //  * projectTaxPendingSwap is 300
+        //
+        // The new total for the projectTaxPendingSwap is:
+        //   = 300 - ((300 * 250) / 385)
+        //   = 300 - 194
+        //   = 106
+
+        if (swapBalance_ < contractBalance_) {
+            projectTaxPendingSwap -= uint128(
+                (projectTaxPendingSwap * swapBalance_) / contractBalance_
+            );
+        } else {
+            projectTaxPendingSwap = 0;
         }
     }
 

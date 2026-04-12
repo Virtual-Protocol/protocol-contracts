@@ -108,9 +108,9 @@ async function setupV2V3TaxComparisonTest(options = {}) {
   const agentTokenV2Impl = await AgentTokenV2Impl.deploy();
   await agentTokenV2Impl.waitForDeployment();
 
-  const AgentTokenV3Impl = await ethers.getContractFactory("AgentTokenV3");
-  const agentTokenV3Impl = await AgentTokenV3Impl.deploy();
-  await agentTokenV3Impl.waitForDeployment();
+  const AgentTokenV4Impl = await ethers.getContractFactory("AgentTokenV4");
+  const agentTokenV4Impl = await AgentTokenV4Impl.deploy();
+  await agentTokenV4Impl.waitForDeployment();
 
   const AgentVeTokenV2 = await ethers.getContractFactory("AgentVeTokenV2");
   const agentVeTokenV2 = await AgentVeTokenV2.deploy();
@@ -211,7 +211,7 @@ async function setupV2V3TaxComparisonTest(options = {}) {
   const agentFactoryV7 = await upgrades.deployProxy(
     AgentFactoryV7,
     [
-      await agentTokenV3Impl.getAddress(),
+      await agentTokenV4Impl.getAddress(),
       await agentVeTokenV2.getAddress(),
       await mockAgentDAO.getAddress(),
       await mockERC6551Registry.getAddress(),
@@ -230,7 +230,26 @@ async function setupV2V3TaxComparisonTest(options = {}) {
     owner.address,
     owner.address
   );
-  await agentFactoryV7.setTokenParams(BUY_TAX, SELL_TAX, 1000, await agentTax.getAddress());
+
+  const TaxAccountingAdapter = await ethers.getContractFactory(
+    "TaxAccountingAdapter"
+  );
+  const taxAccountingAdapter = await upgrades.deployProxy(
+    TaxAccountingAdapter,
+    [owner.address],
+    { initializer: "initialize" }
+  );
+  await taxAccountingAdapter.waitForDeployment();
+
+  await agentFactoryV7.setTokenParams(
+    BUY_TAX,
+    SELL_TAX,
+    1000,
+    await agentTax.getAddress()
+  );
+  await agentFactoryV7.setTaxAccountingAdapter(
+    await taxAccountingAdapter.getAddress()
+  );
 
   await agentNftV2.grantRole(await agentNftV2.MINTER_ROLE(), await agentFactoryV7.getAddress());
 
@@ -370,12 +389,13 @@ async function setupV2V3TaxComparisonTest(options = {}) {
     agentTax,
     agentFactoryV6,
     agentFactoryV7,
+    taxAccountingAdapter,
     agentNftV2,
     bondingConfig,
     ...(includeBondingV4 ? { bondingV4 } : {}),
     bondingV5,
     agentTokenV2Impl,
-    agentTokenV3Impl,
+    agentTokenV4Impl,
     mockUniswapRouter,
   };
 

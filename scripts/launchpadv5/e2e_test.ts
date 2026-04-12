@@ -3,7 +3,8 @@
  * 
  * Usage:
  *   ENV_FILE=.env.launchpadv5_local npx hardhat run scripts/launchpadv5/e2e_test.ts --network local
- *   ENV_FILE=.env.launchpadv5_dev npx hardhat run scripts/launchpadv5/e2e_test.ts --network base_sepolia
+ *   ENV_FILE=.env.launchpadv5_dev_abstract_testnet npx hardhat run scripts/launchpadv5/e2e_test.ts --network abstract_testnet
+ *   ENV_FILE=.env.launchpadv5_dev_monad_testnet npx hardhat run scripts/launchpadv5/e2e_test.ts --network monad_testnet
  *   ENV_FILE=.env.launchpadv5_prod npx hardhat run scripts/launchpadv5/e2e_test.ts --network base
  */
 import { parseEther, formatEther } from "ethers";
@@ -20,6 +21,7 @@ import {
   ANTI_SNIPER_98M,
   launchModeLabel,
 } from "./launchpadv5Common";
+import { launchpadDefaultTxGasLimit } from "./utils";
 const { ethers } = require("hardhat");
 
 interface TestConfig {
@@ -453,7 +455,9 @@ async function main() {
   console.log("Agent Token Balance Before:", formatEther(agentTokenBalanceBefore), "tokens");
 
   console.log("\n--- Executing buy (during anti-sniper period) ---");
-  const buyTx = await bondingV5.buy(buyAmount, tokenAddress, 0, deadline, { gasLimit: 500000 });
+  const buyTx = await bondingV5.buy(buyAmount, tokenAddress, 0, deadline, {
+    gasLimit: launchpadDefaultTxGasLimit(),
+  });
   const buyReceipt = await buyTx.wait();
   console.log("✅ buy() transaction successful!");
   console.log("Gas Used:", buyReceipt.gasUsed.toString());
@@ -546,7 +550,9 @@ async function main() {
   const deadline2 = Math.floor(Date.now() / 1000) + 300;
 
   console.log("\n--- Executing buy (after anti-sniper period) ---");
-  const buyTx2 = await bondingV5.buy(buyAmount2, tokenAddress, 0, deadline2, { gasLimit: 500000 });
+  const buyTx2 = await bondingV5.buy(buyAmount2, tokenAddress, 0, deadline2, {
+    gasLimit: launchpadDefaultTxGasLimit(),
+  });
   const buyReceipt2 = await buyTx2.wait();
   console.log("✅ buy() transaction successful!");
   console.log("Gas Used:", buyReceipt2.gasUsed.toString());
@@ -604,7 +610,9 @@ async function main() {
 
   console.log("\n--- Executing sell ---");
   const sellDeadline = Math.floor(Date.now() / 1000) + 300;
-  const sellTx = await bondingV5.sell(sellAmount, tokenAddress, 0, sellDeadline, { gasLimit: 500000 });
+  const sellTx = await bondingV5.sell(sellAmount, tokenAddress, 0, sellDeadline, {
+    gasLimit: launchpadDefaultTxGasLimit(),
+  });
   const sellReceipt = await sellTx.wait();
   console.log("✅ sell() transaction successful!");
   console.log("Gas Used:", sellReceipt.gasUsed.toString());

@@ -21,3 +21,5 @@ deployments
 fireblocks_secret.key
 .cursor/
 env*
+
+lib/

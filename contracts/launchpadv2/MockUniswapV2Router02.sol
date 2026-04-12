@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
-import "../pool/IUniswapV2Router02.sol";
+import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "../pool/IUniswapV2Factory.sol";
 
 contract MockUniswapV2Router02 {
@@ -286,12 +286,29 @@ contract MockUniswapV2Router02 {
 
     function swapExactTokensForTokensSupportingFeeOnTransferTokens(
         uint amountIn,
-        uint amountOutMin,
+        uint,
         address[] calldata path,
         address to,
-        uint deadline
+        uint
     ) external {
-        // Mock implementation - do nothing
+        require(path.length == 2, "MockUniswapV2Router02: path");
+        IERC20 agent = IERC20(path[0]);
+        IERC20 quoteOut = IERC20(path[1]);
+        address pair = IUniswapV2Factory(_factory).getPair(path[0], path[1]);
+        // Match UniswapV2Router02 (sell → pair). No pair (e.g. bare MockERC20 in unit tests): use this contract.
+        address dest = pair != address(0) ? pair : address(this);
+
+        uint256 beforeBal = agent.balanceOf(dest);
+        require(
+            agent.transferFrom(msg.sender, dest, amountIn),
+            "MockUniswapV2Router02: pull agent"
+        );
+        uint256 receivedAgent = agent.balanceOf(dest) - beforeBal;
+        require(receivedAgent > 0, "MockUniswapV2Router02: zero in");
+        require(
+            quoteOut.transfer(to, receivedAgent),
+            "MockUniswapV2Router02: push quote"
+        );
     }
 
     function swapExactETHForTokensSupportingFeeOnTransferTokens(

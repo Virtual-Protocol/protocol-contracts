@@ -22,6 +22,8 @@ const {
   MAX_TX,
 } = require("../launchpadv2/const.js");
 
+const { setupV2V3TaxComparisonTest } = require("./bondingV5Tax.fixture.js");
+
 // BondingV4 launch mode constants
 const LAUNCH_MODE_NORMAL_V4 = 0;
 
@@ -44,339 +46,6 @@ const ACF_FEE = ethers.parseEther("10");
 // Bonding curve params
 const FAKE_INITIAL_VIRTUAL_LIQ = ethers.parseEther("6300");
 const TARGET_REAL_VIRTUAL = ethers.parseEther("42000");
-
-// BondingV4 specific params
-const BONDING_V4_FEE = 10; // 1% fee (fee_ * 1 ether / 1000)
-
-/**
- * Setup function for V2 vs V3 Tax Attribution comparison tests
- * 
- * Router Architecture (important for understanding):
- * - BondingV4 stores its own FRouterV2 reference at initialization
- * - BondingV5 stores its own FRouterV3 reference at initialization
- * - Each FPairV2 stores its router at creation time
- * - Changing FFactoryV2.router only affects NEW pairs, not existing ones
- * - Therefore, V2 and V3 tokens can coexist without router switching
- * 
- * Flow:
- * 1. Deploy all contracts with AgentFactoryV6 using AgentTokenV2 implementation
- * 2. Deploy BondingV4 (uses FRouterV2) and BondingV5 (uses FRouterV3)
- * 3. Use BondingV4 to create a V2 token (pair gets FRouterV2)
- * 4. Update AgentFactoryV6 to use AgentTokenV3 implementation
- * 5. Use BondingV5 to create a V3 token (pair gets FRouterV3)
- */
-async function setupV2V3TaxComparisonTest() {
-  const setup = {};
-
-  console.log("\n=== V2 vs V3 Tax Comparison Test Setup ===");
-  const [owner, admin, beOpsWallet, user1, user2] = await ethers.getSigners();
-
-  // Deploy Virtual Token
-    const VirtualToken = await ethers.getContractFactory("MockERC20");
-    const virtualToken = await VirtualToken.deploy(
-      "Virtual Token",
-      "VT",
-      owner.address,
-      ethers.parseEther("10000000000")
-    );
-    await virtualToken.waitForDeployment();
-
-  // Deploy FFactoryV2 (for BondingV4/V2 tokens)
-    const FFactoryV2 = await ethers.getContractFactory("FFactoryV2");
-    const fFactoryV2 = await upgrades.deployProxy(
-      FFactoryV2,
-      [
-        FFactoryV2_TAX_VAULT,
-        BUY_TAX,
-        SELL_TAX,
-        ANTI_SNIPER_BUY_TAX_START_VALUE,
-        FFactoryV2_ANTI_SNIPER_TAX_VAULT,
-      ],
-      { initializer: "initialize" }
-    );
-    await fFactoryV2.waitForDeployment();
-
-  // Deploy FFactoryV3 (for BondingV5/V3 tokens - separate from FFactoryV2)
-  // This ensures frontend can determine the correct router based on factory
-  const FFactoryV3 = await ethers.getContractFactory("FFactoryV3");
-  const fFactoryV3 = await upgrades.deployProxy(
-    FFactoryV3,
-    [
-      FFactoryV2_TAX_VAULT, // Same taxVault (AgentTax) for V3 tokens
-      BUY_TAX,
-      SELL_TAX,
-      ANTI_SNIPER_BUY_TAX_START_VALUE,
-      FFactoryV2_ANTI_SNIPER_TAX_VAULT,
-    ],
-    { initializer: "initialize" }
-  );
-  await fFactoryV3.waitForDeployment();
-
-  // Deploy FRouterV2 (for BondingV4/V2 tokens)
-    const FRouterV2 = await ethers.getContractFactory("FRouterV2");
-    const fRouterV2 = await upgrades.deployProxy(
-      FRouterV2,
-      [await fFactoryV2.getAddress(), await virtualToken.getAddress()],
-      { initializer: "initialize" }
-    );
-    await fRouterV2.waitForDeployment();
-
-  // Deploy FRouterV3 (for BondingV5/V3 tokens - uses FFactoryV3)
-  const FRouterV3 = await ethers.getContractFactory("FRouterV3");
-  const fRouterV3 = await upgrades.deployProxy(
-    FRouterV3,
-    [await fFactoryV3.getAddress(), await virtualToken.getAddress()],
-    { initializer: "initialize" }
-  );
-  await fRouterV3.waitForDeployment();
-
-  // Configure FFactoryV2 with FRouterV2
-  await fFactoryV2.grantRole(await fFactoryV2.ADMIN_ROLE(), owner.address);
-    await fFactoryV2.setRouter(await fRouterV2.getAddress());
-
-  // Configure FFactoryV3 with FRouterV3
-  await fFactoryV3.grantRole(await fFactoryV3.ADMIN_ROLE(), owner.address);
-  await fFactoryV3.setRouter(await fRouterV3.getAddress());
-
-  // Deploy AgentTokenV2 implementation (initial)
-  const AgentTokenV2Impl = await ethers.getContractFactory("AgentTokenV2");
-  const agentTokenV2Impl = await AgentTokenV2Impl.deploy();
-  await agentTokenV2Impl.waitForDeployment();
-
-  // Deploy AgentTokenV3 implementation (for later upgrade)
-  const AgentTokenV3Impl = await ethers.getContractFactory("AgentTokenV3");
-  const agentTokenV3Impl = await AgentTokenV3Impl.deploy();
-  await agentTokenV3Impl.waitForDeployment();
-
-  // Deploy AgentVeTokenV2 implementation
-    const AgentVeTokenV2 = await ethers.getContractFactory("AgentVeTokenV2");
-    const agentVeTokenV2 = await AgentVeTokenV2.deploy();
-    await agentVeTokenV2.waitForDeployment();
-
-  // Deploy MockAgentDAO implementation
-    const MockAgentDAO = await ethers.getContractFactory("MockAgentDAO");
-    const mockAgentDAO = await MockAgentDAO.deploy();
-    await mockAgentDAO.waitForDeployment();
-
-  // Deploy MockERC6551Registry
-  const MockERC6551Registry = await ethers.getContractFactory("MockERC6551Registry");
-    const mockERC6551Registry = await MockERC6551Registry.deploy();
-    await mockERC6551Registry.waitForDeployment();
-
-  // Deploy AgentNftV2
-    const AgentNftV2 = await ethers.getContractFactory("AgentNftV2");
-    const agentNftV2 = await upgrades.deployProxy(AgentNftV2, [owner.address], {
-      initializer: "initialize",
-      unsafeAllow: ["internal-function-storage"],
-    });
-    await agentNftV2.waitForDeployment();
-
-  // Deploy MockUniswapV2Factory and Router
-  const MockUniswapV2Factory = await ethers.getContractFactory("MockUniswapV2Factory");
-    const mockUniswapFactory = await MockUniswapV2Factory.deploy();
-    await mockUniswapFactory.waitForDeployment();
-
-  const MockUniswapV2Router02 = await ethers.getContractFactory("MockUniswapV2Router02");
-    const mockUniswapRouter = await MockUniswapV2Router02.deploy(
-      await mockUniswapFactory.getAddress(),
-      await virtualToken.getAddress()
-    );
-    await mockUniswapRouter.waitForDeployment();
-
-  // Deploy AgentFactoryV6 with AgentTokenV2 implementation initially
-    const AgentFactoryV6 = await ethers.getContractFactory("AgentFactoryV6");
-    const agentFactoryV6 = await upgrades.deployProxy(
-      AgentFactoryV6,
-      [
-      await agentTokenV2Impl.getAddress(), // Start with V2 implementation
-        await agentVeTokenV2.getAddress(),
-        await mockAgentDAO.getAddress(),
-        await mockERC6551Registry.getAddress(),
-        await virtualToken.getAddress(),
-        await agentNftV2.getAddress(),
-      owner.address,
-      1,
-      ],
-      { initializer: "initialize" }
-    );
-    await agentFactoryV6.waitForDeployment();
-
-  // Configure AgentFactoryV6
-    await agentFactoryV6.setParams(
-    10 * 365 * 24 * 60 * 60,
-      await mockUniswapRouter.getAddress(),
-    owner.address,
-    owner.address
-    );
-    await agentFactoryV6.setTokenParams(BUY_TAX, SELL_TAX, 1000, owner.address);
-
-  // Configure AgentNftV2 roles
-  await agentNftV2.grantRole(await agentNftV2.MINTER_ROLE(), await agentFactoryV6.getAddress());
-
-  // Deploy Asset Token (USDC) for AgentTaxV2
-  const AssetToken = await ethers.getContractFactory("MockERC20");
-  const assetToken = await AssetToken.deploy(
-    "Mock USDC",
-    "USDC",
-    owner.address,
-    ethers.parseEther("10000000000")
-  );
-  await assetToken.waitForDeployment();
-
-  // Deploy AgentTaxV2 (simplified V3-only contract)
-  // This replaces AgentTax for V3 tokens - much cleaner, no legacy V2 code
-  const AgentTaxV2 = await ethers.getContractFactory("AgentTaxV2");
-  const agentTax = await upgrades.deployProxy(
-    AgentTaxV2,
-    [
-      owner.address,                            // defaultAdmin
-      await assetToken.getAddress(),            // assetToken (USDC)
-      await virtualToken.getAddress(),          // taxToken (VIRTUAL)
-      await mockUniswapRouter.getAddress(),     // router
-      owner.address,                            // treasury
-      ethers.parseEther("100"),                 // minSwapThreshold
-      ethers.parseEther("10000"),               // maxSwapThreshold
-      3000,                                     // feeRate (30%)
-    ],
-    { initializer: "initialize" }
-  );
-  await agentTax.waitForDeployment();
-
-  // Configure FFactoryV2 to use AgentTaxV2 as taxVault
-  // Note: In production, FFactoryV2 would use old AgentTax for V2 tokens
-  // Here we use AgentTaxV2 for simplicity since we're testing V3 flow
-  await fFactoryV2.setTaxParams(
-    await agentTax.getAddress(),
-    BUY_TAX,
-    SELL_TAX,
-    ANTI_SNIPER_BUY_TAX_START_VALUE,
-    FFactoryV2_ANTI_SNIPER_TAX_VAULT
-  );
-
-  // Configure FFactoryV3 to use AgentTaxV2 as taxVault
-  await fFactoryV3.setTaxParams(
-    await agentTax.getAddress(),
-    BUY_TAX,
-    SELL_TAX,
-    ANTI_SNIPER_BUY_TAX_START_VALUE,
-    FFactoryV2_ANTI_SNIPER_TAX_VAULT
-  );
-
-  // Deploy BondingConfig (shared by BondingV4 and BondingV5)
-    const BondingConfig = await ethers.getContractFactory("BondingConfig");
-    const bondingConfig = await upgrades.deployProxy(
-      BondingConfig,
-      [
-        INITIAL_SUPPLY,
-      owner.address,
-      beOpsWallet.address,
-      { maxAirdropBips: MAX_AIRDROP_BIPS, maxTotalReservedBips: MAX_TOTAL_RESERVED_BIPS, acfReservedBips: ACF_RESERVED_BIPS },
-      { startTimeDelay: START_TIME_DELAY, normalLaunchFee: NORMAL_LAUNCH_FEE, acfFee: ACF_FEE },
-      { tbaSalt: TBA_SALT, tbaImplementation: TBA_IMPLEMENTATION, daoVotingPeriod: DAO_VOTING_PERIOD, daoThreshold: DAO_THRESHOLD },
-      { fakeInitialVirtualLiq: FAKE_INITIAL_VIRTUAL_LIQ, targetRealVirtual: TARGET_REAL_VIRTUAL },
-      ],
-      { initializer: "initialize" }
-    );
-    await bondingConfig.waitForDeployment();
-
-  // Deploy BondingV4 (for V2 tokens)
-  // BondingV4.initialize(factory_, router_, feeTo_, fee_, initialSupply_, assetRate_, maxTx_, agentFactory_, gradThreshold_, startTimeDelay_)
-  console.log("\n--- Deploying BondingV4 ---");
-  const BondingV4 = await ethers.getContractFactory("BondingV4");
-  const bondingV4 = await upgrades.deployProxy(
-    BondingV4,
-    [
-      await fFactoryV2.getAddress(),    // factory_
-      await fRouterV2.getAddress(),     // router_
-      beOpsWallet.address,              // feeTo_
-      BONDING_V4_FEE,                   // fee_
-      INITIAL_SUPPLY,                   // initialSupply_
-      ASSET_RATE,                       // assetRate_
-      MAX_TX,                           // maxTx_
-      await agentFactoryV6.getAddress(), // agentFactory_
-      GRAD_THRESHOLD,                   // gradThreshold_
-      START_TIME_DELAY,                 // startTimeDelay_
-    ],
-    { initializer: "initialize" }
-  );
-  await bondingV4.waitForDeployment();
-
-  // Deploy BondingV5 (for V3 tokens) - uses FFactoryV3 and FRouterV3
-    console.log("\n--- Deploying BondingV5 ---");
-    const BondingV5 = await ethers.getContractFactory("BondingV5");
-    const bondingV5 = await upgrades.deployProxy(
-      BondingV5,
-      [
-      await fFactoryV3.getAddress(),  // FFactoryV3 for V3 tokens
-      await fRouterV3.getAddress(),
-        await agentFactoryV6.getAddress(),
-        await bondingConfig.getAddress(),
-      ],
-      { initializer: "initialize" }
-    );
-    await bondingV5.waitForDeployment();
-
-  // Set BondingV4 params (required for preLaunch)
-  await bondingV4.setDeployParams({
-    tbaSalt: TBA_SALT,
-    tbaImplementation: TBA_IMPLEMENTATION,
-    daoVotingPeriod: DAO_VOTING_PERIOD,
-    daoThreshold: DAO_THRESHOLD,
-  });
-  await bondingV4.setLaunchParams({
-    startTimeDelay: START_TIME_DELAY,
-    teamTokenReservedSupply: 550000000, // 550M tokens
-    teamTokenReservedWallet: beOpsWallet.address,
-  });
-
-  // Grant roles for BondingV4
-  await fFactoryV2.grantRole(await fFactoryV2.CREATOR_ROLE(), await bondingV4.getAddress());
-    await fRouterV2.grantRole(await fRouterV2.ADMIN_ROLE(), owner.address);
-  await fRouterV2.setBondingV4(await bondingV4.getAddress());
-  await fRouterV2.grantRole(await fRouterV2.EXECUTOR_ROLE(), await bondingV4.getAddress());
-  await agentFactoryV6.grantRole(await agentFactoryV6.BONDING_ROLE(), await bondingV4.getAddress());
-
-  // Grant roles for BondingV5 (uses FFactoryV3)
-  await fFactoryV3.grantRole(await fFactoryV3.CREATOR_ROLE(), await bondingV5.getAddress());
-  await fRouterV3.grantRole(await fRouterV3.ADMIN_ROLE(), owner.address);
-  await fRouterV3.setBondingV5(await bondingV5.getAddress(), await bondingConfig.getAddress());
-  await fRouterV3.grantRole(await fRouterV3.EXECUTOR_ROLE(), await bondingV5.getAddress());
-  await agentFactoryV6.grantRole(await agentFactoryV6.BONDING_ROLE(), await bondingV5.getAddress());
-
-  // Grant REGISTER_ROLE to BondingV5 in AgentTaxV2 (for registerToken)
-  const REGISTER_ROLE = await agentTax.REGISTER_ROLE();
-  await agentTax.grantRole(REGISTER_ROLE, await bondingV5.getAddress());
-  
-  // Set BondingV5 in AgentTaxV2 (required for special launch agent updates)
-  await agentTax.setBondingV5(await bondingV5.getAddress());
-
-  // Mint Virtual Tokens to test addresses
-    const mintAmount = ethers.parseEther("1000000000");
-  for (const address of [owner.address, admin.address, beOpsWallet.address, user1.address, user2.address]) {
-      await virtualToken.mint(address, mintAmount);
-    }
-
-    setup.contracts = {
-      virtualToken,
-      fFactoryV2,
-    fFactoryV3,
-      fRouterV2,
-    fRouterV3,
-    agentTax,
-      agentFactoryV6,
-    agentNftV2,
-      bondingConfig,
-    bondingV4,
-      bondingV5,
-    agentTokenV2Impl,
-    agentTokenV3Impl,
-    };
-
-    setup.accounts = { owner, admin, beOpsWallet, user1, user2 };
-
-  console.log("\n=== Setup Completed ===");
-    return setup;
-}
 
 describe("V2 vs V3 Tax Attribution Comparison", function () {
   let setup;
@@ -437,27 +106,16 @@ describe("V2 vs V3 Tax Attribution Comparison", function () {
     });
   });
 
-  describe("Phase 2: Upgrade to V3 and Create V3 Token via BondingV5", function () {
-    it("Should upgrade AgentFactoryV6 to use AgentTokenV3 implementation", async function () {
-      const { agentFactoryV6, agentTokenV3Impl } = contracts;
-      const { owner } = accounts;
+  describe("Phase 2: AgentFactoryV7 + AgentTokenV4 via BondingV5", function () {
+    it("Should use AgentFactoryV7 with AgentTokenV4 implementation for BondingV5", async function () {
+      const { agentFactoryV7, agentTokenV4Impl } = contracts;
 
-      // Get current implementations
-      const currentVeToken = await agentFactoryV6.veTokenImplementation();
-      const currentDao = await agentFactoryV6.daoImplementation();
-
-      // Update token implementation to V3 (keep veToken and dao unchanged)
-      await agentFactoryV6.connect(owner).setImplementations(
-        await agentTokenV3Impl.getAddress(),
-        currentVeToken,
-        currentDao
+      expect(await agentFactoryV7.tokenImplementation()).to.equal(
+        await agentTokenV4Impl.getAddress()
       );
-
-      const newImpl = await agentFactoryV6.tokenImplementation();
-      expect(newImpl).to.equal(await agentTokenV3Impl.getAddress());
     });
 
-    it("Should create V3 token with AgentTokenV3 implementation", async function () {
+    it("Should create V4 token with AgentTokenV4 implementation", async function () {
       const { bondingV5, virtualToken, fFactoryV3, fRouterV3, agentTax } = contracts;
       const { user2 } = accounts;
 
@@ -663,8 +321,8 @@ describe("V2 vs V3 Tax Attribution Comparison", function () {
       await virtualToken.connect(user1).approve(await fRouterV3.getAddress(), ethers.MaxUint256);
       await bondingV5.connect(user1).buy(ethers.parseEther("1000"), v3TokenAddress, 0, (await time.latest()) + 300);
 
-      // Get token contract and approve for sell (V3 token uses AgentTokenV3)
-      const v3Token = await ethers.getContractAt("AgentTokenV3", v3TokenAddress);
+      // Get token contract and approve for sell (V4 token uses AgentTokenV4)
+      const v3Token = await ethers.getContractAt("AgentTokenV4", v3TokenAddress);
       const tokenBalance = await v3Token.balanceOf(user1.address);
       await v3Token.connect(user1).approve(await bondingV5.getAddress(), tokenBalance);
       await v3Token.connect(user1).approve(await fRouterV3.getAddress(), tokenBalance);

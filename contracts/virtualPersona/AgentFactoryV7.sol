@@ -11,6 +11,7 @@ import "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
 
 import "./IAgentFactoryV7.sol";
 import "./IAgentTokenV3.sol";
+import "./IAgentTokenV4.sol";
 import "./IAgentVeTokenV2.sol";
 import "./IAgentDAO.sol";
 import "./IAgentNft.sol";
@@ -21,7 +22,7 @@ import "../libs/IERC6551Registry.sol";
  * @notice Factory contract for creating V3 agent tokens used with BondingV5
  * @dev This is a separate factory from AgentFactoryV6 to ensure clean separation of V4 and V5 ecosystems:
  *      - AgentFactoryV6 + AgentTokenV2 + BondingV4 + FRouterV2 → AgentTax (tax-listener)
- *      - AgentFactoryV7 + AgentTokenV3 + BondingV5 + FRouterV3 → AgentTaxV2 (on-chain attribution)
+ *      - AgentFactoryV7 + AgentTokenV4 + BondingV5 + FRouterV3 → AgentTaxV2 (on-chain attribution)
  *
  *      The key difference is that AgentFactoryV7's `projectTaxRecipient` in _tokenTaxParams
  *      should be set to AgentTaxV2 address, enabling on-chain tax attribution for graduated tokens.
@@ -136,6 +137,9 @@ contract AgentFactoryV7 is
     ///////////////////////////////////////////////////////////////
 
     mapping(address => bool) private _existingAgents;
+
+    /// @dev Injected into each new AgentTokenV4 via `initialize(..., taxAccountingAdapter)`.
+    address public taxAccountingAdapter;
 
     error AgentAlreadyExists();
 
@@ -341,11 +345,12 @@ contract AgentFactoryV7 is
             revert AgentAlreadyExists();
         }
         _existingAgents[instance] = true;
-        IAgentTokenV3(instance).initialize(
+        IAgentTokenV4(instance).initialize(
             [_tokenAdmin, _uniswapRouter, assetToken],
             abi.encode(name, symbol),
             tokenSupplyParams_,
-            _tokenTaxParams
+            _tokenTaxParams,
+            taxAccountingAdapter
         );
 
         allTradingTokens.push(instance);
@@ -409,6 +414,7 @@ contract AgentFactoryV7 is
      * @dev For V7, projectTaxRecipient MUST be set to AgentTaxV2 address
      *      to enable on-chain tax attribution for graduated tokens.
      *      This is the key configuration difference from AgentFactoryV6.
+     *      Tax accounting adapter is configured separately via `setTaxAccountingAdapter`.
      */
     function setTokenParams(
         uint256 projectBuyTaxBasisPoints,
@@ -422,6 +428,15 @@ contract AgentFactoryV7 is
             taxSwapThresholdBasisPoints,
             projectTaxRecipient
         );
+    }
+
+    /**
+     * @notice Sets the TaxAccountingAdapter address injected into new AgentTokenV4 clones at initialize.
+     */
+    function setTaxAccountingAdapter(
+        address taxAccountingAdapter_
+    ) public onlyRole(DEFAULT_ADMIN_ROLE) {
+        taxAccountingAdapter = taxAccountingAdapter_;
     }
 
     function pause() public onlyRole(DEFAULT_ADMIN_ROLE) {

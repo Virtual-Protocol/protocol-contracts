@@ -30,9 +30,11 @@ DEFAULT_ENV_FILE=".env.launchpadv5_dev_bsc_local"  # .env.launchpadv5_local, .en
 #   ./scripts/launchpadv5/run_local_deploy.sh --network base_sepolia 0           # run step 0 on base_sepolia
 #   ./scripts/launchpadv5/run_local_deploy.sh --network base_sepolia 4           # run step 4 (revoke roles)
 #
-# Full deploy (deploy-only / default) on `local` or `bsc_testnet` runs deployUniswapV2TestnetLiquidity.ts
-# first unless UNISWAP_V2_ROUTER is already set and AGENT_TAX_ASSET_TOKEN (stable) is set;
-# then writes UNISWAP_V2_ROUTER, AGENT_TAX_DEX_ROUTER, AGENT_TAX_ASSET_TOKEN when that script runs.
+# Full deploy (deploy-only / default) on local, bsc_testnet, monad_testnet runs
+# deployUniswapV2TestnetLiquidity.ts first unless UNISWAP_V2_ROUTER and AGENT_TAX_ASSET_TOKEN are both
+# valid addresses. If AGENT_TAX_ASSET_TOKEN is unset, the script prompts (TTY) before running UniV2;
+# use LAUNCHPAD_AUTO_UNIV2=1 in env to skip the prompt and run automatically. The TS script can prompt
+# to deploy mock VIRTUAL if VIRTUAL_TOKEN_ADDRESS / AGENT_TAX_TAX_TOKEN are missing and writes ENV_FILE.
 #
 # Resume / env handling:
 #   This script never blanks your env file — existing addresses are kept so you can re-run after partial
@@ -48,6 +50,7 @@ DEFAULT_ENV_FILE=".env.launchpadv5_dev_bsc_local"  # .env.launchpadv5_local, .en
 #   base          - Deploy directly to Base mainnet (use with caution!)
 #   bsc_testnet   - Deploy directly to BSC testnet (hardhat `bsc_testnet` url: BSC_TESTNET_RPC_URL,
 #                   then RPC_URL, then default; set these in the same env file you pass with --env).
+#   monad_testnet - Monad testnet (chainId 10143); MONAD_TESTNET_RPC_URL or RPC_URL in env file.
 
 set -e
 
@@ -175,9 +178,24 @@ case "$NETWORK" in
     "bsc_testnet")
         HARDHAT_NETWORK="bsc_testnet"
         ;;
+    "abstract_testnet")
+        HARDHAT_NETWORK="abstract_testnet"
+        ;;
+    "abstract_mainnet")
+        HARDHAT_NETWORK="abstract_mainnet"
+        echo "⚠️  WARNING: Deploying to ABSTRACT MAINNET!"
+        echo "Press Ctrl+C within 5 seconds to cancel..."
+        sleep 5
+        ;;
+    "monad_testnet")
+        HARDHAT_NETWORK="monad_testnet"
+        ;;
+    "monad_mainnet")
+        HARDHAT_NETWORK="monad_mainnet"
+        ;;
     *)
         echo "Error: Unknown network '$NETWORK'"
-        echo "Valid networks: local, base_sepolia, base, bsc_testnet"
+        echo "Valid networks: local, base_sepolia, base, bsc_testnet, abstract_testnet, abstract_mainnet, monad_testnet"
         exit 1
         ;;
 esac
@@ -232,10 +250,6 @@ save_addresses_from_file() {
             addr=$(echo "$line" | grep -oE "0x[a-fA-F0-9]{40}")
             [ -n "$addr" ] && update_env_var "FRouterV3_ADDRESS" "$addr" "$ENV_FILE" && echo "  -> FRouterV3_ADDRESS=$addr"
         fi
-        if echo "$line" | grep -q "AgentTokenV3 implementation deployed at:"; then
-            addr=$(echo "$line" | grep -oE "0x[a-fA-F0-9]{40}")
-            [ -n "$addr" ] && update_env_var "AGENT_TOKEN_V3_IMPLEMENTATION" "$addr" "$ENV_FILE" && echo "  -> AGENT_TOKEN_V3_IMPLEMENTATION=$addr"
-        fi
         if echo "$line" | grep -q "AgentVeTokenV2 implementation deployed at:"; then
             addr=$(echo "$line" | grep -oE "0x[a-fA-F0-9]{40}")
             [ -n "$addr" ] && update_env_var "AGENT_VE_TOKEN_V2_IMPLEMENTATION" "$addr" "$ENV_FILE" && echo "  -> AGENT_VE_TOKEN_V2_IMPLEMENTATION=$addr"
@@ -243,6 +257,14 @@ save_addresses_from_file() {
         if echo "$line" | grep -q "AgentDAO implementation deployed at:"; then
             addr=$(echo "$line" | grep -oE "0x[a-fA-F0-9]{40}")
             [ -n "$addr" ] && update_env_var "AGENT_DAO_IMPLEMENTATION" "$addr" "$ENV_FILE" && echo "  -> AGENT_DAO_IMPLEMENTATION=$addr"
+        fi
+        if echo "$line" | grep -q "TaxAccountingAdapter deployed at:"; then
+            addr=$(echo "$line" | grep -oE "0x[a-fA-F0-9]{40}")
+            [ -n "$addr" ] && update_env_var "TAX_ACCOUNTING_ADAPTER_ADDRESS" "$addr" "$ENV_FILE" && echo "  -> TAX_ACCOUNTING_ADAPTER_ADDRESS=$addr"
+        fi
+        if echo "$line" | grep -q "AgentTokenV4 implementation deployed at:"; then
+            addr=$(echo "$line" | grep -oE "0x[a-fA-F0-9]{40}")
+            [ -n "$addr" ] && update_env_var "AGENT_TOKEN_V4_IMPLEMENTATION" "$addr" "$ENV_FILE" && echo "  -> AGENT_TOKEN_V4_IMPLEMENTATION=$addr"
         fi
         if echo "$line" | grep -q "AgentFactoryV7 deployed at:"; then
             addr=$(echo "$line" | grep -oE "0x[a-fA-F0-9]{40}")
@@ -280,7 +302,7 @@ save_univ2_env_from_log() {
 
 run_univ2_liquidity_deploy() {
     case "$HARDHAT_NETWORK" in
-        local|bsc_testnet)
+        local|bsc_testnet|monad_testnet)
             ;;
         *)
             echo "Skipping deployUniswapV2TestnetLiquidity.ts (not run on network $HARDHAT_NETWORK)"
@@ -307,6 +329,25 @@ run_univ2_liquidity_deploy() {
         echo "UNISWAP_V2_ROUTER and AGENT_TAX_ASSET_TOKEN already set (valid addresses) — skipping deployUniswapV2TestnetLiquidity.ts"
         echo ""
         return 0
+    fi
+
+    if ! is_eth_address_set "${AGENT_TAX_ASSET_TOKEN:-}"; then
+        if [ "${LAUNCHPAD_AUTO_UNIV2:-}" = "1" ]; then
+            echo "AGENT_TAX_ASSET_TOKEN not set; LAUNCHPAD_AUTO_UNIV2=1 — will run deployUniswapV2TestnetLiquidity.ts"
+        elif [ -t 0 ]; then
+            read -r -p "AGENT_TAX_ASSET_TOKEN is not set. Run deployUniswapV2TestnetLiquidity.ts (UniV2 + mock stable, and optional mock VIRTUAL via prompt in script)? [y/N] " _univ2_yn
+            case "$_univ2_yn" in
+                [Yy]|[Yy][Ee][Ss]) ;;
+                *)
+                    echo "Aborted. Set AGENT_TAX_ASSET_TOKEN (and UNISWAP_V2_ROUTER if reusing) in $ENV_FILE, or export LAUNCHPAD_AUTO_UNIV2=1 for non-interactive runs."
+                    return 1
+                    ;;
+            esac
+        else
+            echo "Error: AGENT_TAX_ASSET_TOKEN is not set and stdin is not a TTY."
+            echo "  Set AGENT_TAX_ASSET_TOKEN (and UNISWAP_V2_ROUTER if needed) in $ENV_FILE, or export LAUNCHPAD_AUTO_UNIV2=1 to run UniV2 deploy without prompting."
+            return 1
+        fi
     fi
 
     echo "========================================"
@@ -448,7 +489,7 @@ deploy_all() {
     echo "Deploying to: $HARDHAT_NETWORK"
     echo ""
 
-    # Minimal UniV2 + mock stable; writes UNISWAP_V2_ROUTER, AGENT_TAX_DEX_ROUTER, AGENT_TAX_ASSET_TOKEN (local / bsc_testnet)
+    # Minimal UniV2 + mock stable; writes UNISWAP_V2_ROUTER, AGENT_TAX_DEX_ROUTER, AGENT_TAX_ASSET_TOKEN
     run_univ2_liquidity_deploy || exit 1
     
     # Run deployment scripts sequentially
@@ -466,7 +507,7 @@ deploy_all() {
     echo "Deployed addresses saved to: $ENV_FILE"
     echo ""
     echo "Summary:"
-    grep -E "^(UNISWAP_V2_ROUTER|AGENT_TAX_DEX_ROUTER|AGENT_TAX_ASSET_TOKEN|AGENT_NFT_V2_ADDRESS|AGENT_TAX_V2_CONTRACT_ADDRESS|FFactoryV3_ADDRESS|FRouterV3_ADDRESS|AGENT_FACTORY_V7_ADDRESS|BONDING_CONFIG_ADDRESS|BONDING_V5_ADDRESS)=" "$ENV_FILE"
+    grep -E "^(UNISWAP_V2_ROUTER|AGENT_TAX_DEX_ROUTER|AGENT_TAX_ASSET_TOKEN|AGENT_NFT_V2_ADDRESS|AGENT_TAX_V2_CONTRACT_ADDRESS|FFactoryV3_ADDRESS|FRouterV3_ADDRESS|TAX_ACCOUNTING_ADAPTER_ADDRESS|AGENT_TOKEN_V4_IMPLEMENTATION|AGENT_FACTORY_V7_ADDRESS|BONDING_CONFIG_ADDRESS|BONDING_V5_ADDRESS)=" "$ENV_FILE"
 }
 
 # ============================================================================

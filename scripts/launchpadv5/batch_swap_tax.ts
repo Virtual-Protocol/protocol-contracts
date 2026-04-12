@@ -10,13 +10,16 @@
  * 
  * Required env variables:
  *   - AGENT_TAX_V2_CONTRACT_ADDRESS: AgentTaxV2 contract address
- *   - Deployer private key (configured in hardhat.config) must have EXECUTOR_ROLE
+ *   - Signer (hardhat.config private key) must have SWAP_ROLE on AgentTaxV2 for
+ *     swapForTokenAddress / batchSwapForTokenAddress (see deployLaunchpadv5_0: BE_TAX_OPS_WALLETS).
+ *     EXECUTOR_ROLE alone is not sufficient — the contract uses onlyRole(SWAP_ROLE).
  * 
  * Configuration (edit below):
  *   - TOKEN_ADDRESSES: Array of token addresses to swap tax for
  *   - MIN_OUTPUTS: Array of minimum output amounts (use 0 for no slippage protection)
  */
 import { formatEther } from "ethers";
+import { launchpadBatchSwapGasLimit } from "./utils";
 const { ethers } = require("hardhat");
 
 // ============================================================================
@@ -24,7 +27,8 @@ const { ethers } = require("hardhat");
 // ============================================================================
 const TOKEN_ADDRESSES: string[] = [
   // Add token addresses here, e.g.:
-  "0xD972075b06B6141D36dd35C5C4bb1C0d87462CfF",
+  // "0x36883376506272Fb7BB9062246100C69EFA61Ceb",
+  "0x99326F4CF8f6fC7153FbF6080430BF2459FafC1C"
 ];
 
 // Minimum output amounts for each token (same length as TOKEN_ADDRESSES)
@@ -133,12 +137,15 @@ export async function executeBatchSwap(
   const signerAddress = await signer.getAddress();
   console.log("Signer Address:", signerAddress);
 
+  const swapRole = await agentTaxV2.SWAP_ROLE();
+  const hasSwapRole = await agentTaxV2.hasRole(swapRole, signerAddress);
   const executorRole = await agentTaxV2.EXECUTOR_ROLE();
   const hasExecutorRole = await agentTaxV2.hasRole(executorRole, signerAddress);
-  console.log("Has EXECUTOR_ROLE:", hasExecutorRole);
+  console.log("Has SWAP_ROLE (required for batch swap):", hasSwapRole);
+  console.log("Has EXECUTOR_ROLE (other ops only):", hasExecutorRole);
 
-  if (!hasExecutorRole) {
-    const error = `Signer ${signerAddress} does not have EXECUTOR_ROLE on AgentTaxV2`;
+  if (!hasSwapRole) {
+    const error = `Signer ${signerAddress} does not have SWAP_ROLE on AgentTaxV2 (grant via BE_TAX_OPS_WALLETS in deploy step 0)`;
     console.log(`\n⚠️ ${error}`);
     return { success: false, swappedTokens: [], failedTokens: tokensToSwap, error };
   }
@@ -150,13 +157,21 @@ export async function executeBatchSwap(
   console.log("Tokens:", tokensToSwap);
   console.log("Min Outputs:", minOutputsToSwap.map(m => m.toString()));
 
+  const batchSwapGasLimit = launchpadBatchSwapGasLimit(tokensToSwap.length);
+
   try {
     const agentTaxV2WithSigner = agentTaxV2.connect(signer);
+
+    await agentTaxV2WithSigner.batchSwapForTokenAddress.staticCall(
+      tokensToSwap,
+      minOutputsToSwap,
+      { gasLimit: batchSwapGasLimit }
+    );
 
     const tx = await agentTaxV2WithSigner.batchSwapForTokenAddress(
       tokensToSwap,
       minOutputsToSwap,
-      { gasLimit: 500000 * tokensToSwap.length }
+      { gasLimit: batchSwapGasLimit }
     );
 
     console.log("Transaction submitted:", tx.hash);

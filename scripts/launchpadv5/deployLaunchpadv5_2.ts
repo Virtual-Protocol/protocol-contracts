@@ -181,7 +181,7 @@ const { ethers, upgrades } = require("hardhat");
       );
       const taxAdapterProxy = await upgrades.deployProxy(
         TaxAccountingAdapterFactory,
-        [contractController],
+        [contractController, agentTaxV2Address],
         {
           initializer: "initialize",
           initialOwner: contractController,

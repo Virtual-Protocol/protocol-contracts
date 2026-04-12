@@ -236,7 +236,7 @@ async function setupV2V3TaxComparisonTest(options = {}) {
   );
   const taxAccountingAdapter = await upgrades.deployProxy(
     TaxAccountingAdapter,
-    [owner.address],
+    [owner.address, await agentTax.getAddress()],
     { initializer: "initialize" }
   );
   await taxAccountingAdapter.waitForDeployment();

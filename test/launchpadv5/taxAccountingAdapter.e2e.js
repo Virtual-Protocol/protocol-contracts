@@ -35,9 +35,13 @@ describe("TaxAccountingAdapter E2E (BondingV5 + AgentTokenV4)", function () {
     await ethers.provider.send("hardhat_setBalance", [await mockAgent.getAddress(), "0x10000000000000000"]);
 
     const TaxAccountingAdapter = await ethers.getContractFactory("TaxAccountingAdapter");
-    const taxAdapter = await upgrades.deployProxy(TaxAccountingAdapter, [owner.address], {
-      initializer: "initialize",
-    });
+    const taxAdapter = await upgrades.deployProxy(
+      TaxAccountingAdapter,
+      [owner.address, await agentTax.getAddress()],
+      {
+        initializer: "initialize",
+      }
+    );
     await taxAdapter.waitForDeployment();
 
     await virtualToken.mint(await mockUniswapRouter.getAddress(), ethers.parseEther("1000000"));
@@ -48,7 +52,6 @@ describe("TaxAccountingAdapter E2E (BondingV5 + AgentTokenV4)", function () {
     const tx = await taxAdapter.connect(owner).swapTaxAndDeposit(
       await mockAgent.getAddress(),
       await virtualToken.getAddress(),
-      await agentTax.getAddress(),
       await mockUniswapRouter.getAddress(),
       swapAmt,
       (await ethers.provider.getBlock("latest")).timestamp + 600

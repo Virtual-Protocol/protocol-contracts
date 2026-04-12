@@ -16,12 +16,11 @@ import "./IAgentFactory.sol";
 /// @dev Optional helper: swap with `to = adapter` to satisfy Uniswap V2 Pair `INVALID_TO`, then `depositTax`.
 interface ITaxAccountingAdapter {
     function swapTaxAndDeposit(
-        address agentToken,
-        address pairToken,
-        address taxRecipient,
-        address router,
-        uint256 swapAmount,
-        uint256 deadline
+        address agentToken_,
+        address pairToken_,
+        address router_,
+        uint256 swapAmount_,
+        uint256 deadline_
     ) external;
 }
 
@@ -972,7 +971,6 @@ contract AgentTokenV4 is
             ITaxAccountingAdapter(taxAccountingAdapter).swapTaxAndDeposit(
                 address(this),
                 pairToken,
-                projectTaxRecipient,
                 address(_uniswapRouter),
                 swapBalance_,
                 block.timestamp + 600

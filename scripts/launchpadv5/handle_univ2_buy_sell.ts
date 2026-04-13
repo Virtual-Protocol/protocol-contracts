@@ -49,7 +49,7 @@ const { ethers } = require("hardhat");
 // Edit only this (agent ERC20)
 // ============================================
 const AGENT_TOKEN_ADDRESS =
-  "0x663a3622B6568Bd7Eb2413553B869EA742a50902" as string;
+  "0xa70987664b498cE3438b1B8C4eCeB5d3Bdb82a62" as string;
 const buyHuman = process.env.BUY_VIRTUAL_AMOUNT?.trim() || "99";
 
 const ERC20_ABI = [

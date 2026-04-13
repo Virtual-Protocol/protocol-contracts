@@ -168,16 +168,16 @@ contract AgentFactoryV7 is
     uint256 private constant V3_SWAP_THRESHOLD_DENOMINATOR = 1_000_000;
     uint256 private constant V3_MAX_SWAP_THRESHOLD_MULTIPLE = 20;
 
-    /// @notice When non-zero, `sweepV3ProjectTaxToVirtualAndDeposit` requires `agentToken` to be an EIP-1167 clone
-    ///         whose implementation equals this address (the historical `AgentTokenV3` implementation used for the V3 cohort).
-    ///         Set via `setLegacyAgentTokenV3Implementation` so V4 clones (same proxy pattern, different impl) are rejected.
-    ///         Leave zero to skip the check (not recommended on production).
+    /// @notice Required for `sweepV3ProjectTaxToVirtualAndDeposit`: EIP-1167 clone `agentToken` must delegate to this
+    ///         implementation (historical `AgentTokenV3` for the V3 cohort). Set via `setLegacyAgentTokenV3Implementation`
+    ///         so V4 clones (same proxy pattern, different impl) are rejected.
     address public legacyAgentTokenV3Implementation;
 
     error AgentAlreadyExists();
     error RouterNotSet();
     error TaxAccountingAdapterNotSet();
     error NotLegacyV3AgentToken();
+    error LegacyV3ImplementationNotSet();
 
     event V3ProjectTaxSwept(
         address indexed agentToken,
@@ -521,7 +521,7 @@ contract AgentFactoryV7 is
      * @dev Per-token migration (no token upgrade — uses existing `onlyOwnerOrFactory` on deployed agent tokens):
      *      The sweep sets `projectTaxRecipient` to this factory when it is not already, then runs `distributeTaxTokens` (that order is required).
      *      Call `sweepV3ProjectTaxToVirtualAndDeposit(agentToken)` (repeat until idle if above cap).
-     *      Set `legacyAgentTokenV3Implementation` to the deployed `AgentTokenV3` implementation so V4 clones are rejected (same EIP-1167 layout, different impl).
+     *      `legacyAgentTokenV3Implementation` must be set on the factory; then V4 clones are rejected (same EIP-1167 layout, different impl).
      *      If `_factory` is not this contract, the token owner must coordinate — the factory cannot migrate alone.
      *      Requires `taxAccountingAdapter` set with `taxRecipient` aligned to this factory's AgentTaxV2 (`_tokenTaxParams`).
      *
@@ -538,12 +538,8 @@ contract AgentFactoryV7 is
         if (_uniswapRouter == address(0)) revert RouterNotSet();
         if (taxAccountingAdapter == address(0)) revert TaxAccountingAdapterNotSet();
 
-        address legacyImpl = legacyAgentTokenV3Implementation;
-        if (legacyImpl != address(0)) {
-            if (getCloneImplementation(agentToken) != legacyImpl) {
-                revert NotLegacyV3AgentToken();
-            }
-        }
+        if (legacyAgentTokenV3Implementation == address(0)) revert LegacyV3ImplementationNotSet();
+        if (getCloneImplementation(agentToken) != legacyAgentTokenV3Implementation) revert NotLegacyV3AgentToken();
 
         IAgentTokenV3Sweep token = IAgentTokenV3Sweep(agentToken);
         if (token.projectTaxRecipient() != address(this)) {
@@ -551,6 +547,8 @@ contract AgentFactoryV7 is
         }
         token.distributeTaxTokens();
 
+        // off-chain tax-listener will check the agentTokenBalance of the agentFactoryV7
+        // and call this function if the balance is greater than minThreshold
         uint256 balance = IERC20(agentToken).balanceOf(address(this));
         if (balance == 0) {
             return;

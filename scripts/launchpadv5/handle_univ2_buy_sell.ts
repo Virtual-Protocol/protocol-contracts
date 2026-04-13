@@ -48,8 +48,8 @@ const { ethers } = require("hardhat");
 // ============================================
 // Edit only this (agent ERC20)
 // ============================================
-const AGENT_TOKEN_ADDRESS =
-  "0xa70987664b498cE3438b1B8C4eCeB5d3Bdb82a62" as string;
+// const AGENT_TOKEN_ADDRESS = "0x17742fa86139ed9dB81B2ec8037b2525061F97B9" as string;
+const AGENT_TOKEN_ADDRESS = "0x85A02c33aced66eD39a0fD07FB0cd8d75290939D" as string; // agentTokenV3 on arbitrum sepolia
 const buyHuman = process.env.BUY_VIRTUAL_AMOUNT?.trim() || "99";
 
 const ERC20_ABI = [

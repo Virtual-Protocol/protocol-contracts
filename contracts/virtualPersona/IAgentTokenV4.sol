@@ -1,12 +1,14 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
+import "./IAgentTokenV2.sol";
+
 /**
  * @title IAgentTokenV4
- * @dev Minimal interface for AgentFactoryV7: clones use a single 5-argument `initialize`
- *      (standard tax `bytes` + `taxAccountingAdapter`). Full ERC20 / AgentToken surface matches V3 at ABI level but is not declared here to avoid inheriting the legacy 4-arg `initialize` from IAgentTokenV2.
+ * @dev AgentToken V4: full `IAgentTokenV2` surface plus 5-argument `initialize`
+ *      (tax `bytes` + `taxAccountingAdapter`). The legacy 4-arg `initialize` remains on `IAgentTokenV2` for ABI compatibility; V4 implementations revert it.
  */
-interface IAgentTokenV4 {
+interface IAgentTokenV4 is IAgentTokenV2 {
     event TaxAccountingAdapterUpdated(address indexed adapter);
 
     function initialize(

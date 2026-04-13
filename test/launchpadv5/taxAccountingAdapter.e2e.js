@@ -49,7 +49,7 @@ describe("TaxAccountingAdapter E2E (BondingV5 + AgentTokenV4)", function () {
     const swapAmt = ethers.parseEther("100");
     await mockAgent.connect(agentSigner).approve(await taxAdapter.getAddress(), swapAmt);
 
-    const tx = await taxAdapter.connect(owner).swapTaxAndDeposit(
+    const tx = await taxAdapter.connect(agentSigner).swapTaxAndDeposit(
       await mockAgent.getAddress(),
       await virtualToken.getAddress(),
       await mockUniswapRouter.getAddress(),

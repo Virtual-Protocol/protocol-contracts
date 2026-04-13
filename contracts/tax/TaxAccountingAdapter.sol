@@ -14,8 +14,11 @@ interface IAgentTaxForToken {
 
 /**
  * @title TaxAccountingAdapter
- * @notice Upgradeable (transparent proxy, same pattern as BondingV5). Pulls agent tokens from the AgentToken contract,
- *         swaps to `pairToken` via Uniswap V2 with `to = address(this)`, then deposits into AgentTax via `depositTax`.
+ * @notice Upgradeable (transparent proxy, same pattern as BondingV5). Pulls agent tokens from `msg.sender`
+ *         (`safeTransferFrom` — caller must approve this contract), swaps to `pairToken` via Uniswap V2 with
+ *         `to = address(this)`, then deposits into AgentTax via `depositTax`. Actual swap input uses the balance
+ *         increase from the pull (fee-on-transfer safe). AgentTokenV4 calls with `msg.sender` = the agent token;
+ *         AgentFactoryV7 sweep calls with `msg.sender` = factory after `distributeTaxTokens`.
  * @dev Upgrades are performed via ProxyAdmin, not inside this implementation (no UUPS). Owner may rescue stuck assets
  *      via {emergencyWithdrawERC20} / {emergencyWithdrawNative}.
  *
@@ -66,7 +69,7 @@ contract TaxAccountingAdapter is
     receive() external payable {}
 
     /**
-     * @param agentToken_ Agent ERC20 (same as `path[0]`). Tokens are pulled from `agentToken_` (the contract holding tax).
+     * @param agentToken_ Agent ERC20 (same as `path[0]`). Tokens are pulled from `msg.sender` (must equal allowance giver).
      * @param pairToken_ Quote token (e.g. VIRTUAL).
      * @param router_ Uniswap V2 compatible router (from the agent token; not stored here so one adapter serves all clones).
      * @param swapAmount_ Requested pull amount from `agentToken_`; actual swap input is only the balance increase on this adapter from that pull (fee-on-transfer safe).
@@ -78,15 +81,14 @@ contract TaxAccountingAdapter is
         address router_,
         uint256 swapAmount_,
         uint256 deadline_
-    ) external nonReentrant {
-        address taxSink = taxRecipient;
-        require(taxSink != address(0), "TaxAccountingAdapter: taxRecipient unset");
+    ) external nonReentrant returns (uint256 received) {
+        require(taxRecipient != address(0), "TaxAccountingAdapter: taxRecipient unset");
         require(swapAmount_ > 0, "TaxAccountingAdapter: zero swap");
         require(deadline_ >= block.timestamp, "TaxAccountingAdapter: expired");
         require(router_ != address(0), "TaxAccountingAdapter: zero router");
 
         uint256 agentTokenBalanceBefore = IERC20(agentToken_).balanceOf(address(this));
-        IERC20(agentToken_).safeTransferFrom(agentToken_, address(this), swapAmount_);
+        IERC20(agentToken_).safeTransferFrom(msg.sender, address(this), swapAmount_);
 
         // Use the balance *increase* from this pull, not `swapAmount_`: fee-on-transfer / burn on inbound
         // can make received < swapAmount_; router must not pull more than actually sits here. Also ignores
@@ -110,11 +112,11 @@ contract TaxAccountingAdapter is
             deadline_
         );
 
-        uint256 received = IERC20(pairToken_).balanceOf(address(this)) - pairTokenBalanceBefore;
+        received = IERC20(pairToken_).balanceOf(address(this)) - pairTokenBalanceBefore;
         if (received > 0) {
-            IERC20(pairToken_).forceApprove(taxSink, received);
-            IAgentTaxForToken(taxSink).depositTax(agentToken_, received);
-            emit TaxSwapDeposited(agentToken_, taxSink, received);
+            IERC20(pairToken_).forceApprove(taxRecipient, received);
+            IAgentTaxForToken(taxRecipient).depositTax(agentToken_, received);
+            emit TaxSwapDeposited(agentToken_, taxRecipient, received);
         }
 
         IERC20(agentToken_).forceApprove(router_, 0);

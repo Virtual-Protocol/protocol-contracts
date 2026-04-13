@@ -21,12 +21,11 @@ interface ITaxAccountingAdapter {
         address router_,
         uint256 swapAmount_,
         uint256 deadline_
-    ) external;
+    ) external returns (uint256 received);
 }
 
 contract AgentTokenV4 is
     ContextUpgradeable,
-    IAgentTokenV2,
     IAgentTokenV4,
     Ownable2StepUpgradeable
 {

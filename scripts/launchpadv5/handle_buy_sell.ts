@@ -1,4 +1,4 @@
-import { parseEther, formatEther } from "ethers";
+import { parseEther, formatEther, type TransactionReceipt } from "ethers";
 import { launchpadDefaultTxGasLimit } from "./utils";
 const hre = require("hardhat");
 const { ethers } = hre;
@@ -6,6 +6,7 @@ const { ethers } = hre;
 // USAGE:
 // ENV_FILE=.env.launchpadv5_dev npx hardhat run ./scripts/launchpadv5/handle_buy_sell.ts --network base_sepolia
 // ENV_FILE=.env.launchpadv5_dev_eth_sepolia npx hardhat run ./scripts/launchpadv5/handle_buy_sell.ts --network eth_sepolia
+// ENV_FILE=.env.launchpadv5_dev_arbitrum_sepolia npx hardhat run ./scripts/launchpadv5/handle_buy_sell.ts --network arbitrum_sepolia
 // ENV_FILE=.env.launchpadv5_dev_bsc_testnet npx hardhat run ./scripts/launchpadv5/handle_buy_sell.ts --network bsc_testnet
 
 // ============================================
@@ -13,6 +14,7 @@ const { ethers } = hre;
 // ============================================
 const TOKEN_ADDRESS_BY_NETWORK: Record<string, string> = {
   base_sepolia: "0xF940345C0e54DfB1474137c45b4D50C336C95a4d",
+  arbitrum_sepolia: "0x85A02c33aced66eD39a0fD07FB0cd8d75290939D", // agentTokenV3 on arbitrum sepolia
   eth_sepolia: "0x02b6d8a16f9D79Cb9E8eD685492a1cD64fF627c3",
   bsc_testnet: "0x6B9048DFF2fA0ACd74fC9b195dC4768E1d541FBf",
 };
@@ -29,11 +31,11 @@ const CONFIG = {
   tokenAddress: resolveTokenAddress(),
   
   // Amount of VIRTUAL to spend on buy
-  buyAmount: "10", // 1 VIRTUAL
+  buyAmount: "43000", // 1 VIRTUAL
   
   // Contract addresses (from environment or hardcode)
   bondingV5Address: process.env.BONDING_V5_ADDRESS || "",
-  fRouterV3Address: process.env.FRouterV3_ADDRESS || process.env.FRouterV2_ADDRESS || "",
+  fRouterV3Address: process.env.FRouterV3_ADDRESS || "",
   virtualTokenAddress: process.env.VIRTUAL_TOKEN_ADDRESS || "",
   txConfirmTimeoutMs: Number(process.env.TX_CONFIRM_TIMEOUT_MS || "180000"),
 };
@@ -53,6 +55,23 @@ async function waitWithProgress(txHash: string, label: string, timeoutMs: number
       `⏳ ${label} pending... ${Math.floor(elapsed / 1000)}s elapsed, txHash=${txHash}`
     );
     await new Promise((resolve) => setTimeout(resolve, 5000));
+  }
+}
+
+/** Reverted txs still get a receipt with status 0 — do not treat that as success. */
+function assertSuccessfulReceipt(
+  receipt: TransactionReceipt | null,
+  label: string,
+  txHash: string
+): asserts receipt is TransactionReceipt {
+  if (receipt == null) {
+    throw new Error(`${label} tx has no receipt (null), txHash=${txHash}`);
+  }
+  if (receipt.status !== 1) {
+    throw new Error(
+      `${label} failed on-chain (receipt status ${String(receipt.status)}). ` +
+        `See explorer for revert data (e.g. InvalidTokenStatus). txHash=${txHash}`
+    );
   }
 }
 
@@ -147,14 +166,22 @@ async function main() {
   if (bondingAllowance < buyAmountWei) {
     console.log("Approving VIRTUAL to BondingV5...");
     const approveTx1 = await virtualToken.approve(CONFIG.bondingV5Address, ethers.MaxUint256);
-    await approveTx1.wait();
+    assertSuccessfulReceipt(
+      await approveTx1.wait(),
+      "Approve VIRTUAL to BondingV5",
+      approveTx1.hash
+    );
     console.log("✅ Approved to BondingV5");
   }
 
   if (routerAllowance < buyAmountWei) {
     console.log("Approving VIRTUAL to FRouterV3...");
     const approveTx2 = await virtualToken.approve(CONFIG.fRouterV3Address, ethers.MaxUint256);
-    await approveTx2.wait();
+    assertSuccessfulReceipt(
+      await approveTx2.wait(),
+      "Approve VIRTUAL to FRouterV3",
+      approveTx2.hash
+    );
     console.log("✅ Approved to FRouterV3");
   }
 
@@ -172,6 +199,7 @@ async function main() {
     "Buy",
     CONFIG.txConfirmTimeoutMs
   );
+  assertSuccessfulReceipt(buyReceipt, "Buy", buyTx.hash);
   console.log("✅ Buy successful!");
   console.log("Gas Used:", buyReceipt.gasUsed.toString());
 
@@ -204,7 +232,11 @@ async function main() {
   if (agentTokenAllowance < sellAmount) {
     console.log("Approving Agent Token to FRouterV3...");
     const approveAgentTx = await agentToken.approve(CONFIG.fRouterV3Address, ethers.MaxUint256);
-    await approveAgentTx.wait();
+    assertSuccessfulReceipt(
+      await approveAgentTx.wait(),
+      "Approve agent token to FRouterV3",
+      approveAgentTx.hash
+    );
     console.log("✅ Approved Agent Token to FRouterV3");
   }
 
@@ -223,6 +255,7 @@ async function main() {
     "Sell",
     CONFIG.txConfirmTimeoutMs
   );
+  assertSuccessfulReceipt(sellReceipt, "Sell", sellTx.hash);
   console.log("✅ Sell successful!");
   console.log("Gas Used:", sellReceipt.gasUsed.toString());
 

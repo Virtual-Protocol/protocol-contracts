@@ -49,7 +49,7 @@ const { ethers } = require("hardhat");
 // Edit only this (agent ERC20)
 // ============================================
 // const AGENT_TOKEN_ADDRESS = "0x17742fa86139ed9dB81B2ec8037b2525061F97B9" as string;
-const AGENT_TOKEN_ADDRESS = "0xbc36D98d309A8927e8a616C978BCF93111eC9196" as string;
+const AGENT_TOKEN_ADDRESS = "0xcBFF2B7Bf9A85e9019955a060024f4d3269BECb6" as string;
 const buyHuman = process.env.BUY_VIRTUAL_AMOUNT?.trim() || "99";
 
 const ERC20_ABI = [
@@ -137,7 +137,11 @@ async function main() {
 
   await assertContract("VIRTUAL_TOKEN_ADDRESS", virtualAddr, ethers.provider);
   await assertContract("UNISWAP_V2_ROUTER", routerAddr, ethers.provider);
-  await assertContract("AGENT_TOKEN_ADDRESS", AGENT_TOKEN_ADDRESS, ethers.provider);
+  await assertContract(
+    "AGENT_TOKEN_ADDRESS",
+    AGENT_TOKEN_ADDRESS,
+    ethers.provider
+  );
 
   const vd = await virtual.decimals();
   const ad = await agent.decimals();
@@ -168,15 +172,24 @@ async function main() {
     ["function getPair(address,address) external view returns (address)"],
     ethers.provider
   );
-  const pairFromFactory = await factory.getPair(virtualAddr, AGENT_TOKEN_ADDRESS);
+  const pairFromFactory = await factory.getPair(
+    virtualAddr,
+    AGENT_TOKEN_ADDRESS
+  );
   console.log("factory.getPair(VIRTUAL, agent):", pairFromFactory);
   if (pairFromFactory === ethers.ZeroAddress) {
     console.warn(
       "⚠️ No pair on this factory for VIRTUAL/agent — swaps will likely revert (wrong router or not graduated)."
     );
   }
-  if (pairAddr !== ethers.ZeroAddress && pairFromFactory !== ethers.ZeroAddress) {
-    console.log("pair matches canonical:", pairAddr.toLowerCase() === pairFromFactory.toLowerCase());
+  if (
+    pairAddr !== ethers.ZeroAddress &&
+    pairFromFactory !== ethers.ZeroAddress
+  ) {
+    console.log(
+      "pair matches canonical:",
+      pairAddr.toLowerCase() === pairFromFactory.toLowerCase()
+    );
   }
 
   async function taxOnContract(): Promise<bigint> {
@@ -234,7 +247,9 @@ async function main() {
       }
     } else {
       if (gasEstimated !== undefined) {
-        console.log(`BUY gas estimate (informational; tx uses wallet default cap): ${gasEstimated}`);
+        console.log(
+          `BUY gas estimate (informational; tx uses wallet default cap): ${gasEstimated}`
+        );
       }
     }
 
@@ -284,7 +299,10 @@ async function main() {
     const buyIn = parseUnits(buyHuman, vd);
     if (virtualBefore < buyIn) {
       throw new Error(
-        `Insufficient VIRTUAL: have ${formatUnits(virtualBefore, vd)}, need ${buyHuman}`
+        `Insufficient VIRTUAL: have ${formatUnits(
+          virtualBefore,
+          vd
+        )}, need ${buyHuman}`
       );
     }
     await approveRouterIfNeeded("BUY (VIRTUAL → agent)", virtual, buyIn);
@@ -303,7 +321,11 @@ async function main() {
   const agentMid = await agent.balanceOf(deployerAddress);
   console.log("\n--- After buy ---");
   console.log("Agent balance:", formatUnits(agentMid, ad), aSym);
-  console.log("Tax on agent contract:", tax1.toString(), `(delta ${tax1 - tax0})`);
+  console.log(
+    "Tax on agent contract:",
+    tax1.toString(),
+    `(delta ${tax1 - tax0})`
+  );
 
   if (!skipSell) {
     const bal = await agent.balanceOf(deployerAddress);
@@ -348,15 +370,23 @@ async function main() {
   console.log(
     "      AgentTokenV4 _autoSwap → TaxAccountingAdapter.swapTaxAndDeposit (router swap + AgentTaxV2.depositTax) — heavier."
   );
-  console.log(`SELL gasLimit uses estimate × ${sellGasMultBps}/10000 (SELL_GAS_MULTIPLIER_BPS).`);
+  console.log(
+    `SELL gasLimit uses estimate × ${sellGasMultBps}/10000 (SELL_GAS_MULTIPLIER_BPS).`
+  );
   if (buyGas.gasUsed !== undefined || buyGas.gasEstimated !== undefined) {
     console.log(
-      `  BUY  eth_estimateGas: ${buyGas.gasEstimated?.toString() ?? "n/a"}  gasUsed: ${buyGas.gasUsed?.toString() ?? "n/a"}`
+      `  BUY  eth_estimateGas: ${
+        buyGas.gasEstimated?.toString() ?? "n/a"
+      }  gasUsed: ${buyGas.gasUsed?.toString() ?? "n/a"}`
     );
   }
   if (sellGas.gasUsed !== undefined || sellGas.gasEstimated !== undefined) {
     console.log(
-      `  SELL eth_estimateGas: ${sellGas.gasEstimated?.toString() ?? "n/a"}  gasLimit sent: ${sellGas.gasLimitSent?.toString() ?? "n/a"}  gasUsed: ${sellGas.gasUsed?.toString() ?? "n/a"}`
+      `  SELL eth_estimateGas: ${
+        sellGas.gasEstimated?.toString() ?? "n/a"
+      }  gasLimit sent: ${
+        sellGas.gasLimitSent?.toString() ?? "n/a"
+      }  gasUsed: ${sellGas.gasUsed?.toString() ?? "n/a"}`
     );
   }
   if (
@@ -366,7 +396,9 @@ async function main() {
   ) {
     const ratioBps = (sellGas.gasUsed * 10000n) / buyGas.gasUsed;
     console.log(
-      `  Ratio SELL gasUsed / BUY gasUsed ≈ ${(Number(ratioBps) / 10000).toFixed(4)}× (${sellGas.gasUsed} / ${buyGas.gasUsed})`
+      `  Ratio SELL gasUsed / BUY gasUsed ≈ ${(
+        Number(ratioBps) / 10000
+      ).toFixed(4)}× (${sellGas.gasUsed} / ${buyGas.gasUsed})`
     );
   }
   console.log("=".repeat(72));

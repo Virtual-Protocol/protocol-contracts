@@ -65,8 +65,9 @@ export async function promptYes(question: string): Promise<boolean> {
  * Central gas defaults for Hardhat + `@nomicfoundation/hardhat-ethers` signers.
  *
  * Hardhat's LocalAccountsProvider (micro-eth-signer) rejects `gasLimit` above 30_000_000.
- * Many L2s return `eth_estimateGas` above that for large txs — cap explicitly instead of
- * re-implementing per script.
+ * Many L2 **broadcast** RPCs cap a single tx below 30M — sending `gasLimit: 30_000_000` can fail with
+ * `exceeds max transaction gas limit` even though blocks allow more. Use `launchpadHeavyTxGasLimit()` defaults
+ * (15M remote, 30M local) or set `LAUNCHPAD_HEAVY_TX_GAS_LIMIT`.
  *
  * **Monad (monad_testnet / monad_mainnet):** fees use `gas_limit × gas_price`, not `gas_used`
  * (see Monad docs — async execution / block space). Defaults here are **lower** so you do not
@@ -75,7 +76,9 @@ export async function promptYes(question: string): Promise<boolean> {
  *
  * Optional env (protocol-contracts, all numeric):
  *   LAUNCHPAD_TX_GAS_LIMIT — bonding buy/sell, `launch()`, typical swaps (default 3_000_000; lower on Monad)
- *   LAUNCHPAD_HEAVY_TX_GAS_LIMIT — big deploys, Uni createPool/mint, etc. (default 30_000_000 non-Monad; lower on Monad)
+ *   LAUNCHPAD_HEAVY_TX_GAS_LIMIT — big deploys, Uni Router/Factory, createPool/mint, etc.
+ *       Default: 15_000_000 on remote networks (many L2/RPCs reject 30M); 30_000_000 only on `hardhat` / `localhost`.
+ *       Override upward for L1 or huge bytecode (e.g. LAUNCHPAD_HEAVY_TX_GAS_LIMIT=30000000). Lower on Monad via MONAD_*.
  *   LAUNCHPAD_BATCH_SWAP_MIN_GAS / LAUNCHPAD_BATCH_SWAP_GAS_PER_TOKEN — batch tax swap (tighter defaults on Monad)
  *   LAUNCHPAD_MONAD_* — same semantics, read only on Monad if the non-MONAD var is unset
  *   LAUNCHPAD_MONAD_GAS_LIMIT_CEILING — max gas for preLaunch cap (default 12_000_000 on Monad vs 30M)
@@ -92,6 +95,22 @@ export function isMonadHardhatNetwork(): boolean {
     return false;
   }
 }
+
+/** In-process Hardhat / anvil — high gasLimit is OK (no public RPC cap). */
+export function isHardhatLocalNetwork(): boolean {
+  try {
+    const n = hre.network?.name as string | undefined;
+    return n === "hardhat" || n === "localhost";
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Default for `launchpadHeavyTxGasLimit()` on remote chains when env is unset.
+ * Many L2 public RPCs reject `gasLimit` = 30M (`exceeds max transaction gas limit`).
+ */
+const LAUNCHPAD_HEAVY_DEFAULT_REMOTE = 15_000_000;
 
 /** Upper bound for preLaunch `gasLimit` (estimate × buffer). Lower on Monad. */
 export function launchpadGasLimitCeilingBigint(): bigint {
@@ -159,11 +178,14 @@ export function launchpadDefaultTxGasLimit(): bigint {
 
 /** Gas for heavy deploys / factory / V3 mint (capped at Hardhat signer max). */
 export function launchpadHeavyTxGasLimit(): number {
+  const nonMonadDefault = isHardhatLocalNetwork()
+    ? HARDHAT_SIGNER_GAS_CEILING
+    : LAUNCHPAD_HEAVY_DEFAULT_REMOTE;
   const def = envNumPreferMonad(
     "LAUNCHPAD_HEAVY_TX_GAS_LIMIT",
     "LAUNCHPAD_MONAD_HEAVY_TX_GAS_LIMIT",
     MONAD_DEFAULT_HEAVY,
-    HARDHAT_SIGNER_GAS_CEILING
+    nonMonadDefault
   );
   return clampGasInt(def);
 }

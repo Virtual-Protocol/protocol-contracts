@@ -137,14 +137,14 @@ async function setupBondingV5Test() {
     // ============================================
     console.log("\n=== Step 2: Deploying AgentFactoryV7 and dependencies (V5 Suite) ===");
 
-    // 2.1 Deploy AgentTokenV3 implementation (V5 Suite uses AgentTokenV3)
-    console.log("\n--- Deploying AgentTokenV3 implementation ---");
-    const AgentTokenV3 = await ethers.getContractFactory("AgentTokenV3");
-    const agentTokenV3 = await AgentTokenV3.deploy();
-    await agentTokenV3.waitForDeployment();
+    // 2.1 Deploy AgentTokenV4 implementation (V5 Suite uses AgentTokenV4)
+    console.log("\n--- Deploying AgentTokenV4 implementation ---");
+    const AgentTokenV4 = await ethers.getContractFactory("AgentTokenV4");
+    const agentTokenV4 = await AgentTokenV4.deploy();
+    await agentTokenV4.waitForDeployment();
     console.log(
-      "AgentTokenV3 implementation deployed at:",
-      await agentTokenV3.getAddress()
+      "AgentTokenV4 implementation deployed at:",
+      await agentTokenV4.getAddress()
     );
 
     // 2.2 Deploy AgentVeTokenV2 implementation
@@ -221,7 +221,7 @@ async function setupBondingV5Test() {
     const agentFactoryV7 = await upgrades.deployProxy(
       AgentFactoryV7,
       [
-        await agentTokenV3.getAddress(),
+        await agentTokenV4.getAddress(),
         await agentVeTokenV2.getAddress(),
         await mockAgentDAO.getAddress(),
         await mockERC6551Registry.getAddress(),
@@ -476,7 +476,7 @@ async function setupBondingV5Test() {
       fRouterV3,
       mockUniswapFactory,
       mockUniswapRouter,
-      agentToken: agentTokenV3,
+      agentToken: agentTokenV4,
       agentVeToken: agentVeTokenV2,
       mockAgentDAO,
       mockERC6551Registry,
@@ -496,7 +496,7 @@ async function setupBondingV5Test() {
       fRouterV3: await fRouterV3.getAddress(),
       mockUniswapFactory: await mockUniswapFactory.getAddress(),
       mockUniswapRouter: await mockUniswapRouter.getAddress(),
-      agentToken: await agentTokenV3.getAddress(),
+      agentToken: await agentTokenV4.getAddress(),
       agentVeToken: await agentVeTokenV2.getAddress(),
       mockAgentDAO: await mockAgentDAO.getAddress(),
       mockERC6551Registry: await mockERC6551Registry.getAddress(),

@@ -10,18 +10,41 @@ import "@openzeppelin/contracts/access/AccessControl.sol";
 import "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
 
 import "./IAgentFactoryV7.sol";
-import "./IAgentTokenV3.sol";
+import "./IAgentTokenV4.sol";
 import "./IAgentVeTokenV2.sol";
 import "./IAgentDAO.sol";
 import "./IAgentNft.sol";
 import "../libs/IERC6551Registry.sol";
+import "../pool/IUniswapV2Router02.sol";
+
+/// @dev Minimal surface for AgentTokenV3 tax migration (same clone shape as V4-bound factory).
+interface IAgentTokenV3Sweep {
+    function projectTaxRecipient() external view returns (address);
+
+    function swapThresholdBasisPoints() external view returns (uint16);
+
+    function distributeTaxTokens() external;
+
+    function setProjectTaxRecipient(address projectTaxRecipient_) external;
+}
+
+/// @dev Shared with `TaxAccountingAdapter.swapTaxAndDeposit` (pull from `msg.sender`, deposit via adapter `taxRecipient`).
+interface ITaxAccountingAdapter {
+    function swapTaxAndDeposit(
+        address agentToken_,
+        address pairToken_,
+        address router_,
+        uint256 swapAmount_,
+        uint256 deadline_
+    ) external returns (uint256 received);
+}
 
 /**
  * @title AgentFactoryV7
  * @notice Factory contract for creating V3 agent tokens used with BondingV5
  * @dev This is a separate factory from AgentFactoryV6 to ensure clean separation of V4 and V5 ecosystems:
  *      - AgentFactoryV6 + AgentTokenV2 + BondingV4 + FRouterV2 → AgentTax (tax-listener)
- *      - AgentFactoryV7 + AgentTokenV3 + BondingV5 + FRouterV3 → AgentTaxV2 (on-chain attribution)
+ *      - AgentFactoryV7 + AgentTokenV4 + BondingV5 + FRouterV3 → AgentTaxV2 (on-chain attribution)
  *
  *      The key difference is that AgentFactoryV7's `projectTaxRecipient` in _tokenTaxParams
  *      should be set to AgentTaxV2 address, enabling on-chain tax attribution for graduated tokens.
@@ -137,7 +160,40 @@ contract AgentFactoryV7 is
 
     mapping(address => bool) private _existingAgents;
 
+    /// @dev Injected into each new AgentTokenV4 via `initialize(..., taxAccountingAdapter)`.
+    address public taxAccountingAdapter;
+
+    bytes32 public constant SWEEP_V3_PROJECT_TAX_ROLE = keccak256("SWEEP_V3_PROJECT_TAX_ROLE"); // Able to sweep agentTokenV3 project tax to virtual and deposit to taxAccountingAdapter
+    /// @dev Matches AgentTokenV3 `SWAP_THRESHOLD_DENOMINATOR` / `MAX_SWAP_THRESHOLD_MULTIPLE` for capped sweeps.
+    uint256 private constant V3_SWAP_THRESHOLD_DENOMINATOR = 1_000_000;
+    uint256 private constant V3_MAX_SWAP_THRESHOLD_MULTIPLE = 20;
+
+    /// @notice Required for `sweepV3ProjectTaxToVirtualAndDeposit`: EIP-1167 clone `agentToken` must delegate to this
+    ///         implementation (historical `AgentTokenV3` for the V3 cohort). Set via `setLegacyAgentTokenV3Implementation`
+    ///         so V4 clones (same proxy pattern, different impl) are rejected.
+    address public legacyAgentTokenV3Implementation;
+
+    uint256 public v3SwapThresholdBasisPoints;
+
     error AgentAlreadyExists();
+    error RouterNotSet();
+    error TaxAccountingAdapterNotSet();
+    error NotLegacyV3AgentToken();
+    error LegacyV3ImplementationNotSet();
+
+    event V3ProjectTaxSwept(
+        address indexed agentToken,
+        uint256 agentSold,
+        uint256 virtualDeposited
+    );
+
+    event LegacyAgentTokenV3ImplementationUpdated(
+        address indexed previous,
+        address indexed current
+    );
+
+    /// @dev OpenZeppelin `Clones` EIP-1167 runtime bytecode length.
+    uint256 private constant EIP1167_CLONE_RUNTIME_LENGTH = 45;
 
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() {
@@ -242,9 +298,9 @@ contract AgentFactoryV7 is
         }
 
         // C2
-        address lp = IAgentTokenV3(token).liquidityPools()[0];
+        address lp = IAgentTokenV4(token).liquidityPools()[0];
         IERC20(assetToken).safeTransfer(token, initialAmount);
-        IAgentTokenV3(token).addInitialLiquidity(address(this));
+        IAgentTokenV4(token).addInitialLiquidity(address(this));
 
         // C3
         address veToken = _createNewAgentVeToken(
@@ -341,11 +397,12 @@ contract AgentFactoryV7 is
             revert AgentAlreadyExists();
         }
         _existingAgents[instance] = true;
-        IAgentTokenV3(instance).initialize(
+        IAgentTokenV4(instance).initialize(
             [_tokenAdmin, _uniswapRouter, assetToken],
             abi.encode(name, symbol),
             tokenSupplyParams_,
-            _tokenTaxParams
+            _tokenTaxParams,
+            taxAccountingAdapter
         );
 
         allTradingTokens.push(instance);
@@ -409,6 +466,7 @@ contract AgentFactoryV7 is
      * @dev For V7, projectTaxRecipient MUST be set to AgentTaxV2 address
      *      to enable on-chain tax attribution for graduated tokens.
      *      This is the key configuration difference from AgentFactoryV6.
+     *      Tax accounting adapter is configured separately via `setTaxAccountingAdapter`.
      */
     function setTokenParams(
         uint256 projectBuyTaxBasisPoints,
@@ -422,6 +480,119 @@ contract AgentFactoryV7 is
             taxSwapThresholdBasisPoints,
             projectTaxRecipient
         );
+    }
+
+    /**
+     * @notice Sets the TaxAccountingAdapter address injected into new AgentTokenV4 clones at initialize.
+     */
+    function setTaxAccountingAdapter(
+        address taxAccountingAdapter_
+    ) public onlyRole(DEFAULT_ADMIN_ROLE) {
+        taxAccountingAdapter = taxAccountingAdapter_;
+    }
+
+    /**
+     * @notice Stores the `AgentTokenV3` implementation address used for the legacy cohort. When set, sweeps reject clones
+     *         whose EIP-1167 implementation differs (e.g. AgentTokenV4 clones from the same factory).
+     */
+    function setLegacyAgentTokenV3Implementation(
+        address impl
+    ) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        address previous = legacyAgentTokenV3Implementation;
+        legacyAgentTokenV3Implementation = impl;
+        emit LegacyAgentTokenV3ImplementationUpdated(previous, impl);
+    }
+
+    /**
+     * @dev Returns the delegate target of an OpenZeppelin-style EIP-1167 clone, or `address(0)` if `instance` is not that shape.
+     */
+    function getCloneImplementation(
+        address instance
+    ) public view returns (address impl) {
+        bytes memory code = instance.code;
+        if (code.length != EIP1167_CLONE_RUNTIME_LENGTH) {
+            return address(0);
+        }
+        assembly {
+            impl := shr(96, mload(add(add(code, 0x20), 10)))
+        }
+    }
+
+    function setV3SwapThresholdBasisPoints(uint256 swapThresholdBasisPoints) public onlyRole(DEFAULT_ADMIN_ROLE) {
+        v3SwapThresholdBasisPoints = swapThresholdBasisPoints;
+    }
+
+    /**
+     * @notice Pulls pending project-tax agent tokens via `distributeTaxTokens`, swaps to `assetToken` with the same per-tx cap as in-token autoswap, then `depositTax` via `taxAccountingAdapter` (same path as AgentTokenV4).
+     * @dev Per-token migration (no token upgrade — uses existing `onlyOwnerOrFactory` on deployed agent tokens):
+     *      The sweep sets `projectTaxRecipient` to this factory when it is not already, then runs `distributeTaxTokens` (that order is required).
+     *      Call `sweepV3ProjectTaxToVirtualAndDeposit(agentToken)` (repeat until idle if above cap).
+     *      `legacyAgentTokenV3Implementation` must be set on the factory; then V4 clones are rejected (same EIP-1167 layout, different impl).
+     *      If `_factory` is not this contract, the token owner must coordinate — the factory cannot migrate alone.
+     *      Requires `taxAccountingAdapter` set with `taxRecipient` aligned to this factory's AgentTaxV2 (`_tokenTaxParams`).
+     *
+     *      Tax-listener / backend batching (e.g. Base mainnet pre–TaxAccountingAdapter cohort):
+     *      - Record `minVirtualId` / `maxVirtualId` from `BondingV5` at the cutoff (e.g. block before adapter go-live): virtual ids are
+     *        `BondingV5.VirtualIdBase + 1` … `VirtualIdBase + tokenInfos.length` at that snapshot (see `tokenInfo[token].virtualId` on each launch).
+     *      - For each `virtualId` in `[minVirtualId, maxVirtualId]`, resolve the bonding `token` (iterate `BondingV5.tokenInfos` or index events), read
+     *        `BondingV5.tokenInfo(token).tradingOnUniswap` and `agentToken`; only for graduated rows call this contract with `agentToken` (not the bonding-curve token).
+     *      - Run periodically: for each candidate `agentToken`, call `sweepV3ProjectTaxToVirtualAndDeposit(agentToken)` (handle revert/skips per token).
+     */
+    function sweepV3ProjectTaxToVirtualAndDeposit(
+        address agentToken
+    ) external onlyRole(SWEEP_V3_PROJECT_TAX_ROLE) noReentrant {
+        if (_uniswapRouter == address(0)) revert RouterNotSet();
+        if (taxAccountingAdapter == address(0)) revert TaxAccountingAdapterNotSet();
+
+        if (legacyAgentTokenV3Implementation == address(0)) revert LegacyV3ImplementationNotSet();
+        if (getCloneImplementation(agentToken) != legacyAgentTokenV3Implementation) revert NotLegacyV3AgentToken();
+
+        IAgentTokenV3Sweep token = IAgentTokenV3Sweep(agentToken);
+        if (token.projectTaxRecipient() != address(this)) {
+            token.setProjectTaxRecipient(address(this));
+        }
+        token.distributeTaxTokens();
+
+        // off-chain tax-listener will check the agentTokenBalance of the agentFactoryV7
+        // and call this function if the balance is greater than minThreshold
+        uint256 balance = IERC20(agentToken).balanceOf(address(this));
+        if (balance == 0) {
+            return;
+        }
+
+        uint256 totalSupply = IERC20(agentToken).totalSupply();
+        uint256 swapThresholdInTokens = (totalSupply *
+            v3SwapThresholdBasisPoints) /
+            V3_SWAP_THRESHOLD_DENOMINATOR;
+
+        uint256 swapBalance = balance;
+        if (swapThresholdInTokens > 0) {
+            uint256 cap = swapThresholdInTokens *
+                V3_MAX_SWAP_THRESHOLD_MULTIPLE;
+            if (swapBalance > cap) {
+                swapBalance = cap;
+            }
+        }
+
+        if (swapBalance == 0) {
+            return;
+        }
+
+        IERC20(agentToken).forceApprove(taxAccountingAdapter, swapBalance);
+        uint256 received = ITaxAccountingAdapter(taxAccountingAdapter).swapTaxAndDeposit(
+            agentToken,
+            assetToken,
+            _uniswapRouter,
+            swapBalance,
+            block.timestamp + 600
+        );
+        IERC20(agentToken).forceApprove(taxAccountingAdapter, 0);
+
+        if (received == 0) {
+            return;
+        }
+
+        emit V3ProjectTaxSwept(agentToken, swapBalance, received);
     }
 
     function pause() public onlyRole(DEFAULT_ADMIN_ROLE) {
@@ -535,14 +706,14 @@ contract AgentFactoryV7 is
         address token,
         address blacklistAddress
     ) public onlyRole(BONDING_ROLE) {
-        IAgentTokenV3(token).addBlacklistAddress(blacklistAddress);
+        IAgentTokenV4(token).addBlacklistAddress(blacklistAddress);
     }
 
     function removeBlacklistAddress(
         address token,
         address blacklistAddress
     ) public onlyRole(BONDING_ROLE) {
-        IAgentTokenV3(token).removeBlacklistAddress(blacklistAddress);
+        IAgentTokenV4(token).removeBlacklistAddress(blacklistAddress);
     }
 
     // amountAMin must be the amount of the uniswapPair.token0() that will be received

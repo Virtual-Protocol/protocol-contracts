@@ -10,7 +10,7 @@ import "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol
 
 import "./BondingConfig.sol";
 import "./IFPairV2.sol";
-import "../virtualPersona/IAgentTokenV2.sol";
+import "../virtualPersona/IAgentTokenV4.sol";
 
 // Minimal interfaces to reduce contract size
 interface IFFactoryV2Minimal {
@@ -281,12 +281,12 @@ contract BondingV5 is
         // this is to prevent transfer to blacklist address before graduation
         agentFactory.addBlacklistAddress(
             token,
-            IAgentTokenV2(token).liquidityPools()[0]
+            IAgentTokenV4(token).liquidityPools()[0]
         );
 
         // Calculate bonding curve supply in wei (base supply was validated at the beginning)
         uint256 bondingCurveSupply = bondingCurveSupplyBase *
-            (10 ** IAgentTokenV2(token).decimals());
+            (10 ** IAgentTokenV4(token).decimals());
         // Calculate total reserved supply for transfer
         uint256 totalReservedSupply = configInitialSupply -
             bondingCurveSupplyBase;
@@ -310,7 +310,7 @@ contract BondingV5 is
         if (totalReservedSupply > 0) {
             IERC20(token).safeTransfer(
                 bondingConfig.teamTokenReservedWallet(),
-                totalReservedSupply * (10 ** IAgentTokenV2(token).decimals())
+                totalReservedSupply * (10 ** IAgentTokenV4(token).decimals())
             );
         }
 
@@ -663,7 +663,7 @@ contract BondingV5 is
         // remove blacklist address after graduation, cuz executeBondingCurveApplicationSalt we will transfer all left agentTokens to the uniswapV2Pair
         agentFactory.removeBlacklistAddress(
             tokenAddress_,
-            IAgentTokenV2(tokenAddress_).liquidityPools()[0]
+            IAgentTokenV4(tokenAddress_).liquidityPools()[0]
         );
 
         // previously executeBondingCurveApplicationSalt will create agentToken and do two parts:

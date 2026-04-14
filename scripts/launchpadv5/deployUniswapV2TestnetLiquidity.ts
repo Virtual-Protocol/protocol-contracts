@@ -5,10 +5,11 @@
  * Works on any EVM chain where Hardhat can send txs (testnets without an official Uniswap).
  *
  * Usage:
- *   ENV_FILE=.env.launchpadv5_dev_bsc_testnet npx hardhat run scripts/launchpadv5/deployUniswapV2TestnetLiquidity.ts --network <your_network>
+ *   ENV_FILE=.env.launchpadv5_dev_abstract_testnet npx hardhat run scripts/launchpadv5/deployUniswapV2TestnetLiquidity.ts --network <your_network>
  *
  * Required env:
- *   VIRTUAL_TOKEN_ADDRESS   — existing ERC20 you already have on this chain (e.g. VIRTUAL)
+ *   VIRTUAL_TOKEN_ADDRESS   — existing ERC20 you already have on this chain (e.g. VIRTUAL).
+ *                             To deploy a mock with 1B supply: run deployMockVirtualToken.ts on this chain first.
  *
  * Optional env:
  *   UNISWAP_V2_ROUTER       — if set, skip deploying Factory/WETH/Router and use this router
@@ -59,6 +60,12 @@
  * Artifacts: @uniswap/v2-core (Factory), @uniswap/v2-periphery (WETH9, UniswapV2Router02).
  */
 import { parseUnits, dataSlice, MaxUint256, type FunctionFragment } from "ethers";
+import {
+  launchpadHeavyTxGasLimit,
+  upsertLaunchpadEnvFile,
+  promptYes,
+  isLaunchpadInteractive,
+} from "./utils";
 import FactoryArtifact from "@uniswap/v2-core/build/UniswapV2Factory.json";
 import WethArtifact from "@uniswap/v2-periphery/build/WETH9.json";
 import RouterArtifact from "@uniswap/v2-periphery/build/UniswapV2Router02.json";
@@ -138,11 +145,41 @@ function formatRevertError(err: unknown): string {
     console.log("Deployer:", deployerAddress);
     console.log("Chain ID:", chainId.toString());
 
-    const virtualToken = process.env.VIRTUAL_TOKEN_ADDRESS?.trim();
-    if (!virtualToken) {
-      throw new Error(
-        "VIRTUAL_TOKEN_ADDRESS is required (existing ERC20 on this chain)"
+    const envFile = process.env.ENV_FILE?.trim();
+    const virtualFromEnv = process.env.VIRTUAL_TOKEN_ADDRESS?.trim();
+    const taxFromEnv = process.env.AGENT_TAX_TAX_TOKEN?.trim();
+
+    let virtualToken: string;
+    if (!virtualFromEnv) {
+      const ok = await promptYes(
+        "VIRTUAL_TOKEN_ADDRESS is not set.\n" +
+          "Deploy mock VIRTUAL (MockERC20Decimals) and write VIRTUAL_TOKEN_ADDRESS + AGENT_TAX_TAX_TOKEN to ENV_FILE? [y/N] "
       );
+      if (!ok) {
+        if (!isLaunchpadInteractive()) {
+          throw new Error(
+            "VIRTUAL_TOKEN_ADDRESS missing: use an interactive terminal, set ENV_FILE + addresses manually, or unset LAUNCHPAD_NON_INTERACTIVE/CI."
+          );
+        }
+        throw new Error(
+          "VIRTUAL_TOKEN_ADDRESS is required (existing ERC20 on this chain, or accept mock deploy prompt)."
+        );
+      }
+      const { deployMockVirtualTokenSuite } = await import(
+        "./deployMockVirtualToken"
+      );
+      const { address } = await deployMockVirtualTokenSuite();
+      virtualToken = address;
+    } else {
+      virtualToken = virtualFromEnv;
+      if (!taxFromEnv) {
+        upsertLaunchpadEnvFile(
+          envFile,
+          "AGENT_TAX_TAX_TOKEN",
+          virtualToken
+        );
+        process.env.AGENT_TAX_TAX_TOKEN = virtualToken;
+      }
     }
 
     const liquidityHuman = process.env.LIQUIDITY_AMOUNT?.trim() || "10";
@@ -204,7 +241,9 @@ function formatRevertError(err: unknown): string {
         RouterArtifact.bytecode,
         deployer
       );
-      const router = await Router.deploy(factoryAddr, wethAddr);
+      const router = await Router.deploy(factoryAddr, wethAddr, {
+        gasLimit: launchpadHeavyTxGasLimit(),
+      });
       await router.waitForDeployment();
       routerAddr = await router.getAddress();
       console.log("UniswapV2Router02:", routerAddr);
@@ -483,6 +522,12 @@ function formatRevertError(err: unknown): string {
     console.log(`# WETH9=${wethAddr}`);
     console.log(`# VIRTUAL_STABLE_PAIR=${pairAddr}`);
     console.log("=".repeat(72) + "\n");
+
+    if (envFile) {
+      upsertLaunchpadEnvFile(envFile, "UNISWAP_V2_ROUTER", routerAddr);
+      upsertLaunchpadEnvFile(envFile, "AGENT_TAX_DEX_ROUTER", routerAddr);
+      upsertLaunchpadEnvFile(envFile, "AGENT_TAX_ASSET_TOKEN", usdcAddr!);
+    }
   } catch (e: any) {
     console.error(e);
     process.exit(1);

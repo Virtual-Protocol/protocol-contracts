@@ -3,7 +3,8 @@
  * 
  * Usage:
  *   ENV_FILE=.env.launchpadv5_local npx hardhat run scripts/launchpadv5/e2e_test.ts --network local
- *   ENV_FILE=.env.launchpadv5_dev npx hardhat run scripts/launchpadv5/e2e_test.ts --network base_sepolia
+ *   ENV_FILE=.env.launchpadv5_dev_abstract_testnet npx hardhat run scripts/launchpadv5/e2e_test.ts --network abstract_testnet
+ *   ENV_FILE=.env.launchpadv5_dev_monad_testnet npx hardhat run scripts/launchpadv5/e2e_test.ts --network monad_testnet
  *   ENV_FILE=.env.launchpadv5_prod npx hardhat run scripts/launchpadv5/e2e_test.ts --network base
  */
 import { parseEther, formatEther } from "ethers";
@@ -20,6 +21,7 @@ import {
   ANTI_SNIPER_98M,
   launchModeLabel,
 } from "./launchpadv5Common";
+import { launchpadDefaultTxGasLimit } from "./utils";
 const { ethers } = require("hardhat");
 
 interface TestConfig {
@@ -126,21 +128,22 @@ async function main() {
   const virtualBalance = await virtualToken.balanceOf(signerAddress);
   console.log("VIRTUAL Balance:", formatEther(virtualBalance), "VIRTUAL");
 
-  // Approve if needed - always approve to ensure sufficient allowance
+  // Approve if needed. Use max for FRouterV3 so a large second buy (e.g. parseEther("50000") to graduate)
+  // cannot hit ERC20InsufficientAllowance — Step 2 previously used 10k cap which broke that path.
   const currentAllowance = await virtualToken.allowance(signerAddress, config.bondingV5Address);
-  const requiredAllowance = parseEther("10000");
+  const requiredAllowance = ethers.MaxUint256;
   console.log("\n--- Checking BondingV5 Allowance ---");
   console.log("Signer Address:", signerAddress);
   console.log("BondingV5 Address:", config.bondingV5Address);
   console.log("Current Allowance:", currentAllowance.toString(), `(${formatEther(currentAllowance)} VIRTUAL)`);
-  console.log("Required Allowance:", requiredAllowance.toString(), `(${formatEther(requiredAllowance)} VIRTUAL)`);
+  console.log("Target: MaxUint256 (unlimited spend cap for test harness)");
   console.log("Allowance sufficient?", BigInt(currentAllowance) >= BigInt(requiredAllowance));
   
   if (BigInt(currentAllowance) < BigInt(requiredAllowance)) {
     console.log("\n--- Approving VIRTUAL tokens to BondingV5 ---");
     const approveTx = await virtualToken.approve(config.bondingV5Address, requiredAllowance);
     await approveTx.wait();
-    console.log("✅ Approved", formatEther(requiredAllowance), "VIRTUAL to BondingV5");
+    console.log("✅ Approved MaxUint256 to BondingV5");
     
     // Verify the approval
     const newAllowance = await virtualToken.allowance(signerAddress, config.bondingV5Address);
@@ -159,7 +162,7 @@ async function main() {
     console.log("\n--- Approving VIRTUAL tokens to FRouterV3 ---");
     const approveTx = await virtualToken.approve(config.fRouterV3Address, requiredAllowance);
     await approveTx.wait();
-    console.log("✅ Approved", formatEther(requiredAllowance), "VIRTUAL to FRouterV3");
+    console.log("✅ Approved MaxUint256 to FRouterV3");
   } else {
     console.log("✅ Already approved sufficient VIRTUAL tokens to FRouterV3");
   }
@@ -453,7 +456,9 @@ async function main() {
   console.log("Agent Token Balance Before:", formatEther(agentTokenBalanceBefore), "tokens");
 
   console.log("\n--- Executing buy (during anti-sniper period) ---");
-  const buyTx = await bondingV5.buy(buyAmount, tokenAddress, 0, deadline, { gasLimit: 500000 });
+  const buyTx = await bondingV5.buy(buyAmount, tokenAddress, 0, deadline, {
+    gasLimit: launchpadDefaultTxGasLimit(),
+  });
   const buyReceipt = await buyTx.wait();
   console.log("✅ buy() transaction successful!");
   console.log("Gas Used:", buyReceipt.gasUsed.toString());
@@ -509,7 +514,9 @@ async function main() {
   // Step 8: Test Buy After Anti-Sniper Period (if applicable)
   // ============================================
   console.log("\n" + "=".repeat(80));
-  console.log("  Step 8: Wait for Anti-Sniper Period to End and Test Buy");
+  console.log(
+    "  Step 8: Wait for Anti-Sniper Period to End (sell runs next while still in private pool)"
+  );
   console.log("=".repeat(80));
 
   // Wait for anti-sniper period to end if still active
@@ -534,49 +541,15 @@ async function main() {
   const hasAntiSniperTaxAfterWait = await fRouterV3.hasAntiSniperTax(pairAddress);
   console.log("\nAnti-Sniper Tax Active After Wait:", hasAntiSniperTaxAfterWait);
 
-  // Get tax vault balances before second buy
-  const taxVaultBalanceBeforeBuy2 = await virtualToken.balanceOf(taxVault);
-  const antiSniperTaxVaultBalanceBeforeBuy2 = await virtualToken.balanceOf(antiSniperTaxVault);
-
-  console.log("\n--- Tax Vault Balances Before Second Buy ---");
-  console.log("Tax Vault Balance:", formatEther(taxVaultBalanceBeforeBuy2), "VIRTUAL");
-  console.log("Anti-Sniper Tax Vault Balance:", formatEther(antiSniperTaxVaultBalanceBeforeBuy2), "VIRTUAL");
-
-  const buyAmount2 = parseEther("5"); // 5 VIRTUAL
-  const deadline2 = Math.floor(Date.now() / 1000) + 300;
-
-  console.log("\n--- Executing buy (after anti-sniper period) ---");
-  const buyTx2 = await bondingV5.buy(buyAmount2, tokenAddress, 0, deadline2, { gasLimit: 500000 });
-  const buyReceipt2 = await buyTx2.wait();
-  console.log("✅ buy() transaction successful!");
-  console.log("Gas Used:", buyReceipt2.gasUsed.toString());
-
-  // Get tax vault balances after second buy
-  const taxVaultBalanceAfterBuy2 = await virtualToken.balanceOf(taxVault);
-  const antiSniperTaxVaultBalanceAfterBuy2 = await virtualToken.balanceOf(antiSniperTaxVault);
-  
-  const normalTaxCollected2 = taxVaultBalanceAfterBuy2 - taxVaultBalanceBeforeBuy2;
-  const antiSniperTaxCollected2 = antiSniperTaxVaultBalanceAfterBuy2 - antiSniperTaxVaultBalanceBeforeBuy2;
-  
-  console.log("\n--- Tax Collected After Anti-Sniper Period ---");
-  console.log("Normal Tax Collected:", formatEther(normalTaxCollected2), "VIRTUAL");
-  console.log("Anti-Sniper Tax Collected:", formatEther(antiSniperTaxCollected2), "VIRTUAL");
-
-  // Calculate expected normal tax
-  const expectedNormalTax2 = (buyAmount2 * BigInt(buyTax)) / 100n;
-  console.log("Expected Normal Tax (", buyTax.toString(), "% of", formatEther(buyAmount2), "):", formatEther(expectedNormalTax2), "VIRTUAL");
-
-  if (!hasAntiSniperTaxAfterWait && BigInt(normalTaxCollected2) > 0n && BigInt(antiSniperTaxCollected2) === 0n) {
-    console.log("✅ After anti-sniper period: Only normal tax collected (no anti-sniper tax)");
-  } else if (hasAntiSniperTaxAfterWait) {
-    console.log("⚠️ Anti-sniper period still active (may need longer wait time)");
-  }
-
   // ============================================
-  // Step 9: Test Sell with Tax Verification
+  // Step 9: Test Sell with Tax Verification (bonding / private pool — before second buy)
   // ============================================
+  // Second buy is placed after sell so a large buy2 can graduate the token; post-graduation
+  // sells go through UniV2, not bondingV5.sell().
   console.log("\n" + "=".repeat(80));
-  console.log("  Step 9: Test Sell with Tax Verification");
+  console.log(
+    "  Step 9: Test Sell with Tax Verification (private pool — before second buy / graduation)"
+  );
   console.log("=".repeat(80));
 
   // Get updated token balance
@@ -604,7 +577,9 @@ async function main() {
 
   console.log("\n--- Executing sell ---");
   const sellDeadline = Math.floor(Date.now() / 1000) + 300;
-  const sellTx = await bondingV5.sell(sellAmount, tokenAddress, 0, sellDeadline, { gasLimit: 500000 });
+  const sellTx = await bondingV5.sell(sellAmount, tokenAddress, 0, sellDeadline, {
+    gasLimit: launchpadDefaultTxGasLimit(),
+  });
   const sellReceipt = await sellTx.wait();
   console.log("✅ sell() transaction successful!");
   console.log("Gas Used:", sellReceipt.gasUsed.toString());
@@ -629,10 +604,60 @@ async function main() {
   }
 
   // ============================================
-  // Step 10: Verify Tax in AgentTaxV2
+  // Step 10: Second buy after anti-sniper (may graduate)
   // ============================================
   console.log("\n" + "=".repeat(80));
-  console.log("  Step 10: Verify Tax in AgentTaxV2");
+  console.log(
+    "  Step 10: Second Buy After Anti-Sniper (normal tax; may graduate to UniV2)"
+  );
+  console.log("=".repeat(80));
+
+  // Get tax vault balances before second buy (after sell, so buy2 delta is correct)
+  const taxVaultBalanceBeforeBuy2 = await virtualToken.balanceOf(taxVault);
+  const antiSniperTaxVaultBalanceBeforeBuy2 = await virtualToken.balanceOf(antiSniperTaxVault);
+
+  console.log("\n--- Tax Vault Balances Before Second Buy ---");
+  console.log("Tax Vault Balance:", formatEther(taxVaultBalanceBeforeBuy2), "VIRTUAL");
+  console.log("Anti-Sniper Tax Vault Balance:", formatEther(antiSniperTaxVaultBalanceBeforeBuy2), "VIRTUAL");
+
+  // Large buy may graduate; wallet must hold enough VIRTUAL + FRouter allowance (set in Step 2).
+  const buyAmount2 = parseEther("50000"); // 50_000 VIRTUAL
+  const deadline2 = Math.floor(Date.now() / 1000) + 300;
+
+  console.log("\n--- Executing buy (after anti-sniper period) ---");
+  const buyTx2 = await bondingV5.buy(buyAmount2, tokenAddress, 0, deadline2, {
+    gasLimit: launchpadDefaultTxGasLimit(),
+  });
+  const buyReceipt2 = await buyTx2.wait();
+  console.log("✅ buy() transaction successful!");
+  console.log("Gas Used:", buyReceipt2.gasUsed.toString());
+
+  // Get tax vault balances after second buy
+  const taxVaultBalanceAfterBuy2 = await virtualToken.balanceOf(taxVault);
+  const antiSniperTaxVaultBalanceAfterBuy2 = await virtualToken.balanceOf(antiSniperTaxVault);
+  
+  const normalTaxCollected2 = taxVaultBalanceAfterBuy2 - taxVaultBalanceBeforeBuy2;
+  const antiSniperTaxCollected2 = antiSniperTaxVaultBalanceAfterBuy2 - antiSniperTaxVaultBalanceBeforeBuy2;
+  
+  console.log("\n--- Tax Collected After Anti-Sniper Period ---");
+  console.log("Normal Tax Collected:", formatEther(normalTaxCollected2), "VIRTUAL");
+  console.log("Anti-Sniper Tax Collected:", formatEther(antiSniperTaxCollected2), "VIRTUAL");
+
+  // Calculate expected normal tax
+  const expectedNormalTax2 = (buyAmount2 * BigInt(buyTax)) / 100n;
+  console.log("Expected Normal Tax (", buyTax.toString(), "% of", formatEther(buyAmount2), "):", formatEther(expectedNormalTax2), "VIRTUAL");
+
+  if (!hasAntiSniperTaxAfterWait && BigInt(normalTaxCollected2) > 0n && BigInt(antiSniperTaxCollected2) === 0n) {
+    console.log("✅ After anti-sniper period: Only normal tax collected (no anti-sniper tax)");
+  } else if (hasAntiSniperTaxAfterWait) {
+    console.log("⚠️ Anti-sniper period still active (may need longer wait time)");
+  }
+
+  // ============================================
+  // Step 11: Verify Tax in AgentTaxV2
+  // ============================================
+  console.log("\n" + "=".repeat(80));
+  console.log("  Step 11: Verify Tax in AgentTaxV2");
   console.log("=".repeat(80));
 
   const agentTaxV2Address = process.env.AGENT_TAX_V2_CONTRACT_ADDRESS;
@@ -684,10 +709,10 @@ async function main() {
     console.log("Treasury:", treasuryAddress);
     
     // ============================================
-    // Step 11: Test batchSwapForTokenAddress with Deployer
+    // Step 12: Test batchSwapForTokenAddress with Deployer
     // ============================================
     console.log("\n" + "=".repeat(80));
-    console.log("  Step 11: Test batchSwapForTokenAddress with Deployer");
+    console.log("  Step 12: Test batchSwapForTokenAddress with Deployer");
     console.log("=".repeat(80));
     
     if (pendingTax < minSwapThreshold) {
@@ -728,8 +753,8 @@ async function main() {
   console.log("  8. Fee calculation correct (ACF fee for immediate launch)");
   console.log("  9. launch() executed successfully after start time");
   console.log("  10. buy() during anti-sniper period - tax to antiSniperTaxVault");
-  console.log("  11. buy() after anti-sniper period - normal tax to taxVault (AgentTaxV2)");
-  console.log("  12. sell() executed with correct tax collection to AgentTaxV2");
+  console.log("  11. sell() in bonding pool before second buy - tax to taxVault (graduation-safe order)");
+  console.log("  12. buy() after anti-sniper period - normal tax to taxVault (may graduate to UniV2)");
   console.log("  13. AgentTaxV2 has recorded tax for launched token");
   console.log("  14. batchSwapForTokenAddress successfully distributes tax (if threshold met)");
 

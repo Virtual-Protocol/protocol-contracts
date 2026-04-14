@@ -116,6 +116,7 @@ contract TaxAccountingAdapter is
         if (received > 0) {
             IERC20(pairToken_).forceApprove(taxRecipient, received);
             IAgentTaxForToken(taxRecipient).depositTax(agentToken_, received);
+            IERC20(pairToken_).forceApprove(taxRecipient, 0);
             emit TaxSwapDeposited(agentToken_, taxRecipient, received);
         }
 

@@ -173,6 +173,8 @@ contract AgentFactoryV7 is
     ///         so V4 clones (same proxy pattern, different impl) are rejected.
     address public legacyAgentTokenV3Implementation;
 
+    uint256 public v3SwapThresholdBasisPoints;
+
     error AgentAlreadyExists();
     error RouterNotSet();
     error TaxAccountingAdapterNotSet();
@@ -516,6 +518,10 @@ contract AgentFactoryV7 is
         }
     }
 
+    function setV3SwapThresholdBasisPoints(uint256 swapThresholdBasisPoints) public onlyRole(DEFAULT_ADMIN_ROLE) {
+        v3SwapThresholdBasisPoints = swapThresholdBasisPoints;
+    }
+
     /**
      * @notice Pulls pending project-tax agent tokens via `distributeTaxTokens`, swaps to `assetToken` with the same per-tx cap as in-token autoswap, then `depositTax` via `taxAccountingAdapter` (same path as AgentTokenV4).
      * @dev Per-token migration (no token upgrade — uses existing `onlyOwnerOrFactory` on deployed agent tokens):
@@ -556,7 +562,7 @@ contract AgentFactoryV7 is
 
         uint256 totalSupply = IERC20(agentToken).totalSupply();
         uint256 swapThresholdInTokens = (totalSupply *
-            uint256(token.swapThresholdBasisPoints())) /
+            v3SwapThresholdBasisPoints) /
             V3_SWAP_THRESHOLD_DENOMINATOR;
 
         uint256 swapBalance = balance;

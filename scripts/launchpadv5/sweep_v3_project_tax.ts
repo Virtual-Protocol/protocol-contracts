@@ -41,7 +41,7 @@ const SWEEP_V3_PROJECT_TAX_ROLE = ethers.keccak256(
 // ============================================
 // Agent token to sweep — hardcoded (change per regression / network)
 // ============================================
-const AGENT_TOKEN = "0xC4C27033ac81b7f6CE94bFcf5577956d5B690a08";
+const AGENT_TOKEN = "0xf11e998C52AB2860693337A31244E3C4312B449d";
 
 function assertSuccessfulReceipt(
   receipt: TransactionReceipt | null,

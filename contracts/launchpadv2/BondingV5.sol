@@ -109,6 +109,8 @@ contract BondingV5 is
     // Mapping to store graduation threshold for each token (calculated per-token based on airdropBips and needAcf)
     mapping(address => uint256) public tokenGradThreshold;
 
+    mapping(address => bool) public isFeeDelegation;
+
     event PreLaunched(
         address indexed token,
         address indexed pair,
@@ -173,7 +175,8 @@ contract BondingV5 is
         uint16 airdropBips_,
         bool needAcf_,
         uint8 antiSniperTaxType_,
-        bool isProject60days_
+        bool isProject60days_,
+        bool isFeeDelegation_
     ) public nonReentrant returns (address, address, uint, uint256) {
         // Fail-fast: validate reserve bips and calculate bonding curve supply upfront
         // This validates: airdropBips <= maxAirdropBips AND totalReserved < maxTotalReservedBips
@@ -350,6 +353,7 @@ contract BondingV5 is
             antiSniperTaxType: antiSniperTaxType_,
             isProject60days: isProject60days_
         });
+        isFeeDelegation[token] = isFeeDelegation_;
 
         // Set Data struct fields
         newToken.data.token = token;
@@ -448,7 +452,7 @@ contract BondingV5 is
 
         // X_LAUNCH, ACP_SKILL, and Project60days: taxRecipient (AgentTax) must be updated by the backend
         // before trading starts; only privileged backend wallets may call launch() so that ordering is enforced.
-        if (isProject60days(tokenAddress_) || isProjectXLaunch(tokenAddress_) || isAcpSkillLaunch(tokenAddress_)) {
+        if (isFeeDelegation[tokenAddress_] || isProject60days(tokenAddress_) || isProjectXLaunch(tokenAddress_) || isAcpSkillLaunch(tokenAddress_)) {
             if (!bondingConfig.isPrivilegedLauncher(msg.sender)) {
                 revert UnauthorizedLauncher();
             }

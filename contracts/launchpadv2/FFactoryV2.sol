@@ -113,6 +113,9 @@ contract FFactoryV2 is
         address antiSniperTaxVault_
     ) public onlyRole(ADMIN_ROLE) {
         require(newVault_ != address(0), "Zero addresses are not allowed.");
+        require(buyTax_ <= 99, "buyTax exceeds maximum");
+        require(sellTax_ <= 99, "sellTax exceeds maximum");
+        require(antiSniperBuyTaxStartValue_ <= 99, "antiSniper exceeds maximum");
 
         taxVault = newVault_;
         buyTax = buyTax_;

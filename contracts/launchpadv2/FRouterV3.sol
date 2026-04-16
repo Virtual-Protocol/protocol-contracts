@@ -359,7 +359,7 @@ contract FRouterV3 is
 
     /**
      * @dev Drain all assets and tokens from a private pool (FPairV2)
-     * Only callable by EXECUTOR_ROLE and only for Project60days tokens
+     * Only callable by BE_OPS_ROLE and only for Project60days tokens
      * @param tokenAddress The address of the fun token (must be isProject60days)
      * @param recipient The address that will receive the drained assets and tokens
      * @return assetAmount Amount of asset tokens drained

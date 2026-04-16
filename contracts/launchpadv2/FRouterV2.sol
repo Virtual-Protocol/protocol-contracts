@@ -476,7 +476,7 @@ contract FRouterV2 is
 
         // Call removeLpLiquidity through AgentFactoryV6
         // amountAMin and amountBMin set to 0 - this is a privileged drain operation
-        // No slippage protection needed since EXECUTOR_ROLE is trusted
+        // No slippage protection needed since BE_OPS_ROLE is trusted
         address agentFactory = bondingV2.agentFactory();
         IAgentFactoryV6(agentFactory).removeLpLiquidity(
             veToken,

@@ -24,7 +24,7 @@ contract FFactoryV2 is
     address public taxVault;
     uint256 public buyTax;
     uint256 public sellTax;
-    uint256 public antiSniperBuyTaxStartValue; // Starting tax value for anti-sniper (in basis points)
+    uint256 public antiSniperBuyTaxStartValue; // Anti-sniper starting tax (percentage, e.g. 99 = 99%)
     address public antiSniperTaxVault;
 
     event PairCreated(
@@ -117,6 +117,10 @@ contract FFactoryV2 is
         require(buyTax_ <= 99, "buyTax exceeds maximum");
         require(sellTax_ <= 99, "sellTax exceeds maximum");
         require(antiSniperBuyTaxStartValue_ <= 99, "antiSniper exceeds maximum");
+        require(
+            buyTax_ + antiSniperBuyTaxStartValue_ <= 100,
+            "Tax sum exceeds 100%"
+        );
 
         taxVault = newVault_;
         buyTax = buyTax_;

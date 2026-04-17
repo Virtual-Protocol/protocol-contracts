@@ -117,9 +117,18 @@ module.exports = {
     deployer: `privatekey://${process.env.PRIVATE_KEY}`,
   },
   etherscan: {
-    // Etherscan.io API keys work for v2 multi-chain verification (incl. Abscan-backed chains).
+    // Etherscan API V2 (single key, multichain via chainid): https://docs.etherscan.io/v2-migration
+    // Do not use legacy api.basescan.org/api — Hardhat-verify reports deprecated V1 / log fetch failures.
     apiKey: process.env.ETHERSCAN_API_KEY,
     customChains: [
+      {
+        network: "base",
+        chainId: 8453,
+        urls: {
+          apiURL: "https://api.etherscan.io/v2/api",
+          browserURL: "https://basescan.org/",
+        },
+      },
       {
         network: "base_sepolia",
         chainId: 84532,

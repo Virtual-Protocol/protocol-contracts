@@ -34,6 +34,7 @@ contract FRouterV2 is
 
     bytes32 public constant ADMIN_ROLE = keccak256("ADMIN_ROLE");
     bytes32 public constant EXECUTOR_ROLE = keccak256("EXECUTOR_ROLE");
+    bytes32 public constant BE_OPS_ROLE = keccak256("BE_OPS_ROLE");
 
     FFactoryV2 public factory;
     address public assetToken;
@@ -280,7 +281,7 @@ contract FRouterV2 is
     function resetTime(
         address tokenAddress,
         uint256 newStartTime
-    ) external onlyRole(EXECUTOR_ROLE) nonReentrant {
+    ) external onlyRole(BE_OPS_ROLE) nonReentrant {
         address pairAddress = factory.getPair(tokenAddress, assetToken);
 
         IFPairV2 pair = IFPairV2(pairAddress);
@@ -372,7 +373,7 @@ contract FRouterV2 is
 
     /**
      * @dev Drain all assets and tokens from a private pool (FPairV2)
-     * Only callable by EXECUTOR_ROLE and only for Project60days tokens
+     * Only callable by BE_OPS_ROLE and only for Project60days tokens
      * @param tokenAddress The address of the fun token (must be isProject60days)
      * @param recipient The address that will receive the drained assets and tokens
      * @return assetAmount Amount of asset tokens drained
@@ -381,7 +382,7 @@ contract FRouterV2 is
     function drainPrivatePool(
         address tokenAddress,
         address recipient
-    ) public onlyRole(EXECUTOR_ROLE) nonReentrant returns (uint256, uint256) {
+    ) public onlyRole(BE_OPS_ROLE) nonReentrant returns (uint256, uint256) {
         require(address(bondingV2) != address(0), "BondingV2 not set");
         require(tokenAddress != address(0), "Zero addresses are not allowed.");
         require(recipient != address(0), "Zero addresses are not allowed.");
@@ -425,7 +426,7 @@ contract FRouterV2 is
 
     /**
      * @dev Drain ALL liquidity from a UniswapV2 pool (for graduated tokens)
-     * Only callable by EXECUTOR_ROLE and only for Project60days tokens
+     * Only callable by BE_OPS_ROLE and only for Project60days tokens
      * @param agentToken The token address (same as agentToken in single token model, must be isProject60days)
      * @param veToken The veToken address (staked LP token) to drain from
      * @param recipient The address that will receive the drained liquidity
@@ -438,7 +439,7 @@ contract FRouterV2 is
         address veToken,
         address recipient,
         uint256 deadline
-    ) public onlyRole(EXECUTOR_ROLE) nonReentrant {
+    ) public onlyRole(BE_OPS_ROLE) nonReentrant {
         require(address(bondingV2) != address(0), "BondingV2 not set");
         require(agentToken != address(0), "Invalid agentToken");
         require(veToken != address(0), "Invalid veToken");
@@ -475,7 +476,7 @@ contract FRouterV2 is
 
         // Call removeLpLiquidity through AgentFactoryV6
         // amountAMin and amountBMin set to 0 - this is a privileged drain operation
-        // No slippage protection needed since EXECUTOR_ROLE is trusted
+        // No slippage protection needed since BE_OPS_ROLE is trusted
         address agentFactory = bondingV2.agentFactory();
         IAgentFactoryV6(agentFactory).removeLpLiquidity(
             veToken,

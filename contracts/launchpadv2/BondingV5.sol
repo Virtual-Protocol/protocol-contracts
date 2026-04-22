@@ -414,7 +414,7 @@ contract BondingV5 is
         return (token, pair, tokenInfo[token].virtualId, initialPurchase);
     }
 
-    function cancelLaunch(address tokenAddress_) public {
+    function cancelLaunch(address tokenAddress_) public nonReentrant() {
         BondingConfig.Token storage tokenRef = tokenInfo[tokenAddress_];
 
         // Validate that the token exists and was properly prelaunched

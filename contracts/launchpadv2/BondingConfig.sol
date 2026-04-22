@@ -178,6 +178,9 @@ contract BondingConfig is Initializable, OwnableUpgradeable {
     function setBondingCurveParams(
         BondingCurveParams memory params_
     ) external onlyOwner {
+        require(params_.fakeInitialVirtualLiq > 0, "fakeInitialVirtualLiq cannot be zero");
+        require(params_.targetRealVirtual > 0, "targetRealVirtual cannot be zero");
+        
         bondingCurveParams = params_;
         emit BondingCurveParamsUpdated(params_);
     }

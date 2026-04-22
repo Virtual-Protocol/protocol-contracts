@@ -46,6 +46,10 @@ function walletFromPk(pk: string | undefined, label: string) {
   return new ethers.Wallet(t, ethers.provider);
 }
 
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
 async function main() {
   const mode = (process.env.DRAIN_LIQUIDITY_MODE || "univ2")
     .trim()
@@ -104,12 +108,37 @@ async function main() {
     );
   }
 
-  const execRole = await fRouterV3.EXECUTOR_ROLE();
-  if (!(await fRouterV3.hasRole(execRole, executorAddress))) {
+  const beOpsRole = await fRouterV3.BE_OPS_ROLE();
+  if (!(await fRouterV3.hasRole(beOpsRole, executorAddress))) {
     throw new Error(
-      `Executor ${executorAddress} lacks EXECUTOR_ROLE on FRouterV3`
+      `Executor ${executorAddress} lacks BE_OPS_ROLE on FRouterV3`
     );
   }
+
+  /**
+   * drainUniV2Pool is onlyRole(BE_OPS_ROLE) on FRouter, but it calls
+   * AgentFactoryV7.removeLpLiquidity — that uses msg.sender == FRouter, so the
+   * **router contract** must hold REMOVE_LIQUIDITY_ROLE on the factory (not your EOA).
+   */
+  const agentFactoryAddress = await bondingV5.agentFactory();
+  const agentFactory = await ethers.getContractAt(
+    "AgentFactoryV7",
+    agentFactoryAddress
+  );
+  const removeLiqRole = await agentFactory.REMOVE_LIQUIDITY_ROLE();
+  if (!(await agentFactory.hasRole(removeLiqRole, fRouterV3Address))) {
+    throw new Error(
+      `FRouterV3 ${fRouterV3Address} is missing REMOVE_LIQUIDITY_ROLE on AgentFactoryV7 ${agentFactoryAddress}. ` +
+        `BE_OPS_ROLE only allows your wallet to call drainUniV2Pool on the router; ` +
+        `the router then calls agentFactory.removeLpLiquidity (as msg.sender = FRouter). ` +
+        `Fix: admin on AgentFactoryV7 must grantRole(REMOVE_LIQUIDITY_ROLE, <this FRouterV3 address>).`
+    );
+  }
+  console.log(
+    "AgentFactory REMOVE_LIQUIDITY_ROLE on FRouterV3:",
+    fRouterV3Address,
+    "✅"
+  );
 
   const bal = await virtualToken.balanceOf(creatorAddress);
   if (mode === "univ2" && bal < GRAD_BUY_AMOUNT) {
@@ -192,9 +221,13 @@ async function main() {
   const veToken = await findVeTokenForAgentToken(agentNftV2, tokenAddress);
   console.log("veToken:", veToken);
 
-  const latest = await ethers.provider.getBlock("latest");
-  const deadline = BigInt(latest!.timestamp) + 3600n;
+  await sleep(10000); // wait for 10 seconds to drain
+
+  // `removeLiquidity` needs deadline > block.timestamp. Using wall clock avoids RPC
+  // "latest" block timestamp lag; ensure this machine's time is not behind the chain.
+  const deadline = BigInt(Math.floor(Date.now() / 1000)) + 3600n;
   console.log("\n--- 5) drainUniV2Pool → creator ---");
+  console.log("deadline (unix s):", deadline.toString());
   const txU = await fRouterV3.drainUniV2Pool(
     tokenAddress,
     veToken,

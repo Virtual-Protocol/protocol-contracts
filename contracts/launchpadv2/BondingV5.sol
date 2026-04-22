@@ -147,6 +147,25 @@ contract BondingV5 is
         _disableInitializers();
     }
 
+    /// @notice Decode `isFeeDelegation` from optional extension calldata.
+    /// @dev V1 layout: first 32 bytes = `abi.encode(bool isFeeDelegation)` (standard ABI word).
+    ///      Empty `extParams` or length less than 32 ⇒ false. Extra trailing bytes are ignored here so
+    ///      callers can forward-compat append more values after the bool (same encoding rules).
+    ///      Non-canonical bool words (not 0 or 1) ⇒ false.
+    function _decodeIsFeeDelegation(bytes calldata extParams) internal pure returns (bool) {
+        if (extParams.length < 32) {
+            return false;
+        }
+        bytes32 word;
+        assembly ("memory-safe") {
+            word := calldataload(extParams.offset)
+        }
+        uint256 v = uint256(word);
+        if (v == 1) return true;
+        if (v == 0) return false;
+        return false;
+    }
+
     function initialize(
         address factory_,
         address router_,
@@ -162,6 +181,9 @@ contract BondingV5 is
         bondingConfig = BondingConfig(bondingConfig_);
     }
 
+    /// @param extParams_ Optional extension payload. V1: `abi.encode(bool isFeeDelegation)`; use
+    ///         `""` (empty) to default `isFeeDelegation` to false. Future versions may use
+    ///         `abi.encode(bool, ...)`; this function only reads the first bool word.
     function preLaunch(
         string memory name_,
         string memory ticker_,
@@ -176,8 +198,10 @@ contract BondingV5 is
         bool needAcf_,
         uint8 antiSniperTaxType_,
         bool isProject60days_,
-        bool isFeeDelegation_
+        bytes calldata extParams_
     ) public nonReentrant returns (address, address, uint, uint256) {
+        bool isFeeDelegation_ = _decodeIsFeeDelegation(extParams_);
+
         // Fail-fast: validate reserve bips and calculate bonding curve supply upfront
         // This validates: airdropBips <= maxAirdropBips AND totalReserved < maxTotalReservedBips
         uint256 bondingCurveSupplyBase = bondingConfig

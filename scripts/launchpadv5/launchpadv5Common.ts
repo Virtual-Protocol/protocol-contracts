@@ -1,7 +1,7 @@
 /**
  * Shared BondingV5 launch + Project60days graduation helpers for scripts (e2e, drain tests).
  */
-import { formatEther, parseEther } from "ethers";
+import { AbiCoder, formatEther, parseEther } from "ethers";
 import type { Contract, Signer } from "ethers";
 import {
   launchpadDefaultTxGasLimit,
@@ -27,6 +27,26 @@ export const DEFAULT_SCHEDULED_START_OFFSET_SEC = 86400;
 
 /** Aligns with BondingConfig 60s anti-sniper window (ANTI_SNIPER_60S); override via ANTI_SNIPER_WAIT_SECONDS */
 export const DEFAULT_ANTI_SNIPER_WAIT_BEFORE_GRAD_SEC = 60 + 10;
+
+/**
+ * BondingV5 `preLaunch` extParams V1: first 32 bytes = `abi.encode(bool isFeeDelegation)` (app: fee delegation).
+ * Used as default for script helpers so `bondingV5.isFeeDelegation(token)` is true after preLaunch.
+ */
+export const PRELAUNCH_EXT_PARAMS_FEE_DELEGATION_TRUE =
+  AbiCoder.defaultAbiCoder().encode(["bool"], [true]) as `0x${string}`;
+
+/** Empty extParams ⇒ on-chain `isFeeDelegation` false (BondingV5 `_decodeIsFeeDelegation`). */
+export const PRELAUNCH_EXT_PARAMS_NONE = "0x" as const;
+
+/**
+ * Mirrors BondingV5 `_decodeIsFeeDelegation` — used to know if `launch()` requires `BondingConfig.isPrivilegedLauncher`.
+ */
+export function extParamsImpliesFeeDelegation(extParams: string): boolean {
+  const hex = extParams.startsWith("0x") ? extParams.slice(2) : extParams;
+  if (hex.length < 64) return false;
+  const word = BigInt("0x" + hex.slice(0, 64));
+  return word === 1n;
+}
 
 export function launchModeLabel(mode: number): string {
   if (mode === LAUNCH_MODE_NORMAL) return "NORMAL";
@@ -79,6 +99,11 @@ export interface ExecutePreLaunchParams {
   needAcf: boolean;
   antiSniperTaxType: number;
   isProject60days: boolean;
+  /**
+   * V1: first word `abi.encode(bool isFeeDelegation)`; empty `0x` ⇒ false.
+   * Default in `executePreLaunch` is fee-delegation true (`PRELAUNCH_EXT_PARAMS_FEE_DELEGATION_TRUE`).
+   */
+  extParams?: `0x${string}`;
   /** E2E-style staticCall + gas estimate logging */
   runDiagnostics?: boolean;
 }
@@ -121,6 +146,7 @@ export async function executePreLaunch(
     needAcf,
     antiSniperTaxType,
     isProject60days,
+    extParams = PRELAUNCH_EXT_PARAMS_FEE_DELEGATION_TRUE,
     runDiagnostics = true,
   } = params;
 
@@ -158,7 +184,8 @@ export async function executePreLaunch(
         airdropBips,
         needAcf,
         antiSniperTaxType,
-        isProject60days
+        isProject60days,
+        extParams
       );
       console.log(
         "✅ staticCall passed, proceeding with actual transaction..."
@@ -185,7 +212,8 @@ export async function executePreLaunch(
     airdropBips,
     needAcf,
     antiSniperTaxType,
-    isProject60days
+    isProject60days,
+    extParams
   );
   const cap = launchpadGasLimitCeilingBigint();
   const bps = preLaunchGasBufferBps();
@@ -214,6 +242,7 @@ export async function executePreLaunch(
     needAcf,
     antiSniperTaxType,
     isProject60days,
+    extParams,
     { gasLimit }
   );
 

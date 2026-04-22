@@ -37,7 +37,7 @@ async function preLaunchProject60daysP60(
     false,
     ANTI_SNIPER_60S,
     true
-  );
+  ,"0x");
   const receipt = await tx.wait();
   const event = receipt.logs.find((log) => {
     try {
@@ -164,7 +164,7 @@ describe("BondingV5 / FRouterV3 — drain liquidity (V5 suite)", function () {
         false,
         ANTI_SNIPER_60S,
         false
-      );
+      ,"0x");
       const receipt = await tx.wait();
       const event = receipt.logs.find((log) => {
         try {

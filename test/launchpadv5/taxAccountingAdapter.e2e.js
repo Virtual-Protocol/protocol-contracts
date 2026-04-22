@@ -120,7 +120,7 @@ describe("TaxAccountingAdapter E2E (BondingV5 + AgentTokenV4)", function () {
       false,
       ANTI_SNIPER_60S,
       false
-    );
+    ,"0x");
     const receipt = await tx.wait();
     const preEvent = receipt.logs.find((log) => {
       try {

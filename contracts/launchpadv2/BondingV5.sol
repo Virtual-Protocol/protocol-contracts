@@ -111,6 +111,9 @@ contract BondingV5 is
 
     mapping(address => bool) public isFeeDelegation;
 
+    /// @notice Raw `extParams_` from `preLaunch` (per agent token). Backend can read as canonical payload; not updated by `setFeeDelegation`.
+    mapping(address => bytes) public tokenPreLaunchExtParams;
+
     event PreLaunched(
         address indexed token,
         address indexed pair,
@@ -133,6 +136,8 @@ contract BondingV5 is
         uint256 initialPurchase
     );
     event Graduated(address indexed token, address agentToken);
+
+    event FeeDelegationUpdated(address indexed token, bool isFeeDelegation);
 
     error InvalidTokenStatus();
     error InvalidInput();
@@ -378,6 +383,7 @@ contract BondingV5 is
             isProject60days: isProject60days_
         });
         isFeeDelegation[token] = isFeeDelegation_;
+        tokenPreLaunchExtParams[token] = extParams_;
 
         // Set Data struct fields
         newToken.data.token = token;
@@ -811,5 +817,14 @@ contract BondingV5 is
 
     function setBondingConfig(address bondingConfig_) public onlyOwner {
         bondingConfig = BondingConfig(bondingConfig_);
+    }
+
+    /// @notice Update `isFeeDelegation` for an existing BondingV5 token (e.g. backend correction after mis-encoded `extParams`). Does not change `tokenPreLaunchExtParams`.
+    function setFeeDelegation(address token, bool isFeeDelegation_) external onlyOwner {
+        if (token == address(0) || tokenInfo[token].token == address(0)) {
+            revert InvalidInput();
+        }
+        isFeeDelegation[token] = isFeeDelegation_;
+        emit FeeDelegationUpdated(token, isFeeDelegation_);
     }
 }

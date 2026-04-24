@@ -166,7 +166,7 @@ describe("BondingV5", function () {
         false, // needAcf_
         ANTI_SNIPER_60S, // antiSniperTaxType_
         false // isProject60days_
-      );
+      ,"0x");
 
       const receipt = await tx.wait();
       const event = receipt.logs.find((log) => {
@@ -225,7 +225,7 @@ describe("BondingV5", function () {
             false,
             ANTI_SNIPER_60S,
             false
-          )
+          ,"0x")
       ).to.be.revertedWithCustomError(bondingV5, ERR_INVALID_INPUT);
     });
 
@@ -251,7 +251,7 @@ describe("BondingV5", function () {
           false,
           ANTI_SNIPER_60S,
           false
-        )
+        ,"0x")
       ).to.be.revertedWithCustomError(bondingV5, ERR_INVALID_INPUT);
     });
 
@@ -279,7 +279,7 @@ describe("BondingV5", function () {
         false,
         ANTI_SNIPER_60S,
         true // isProject60days_ = true
-      );
+      ,"0x");
 
       const receipt = await tx.wait();
       const event = receipt.logs.find((log) => {
@@ -331,7 +331,7 @@ describe("BondingV5", function () {
           false,
           ANTI_SNIPER_60S,
           false
-        );
+        ,"0x");
 
       const receipt = await tx.wait();
       const event = receipt.logs.find((log) => {
@@ -410,7 +410,7 @@ describe("BondingV5", function () {
           false,
           ANTI_SNIPER_60S,
           false
-        );
+        ,"0x");
 
       const receipt = await tx.wait();
       const event = receipt.logs.find((log) => {
@@ -485,7 +485,7 @@ describe("BondingV5", function () {
           false,
           ANTI_SNIPER_60S,
           false
-        );
+        ,"0x");
 
       const receipt = await tx.wait();
       const event = receipt.logs.find((log) => {
@@ -581,7 +581,7 @@ describe("BondingV5", function () {
         false, // needAcf must be false for special modes
         ANTI_SNIPER_60S, // antiSniperTaxType must be 60S for special modes
         false // isProject60days must be false for special modes
-      );
+      ,"0x");
 
       const receipt = await tx.wait();
       const event = receipt.logs.find((log) => {
@@ -639,7 +639,7 @@ describe("BondingV5", function () {
             false,
             ANTI_SNIPER_NONE,
             false
-          )
+          ,"0x")
       ).to.be.revertedWithCustomError(bondingV5, "UnauthorizedLauncher");
     });
 
@@ -670,7 +670,7 @@ describe("BondingV5", function () {
           false,
           ANTI_SNIPER_NONE,
           false
-        )
+        ,"0x")
       ).to.be.revertedWithCustomError(bondingV5, "InvalidSpecialLaunchParams");
     });
   });
@@ -719,7 +719,7 @@ describe("BondingV5", function () {
           false,
           ANTI_SNIPER_60S, // antiSniperTaxType must be 60S for special modes
           false
-        );
+        ,"0x");
 
       const receipt = await tx.wait();
       const event = receipt.logs.find((log) => {
@@ -779,7 +779,7 @@ describe("BondingV5", function () {
             false,
             ANTI_SNIPER_NONE,
             false
-          )
+          ,"0x")
       ).to.be.revertedWithCustomError(bondingV5, "UnauthorizedLauncher");
     });
   });
@@ -947,7 +947,7 @@ describe("BondingV5", function () {
           false,
           5, // Invalid anti-sniper type
           false
-        )
+        ,"0x")
       ).to.be.revertedWithCustomError(bondingV5, "InvalidAntiSniperType");
     });
   });
@@ -983,7 +983,7 @@ describe("BondingV5", function () {
             false,
             ANTI_SNIPER_60S,
             false
-          );
+          ,"0x");
 
         const receipt = await tx.wait();
         const event = receipt.logs.find((log) => {
@@ -1023,7 +1023,7 @@ describe("BondingV5", function () {
           false,
           ANTI_SNIPER_60S,
           false // MAX_AIRDROP_BIPS = 500 (5.00%)
-        );
+        ,"0x");
 
         const receipt = await tx.wait();
         const event = receipt.logs.find((log) => {
@@ -1063,7 +1063,7 @@ describe("BondingV5", function () {
           false,
           ANTI_SNIPER_60S,
           false // 300 = 3.00%
-        );
+        ,"0x");
 
         const receipt = await tx.wait();
         const event = receipt.logs.find((log) => {
@@ -1105,7 +1105,7 @@ describe("BondingV5", function () {
             false,
             ANTI_SNIPER_60S,
             false // 600 (6.00%) > MAX_AIRDROP_BIPS (500 = 5.00%)
-          )
+          ,"0x")
         ).to.be.revertedWithCustomError(bondingConfig, "AirdropBipsExceedsMax");
       });
     });
@@ -1138,7 +1138,7 @@ describe("BondingV5", function () {
           true,
           ANTI_SNIPER_60S,
           false // needAcf = true
-        );
+        ,"0x");
 
         const receipt = await tx.wait();
         const event = receipt.logs.find((log) => {
@@ -1185,7 +1185,7 @@ describe("BondingV5", function () {
           false,
           ANTI_SNIPER_60S,
           false // needAcf = false
-        );
+        ,"0x");
 
         const receipt = await tx.wait();
         const event = receipt.logs.find((log) => {
@@ -1232,7 +1232,7 @@ describe("BondingV5", function () {
           true,
           ANTI_SNIPER_60S,
           false // 500 (5.00%) + 5000 (50%) = 5500 (55%)
-        );
+        ,"0x");
 
         const receipt = await tx.wait();
         expect(receipt).to.not.be.undefined;
@@ -1264,7 +1264,7 @@ describe("BondingV5", function () {
           true,
           ANTI_SNIPER_60S,
           false // 400 (4.00%) + 5000 (50%) = 5400 (54%)
-        );
+        ,"0x");
 
         const receipt = await tx.wait();
         const event = receipt.logs.find((log) => {
@@ -1305,7 +1305,7 @@ describe("BondingV5", function () {
             false,
             ANTI_SNIPER_NONE,
             false
-          );
+          ,"0x");
 
         const receipt = await tx.wait();
         const event = receipt.logs.find((log) => {
@@ -1348,7 +1348,7 @@ describe("BondingV5", function () {
             false,
             ANTI_SNIPER_60S,
             false
-          );
+          ,"0x");
 
         const receipt = await tx.wait();
         const event = receipt.logs.find((log) => {
@@ -1391,7 +1391,7 @@ describe("BondingV5", function () {
             false,
             ANTI_SNIPER_98M,
             false
-          );
+          ,"0x");
 
         const receipt = await tx.wait();
         const event = receipt.logs.find((log) => {
@@ -1434,7 +1434,7 @@ describe("BondingV5", function () {
           false,
           ANTI_SNIPER_60S,
           true // isProject60days = true
-        );
+        ,"0x");
 
         const receipt = await tx.wait();
         const event = receipt.logs.find((log) => {
@@ -1473,7 +1473,7 @@ describe("BondingV5", function () {
           false,
           ANTI_SNIPER_60S,
           false // isProject60days = false
-        );
+        ,"0x");
 
         const receipt = await tx.wait();
         const event = receipt.logs.find((log) => {
@@ -1519,7 +1519,7 @@ describe("BondingV5", function () {
             false,
             ANTI_SNIPER_60S,
             false
-          );
+          ,"0x");
 
         const receipt = await tx.wait();
         expect(receipt).to.not.be.undefined;
@@ -1558,7 +1558,7 @@ describe("BondingV5", function () {
             false,
             ANTI_SNIPER_60S,
             false
-          );
+          ,"0x");
 
         const receipt = await tx.wait();
         expect(receipt).to.not.be.undefined;
@@ -1609,7 +1609,7 @@ describe("BondingV5", function () {
             false,
             ANTI_SNIPER_NONE,
             false
-          )
+          ,"0x")
       ).to.be.revertedWithCustomError(bondingV5, "InvalidSpecialLaunchParams");
     });
 
@@ -1641,7 +1641,7 @@ describe("BondingV5", function () {
             true,
             ANTI_SNIPER_NONE,
             false
-          )
+          ,"0x")
       ).to.be.revertedWithCustomError(bondingV5, "InvalidSpecialLaunchParams");
     });
 
@@ -1674,7 +1674,7 @@ describe("BondingV5", function () {
             false,
             ANTI_SNIPER_NONE, // Should revert: special modes require ANTI_SNIPER_60S
             false
-          )
+          ,"0x")
       ).to.be.revertedWithCustomError(bondingV5, "InvalidSpecialLaunchParams");
     });
 
@@ -1706,7 +1706,7 @@ describe("BondingV5", function () {
             false,
             ANTI_SNIPER_NONE,
             true
-          )
+          ,"0x")
       ).to.be.revertedWithCustomError(bondingV5, "InvalidSpecialLaunchParams");
     });
 
@@ -1739,7 +1739,7 @@ describe("BondingV5", function () {
             false,
             ANTI_SNIPER_NONE,
             false
-          )
+          ,"0x")
       ).to.be.revertedWithCustomError(bondingV5, "InvalidSpecialLaunchParams");
     });
 
@@ -1771,7 +1771,7 @@ describe("BondingV5", function () {
             false,
             ANTI_SNIPER_NONE,
             false
-          )
+          ,"0x")
       ).to.be.revertedWithCustomError(bondingV5, "InvalidSpecialLaunchParams");
     });
 
@@ -1803,7 +1803,7 @@ describe("BondingV5", function () {
             true,
             ANTI_SNIPER_NONE,
             false
-          )
+          ,"0x")
       ).to.be.revertedWithCustomError(bondingV5, "InvalidSpecialLaunchParams");
     });
 
@@ -1835,7 +1835,7 @@ describe("BondingV5", function () {
             false,
             ANTI_SNIPER_98M,
             false
-          )
+          ,"0x")
       ).to.be.revertedWithCustomError(bondingV5, "InvalidSpecialLaunchParams");
     });
 
@@ -1867,7 +1867,7 @@ describe("BondingV5", function () {
             false,
             ANTI_SNIPER_NONE,
             true
-          )
+          ,"0x")
       ).to.be.revertedWithCustomError(bondingV5, "InvalidSpecialLaunchParams");
     });
 
@@ -1900,7 +1900,7 @@ describe("BondingV5", function () {
             false,
             ANTI_SNIPER_NONE,
             false
-          )
+          ,"0x")
       ).to.be.revertedWithCustomError(bondingV5, "InvalidSpecialLaunchParams");
     });
   });
@@ -1933,7 +1933,7 @@ describe("BondingV5", function () {
         false,
         ANTI_SNIPER_98M,
         true // 500 = 5.00%
-      );
+      ,"0x");
 
       const receipt = await tx.wait();
       const event = receipt.logs.find((log) => {
@@ -1979,7 +1979,7 @@ describe("BondingV5", function () {
         false,
         ANTI_SNIPER_60S,
         false // 500 = 5.00%
-      );
+      ,"0x");
 
       let receipt = await tx.wait();
       let event = receipt.logs.find((log) => {
@@ -2047,7 +2047,7 @@ describe("BondingV5", function () {
           false,
           ANTI_SNIPER_60S,
           false
-        );
+        ,"0x");
       let receipt = await tx.wait();
       let event = receipt.logs.find((log) => {
         try {
@@ -2078,7 +2078,7 @@ describe("BondingV5", function () {
         false,
         ANTI_SNIPER_60S,
         false // 500 = 5.00%
-      );
+      ,"0x");
       receipt = await tx.wait();
       event = receipt.logs.find((log) => {
         try {
@@ -2123,7 +2123,7 @@ describe("BondingV5", function () {
           true,
           ANTI_SNIPER_60S,
           false
-        );
+        ,"0x");
       const receipt = await tx.wait();
       const event = receipt.logs.find((log) => {
         try {
@@ -2169,7 +2169,7 @@ describe("BondingV5", function () {
           false,
           ANTI_SNIPER_60S,
           false
-        )
+        ,"0x")
       ).to.be.revertedWithCustomError(bondingV5, "LaunchModeNotEnabled");
     });
 
@@ -2199,7 +2199,7 @@ describe("BondingV5", function () {
         true,
         ANTI_SNIPER_60S,
         false // 400 = 4.00%
-      );
+      ,"0x");
 
       const receipt = await tx.wait();
       expect(receipt).to.not.be.undefined;
@@ -2231,7 +2231,7 @@ describe("BondingV5", function () {
         true,
         ANTI_SNIPER_60S,
         false // 500 = 5.00%
-      );
+      ,"0x");
 
       const receipt = await tx.wait();
       expect(receipt).to.not.be.undefined;
@@ -2264,7 +2264,7 @@ describe("BondingV5", function () {
           true,
           ANTI_SNIPER_60S,
           false
-        );
+        ,"0x");
 
       const receipt = await tx.wait();
       const event = receipt.logs.find((log) => {
@@ -2307,7 +2307,7 @@ describe("BondingV5", function () {
         true,
         ANTI_SNIPER_60S,
         false // 400 = 4.00%
-      );
+      ,"0x");
 
       const receipt = await tx.wait();
       expect(receipt).to.not.be.undefined;
@@ -2339,7 +2339,7 @@ describe("BondingV5", function () {
         true,
         ANTI_SNIPER_60S,
         false // 500 = 5.00%
-      );
+      ,"0x");
 
       const receipt = await tx.wait();
       expect(receipt).to.not.be.undefined;
@@ -2372,7 +2372,7 @@ describe("BondingV5", function () {
           false,
           ANTI_SNIPER_60S,
           false // 600 = 6.00% > 5% max
-        )
+        ,"0x")
       ).to.be.revertedWithCustomError(bondingConfig, "AirdropBipsExceedsMax");
     });
   });
@@ -2407,7 +2407,7 @@ describe("BondingV5", function () {
           false,
           ANTI_SNIPER_NONE,
           false
-        );
+        ,"0x");
 
       const receipt = await tx.wait();
       const event = receipt.logs.find((log) => {
@@ -2451,7 +2451,7 @@ describe("BondingV5", function () {
         false,
         ANTI_SNIPER_98M,
         true // MAX_AIRDROP_BIPS = 500 (5.00%)
-      );
+      ,"0x");
 
       const receipt = await tx.wait();
       const event = receipt.logs.find((log) => {
@@ -2533,7 +2533,7 @@ describe("BondingV5", function () {
             tc.needAcf,
             tc.antiSniper,
             tc.is60days
-          );
+          ,"0x");
 
         const receipt = await tx.wait();
         const event = receipt.logs.find((log) => {
@@ -2587,7 +2587,7 @@ describe("BondingV5", function () {
         false,
         ANTI_SNIPER_60S,
         true // 500 = 5.00%
-      );
+      ,"0x");
 
       const receipt = await tx.wait();
       const event = receipt.logs.find((log) => {
@@ -2634,7 +2634,7 @@ describe("BondingV5", function () {
           false,
           ANTI_SNIPER_60S,
           false
-        );
+        ,"0x");
 
       const receipt = await tx.wait();
       const event = receipt.logs.find((log) => {
@@ -2685,7 +2685,7 @@ describe("BondingV5", function () {
         false,
         ANTI_SNIPER_60S,
         true // isProject60days
-      );
+      ,"0x");
       const receipt = await tx.wait();
       const event = receipt.logs.find((log) => {
         try {
@@ -2732,7 +2732,7 @@ describe("BondingV5", function () {
         false,
         ANTI_SNIPER_98M,
         true // 500 = 5.00%
-      );
+      ,"0x");
 
       const receipt = await tx.wait();
       const event = receipt.logs.find((log) => {
@@ -2790,7 +2790,7 @@ describe("BondingV5", function () {
           false,
           ANTI_SNIPER_60S,
           false
-        );
+        ,"0x");
 
       const receipt = await tx.wait();
       const event = receipt.logs.find((log) => {
@@ -2909,7 +2909,7 @@ describe("BondingV5", function () {
           false,
           ANTI_SNIPER_60S,
           false
-        );
+        ,"0x");
 
       const receipt = await tx.wait();
       const event = receipt.logs.find((log) => {
@@ -2971,7 +2971,7 @@ describe("BondingV5", function () {
           false,
           ANTI_SNIPER_60S,
           false
-        );
+        ,"0x");
 
       const receipt = await tx.wait();
       const event = receipt.logs.find((log) => {
@@ -3101,7 +3101,7 @@ describe("BondingV5", function () {
         true,
         ANTI_SNIPER_98M,
         true
-      );
+      ,"0x");
 
       const receipt = await tx.wait();
       const event = receipt.logs.find((log) => {
@@ -3356,7 +3356,7 @@ describe("BondingV5", function () {
           true,
           ANTI_SNIPER_60S,
           false
-        );
+        ,"0x");
 
       const feeToBalanceAfter = await virtualToken.balanceOf(owner.address);
       const feeCollected = feeToBalanceAfter - feeToBalanceBefore;
@@ -3394,7 +3394,7 @@ describe("BondingV5", function () {
           false,
           ANTI_SNIPER_60S,
           false
-        );
+        ,"0x");
 
       const feeToBalanceAfter = await virtualToken.balanceOf(owner.address);
       const feeCollected = feeToBalanceAfter - feeToBalanceBefore;
@@ -3436,7 +3436,7 @@ describe("BondingV5", function () {
         false,
         ANTI_SNIPER_60S,
         false // 500 = 5.00%
-      );
+      ,"0x");
 
       const receipt = await tx.wait();
       const event = receipt.logs.find((log) => {
@@ -3487,7 +3487,7 @@ describe("BondingV5", function () {
         true,
         ANTI_SNIPER_60S,
         false // 400 = 4.00%
-      );
+      ,"0x");
 
       const receipt = await tx.wait();
       const event = receipt.logs.find((log) => {

@@ -20,6 +20,8 @@ import {
   ANTI_SNIPER_60S,
   ANTI_SNIPER_98M,
   launchModeLabel,
+  PRELAUNCH_EXT_PARAMS_FEE_DELEGATION_TRUE,
+  extParamsImpliesFeeDelegation,
 } from "./launchpadv5Common";
 import { launchpadDefaultTxGasLimit } from "./utils";
 const { ethers } = require("hardhat");
@@ -227,6 +229,9 @@ async function main() {
   const antiSniperTaxType = ANTI_SNIPER_60S; // 60 seconds anti-sniper
   const isProject60days = false;
 
+  /** BondingV5 extParams V1 — matches default in `executePreLaunch` (fee delegation / `isFeeDelegation`). */
+  const preLaunchExtParams = PRELAUNCH_EXT_PARAMS_FEE_DELEGATION_TRUE;
+
   const isScheduledLaunchPreview =
     startTime >= currentTimestamp + startTimeDelayNum;
 
@@ -244,18 +249,24 @@ async function main() {
   console.log("Need ACF:", needAcf);
   console.log("Anti-Sniper Tax Type:", antiSniperTaxType, "(60S)");
   console.log("Is Project 60 Days:", isProject60days);
+  console.log(
+    "preLaunch extParams (fee delegation → isFeeDelegation):",
+    preLaunchExtParams,
+    "(expects true on-chain)"
+  );
 
-  // For X_LAUNCH / ACP_SKILL and Project60days launches, BondingV5 requires privileged backend wallet.
+  // X_LAUNCH / ACP_SKILL / Project60days / fee-delegation tokens: BondingV5.launch requires privileged launcher.
   if (
     launchMode === LAUNCH_MODE_X_LAUNCH ||
     launchMode === LAUNCH_MODE_ACP_SKILL ||
-    isProject60days
+    isProject60days ||
+    extParamsImpliesFeeDelegation(preLaunchExtParams)
   ) {
     const isPrivilegedLauncher = await bondingConfig.isPrivilegedLauncher(await signer.getAddress());
     console.log("Signer isPrivilegedLauncher:", isPrivilegedLauncher);
     if (!isPrivilegedLauncher) {
       throw new Error(
-        `Signer ${await signer.getAddress()} is not a privileged launcher for ${launchModeLabel(launchMode)} preLaunch/launch flow`
+        `Signer ${await signer.getAddress()} is not a privileged launcher for ${launchModeLabel(launchMode)} / fee-delegation launch flow`
       );
     }
   }
@@ -295,6 +306,7 @@ async function main() {
     needAcf,
     antiSniperTaxType,
     isProject60days,
+    extParams: preLaunchExtParams,
     runDiagnostics: true,
   });
 
@@ -355,6 +367,15 @@ async function main() {
   console.log("isProject60days():", isProject60daysResult, "(expected:", isProject60days, ")");
   console.log("tokenAntiSniperType():", tokenAntiSniperTypeResult, "(expected:", antiSniperTaxType, ")");
   console.log("tokenGradThreshold():", formatEther(tokenGradThreshold), "tokens");
+
+  const isFeeDelegationOnChain = await bondingV5.isFeeDelegation(tokenAddress);
+  console.log(
+    "isFeeDelegation():",
+    isFeeDelegationOnChain,
+    "(expected:",
+    extParamsImpliesFeeDelegation(preLaunchExtParams),
+    ")"
+  );
 
   // Verify anti-sniper duration from BondingConfig
   const antiSniperDuration = await bondingConfig.getAntiSniperDuration(antiSniperTaxType);

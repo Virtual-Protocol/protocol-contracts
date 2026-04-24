@@ -115,7 +115,8 @@ async function main() {
   const expectedV3 = envAddr("AGENT_TOKEN_V3_IMPLEMENTATION") || "0x28DA9E5D949B0cc162796769bd03beD106f370B1";
   const expectedV4 = envAddr("AGENT_TOKEN_V4_IMPLEMENTATION") || "0xdfc000635776d152236b002D25F95fd34B3753a2";
 
-  const cloneV3 = "0x85A02c33aced66eD39a0fD07FB0cd8d75290939D";
+  // const cloneV3 = "0x85A02c33aced66eD39a0fD07FB0cd8d75290939D";
+  const cloneV3 = "0x1cD8eD80aA4479920D8C74b62677b161F7eC2F46";
   const cloneV4 = "0x17742fa86139ed9dB81B2ec8037b2525061F97B9";
 
   const factory = new hreEthers.Contract(factoryAddr, FACTORY_ABI, hreEthers.provider);

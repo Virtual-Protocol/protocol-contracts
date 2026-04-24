@@ -49,8 +49,8 @@ const { ethers } = require("hardhat");
 // Edit only this (agent ERC20)
 // ============================================
 // const AGENT_TOKEN_ADDRESS = "0x17742fa86139ed9dB81B2ec8037b2525061F97B9" as string;
-const AGENT_TOKEN_ADDRESS = "0xcBFF2B7Bf9A85e9019955a060024f4d3269BECb6" as string;
-const buyHuman = process.env.BUY_VIRTUAL_AMOUNT?.trim() || "99";
+const AGENT_TOKEN_ADDRESS = "0x1cD8eD80aA4479920D8C74b62677b161F7eC2F46" as string;
+const buyHuman = process.env.BUY_VIRTUAL_AMOUNT?.trim() || "9900";
 
 const ERC20_ABI = [
   "function approve(address spender, uint256 amount) external returns (bool)",
@@ -100,6 +100,17 @@ async function main() {
   }
 
   const virtualAddr = process.env.VIRTUAL_TOKEN_ADDRESS?.trim();
+  /*
+  If we encounter error below, it means the agentToken.router is not the same as the factory.
+  Because we are swticthing the base-sepolia uniswapV2Router to our own deployed one.
+
+  Previous one: UNISWAP_V2_ROUTER=0x1689E7B1F10000AE47eBfE339a4f69dECd19F602 # 
+  New one: UNISWAP_V2_ROUTER=0x3AE8ce55b48Ac924F96C48E987439Ade017A2c2F # mocked Uniswap V2 Router
+
+  Example error:
+  factory.getPair(VIRTUAL, agent): 0x0000000000000000000000000000000000000000
+⚠️ No pair on this factory for VIRTUAL/agent — swaps will likely revert (wrong router or not graduated).
+  */
   const routerAddr = process.env.UNISWAP_V2_ROUTER?.trim();
   if (!virtualAddr) throw new Error("VIRTUAL_TOKEN_ADDRESS is required");
   if (!routerAddr) throw new Error("UNISWAP_V2_ROUTER is required");

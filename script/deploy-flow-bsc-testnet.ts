@@ -62,43 +62,49 @@ async function main() {
     console.log(`[flow] reusing USDT=${usdtAddr}`);
   }
 
-  // 2. $FLOW token.
+  // 2. $FLOW token (clonable — deploy + initialize).
   console.log("[flow] deploying Flow token");
   const Flow = await ethers.getContractFactory("Flow");
-  const flow = await Flow.deploy(deployer.address);
+  const flow = await Flow.deploy();
   await flow.waitForDeployment();
+  await (await flow.initialize(deployer.address, "AgentFlow", "FLOW")).wait();
   const flowAddr = await flow.getAddress();
   console.log(`[flow] Flow=${flowAddr}`);
 
-  // 3. GWT token.
+  // 3. GWT token (clonable — deploy + initialize).
   console.log("[flow] deploying FlowGrowToken (GWT)");
   const Gwt = await ethers.getContractFactory("FlowGrowToken");
-  const gwt = await Gwt.deploy(deployer.address);
+  const gwt = await Gwt.deploy();
   await gwt.waitForDeployment();
+  await (await gwt.initialize(deployer.address, "Flow Grow", "GWT")).wait();
   const gwtAddr = await gwt.getAddress();
   console.log(`[flow] GWT=${gwtAddr}`);
 
-  // 4. PhenomenalTree (immutable structure, root = deployer or supplied).
+  // 4. PhenomenalTree (clonable — deploy + initialize).
   console.log(`[flow] deploying PhenomenalTree (root=${treeRoot})`);
   const Tree = await ethers.getContractFactory("PhenomenalTree");
-  const tree = await Tree.deploy(deployer.address, treeRoot);
+  const tree = await Tree.deploy();
   await tree.waitForDeployment();
+  await (await tree.initialize(deployer.address, treeRoot)).wait();
   const treeAddr = await tree.getAddress();
   console.log(`[flow] PhenomenalTree=${treeAddr}`);
 
-  // 5. FlowProtocol.
+  // 5. FlowProtocol (clonable — deploy + initialize).
   console.log("[flow] deploying FlowProtocol");
   const Protocol = await ethers.getContractFactory("FlowProtocol");
-  const protocol = await Protocol.deploy(
-    deployer.address,
-    usdtAddr,
-    flowAddr,
-    gwtAddr,
-    treeAddr,
-    treasury,
-    initialPrice,
-  );
+  const protocol = await Protocol.deploy();
   await protocol.waitForDeployment();
+  await (
+    await protocol.initialize(
+      deployer.address,
+      usdtAddr,
+      flowAddr,
+      gwtAddr,
+      treeAddr,
+      treasury,
+      initialPrice,
+    )
+  ).wait();
   const protocolAddr = await protocol.getAddress();
   console.log(`[flow] FlowProtocol=${protocolAddr}`);
 

@@ -37,22 +37,49 @@ async function deployFixture() {
     parseEther("100000000"),
   );
 
-  // 2. FLOW token.
-  const Flow = await ethers.getContractFactory("Flow");
-  const flow = await Flow.deploy(admin.address);
+  // The four sub-contracts are clonable (EIP-1167) with
+  // `_disableInitializers()` baked into their implementation constructor —
+  // they cannot be used standalone. We use a tiny `Cloner` helper to
+  // deploy fresh proxy instances for tests.
+  const Cloner = await ethers.getContractFactory("Cloner");
+  const cloner = await Cloner.deploy();
 
-  // 3. GWT token.
-  const Gwt = await ethers.getContractFactory("FlowGrowToken");
-  const gwt = await Gwt.deploy(admin.address);
+  async function deployClone(name, initArgs) {
+    const Impl = await ethers.getContractFactory(name);
+    const impl = await Impl.deploy();
+    await impl.waitForDeployment();
+    const tx = await cloner.clone(await impl.getAddress());
+    const r = await tx.wait();
+    const ev = r.logs
+      .map((l) => {
+        try {
+          return cloner.interface.parseLog(l);
+        } catch {
+          return null;
+        }
+      })
+      .find((e) => e && e.name === "Cloned");
+    const inst = await ethers.getContractAt(name, ev.args.instance);
+    if (initArgs) await (await inst.initialize(...initArgs)).wait();
+    return inst;
+  }
 
-  // 4. Phenomenal Tree — root = admin's `root` signer.
-  const Tree = await ethers.getContractFactory("PhenomenalTree");
-  const tree = await Tree.deploy(admin.address, root.address);
+  // 2. FLOW token (clone).
+  const flow = await deployClone("Flow", [admin.address, "AgentFlow", "FLOW"]);
 
-  // 5. Protocol.
-  const Protocol = await ethers.getContractFactory("FlowProtocol");
+  // 3. GWT token (clone).
+  const gwt = await deployClone("FlowGrowToken", [
+    admin.address,
+    "Flow Grow",
+    "GWT",
+  ]);
+
+  // 4. Phenomenal Tree (clone). Root = `root` signer.
+  const tree = await deployClone("PhenomenalTree", [admin.address, root.address]);
+
+  // 5. Protocol (clone).
   const initialPrice = parseEther("0.1"); // 0.1 USDT/FLOW
-  const protocol = await Protocol.deploy(
+  const protocol = await deployClone("FlowProtocol", [
     admin.address,
     await usdt.getAddress(),
     await flow.getAddress(),
@@ -60,7 +87,7 @@ async function deployFixture() {
     await tree.getAddress(),
     treasury.address,
     initialPrice,
-  );
+  ]);
 
   // 6. Wire roles.
   const MINTER = await flow.MINTER_ROLE();
@@ -222,15 +249,38 @@ describe("Flow — sell + income limit math", function () {
     const donors = signers.slice(5, 18); // 13 extra users for pump
     const Mock = await ethers.getContractFactory("MockERC20");
     const usdt = await Mock.deploy("U", "U", admin.address, parseEther("100000000"));
-    const Flow_ = await ethers.getContractFactory("Flow");
-    const flow = await Flow_.deploy(admin.address);
-    const Gwt = await ethers.getContractFactory("FlowGrowToken");
-    const gwt = await Gwt.deploy(admin.address);
-    const Tree = await ethers.getContractFactory("PhenomenalTree");
-    const tree = await Tree.deploy(admin.address, root.address);
-    const Protocol = await ethers.getContractFactory("FlowProtocol");
+
+    // Clonable sub-contracts deployed via Cloner helper.
+    const Cloner = await ethers.getContractFactory("Cloner");
+    const cloner = await Cloner.deploy();
+    const deployClone = async (name, initArgs) => {
+      const Impl = await ethers.getContractFactory(name);
+      const impl = await Impl.deploy();
+      await impl.waitForDeployment();
+      const tx = await cloner.clone(await impl.getAddress());
+      const r = await tx.wait();
+      const ev = r.logs
+        .map((l) => {
+          try {
+            return cloner.interface.parseLog(l);
+          } catch {
+            return null;
+          }
+        })
+        .find((e) => e && e.name === "Cloned");
+      const inst = await ethers.getContractAt(name, ev.args.instance);
+      if (initArgs) await (await inst.initialize(...initArgs)).wait();
+      return inst;
+    };
+    const flow = await deployClone("Flow", [admin.address, "AgentFlow", "FLOW"]);
+    const gwt = await deployClone("FlowGrowToken", [
+      admin.address,
+      "Flow Grow",
+      "GWT",
+    ]);
+    const tree = await deployClone("PhenomenalTree", [admin.address, root.address]);
     const initialPrice = parseEther("0.001"); // very low
-    const protocol = await Protocol.deploy(
+    const protocol = await deployClone("FlowProtocol", [
       admin.address,
       await usdt.getAddress(),
       await flow.getAddress(),
@@ -238,7 +288,7 @@ describe("Flow — sell + income limit math", function () {
       await tree.getAddress(),
       treasury.address,
       initialPrice,
-    );
+    ]);
     await flow.connect(admin).grantRole(await flow.MINTER_ROLE(), await protocol.getAddress());
     await gwt.connect(admin).grantRole(await gwt.MINTER_ROLE(), await protocol.getAddress());
     await tree.connect(admin).grantRole(await tree.TREE_OPERATOR_ROLE(), await protocol.getAddress());

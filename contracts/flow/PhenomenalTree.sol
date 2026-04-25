@@ -40,10 +40,11 @@ pragma solidity ^0.8.26;
 //   * Re-placement of the same user reverts.
 // ----------------------------------------------------------------------------
 
-import "@openzeppelin/contracts/access/AccessControl.sol";
+import "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import "./interfaces/IPhenomenalTree.sol";
 
-contract PhenomenalTree is AccessControl, IPhenomenalTree {
+contract PhenomenalTree is Initializable, AccessControlUpgradeable, IPhenomenalTree {
     bytes32 public constant TREE_OPERATOR_ROLE = keccak256("TREE_OPERATOR_ROLE");
 
     uint256 public constant MAX_DEPTH = 10;
@@ -63,8 +64,10 @@ contract PhenomenalTree is AccessControl, IPhenomenalTree {
     }
 
     /// @notice Root sentinel — every chain bottoms out here. The protocol
-    ///         passes its `treeRoot` (any address it owns) at construction.
-    address public immutable root;
+    ///         passes its `treeRoot` (any address it owns) at initialize.
+    ///         No longer `immutable` to support EIP-1167 minimal-proxy clones
+    ///         (clones must derive all state from `initialize`, not bytecode).
+    address public root;
 
     mapping(address => Position) private _pos;
 
@@ -92,8 +95,14 @@ contract PhenomenalTree is AccessControl, IPhenomenalTree {
         bool active
     );
 
-    constructor(address admin, address treeRoot) {
+    /// @custom:oz-upgrades-unsafe-allow constructor
+    constructor() {
+        _disableInitializers();
+    }
+
+    function initialize(address admin, address treeRoot) external initializer {
         if (admin == address(0) || treeRoot == address(0)) revert ZeroAdmin();
+        __AccessControl_init();
         _grantRole(DEFAULT_ADMIN_ROLE, admin);
 
         // Bootstrap root at depth 0 with infinite active window.

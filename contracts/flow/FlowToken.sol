@@ -23,20 +23,38 @@ pragma solidity ^0.8.26;
 // selectors match exactly.
 // ----------------------------------------------------------------------------
 
-import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
-import "@openzeppelin/contracts/token/ERC20/extensions/ERC20Permit.sol";
-import "@openzeppelin/contracts/access/AccessControl.sol";
+import "@openzeppelin/contracts-upgradeable/token/ERC20/ERC20Upgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/token/ERC20/extensions/ERC20PermitUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 
-contract Flow is ERC20, ERC20Permit, AccessControl {
+/// @notice Clonable (EIP-1167) variant of the $FLOW protocol token.
+///         A fresh `name`/`symbol` is set at initialize-time so the same
+///         implementation can back any dPNM-style token (FLOW, FOO, BAR…).
+contract Flow is
+    Initializable,
+    ERC20Upgradeable,
+    ERC20PermitUpgradeable,
+    AccessControlUpgradeable
+{
     bytes32 public constant MINTER_ROLE = keccak256("MINTER_ROLE");
 
     error ZeroAdmin();
 
-    constructor(address admin)
-        ERC20("AgentFlow", "FLOW")
-        ERC20Permit("AgentFlow")
-    {
+    /// @custom:oz-upgrades-unsafe-allow constructor
+    constructor() {
+        _disableInitializers();
+    }
+
+    function initialize(
+        address admin,
+        string memory name_,
+        string memory symbol_
+    ) external initializer {
         if (admin == address(0)) revert ZeroAdmin();
+        __ERC20_init(name_, symbol_);
+        __ERC20Permit_init(name_);
+        __AccessControl_init();
         _grantRole(DEFAULT_ADMIN_ROLE, admin);
     }
 

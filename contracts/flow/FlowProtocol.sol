@@ -51,16 +51,23 @@ pragma solidity ^0.8.26;
 
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-import "@openzeppelin/contracts/access/AccessControl.sol";
-import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
-import "@openzeppelin/contracts/utils/Pausable.sol";
+import "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 
 import "./interfaces/IFlowToken.sol";
 import "./interfaces/IFlowGrowToken.sol";
 import "./interfaces/IPhenomenalTree.sol";
 import "./interfaces/IFlowProtocol.sol";
 
-contract FlowProtocol is AccessControl, ReentrancyGuard, Pausable, IFlowProtocol {
+contract FlowProtocol is
+    Initializable,
+    AccessControlUpgradeable,
+    ReentrancyGuardUpgradeable,
+    PausableUpgradeable,
+    IFlowProtocol
+{
     using SafeERC20 for IERC20;
 
     // ----------------------------------------------------------------
@@ -107,12 +114,12 @@ contract FlowProtocol is AccessControl, ReentrancyGuard, Pausable, IFlowProtocol
     uint256 public constant GWT_REDEEM_CAP_BPS = 1_000; // 10%
 
     // ----------------------------------------------------------------
-    // Immutable refs
+    // Refs (set once via initialize — clonable via EIP-1167)
     // ----------------------------------------------------------------
-    IERC20 public immutable usdt;
-    IFlowToken public immutable flow;
-    IFlowGrowToken public immutable gwt;
-    IPhenomenalTree public immutable tree;
+    IERC20 public usdt;
+    IFlowToken public flow;
+    IFlowGrowToken public gwt;
+    IPhenomenalTree public tree;
 
     address public treasury;
     uint256 public initialPrice; // USDT/FLOW (18-dec). Used while supply==0.
@@ -195,9 +202,14 @@ contract FlowProtocol is AccessControl, ReentrancyGuard, Pausable, IFlowProtocol
     error InvariantBroken();
 
     // ----------------------------------------------------------------
-    // Constructor
+    // Initializer (clonable via EIP-1167)
     // ----------------------------------------------------------------
-    constructor(
+    /// @custom:oz-upgrades-unsafe-allow constructor
+    constructor() {
+        _disableInitializers();
+    }
+
+    function initialize(
         address admin,
         IERC20 _usdt,
         IFlowToken _flow,
@@ -205,7 +217,7 @@ contract FlowProtocol is AccessControl, ReentrancyGuard, Pausable, IFlowProtocol
         IPhenomenalTree _tree,
         address _treasury,
         uint256 _initialPrice
-    ) {
+    ) external initializer {
         if (
             admin == address(0) ||
             address(_usdt) == address(0) ||
@@ -215,6 +227,10 @@ contract FlowProtocol is AccessControl, ReentrancyGuard, Pausable, IFlowProtocol
             _treasury == address(0)
         ) revert ZeroAddress();
         if (_initialPrice == 0) revert BelowMinimum();
+
+        __AccessControl_init();
+        __ReentrancyGuard_init();
+        __Pausable_init();
 
         _grantRole(DEFAULT_ADMIN_ROLE, admin);
         _grantRole(PAUSER_ROLE, admin);

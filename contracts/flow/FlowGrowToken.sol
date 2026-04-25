@@ -13,16 +13,35 @@ pragma solidity ^0.8.26;
 // MINTER_ROLE held by FlowProtocol exclusively.
 // ----------------------------------------------------------------------------
 
-import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
-import "@openzeppelin/contracts/access/AccessControl.sol";
+import "@openzeppelin/contracts-upgradeable/token/ERC20/ERC20Upgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 
-contract FlowGrowToken is ERC20, AccessControl {
+/// @notice Clonable companion token (Grow / GWT) for the dPNM template.
+///         `name`/`symbol` are initialize-time so each launchpad instance
+///         can have a uniquely-named GWT clone.
+contract FlowGrowToken is
+    Initializable,
+    ERC20Upgradeable,
+    AccessControlUpgradeable
+{
     bytes32 public constant MINTER_ROLE = keccak256("MINTER_ROLE");
 
     error ZeroAdmin();
 
-    constructor(address admin) ERC20("Flow Grow", "GWT") {
+    /// @custom:oz-upgrades-unsafe-allow constructor
+    constructor() {
+        _disableInitializers();
+    }
+
+    function initialize(
+        address admin,
+        string memory name_,
+        string memory symbol_
+    ) external initializer {
         if (admin == address(0)) revert ZeroAdmin();
+        __ERC20_init(name_, symbol_);
+        __AccessControl_init();
         _grantRole(DEFAULT_ADMIN_ROLE, admin);
     }
 

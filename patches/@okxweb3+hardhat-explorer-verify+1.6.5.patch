@@ -1,0 +1,620 @@
+diff --git a/node_modules/@okxweb3/hardhat-explorer-verify/dist/etherscan/EtherscanService.js b/node_modules/@okxweb3/hardhat-explorer-verify/dist/etherscan/EtherscanService.js
+index eb7c379..115526e 100644
+--- a/node_modules/@okxweb3/hardhat-explorer-verify/dist/etherscan/EtherscanService.js
++++ b/node_modules/@okxweb3/hardhat-explorer-verify/dist/etherscan/EtherscanService.js
+@@ -8,77 +8,133 @@ async function delay(ms) {
+     return new Promise(resolve => setTimeout(resolve, ms));
+ }
+ exports.delay = delay;
+-// Used for polling the result of the contract verification.
++function http429MaxRetries() {
++    const raw = process.env.OKVERIFY_HTTP429_MAX_RETRIES;
++    if (raw !== undefined && raw !== "")
++        return Math.max(1, parseInt(raw, 10));
++    return 12;
++}
++function retryAfterDelayMs(statusCode, response, attemptIndex) {
++    if (statusCode !== 429)
++        return 0;
++    const ra = response.headers?.["retry-after"];
++    const raw = Array.isArray(ra) ? ra[0] : ra;
++    if (raw !== undefined && raw !== "") {
++        const sec = parseInt(String(raw).trim(), 10);
++        if (!Number.isNaN(sec) && sec >= 0)
++            return Math.min(sec * 1000, 180000);
++    }
++    const base = parseInt(process.env.OKVERIFY_HTTP429_BASE_DELAY_MS || "8000", 10);
++    const cap = parseInt(process.env.OKVERIFY_HTTP429_MAX_DELAY_MS || "90000", 10);
++    const jitter = Math.floor(Math.random() * 1500);
++    const stepped = base * (attemptIndex + 1);
++    return Math.min(cap, stepped + jitter);
++}
+ const verificationIntervalMs = 3000;
+ async function verifyContract(url, req) {
+     const parameters = new URLSearchParams({ ...req });
+-    let response;
+-    try {
+-        response = await (0, undiciClient_1.sendPostRequest)(new URL(url), parameters.toString());
+-    }
+-    catch (error) {
+-        throw new plugins_1.NomicLabsHardhatPluginError(constants_1.pluginName, `Failed to send contract verification request.
++    const maxRetries = http429MaxRetries();
++    let last429Body = "";
++    for (let attempt = 0; attempt < maxRetries; attempt++) {
++        let response;
++        try {
++            response = await (0, undiciClient_1.sendPostRequest)(new URL(url), parameters.toString());
++        }
++        catch (error) {
++            throw new plugins_1.NomicLabsHardhatPluginError(constants_1.pluginName, `Failed to send contract verification request.
+ Endpoint URL: ${url}
+ Reason: ${error.message}`, error);
+-    }
+-    if (!(response.statusCode >= 200 && response.statusCode <= 299)) {
+-        // This could be always interpreted as JSON if there were any such guarantee in the Etherscan API.
+-        const responseText = await response.body.text();
+-        throw new plugins_1.NomicLabsHardhatPluginError(constants_1.pluginName, `Failed to send contract verification request.
++        }
++        if (response.statusCode === 429) {
++            last429Body = await response.body.text();
++            const waitMs = retryAfterDelayMs(429, response, attempt);
++            if (attempt < maxRetries - 1) {
++                const s = Math.ceil(waitMs / 1000);
++                console.warn(`[okverify] Rate limited (429). Waiting ${s}s before retry ${attempt + 2}/${maxRetries}...`);
++                await delay(waitMs);
++                continue;
++            }
++            throw new plugins_1.NomicLabsHardhatPluginError(constants_1.pluginName, `Failed to send contract verification request (HTTP 429 Too Many Requests after ${maxRetries} tries).
++Endpoint URL: ${url}
++Last response: ${last429Body}
++Set OKVERIFY_HTTP429_BASE_DELAY_MS / OKVERIFY_HTTP429_MAX_RETRIES if needed.`);
++        }
++        if (!(response.statusCode >= 200 && response.statusCode <= 299)) {
++            const responseText = await response.body.text();
++            throw new plugins_1.NomicLabsHardhatPluginError(constants_1.pluginName, `Failed to send contract verification request.
+ Endpoint URL: ${url}
+ The HTTP server response is not ok. Status code: ${response.statusCode} Response text: ${responseText}`);
+-    }
+-    const data = await response.body.json();
+-    const etherscanResponse = new EtherscanResponse(data);
+-    if (etherscanResponse.isBytecodeMissingInNetworkError()) {
+-        throw new plugins_1.NomicLabsHardhatPluginError(constants_1.pluginName, `Failed to send contract verification request.
++        }
++        const data = await response.body.json();
++        const etherscanResponse = new EtherscanResponse(data);
++        if (etherscanResponse.isBytecodeMissingInNetworkError()) {
++            throw new plugins_1.NomicLabsHardhatPluginError(constants_1.pluginName, `Failed to send contract verification request.
+ Endpoint URL: ${url}
+ Reason: The Etherscan API responded that the address ${req.contractaddress} does not have bytecode.
+ This can happen if the contract was recently deployed and this fact hasn't propagated to the backend yet.
+ Try waiting for a minute before verifying your contract. If you are invoking this from a script,
+ try to wait for five confirmations of your contract deployment transaction before running the verification subtask.`);
++        }
++        if (!etherscanResponse.isOk()) {
++            throw new plugins_1.NomicLabsHardhatPluginError(constants_1.pluginName, etherscanResponse.message);
++        }
++        return etherscanResponse;
+     }
+-    if (!etherscanResponse.isOk()) {
+-        throw new plugins_1.NomicLabsHardhatPluginError(constants_1.pluginName, etherscanResponse.message);
+-    }
+-    return etherscanResponse;
++    throw new plugins_1.NomicLabsHardhatPluginError(constants_1.pluginName, `Contract verification exhausted retries.
++Endpoint URL: ${url}`);
+ }
+ exports.verifyContract = verifyContract;
+ async function getVerificationStatus(url, req) {
+     const parameters = new URLSearchParams({ ...req });
+     const urlWithQuery = new URL(url);
+     urlWithQuery.search = parameters.toString();
+-    let response;
+-    try {
+-        response = await (0, undiciClient_1.sendGetRequest)(urlWithQuery);
+-        if (!(response.statusCode >= 200 && response.statusCode <= 299)) {
+-            // This could be always interpreted as JSON if there were any such guarantee in the Etherscan API.
+-            const responseText = await response.body.text();
+-            const message = `The HTTP server response is not ok. Status code: ${response.statusCode} Response text: ${responseText}`;
+-            throw new plugins_1.NomicLabsHardhatPluginError(constants_1.pluginName, message);
++    const maxRetries = http429MaxRetries();
++    for (let attempt = 0; attempt < maxRetries; attempt++) {
++        let response;
++        try {
++            response = await (0, undiciClient_1.sendGetRequest)(urlWithQuery);
++            if (response.statusCode === 429) {
++                await response.body.text();
++                const waitMs = retryAfterDelayMs(429, response, attempt);
++                if (attempt < maxRetries - 1) {
++                    console.warn(`[okverify] Status poll rate limited (429). Waiting ${Math.ceil(waitMs / 1000)}s...`);
++                    await delay(waitMs);
++                    continue;
++                }
++                throw new plugins_1.NomicLabsHardhatPluginError(constants_1.pluginName, `Failure during etherscan status polling (HTTP 429).
++Endpoint URL: ${urlWithQuery.toString()}`);
++            }
++            if (!(response.statusCode >= 200 && response.statusCode <= 299)) {
++                const responseText = await response.body.text();
++                const message = `The HTTP server response is not ok. Status code: ${response.statusCode} Response text: ${responseText}`;
++                throw new plugins_1.NomicLabsHardhatPluginError(constants_1.pluginName, message);
++            }
+         }
+-    }
+-    catch (error) {
+-        throw new plugins_1.NomicLabsHardhatPluginError(constants_1.pluginName, `Failure during etherscan status polling. The verification may still succeed but
++        catch (error) {
++            if (error instanceof plugins_1.NomicLabsHardhatPluginError)
++                throw error;
++            throw new plugins_1.NomicLabsHardhatPluginError(constants_1.pluginName, `Failure during etherscan status polling. The verification may still succeed but
+ should be checked manually.
+ Endpoint URL: ${urlWithQuery.toString()}
+ Reason: ${error.message}`, error);
+-    }
+-    const data = await response.body.json();
+-    const etherscanResponse = new EtherscanResponse(data);
+-    if (etherscanResponse.isPending()) {
+-        await delay(verificationIntervalMs);
+-        return getVerificationStatus(url, req);
+-    }
+-    if (etherscanResponse.isVerificationFailure()) {
+-        return etherscanResponse;
+-    }
+-    if (!etherscanResponse.isOk()) {
+-        throw new plugins_1.NomicLabsHardhatPluginError(constants_1.pluginName, `The Etherscan API responded with a failure status.
++        }
++        const data = await response.body.json();
++        const etherscanResponse = new EtherscanResponse(data);
++        if (etherscanResponse.isPending()) {
++            await delay(verificationIntervalMs);
++            return getVerificationStatus(url, req);
++        }
++        if (etherscanResponse.isVerificationFailure()) {
++            return etherscanResponse;
++        }
++        if (!etherscanResponse.isOk()) {
++            throw new plugins_1.NomicLabsHardhatPluginError(constants_1.pluginName, `The Etherscan API responded with a failure status.
+ The verification may still succeed but should be checked manually.
+ Reason: ${etherscanResponse.message}`);
++        }
++        return etherscanResponse;
+     }
+-    return etherscanResponse;
++    throw new plugins_1.NomicLabsHardhatPluginError(constants_1.pluginName, "Verification status polling exhausted retries.");
+ }
+ exports.getVerificationStatus = getVerificationStatus;
+ class EtherscanResponse {
+@@ -89,7 +145,7 @@ class EtherscanResponse {
+         this.message = response.result;
+     }
+     isPending() {
+-        return this.message === 'Pending in queue';
++        return this.message === "Pending in queue";
+     }
+     isFailure() {
+         return this.message === "Fail - Unable to verify";
+@@ -98,13 +154,13 @@ class EtherscanResponse {
+         return this.message === "Pass - Verified";
+     }
+     isVerificationFailure() {
+-        return this.message === 'Fail - Unable to verify';
++        return this.message === "Fail - Unable to verify";
+     }
+     isVerificationSuccess() {
+-        return this.message === 'Pass - Verified';
++        return this.message === "Pass - Verified";
+     }
+     isBytecodeMissingInNetworkError() {
+-        return this.message.startsWith('Unable to locate ContractCode at');
++        return this.message.startsWith("Unable to locate ContractCode at");
+     }
+     isOk() {
+         return this.status === 1;
+@@ -113,8 +169,8 @@ class EtherscanResponse {
+ exports.EtherscanResponse = EtherscanResponse;
+ async function isAlreadyVerified(apiURL, apiKey, address) {
+     const parameters = new URLSearchParams({
+-        module: 'contract',
+-        action: 'getsourcecode',
++        module: "contract",
++        action: "getsourcecode",
+         address,
+         apikey: apiKey,
+     });
+@@ -122,18 +178,17 @@ async function isAlreadyVerified(apiURL, apiKey, address) {
+     url.search = parameters.toString();
+     const response = await (0, undiciClient_1.sendGetRequest)(url);
+     if (!(response.statusCode >= 200 && response.statusCode <= 299)) {
+-        // This could be always interpreted as JSON if there were any such guarantee in the Etherscan API.
+         const responseText = await response.body.text();
+         throw new plugins_1.NomicLabsHardhatPluginError(constants_1.pluginName, `Failed to send contract verification request.
+ Endpoint URL: ${url}
+ The HTTP server response is not ok. Status code: ${response.statusCode} Response text: ${responseText}`);
+     }
+-    const json = (await response.body.json());
+-    if (json.message !== 'OK') {
++    const json = await response.body.json();
++    if (json.message !== "OK") {
+         return false;
+     }
+     const sourceCode = json?.result?.[0]?.SourceCode;
+-    return sourceCode !== undefined && sourceCode !== '';
++    return sourceCode !== undefined && sourceCode !== "";
+ }
+ exports.isAlreadyVerified = isAlreadyVerified;
+ //# sourceMappingURL=EtherscanService.js.map
+diff --git a/node_modules/@okxweb3/hardhat-explorer-verify/dist/solc/version.js b/node_modules/@okxweb3/hardhat-explorer-verify/dist/solc/version.js
+index 1b0e065..6e2a0da 100644
+--- a/node_modules/@okxweb3/hardhat-explorer-verify/dist/solc/version.js
++++ b/node_modules/@okxweb3/hardhat-explorer-verify/dist/solc/version.js
+@@ -4,30 +4,36 @@ exports.getVersions = exports.getLongVersion = void 0;
+ const plugins_1 = require("hardhat/plugins");
+ const constants_1 = require("../task/constants");
+ const undiciClient_1 = require("../undiciClient");
+-const COMPILERS_LIST_URL = 'https://solc-bin.ethereum.org/bin/list.json';
++const COMPILERS_LIST_URLS = [
++    "https://binaries.soliditylang.org/bin/list.json",
++    "https://solc-bin.ethereum.org/bin/list.json",
++];
+ // TODO: this could be retrieved from the hardhat config instead.
+ async function getLongVersion(shortVersion) {
+     const versions = await getVersions();
+     const fullVersion = versions.releases[shortVersion];
+-    if (fullVersion === undefined || fullVersion === '') {
++    if (fullVersion === undefined || fullVersion === "") {
+         throw new plugins_1.NomicLabsHardhatPluginError(constants_1.pluginName, "Given solc version doesn't exist");
+     }
+-    return fullVersion.replace(/(soljson-)(.*)(.js)/, '$2');
++    return fullVersion.replace(/(soljson-)(.*)(.js)/, "$2");
+ }
+ exports.getLongVersion = getLongVersion;
+ async function getVersions() {
+-    try {
+-        // It would be better to query an etherscan API to get this list but there's no such API yet.
+-        const response = await (0, undiciClient_1.sendGetRequest)(new URL(COMPILERS_LIST_URL));
+-        if (!(response.statusCode >= 200 && response.statusCode <= 299)) {
+-            const responseText = await response.body.text();
+-            throw new plugins_1.NomicLabsHardhatPluginError(constants_1.pluginName, `HTTP response is not ok. Status code: ${response.statusCode} Response text: ${responseText}`);
++    let lastError;
++    for (const compilersListUrl of COMPILERS_LIST_URLS) {
++        try {
++            const response = await (0, undiciClient_1.sendGetRequest)(new URL(compilersListUrl));
++            if (!(response.statusCode >= 200 && response.statusCode <= 299)) {
++                const responseText = await response.body.text();
++                throw new plugins_1.NomicLabsHardhatPluginError(constants_1.pluginName, `HTTP response is not ok for ${compilersListUrl}. Status code: ${response.statusCode} Response text: ${responseText}`);
++            }
++            return await response.body.json();
++        }
++        catch (error) {
++            lastError = error;
+         }
+-        return (await response.body.json());
+-    }
+-    catch (error) {
+-        throw new plugins_1.NomicLabsHardhatPluginError(constants_1.pluginName, `Failed to obtain list of solc versions. Reason: ${error.message}`, error);
+     }
++    throw new plugins_1.NomicLabsHardhatPluginError(constants_1.pluginName, `Failed to obtain list of solc versions (${COMPILERS_LIST_URLS.join(" → ")}). Reason: ${lastError?.message}`, lastError);
+ }
+ exports.getVersions = getVersions;
+ //# sourceMappingURL=version.js.map
+diff --git a/node_modules/@okxweb3/hardhat-explorer-verify/src/etherscan/EtherscanService.ts b/node_modules/@okxweb3/hardhat-explorer-verify/src/etherscan/EtherscanService.ts
+index 8274160..b7d9bae 100644
+--- a/node_modules/@okxweb3/hardhat-explorer-verify/src/etherscan/EtherscanService.ts
++++ b/node_modules/@okxweb3/hardhat-explorer-verify/src/etherscan/EtherscanService.ts
+@@ -14,6 +14,28 @@ export async function delay(ms: number): Promise<void> {
+     return new Promise(resolve => setTimeout(resolve, ms));
+ }
+ 
++/** OKLink explorer often returns HTTP 429 when verifying proxy + impl + ProxyAdmin in one run. */
++function http429MaxRetries(): number {
++    const raw = process.env.OKVERIFY_HTTP429_MAX_RETRIES;
++    if (raw !== undefined && raw !== '') return Math.max(1, parseInt(raw, 10));
++    return 12;
++}
++
++function retryAfterDelayMs(statusCode: number, response: Dispatcher.ResponseData, attemptIndex: number): number {
++    if (statusCode !== 429) return 0;
++    const ra = response.headers?.['retry-after'];
++    const raw = Array.isArray(ra) ? ra[0] : ra;
++    if (raw !== undefined && raw !== '') {
++        const sec = parseInt(String(raw).trim(), 10);
++        if (!Number.isNaN(sec) && sec >= 0) return Math.min(sec * 1000, 180_000);
++    }
++    const base = parseInt(process.env.OKVERIFY_HTTP429_BASE_DELAY_MS || '8000', 10);
++    const cap = parseInt(process.env.OKVERIFY_HTTP429_MAX_DELAY_MS || '90000', 10);
++    const jitter = Math.floor(Math.random() * 1500);
++    const stepped = base * (attemptIndex + 1);
++    return Math.min(cap, stepped + jitter);
++}
++
+ // Used for polling the result of the contract verification.
+ const verificationIntervalMs = 3000;
+ 
+@@ -22,51 +44,80 @@ export async function verifyContract(
+     req: EtherscanVerifyRequest,
+ ): Promise<EtherscanResponse> {
+     const parameters = new URLSearchParams({ ...req });
+-
+-    let response: Dispatcher.ResponseData;
+-    try {
+-        response = await sendPostRequest(new URL(url), parameters.toString());
+-    } catch (error: any) {
+-        throw new NomicLabsHardhatPluginError(
+-            pluginName,
+-            `Failed to send contract verification request.
++    const maxRetries = http429MaxRetries();
++    let last429Body = '';
++
++    for (let attempt = 0; attempt < maxRetries; attempt++) {
++        let response: Dispatcher.ResponseData;
++        try {
++            response = await sendPostRequest(new URL(url), parameters.toString());
++        } catch (error: any) {
++            throw new NomicLabsHardhatPluginError(
++                pluginName,
++                `Failed to send contract verification request.
+ Endpoint URL: ${url}
+ Reason: ${error.message}`,
+-            error,
+-        );
+-    }
++                error,
++            );
++        }
+ 
+-    if (!(response.statusCode >= 200 && response.statusCode <= 299)) {
+-        // This could be always interpreted as JSON if there were any such guarantee in the Etherscan API.
+-        const responseText = await response.body.text();
+-        throw new NomicLabsHardhatPluginError(
+-            pluginName,
+-            `Failed to send contract verification request.
++        if (response.statusCode === 429) {
++            last429Body = await response.body.text();
++            const waitMs = retryAfterDelayMs(429, response, attempt);
++            if (attempt < maxRetries - 1) {
++                const s = Math.ceil(waitMs / 1000);
++                console.warn(
++                    `[okverify] Rate limited (429). Waiting ${s}s before retry ${attempt + 2}/${maxRetries}...`,
++                );
++                await delay(waitMs);
++                continue;
++            }
++            throw new NomicLabsHardhatPluginError(
++                pluginName,
++                `Failed to send contract verification request (HTTP 429 Too Many Requests after ${maxRetries} tries).
++Endpoint URL: ${url}
++Last response: ${last429Body}
++Set OKVERIFY_HTTP429_BASE_DELAY_MS / OKVERIFY_HTTP429_MAX_RETRIES if needed.`,
++            );
++        }
++
++        if (!(response.statusCode >= 200 && response.statusCode <= 299)) {
++            const responseText = await response.body.text();
++            throw new NomicLabsHardhatPluginError(
++                pluginName,
++                `Failed to send contract verification request.
+ Endpoint URL: ${url}
+ The HTTP server response is not ok. Status code: ${response.statusCode} Response text: ${responseText}`,
+-        );
+-    }
++            );
++        }
+ 
+-    const data = await response.body.json();
+-    const etherscanResponse = new EtherscanResponse(data);
++        const data = await response.body.json();
++        const etherscanResponse = new EtherscanResponse(data);
+ 
+-    if (etherscanResponse.isBytecodeMissingInNetworkError()) {
+-        throw new NomicLabsHardhatPluginError(
+-            pluginName,
+-            `Failed to send contract verification request.
++        if (etherscanResponse.isBytecodeMissingInNetworkError()) {
++            throw new NomicLabsHardhatPluginError(
++                pluginName,
++                `Failed to send contract verification request.
+ Endpoint URL: ${url}
+ Reason: The Etherscan API responded that the address ${req.contractaddress} does not have bytecode.
+ This can happen if the contract was recently deployed and this fact hasn't propagated to the backend yet.
+ Try waiting for a minute before verifying your contract. If you are invoking this from a script,
+ try to wait for five confirmations of your contract deployment transaction before running the verification subtask.`,
+-        );
+-    }
++            );
++        }
+ 
+-    if (!etherscanResponse.isOk()) {
+-        throw new NomicLabsHardhatPluginError(pluginName, etherscanResponse.message);
++        if (!etherscanResponse.isOk()) {
++            throw new NomicLabsHardhatPluginError(pluginName, etherscanResponse.message);
++        }
++
++        return etherscanResponse;
+     }
+ 
+-    return etherscanResponse;
++    throw new NomicLabsHardhatPluginError(
++        pluginName,
++        `Contract verification exhausted retries.
++Endpoint URL: ${url}`,
++    );
+ }
+ 
+ export async function getVerificationStatus(
+@@ -76,52 +127,74 @@ export async function getVerificationStatus(
+     const parameters = new URLSearchParams({ ...req });
+     const urlWithQuery = new URL(url);
+     urlWithQuery.search = parameters.toString();
+-
+-    let response;
+-    try {
+-        response = await sendGetRequest(urlWithQuery);
+-
+-        if (!(response.statusCode >= 200 && response.statusCode <= 299)) {
+-            // This could be always interpreted as JSON if there were any such guarantee in the Etherscan API.
+-            const responseText = await response.body.text();
+-            const message = `The HTTP server response is not ok. Status code: ${response.statusCode} Response text: ${responseText}`;
+-
+-            throw new NomicLabsHardhatPluginError(pluginName, message);
+-        }
+-    } catch (error: any) {
+-        throw new NomicLabsHardhatPluginError(
+-            pluginName,
+-            `Failure during etherscan status polling. The verification may still succeed but
++    const maxRetries = http429MaxRetries();
++
++    for (let attempt = 0; attempt < maxRetries; attempt++) {
++        let response: Dispatcher.ResponseData;
++        try {
++            response = await sendGetRequest(urlWithQuery);
++
++            if (response.statusCode === 429) {
++                await response.body.text();
++                const waitMs = retryAfterDelayMs(429, response, attempt);
++                if (attempt < maxRetries - 1) {
++                    console.warn(
++                        `[okverify] Status poll rate limited (429). Waiting ${Math.ceil(waitMs / 1000)}s...`,
++                    );
++                    await delay(waitMs);
++                    continue;
++                }
++                throw new NomicLabsHardhatPluginError(
++                    pluginName,
++                    `Failure during etherscan status polling (HTTP 429).
++Endpoint URL: ${urlWithQuery.toString()}`,
++                );
++            }
++
++            if (!(response.statusCode >= 200 && response.statusCode <= 299)) {
++                const responseText = await response.body.text();
++                const message = `The HTTP server response is not ok. Status code: ${response.statusCode} Response text: ${responseText}`;
++
++                throw new NomicLabsHardhatPluginError(pluginName, message);
++            }
++        } catch (error: any) {
++            if (error instanceof NomicLabsHardhatPluginError) throw error;
++            throw new NomicLabsHardhatPluginError(
++                pluginName,
++                `Failure during etherscan status polling. The verification may still succeed but
+ should be checked manually.
+ Endpoint URL: ${urlWithQuery.toString()}
+ Reason: ${error.message}`,
+-            error,
+-        );
+-    }
++                error,
++            );
++        }
+ 
+-    const data = await response.body.json();
+-    const etherscanResponse = new EtherscanResponse(data);
++        const data = await response.body.json();
++        const etherscanResponse = new EtherscanResponse(data);
+ 
+-    if (etherscanResponse.isPending()) {
+-        await delay(verificationIntervalMs);
++        if (etherscanResponse.isPending()) {
++            await delay(verificationIntervalMs);
+ 
+-        return getVerificationStatus(url, req);
+-    }
++            return getVerificationStatus(url, req);
++        }
+ 
+-    if (etherscanResponse.isVerificationFailure()) {
+-        return etherscanResponse;
+-    }
++        if (etherscanResponse.isVerificationFailure()) {
++            return etherscanResponse;
++        }
+ 
+-    if (!etherscanResponse.isOk()) {
+-        throw new NomicLabsHardhatPluginError(
+-            pluginName,
+-            `The Etherscan API responded with a failure status.
++        if (!etherscanResponse.isOk()) {
++            throw new NomicLabsHardhatPluginError(
++                pluginName,
++                `The Etherscan API responded with a failure status.
+ The verification may still succeed but should be checked manually.
+ Reason: ${etherscanResponse.message}`,
+-        );
++            );
++        }
++
++        return etherscanResponse;
+     }
+ 
+-    return etherscanResponse;
++    throw new NomicLabsHardhatPluginError(pluginName, 'Verification status polling exhausted retries.');
+ }
+ 
+ export class EtherscanResponse {
+@@ -181,7 +254,6 @@ export async function isAlreadyVerified(
+     const response = await sendGetRequest(url);
+ 
+     if (!(response.statusCode >= 200 && response.statusCode <= 299)) {
+-        // This could be always interpreted as JSON if there were any such guarantee in the Etherscan API.
+         const responseText = await response.body.text();
+         throw new NomicLabsHardhatPluginError(
+             pluginName,
+diff --git a/node_modules/@okxweb3/hardhat-explorer-verify/src/solc/version.ts b/node_modules/@okxweb3/hardhat-explorer-verify/src/solc/version.ts
+index 9b506bb..62ee99b 100644
+--- a/node_modules/@okxweb3/hardhat-explorer-verify/src/solc/version.ts
++++ b/node_modules/@okxweb3/hardhat-explorer-verify/src/solc/version.ts
+@@ -3,7 +3,11 @@ import { NomicLabsHardhatPluginError } from 'hardhat/plugins';
+ import { pluginName } from '../task/constants';
+ import { sendGetRequest } from '../undiciClient';
+ 
+-const COMPILERS_LIST_URL = 'https://solc-bin.ethereum.org/bin/list.json';
++// Primary: soliditylang.org (current host; better DNS in some regions). Fallback: legacy solc-bin.ethereum.org.
++const COMPILERS_LIST_URLS = [
++    'https://binaries.soliditylang.org/bin/list.json',
++    'https://solc-bin.ethereum.org/bin/list.json',
++] as const;
+ 
+ // Non-exhaustive interface for the official compiler list.
+ export interface CompilersList {
+@@ -26,24 +30,27 @@ export async function getLongVersion(shortVersion: string): Promise<string> {
+ }
+ 
+ export async function getVersions(): Promise<CompilersList> {
+-    try {
+-        // It would be better to query an etherscan API to get this list but there's no such API yet.
+-        const response = await sendGetRequest(new URL(COMPILERS_LIST_URL));
+-
+-        if (!(response.statusCode >= 200 && response.statusCode <= 299)) {
+-            const responseText = await response.body.text();
+-            throw new NomicLabsHardhatPluginError(
+-                pluginName,
+-                `HTTP response is not ok. Status code: ${response.statusCode} Response text: ${responseText}`,
+-            );
++    let lastError: Error | undefined;
++    for (const compilersListUrl of COMPILERS_LIST_URLS) {
++        try {
++            const response = await sendGetRequest(new URL(compilersListUrl));
++
++            if (!(response.statusCode >= 200 && response.statusCode <= 299)) {
++                const responseText = await response.body.text();
++                throw new NomicLabsHardhatPluginError(
++                    pluginName,
++                    `HTTP response is not ok for ${compilersListUrl}. Status code: ${response.statusCode} Response text: ${responseText}`,
++                );
++            }
++
++            return (await response.body.json()) as CompilersList;
++        } catch (error: any) {
++            lastError = error;
+         }
+-
+-        return (await response.body.json()) as CompilersList;
+-    } catch (error: any) {
+-        throw new NomicLabsHardhatPluginError(
+-            pluginName,
+-            `Failed to obtain list of solc versions. Reason: ${error.message}`,
+-            error,
+-        );
+     }
++    throw new NomicLabsHardhatPluginError(
++        pluginName,
++        `Failed to obtain list of solc versions (${COMPILERS_LIST_URLS.join(' → ')}). Reason: ${lastError?.message}`,
++        lastError,
++    );
+ }

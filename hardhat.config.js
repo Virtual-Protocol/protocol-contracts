@@ -43,6 +43,7 @@ if (target) {
   console.log("Loaded env via dotenv default (cwd .env if present)");
 }
 require("@nomicfoundation/hardhat-toolbox");
+require("@okxweb3/hardhat-explorer-verify"); // OKLink `okverify` for X Layer (chainId 1952 / 196). See okxweb3explorer below.
 require("hardhat-deploy");
 require("@openzeppelin/hardhat-upgrades");
 require("@fireblocks/hardhat-fireblocks");
@@ -51,15 +52,53 @@ require("hardhat-contract-sizer");
 const { ApiBaseUrl } = require("@fireblocks/fireblocks-web3-provider");
 
 module.exports = {
+  // Multiple compilers: verify (okverify / etherscan) must include every solc version present in on-chain bytecode metadata.
+  // Deploys may use 0.8.29 while day-to-day sources target 0.8.26 — list both with the same optimizer/viaIR so verification matches.
+  // Hardhat picks the highest pragma-compatible compiler per file; use `overrides` below to pin 0.8.26 where bytecode must stay fixed.
+  // Uni V2 npm artifacts: @uniswap/v2-core 0.5.16; @uniswap/v2-periphery 0.6.6.
   solidity: {
-    version: "0.8.26",
-    settings: {
-      viaIR: true,
-      optimizer: {
-        enabled: true,
-        runs: 200,
+    compilers: [
+      {
+        version: "0.5.16",
+        settings: {
+          optimizer: {
+            enabled: true,
+            runs: 999999,
+          },
+          evmVersion: "istanbul",
+        },
       },
-    },
+      {
+        version: "0.6.6",
+        settings: {
+          optimizer: {
+            enabled: true,
+            runs: 999999,
+          },
+          evmVersion: "istanbul",
+        },
+      },
+      {
+        version: "0.8.26",
+        settings: {
+          viaIR: true,
+          optimizer: {
+            enabled: true,
+            runs: 200,
+          },
+        },
+      },
+      // {
+      //   version: "0.8.29",
+      //   settings: {
+      //     viaIR: true,
+      //     optimizer: {
+      //       enabled: true,
+      //       runs: 200,
+      //     },
+      //   },
+      // },
+    ],
   },
   overrides: {
     "contracts/genesis/FGenesis.sol": {
@@ -119,7 +158,14 @@ module.exports = {
   etherscan: {
     // Etherscan API V2 (single key, multichain via chainid): https://docs.etherscan.io/v2-migration
     // Do not use legacy api.basescan.org/api — Hardhat-verify reports deprecated V1 / log fetch failures.
-    apiKey: process.env.ETHERSCAN_API_KEY,
+    //
+    // X Layer (OKLink): uses `okverify` task from @okxweb3/hardhat-explorer-verify (Method 1).
+    // Method 2 (customChains + verify:verify/verify:etherscan) does NOT work — OKLink's plugin
+    // endpoint rejects standard Etherscan POST format ("Missing or unsupported chainid parameter").
+    // The xlayer_* entries below are kept for reference but verification goes through okxweb3explorer below.
+    // Set OKLINK_API_KEY (or ETHERSCAN_API_KEY) to your OKLink API key when verifying on xlayer_*.
+    // https://www.oklink.com/docs/zh/#explorer-api-tools-contract-verification-verify-source-code-using-hardhat
+    apiKey: process.env.OKLINK_API_KEY || process.env.ETHERSCAN_API_KEY,
     customChains: [
       {
         network: "base",
@@ -179,6 +225,54 @@ module.exports = {
         urls: {
           apiURL: "https://api.etherscan.io/v2/api",
           browserURL: "https://sepolia.arbiscan.io/",
+        },
+      },
+      // X Layer (OKLink) — kept for reference only. Verification uses okxweb3explorer (okverify) below.
+      // Standard Etherscan format (verify:verify / verify:etherscan) fails with "Missing or unsupported chainid parameter".
+      {
+        network: "xlayer_testnet",
+        chainId: 1952,
+        urls: {
+          apiURL:
+            "https://www.oklink.com/api/v5/explorer/contract/verify-source-code-plugin/XLAYER_TESTNET",
+          browserURL: "https://www.oklink.com/xlayer-test",
+        },
+      },
+      {
+        network: "xlayer_mainnet",
+        chainId: 196,
+        urls: {
+          apiURL:
+            "https://www.oklink.com/api/v5/explorer/contract/verify-source-code-plugin/XLAYER",
+          browserURL: "https://www.oklink.com/xlayer",
+        },
+      },
+    ],
+  },
+  // @okxweb3/hardhat-explorer-verify: primary verification for X Layer (okverify task, Method 1).
+  // Uses OKLink-specific request format — the only format OKLink's plugin endpoint accepts.
+  okxweb3explorer: {
+    apiKey:
+      process.env.OKLINK_API_KEY ||
+      process.env.ETHERSCAN_API_KEY ||
+      "OKLINK",
+    customChains: [
+      {
+        network: "xlayer_testnet",
+        chainId: 1952,
+        urls: {
+          apiURL:
+            "https://www.oklink.com/api/v5/explorer/contract/verify-source-code-plugin/XLAYER_TESTNET",
+          browserURL: "https://www.oklink.com/zh-hans/xlayer-test/explorer",
+        },
+      },
+      {
+        network: "xlayer_mainnet",
+        chainId: 196,
+        urls: {
+          apiURL:
+            "https://www.oklink.com/api/v5/explorer/contract/verify-source-code-plugin/XLAYER",
+          browserURL: "https://www.oklink.com/zh-hans/xlayer/explorer",
         },
       },
     ],
@@ -282,6 +376,22 @@ module.exports = {
       accounts: [process.env.PRIVATE_KEY],
       chainId: 421614,
     },
+    // X Layer (OKX)
+    // Do not fall back to RPC_URL to avoid accidental cross-chain deploys.
+    xlayer_testnet: {
+      url:
+        process.env.XLAYER_TESTNET_RPC_URL ||
+        "https://xlayertestrpc.okx.com/terigon",
+      accounts: [process.env.PRIVATE_KEY],
+      chainId: 1952,
+    },
+    xlayer_mainnet: {
+      url:
+        process.env.XLAYER_RPC_URL ||
+        "https://xlayerrpc.okx.com",
+      accounts: [process.env.PRIVATE_KEY],
+      chainId: 196,
+    },
     base_sepolia_fire: {
       url: "https://sepolia.base.org",
       accounts: [process.env.PRIVATE_KEY],
@@ -354,6 +464,16 @@ module.exports = {
           },
         },
         421614: {
+          hardforkHistory: {
+            cancun: 0,
+          },
+        },
+        1952: {
+          hardforkHistory: {
+            cancun: 0,
+          },
+        },
+        196: {
           hardforkHistory: {
             cancun: 0,
           },

@@ -381,9 +381,11 @@ module.exports = {
     xlayer_testnet: {
       url:
         process.env.XLAYER_TESTNET_RPC_URL ||
-        "https://xlayertestrpc.okx.com/terigon",
+        // `/terigon` has been flaky (ECONNRESET); public endpoint without path is more stable.
+        "https://xlayertestrpc.okx.com",
       accounts: [process.env.PRIVATE_KEY],
       chainId: 1952,
+      timeout: 120_000,
     },
     xlayer_mainnet: {
       url:

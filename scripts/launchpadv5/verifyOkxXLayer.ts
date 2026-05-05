@@ -17,6 +17,15 @@
  *   npx hardhat okverify --network xlayer_testnet 0x...
  *   npx hardhat okverify --network xlayer_testnet --contract contracts/Foo.sol:Foo --proxy 0x...
  *
+ * If you see `Error: read ECONNRESET`: set `XLAYER_TESTNET_RPC_URL` in the env file; the
+ * `patch-package` patch on `@okxweb3/hardhat-explorer-verify` retries RPC + OKLink HTTP (see
+ * `patches/@okxweb3+hardhat-explorer-verify+1.6.5.patch`). Tune with:
+ *   OKVERIFY_RPC_RETRIES=6
+ *   OKVERIFY_NETWORK_RETRIES=8
+ *   OKVERIFY_CONNECT_TIMEOUT_MS / OKVERIFY_BODY_TIMEOUT_MS
+ *   HTTPS_PROXY / HTTP_PROXY if you must use a corporate proxy
+ * You can still use `./scripts/launchpadv5/okverify_with_retry.sh` for whole-command retries.
+ *
  * Optional:
  *   VERIFY_CONTRACT=contracts/path/Contract.sol:ContractName
  *   VERIFY_CONSTRUCTOR_ARGS_JSON='["arg1","0x...",18]'   (JSON array, empty [] if none)

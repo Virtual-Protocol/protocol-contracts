@@ -240,6 +240,75 @@ index eb7c379..115526e 100644
  }
  exports.isAlreadyVerified = isAlreadyVerified;
  //# sourceMappingURL=EtherscanService.js.map
+diff --git a/node_modules/@okxweb3/hardhat-explorer-verify/dist/network/prober.js b/node_modules/@okxweb3/hardhat-explorer-verify/dist/network/prober.js
+index 88f4a5e..e2af4b5 100644
+--- a/node_modules/@okxweb3/hardhat-explorer-verify/dist/network/prober.js
++++ b/node_modules/@okxweb3/hardhat-explorer-verify/dist/network/prober.js
+@@ -4,13 +4,51 @@ exports.retrieveContractBytecode = exports.getEtherscanEndpoints = void 0;
+ const plugins_1 = require("hardhat/plugins");
+ const constants_1 = require("../task/constants");
+ const errors_1 = require("../errors");
++function isRetryableRpcError(e) {
++    const code = e && e.code;
++    const msg = String((e && e.message) || "");
++    return (code === "ECONNRESET" ||
++        code === "ECONNREFUSED" ||
++        code === "ETIMEDOUT" ||
++        code === "EPIPE" ||
++        /ECONNRESET|ETIMEDOUT|timeout|socket/i.test(msg));
++}
++function maxRpcRetries() {
++    const raw = process.env.OKVERIFY_RPC_RETRIES;
++    if (raw !== undefined && raw !== "")
++        return Math.max(1, parseInt(raw, 10));
++    return 6;
++}
++async function sleepRpc(ms) {
++    return new Promise((r) => setTimeout(r, ms));
++}
++async function retryRpc(operation, label) {
++    const max = maxRpcRetries();
++    let last;
++    for (let i = 0; i < max; i++) {
++        try {
++            return await operation();
++        }
++        catch (e) {
++            last = e;
++            if (i < max - 1 && isRetryableRpcError(e)) {
++                const w = 1200 * (i + 1) + Math.floor(Math.random() * 600);
++                console.warn(`[okverify] RPC ${label} → ${e.code || e.message} (retry ${i + 2}/${max} in ${Math.ceil(w / 1000)}s)`);
++                await sleepRpc(w);
++                continue;
++            }
++            throw e;
++        }
++    }
++    throw last;
++}
+ async function getEtherscanEndpoints(provider, networkName, chainConfig, customChains) {
+     const chainIdsToNames = new Map(entries(chainConfig).map(([chainName, config]) => [config.chainId, chainName]));
+-    const chainID = parseInt(await provider.send('eth_chainId'), 16);
++    const chainID = parseInt(await retryRpc(() => provider.send("eth_chainId"), "eth_chainId"), 16);
+     const safeCustomChains = Array.isArray(customChains) ? customChains : [];
+     const networkInCustomChains = [...safeCustomChains]
+         .reverse() // the last entry wins
+-        .find(customChain => customChain.chainId === chainID);
++        .find((customChain) => customChain.chainId === chainID);
+     // if there is a custom chain with the given chain id, that one is preferred
+     // over the built-in ones
+     if (networkInCustomChains !== undefined) {
+@@ -25,8 +63,8 @@ async function getEtherscanEndpoints(provider, networkName, chainConfig, customC
+ }
+ exports.getEtherscanEndpoints = getEtherscanEndpoints;
+ async function retrieveContractBytecode(address, provider, networkName) {
+-    const bytecodeString = (await provider.send('eth_getCode', [address, 'latest']));
+-    const deployedBytecode = bytecodeString.startsWith('0x')
++    const bytecodeString = (await retryRpc(() => provider.send("eth_getCode", [address, "latest"]), "eth_getCode"));
++    const deployedBytecode = bytecodeString.startsWith("0x")
+         ? bytecodeString.slice(2)
+         : bytecodeString;
+     if (deployedBytecode.length === 0) {
 diff --git a/node_modules/@okxweb3/hardhat-explorer-verify/dist/solc/version.js b/node_modules/@okxweb3/hardhat-explorer-verify/dist/solc/version.js
 index 1b0e065..6e2a0da 100644
 --- a/node_modules/@okxweb3/hardhat-explorer-verify/dist/solc/version.js
@@ -294,6 +363,119 @@ index 1b0e065..6e2a0da 100644
  }
  exports.getVersions = getVersions;
  //# sourceMappingURL=version.js.map
+diff --git a/node_modules/@okxweb3/hardhat-explorer-verify/dist/undiciClient.js b/node_modules/@okxweb3/hardhat-explorer-verify/dist/undiciClient.js
+index e564a68..f61e9c3 100644
+--- a/node_modules/@okxweb3/hardhat-explorer-verify/dist/undiciClient.js
++++ b/node_modules/@okxweb3/hardhat-explorer-verify/dist/undiciClient.js
+@@ -3,28 +3,93 @@ Object.defineProperty(exports, "__esModule", { value: true });
+ exports.isSuccessStatusCode = exports.sendPostRequest = exports.sendGetRequest = void 0;
+ const undici_1 = require("undici");
+ function getDispatcher() {
+-    const { ProxyAgent, getGlobalDispatcher } = require('undici');
+-    if (process.env.http_proxy !== undefined) {
+-        return new ProxyAgent(process.env.http_proxy);
++    const { ProxyAgent, getGlobalDispatcher } = require("undici");
++    const proxy = process.env.https_proxy ||
++        process.env.HTTPS_PROXY ||
++        process.env.http_proxy ||
++        process.env.HTTP_PROXY;
++    if (proxy !== undefined && proxy !== "") {
++        return new ProxyAgent(proxy);
+     }
+     return getGlobalDispatcher();
+ }
++function requestOpts(extra) {
++    return {
++        connectTimeout: parseInt(process.env.OKVERIFY_CONNECT_TIMEOUT_MS || "60000", 10),
++        bodyTimeout: parseInt(process.env.OKVERIFY_BODY_TIMEOUT_MS || "120000", 10),
++        ...extra,
++    };
++}
++function isRetryableNetworkError(err) {
++    const code = err && (err.code || (err.cause && err.cause.code));
++    const msg = String((err && err.message) || "");
++    return (code === "ECONNRESET" ||
++        code === "ECONNREFUSED" ||
++        code === "ETIMEDOUT" ||
++        code === "EPIPE" ||
++        code === "UND_ERR_SOCKET" ||
++        code === "UND_ERR_CONNECT_TIMEOUT" ||
++        /ECONNRESET|ETIMEDOUT|fetch failed|socket|UND_ERR/i.test(msg));
++}
++function maxNetworkRetries() {
++    const raw = process.env.OKVERIFY_NETWORK_RETRIES;
++    if (raw !== undefined && raw !== "")
++        return Math.max(1, parseInt(raw, 10));
++    return 8;
++}
++async function sleep(ms) {
++    return new Promise((r) => setTimeout(r, ms));
++}
+ async function sendGetRequest(url) {
+-    const dispatcher = getDispatcher();
+-    return (0, undici_1.request)(url, {
+-        dispatcher,
+-        method: 'GET',
+-    });
++    const max = maxNetworkRetries();
++    let lastErr;
++    for (let i = 0; i < max; i++) {
++        try {
++            const dispatcher = getDispatcher();
++            return await (0, undici_1.request)(url, requestOpts({
++                dispatcher,
++                method: "GET",
++            }));
++        }
++        catch (err) {
++            lastErr = err;
++            if (i < max - 1 && isRetryableNetworkError(err)) {
++                const wait = 1500 * (i + 1) + Math.floor(Math.random() * 800);
++                console.warn(`[okverify] GET ${String(url).slice(0, 80)}… → ${err.code || err.message} (retry ${i + 2}/${max} in ${Math.ceil(wait / 1000)}s)`);
++                await sleep(wait);
++                continue;
++            }
++            throw err;
++        }
++    }
++    throw lastErr;
+ }
+ exports.sendGetRequest = sendGetRequest;
+ async function sendPostRequest(url, body) {
+-    const dispatcher = getDispatcher();
+-    return (0, undici_1.request)(url, {
+-        dispatcher,
+-        method: 'POST',
+-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+-        body,
+-    });
++    const max = maxNetworkRetries();
++    let lastErr;
++    for (let i = 0; i < max; i++) {
++        try {
++            const dispatcher = getDispatcher();
++            return await (0, undici_1.request)(url, requestOpts({
++                dispatcher,
++                method: "POST",
++                headers: { "Content-Type": "application/x-www-form-urlencoded" },
++                body,
++            }));
++        }
++        catch (err) {
++            lastErr = err;
++            if (i < max - 1 && isRetryableNetworkError(err)) {
++                const wait = 2000 * (i + 1) + Math.floor(Math.random() * 1000);
++                console.warn(`[okverify] POST … → ${err.code || err.message} (retry ${i + 2}/${max} in ${Math.ceil(wait / 1000)}s)`);
++                await sleep(wait);
++                continue;
++            }
++            throw err;
++        }
++    }
++    throw lastErr;
+ }
+ exports.sendPostRequest = sendPostRequest;
+ function isSuccessStatusCode(statusCode) {
 diff --git a/node_modules/@okxweb3/hardhat-explorer-verify/src/etherscan/EtherscanService.ts b/node_modules/@okxweb3/hardhat-explorer-verify/src/etherscan/EtherscanService.ts
 index 8274160..b7d9bae 100644
 --- a/node_modules/@okxweb3/hardhat-explorer-verify/src/etherscan/EtherscanService.ts

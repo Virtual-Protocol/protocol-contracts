@@ -51,6 +51,8 @@ DEFAULT_ENV_FILE=".env.launchpadv5_dev_bsc_local"  # .env.launchpadv5_local, .en
 #   bsc_testnet   - Deploy directly to BSC testnet (hardhat `bsc_testnet` url: BSC_TESTNET_RPC_URL,
 #                   then RPC_URL, then default; set these in the same env file you pass with --env).
 #   monad_testnet - Monad testnet (chainId 10143); MONAD_TESTNET_RPC_URL or RPC_URL in env file.
+#   xlayer_testnet - X Layer testnet (chainId 1952); XLAYER_TESTNET_RPC_URL in env file.
+#   xlayer_mainnet - X Layer mainnet (chainId 196); XLAYER_RPC_URL in env file.
 
 set -e
 
@@ -193,9 +195,18 @@ case "$NETWORK" in
     "monad_mainnet")
         HARDHAT_NETWORK="monad_mainnet"
         ;;
+    "xlayer_testnet")
+        HARDHAT_NETWORK="xlayer_testnet"
+        ;;
+    "xlayer_mainnet")
+        HARDHAT_NETWORK="xlayer_mainnet"
+        echo "⚠️  WARNING: Deploying to X LAYER MAINNET!"
+        echo "Press Ctrl+C within 5 seconds to cancel..."
+        sleep 5
+        ;;
     *)
         echo "Error: Unknown network '$NETWORK'"
-        echo "Valid networks: local, base_sepolia, base, bsc_testnet, abstract_testnet, abstract_mainnet, monad_testnet"
+        echo "Valid networks: local, base_sepolia, base, bsc_testnet, abstract_testnet, abstract_mainnet, monad_testnet, xlayer_testnet, xlayer_mainnet"
         exit 1
         ;;
 esac
@@ -302,7 +313,7 @@ save_univ2_env_from_log() {
 
 run_univ2_liquidity_deploy() {
     case "$HARDHAT_NETWORK" in
-        local|bsc_testnet|monad_testnet)
+        local|bsc_testnet|monad_testnet|xlayer_testnet)
             ;;
         *)
             echo "Skipping deployUniswapV2TestnetLiquidity.ts (not run on network $HARDHAT_NETWORK)"
@@ -357,7 +368,9 @@ run_univ2_liquidity_deploy() {
 
     local log_file="/tmp/deploy_step_univ2.log"
     set +e
-    ENV_FILE="$ENV_FILE" npx hardhat run "scripts/launchpadv5/deployUniswapV2TestnetLiquidity.ts" --network "$HARDHAT_NETWORK" 2>&1 | tee "$log_file"
+    # Hardhat runs behind `tee`: stdout is not a TTY, so deployUniswapV2TestnetLiquidity.ts cannot prompt for
+    # mock VIRTUAL — auto-deploy mock when VIRTUAL_TOKEN_ADDRESS is unset (user already confirmed UniV2 step above).
+    ENV_FILE="$ENV_FILE" LAUNCHPAD_AUTO_DEPLOY_MOCK_VIRTUAL=1 npx hardhat run "scripts/launchpadv5/deployUniswapV2TestnetLiquidity.ts" --network "$HARDHAT_NETWORK" 2>&1 | tee "$log_file"
     local exit_code=${PIPESTATUS[0]}
     set -e
 

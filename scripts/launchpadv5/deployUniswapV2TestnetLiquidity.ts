@@ -9,7 +9,9 @@
  *
  * Required env:
  *   VIRTUAL_TOKEN_ADDRESS   — existing ERC20 you already have on this chain (e.g. VIRTUAL).
- *                             To deploy a mock with 1B supply: run deployMockVirtualToken.ts on this chain first.
+ *                             To deploy a mock with 1B supply: run deployMockVirtualToken.ts on this chain first,
+ *                             or set LAUNCHPAD_AUTO_DEPLOY_MOCK_VIRTUAL=1 / LAUNCHPAD_AUTO_UNIV2=1 so this script
+ *                             deploys mock when stdin/stdout are not a TTY (e.g. piped through `tee`).
  *
  * Optional env:
  *   UNISWAP_V2_ROUTER       — if set, skip deploying Factory/WETH/Router and use this router
@@ -149,16 +151,24 @@ function formatRevertError(err: unknown): string {
     const virtualFromEnv = process.env.VIRTUAL_TOKEN_ADDRESS?.trim();
     const taxFromEnv = process.env.AGENT_TAX_TAX_TOKEN?.trim();
 
+    const autoDeployMockVirtual =
+      process.env.LAUNCHPAD_AUTO_DEPLOY_MOCK_VIRTUAL === "1" ||
+      process.env.LAUNCHPAD_AUTO_DEPLOY_MOCK_VIRTUAL === "true" ||
+      process.env.LAUNCHPAD_AUTO_UNIV2 === "1";
+
     let virtualToken: string;
     if (!virtualFromEnv) {
-      const ok = await promptYes(
-        "VIRTUAL_TOKEN_ADDRESS is not set.\n" +
-          "Deploy mock VIRTUAL (MockERC20Decimals) and write VIRTUAL_TOKEN_ADDRESS + AGENT_TAX_TAX_TOKEN to ENV_FILE? [y/N] "
-      );
+      const ok =
+        autoDeployMockVirtual ||
+        (await promptYes(
+          "VIRTUAL_TOKEN_ADDRESS is not set.\n" +
+            "Deploy mock VIRTUAL (MockERC20Decimals) and write VIRTUAL_TOKEN_ADDRESS + AGENT_TAX_TAX_TOKEN to ENV_FILE? [y/N] "
+        ));
       if (!ok) {
         if (!isLaunchpadInteractive()) {
           throw new Error(
-            "VIRTUAL_TOKEN_ADDRESS missing: use an interactive terminal, set ENV_FILE + addresses manually, or unset LAUNCHPAD_NON_INTERACTIVE/CI."
+            "VIRTUAL_TOKEN_ADDRESS missing: add it to ENV_FILE (or deploy mock via deployMockVirtualToken.ts). " +
+              "Non-interactive / no TTY: set LAUNCHPAD_AUTO_DEPLOY_MOCK_VIRTUAL=1 or LAUNCHPAD_AUTO_UNIV2=1 to auto-deploy mock."
           );
         }
         throw new Error(

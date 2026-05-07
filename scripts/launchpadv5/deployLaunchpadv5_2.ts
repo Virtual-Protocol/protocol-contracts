@@ -309,8 +309,9 @@ const { ethers, upgrades } = require("hardhat");
     // ============================================
     // 6. Deploy AgentFactoryV7 (NEW for V5 Suite)
     // ============================================
-    // Check if AgentFactoryV7 already exists
-    const agentFactoryV7Address = process.env.AGENT_FACTORY_V7_ADDRESS;
+    // Check if AgentFactoryV7 already exists (must use one outer binding — do not `const` shadow
+    // inside the deploy branch or step 8 sees `undefined` and ethers hits NotImplemented resolveName.)
+    let agentFactoryV7Address = (process.env.AGENT_FACTORY_V7_ADDRESS || "").trim();
     if (agentFactoryV7Address) {
       console.log(
         "\n=== AgentFactoryV7 already exists, skipping deployment ==="
@@ -341,7 +342,7 @@ const { ethers, upgrades } = require("hardhat");
         }
       );
       await agentFactoryV7.waitForDeployment();
-      const agentFactoryV7Address = await agentFactoryV7.getAddress();
+      agentFactoryV7Address = await agentFactoryV7.getAddress();
       deployedContracts.AgentFactoryV7 = agentFactoryV7Address;
       console.log("AgentFactoryV7 deployed at:", agentFactoryV7Address);
 
@@ -441,6 +442,16 @@ const { ethers, upgrades } = require("hardhat");
     // 8. Grant MINTER_ROLE on AgentNftV2 to AgentFactoryV7
     // ============================================
     console.log("\n--- Configuring AgentNftV2 roles ---");
+
+    if (
+      !agentFactoryV7Address ||
+      !ethers.isAddress(agentFactoryV7Address)
+    ) {
+      throw new Error(
+        "AgentFactoryV7 address is missing or invalid — cannot grant MINTER_ROLE on AgentNftV2 " +
+          "(fix AGENT_FACTORY_V7_ADDRESS env or redeploy step 2 without skipping factory deploy)."
+      );
+    }
 
     const agentNftV2Read = await ethers.getContractAt(
       "AgentNftV2",

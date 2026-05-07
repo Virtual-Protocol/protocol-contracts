@@ -222,15 +222,42 @@ const MONAD_SOURCIFY = {
 };
 
 /**
+ * `okverify` variadic `constructorArgsParams` is CLI-typed: every value must be a string
+ * (HH301 if you pass number/boolean/bigint). Encoding subtasks still coerce for the ABI.
+ */
+function toOkverifyConstructorParams(args: any[] | undefined): string[] {
+  if (args == null || args.length === 0) return [];
+  return args.map((a) => {
+    if (typeof a === "bigint") return a.toString();
+    if (typeof a === "number" || typeof a === "boolean") return String(a);
+    if (a == null) return "0";
+    return String(a);
+  });
+}
+
+/**
  * Verify a contract: Etherscan-compatible explorers and/or Sourcify.
+ *
  * On monad_testnet / monad_mainnet: runs Sourcify first (verify:verify would stop if Etherscan fails), then MonadScan.
+ *
+ * On xlayer_testnet / xlayer_mainnet: uses `okverify` task from @okxweb3/hardhat-explorer-verify (Method 1).
+ * Pass `opts.proxy: true` for OZ proxy addresses (same as CLI `okverify … --proxy <proxyAddr>`): verifies implementation,
+ * proxy wrapper, and ProxyAdmin. Optional `opts.contract` only if bytecode matches multiple local contracts.
+ * Method 2 (etherscan.customChains + verify:etherscan) does NOT work — OKLink's plugin endpoint
+ * (/verify-source-code-plugin/XLAYER_TESTNET) requires OKLink-specific request format, and returns
+ * "Missing or unsupported chainid parameter" for standard Etherscan POST requests. Additionally,
+ * @openzeppelin/hardhat-upgrades v3.x hooks into ALL Hardhat verify tasks including verify:etherscan,
+ * triggering proxy detection which then calls getLogs and also fails on OKLink.
+ * `okverify` bypasses both issues: it sends the correct OKLink format and is not intercepted by OZ upgrades.
+ * Set OKLINK_API_KEY (or ETHERSCAN_API_KEY) to your OKLink API key before running.
  */
 export async function verifyContract(
   address: string,
   constructorArguments: any[] = [],
-  opts?: { contract?: string }
+  opts?: { contract?: string; proxy?: boolean }
 ) {
-  console.log(`\n--- Verifying contract at ${address} ---`);
+  const proxyNote = opts?.proxy ? " (OZ proxy — okverify links impl + proxy + ProxyAdmin on OKLink)" : "";
+  console.log(`\n--- Verifying contract at ${address}${proxyNote} ---`);
   const net = hre.network.name;
   const isMonad = net === "monad_testnet" || net === "monad_mainnet";
 
@@ -285,6 +312,39 @@ export async function verifyContract(
     return;
   }
 
+  if (net === "xlayer_testnet" || net === "xlayer_mainnet") {
+    // Use okverify (Method 1: @okxweb3/hardhat-explorer-verify plugin).
+    // This sends requests in OKLink's own format — not standard Etherscan POST.
+    // verify:etherscan / verify:verify both fail with "Missing or unsupported chainid parameter"
+    // because OKLink's plugin endpoint rejects standard Etherscan format requests.
+    // constructorArgsParams must be string[] (HH301 on non-string values).
+    console.log(
+      "  OKLink via okverify (@okxweb3/hardhat-explorer-verify Method 1) — see hardhat.config.js okxweb3explorer."
+    );
+    try {
+      await run("okverify", {
+        address,
+        constructorArgsParams: toOkverifyConstructorParams(constructorArguments),
+        ...(opts?.contract ? { contract: opts.contract } : {}),
+        ...(opts?.proxy ? { proxy: true } : {}),
+      });
+      console.log("✅ Contract verified (OKLink)");
+    } catch (error: any) {
+      const msg = error?.message ?? String(error);
+      if (
+        msg.includes("Already Verified") ||
+        msg.includes("already been verified") ||
+        msg.includes("Already verified") ||
+        msg.includes("Contract source code already verified")
+      ) {
+        console.log("✅ Contract already verified");
+      } else {
+        console.log("⚠️ Verification failed:", msg);
+      }
+    }
+    return;
+  }
+
   try {
     await run("verify:verify", {
       address,
@@ -294,7 +354,11 @@ export async function verifyContract(
     console.log("✅ Contract verified");
   } catch (error: any) {
     const msg = error?.message ?? String(error);
-    if (msg.includes("Already Verified")) {
+    if (
+      msg.includes("Already Verified") ||
+      msg.includes("already been verified") ||
+      msg.includes("Already verified")
+    ) {
       console.log("✅ Contract already verified");
     } else {
       console.log("⚠️ Verification failed:", msg);

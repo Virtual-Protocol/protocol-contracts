@@ -227,6 +227,24 @@ module.exports = {
           browserURL: "https://sepolia.arbiscan.io/",
         },
       },
+      // Arc Network — uses Blockscout (Etherscan-compatible API).
+      // Explorer: https://testnet.arcscan.app
+      {
+        network: "arc_testnet",
+        chainId: 5042002,
+        urls: {
+          apiURL: "https://testnet.arcscan.app/api",
+          browserURL: "https://testnet.arcscan.app",
+        },
+      },
+      {
+        network: "arc_mainnet",
+        chainId: 5042,
+        urls: {
+          apiURL: "https://arcscan.app/api",
+          browserURL: "https://arcscan.app",
+        },
+      },
       // X Layer (OKLink) — kept for reference only. Verification uses okxweb3explorer (okverify) below.
       // Standard Etherscan format (verify:verify / verify:etherscan) fails with "Missing or unsupported chainid parameter".
       {
@@ -393,6 +411,23 @@ module.exports = {
         "https://xlayerrpc.okx.com",
       accounts: [process.env.PRIVATE_KEY],
       chainId: 196,
+    },
+    // Arc Network — https://www.arc.network/
+    // Do not fall back to RPC_URL to avoid accidental cross-chain deploys.
+    arc_testnet: {
+      url:
+        process.env.ARC_TESTNET_RPC_URL ||
+        "https://rpc.arc-testnet.network",
+      accounts: [process.env.PRIVATE_KEY],
+      chainId: 5042002,
+      timeout: 120_000,
+    },
+    arc_mainnet: {
+      url:
+        process.env.ARC_MAINNET_RPC_URL ||
+        "https://rpc.arc.network",
+      accounts: [process.env.PRIVATE_KEY],
+      chainId: 5042,
     },
     base_sepolia_fire: {
       url: "https://sepolia.base.org",

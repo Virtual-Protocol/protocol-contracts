@@ -204,9 +204,18 @@ case "$NETWORK" in
         echo "Press Ctrl+C within 5 seconds to cancel..."
         sleep 5
         ;;
+    "arc_testnet")
+        HARDHAT_NETWORK="arc_testnet"
+        ;;
+    "arc_mainnet")
+        HARDHAT_NETWORK="arc_mainnet"
+        echo "⚠️  WARNING: Deploying to ARC MAINNET!"
+        echo "Press Ctrl+C within 5 seconds to cancel..."
+        sleep 5
+        ;;
     *)
         echo "Error: Unknown network '$NETWORK'"
-        echo "Valid networks: local, base_sepolia, base, bsc_testnet, abstract_testnet, abstract_mainnet, monad_testnet, xlayer_testnet, xlayer_mainnet"
+        echo "Valid networks: local, base_sepolia, base, bsc_testnet, abstract_testnet, abstract_mainnet, monad_testnet, xlayer_testnet, xlayer_mainnet, arc_testnet, arc_mainnet"
         exit 1
         ;;
 esac
@@ -313,7 +322,7 @@ save_univ2_env_from_log() {
 
 run_univ2_liquidity_deploy() {
     case "$HARDHAT_NETWORK" in
-        local|bsc_testnet|monad_testnet|xlayer_testnet)
+        local|bsc_testnet|monad_testnet|xlayer_testnet|arc_testnet)
             ;;
         *)
             echo "Skipping deployUniswapV2TestnetLiquidity.ts (not run on network $HARDHAT_NETWORK)"

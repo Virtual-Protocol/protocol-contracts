@@ -35,7 +35,11 @@ async function main() {
   const [deployer] = await ethers.getSigners();
   const initialAdmin = process.env.MULTISIG_OWNER || deployer.address;
   const treasury = process.env.TREASURY_ADDRESS || deployer.address;
-  const treeRoot = process.env.FLOW_TREE_ROOT || deployer.address;
+  // Bug-fix: treeRoot must NOT be the deployer — if it were, the deployer's
+  // activate() call would revert with AlreadyPlaced because the tree root is
+  // already marked placed. Use the dead address as a neutral, non-activatable
+  // sentinel. Override via FLOW_TREE_ROOT in production.
+  const treeRoot = process.env.FLOW_TREE_ROOT || "0x000000000000000000000000000000000000dEaD";
   const initialPrice = ethers.parseEther(
     process.env.FLOW_INITIAL_PRICE || "0.1",
   );

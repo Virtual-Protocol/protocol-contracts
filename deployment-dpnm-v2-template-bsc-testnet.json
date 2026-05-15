@@ -1,0 +1,27 @@
+{
+  "chain": "bsc_testnet",
+  "chainId": 97,
+  "deployer": "0x29c435832C166892C096c055316fd6992479C428",
+  "factory": "0x713d03A57f9e2c5A526D0C5177342e9417841920",
+  "template": {
+    "id": "0x68678b13be2d49552cc24c4eea0d4c0611e1e2a96f59a7eadfea174a5f039056",
+    "label": "dpnm-v2",
+    "implementation": "0x3F3B7E8B84B291c6894EF745db993ebd28D42d21",
+    "initSelector": "0x3ba009a3"
+  },
+  "subImpls": {
+    "DPNMToken": "0x7a9f92D4E2a5E1623C2Ae15F6D2D0261540B9f3b",
+    "DPNMGrowToken": "0x12Fa98f25c44549084F4F0e6207B2B5e11B9626D",
+    "DPNMTree": "0xE660E5a057e82841585060C767DeBbC252A14573",
+    "BuybackPools": "0xD6A673D8e53ab3A7dDAb43D450930b3169a4C011",
+    "Whitelist": "0x77B75bff53621a0Ba274017D80540C39256C068B",
+    "DPNMProtocol": "0x3622221Ce36ddDBa94Bfa77e0F53D6297941CF1B"
+  },
+  "registeredAt": "2026-05-15T02:05:33.475Z",
+  "todo": [
+    "Surface the 6 sub-impls in agentflow-api so wizard launches can pass them as `impls`.",
+    "Once a tenant launches, store its template-clone address as the canonical instance.",
+    "Verify all 7 contracts on BscScan via `npx hardhat verify --network bsc_testnet <addr>`.",
+    "Optional: pause the legacy `dpnm` template id when `dpnm-v2` is the new default."
+  ]
+}

@@ -13,6 +13,7 @@ const { ethers } = hre;
 // ENV_FILE=.env.launchpadv5_dev_arbitrum_sepolia npx hardhat run ./scripts/launchpadv5/handle_buy_sell.ts --network arbitrum_sepolia
 // ENV_FILE=.env.launchpadv5_dev_bsc_testnet npx hardhat run ./scripts/launchpadv5/handle_buy_sell.ts --network bsc_testnet
 // ENV_FILE=.env.launchpadv5_dev_xlayer_testnet npx hardhat run ./scripts/launchpadv5/handle_buy_sell.ts --network xlayer_testnet [--no-compile]
+// ENV_FILE=.env.launchpadv5_dev_arc_testnet npx hardhat run ./scripts/launchpadv5/handle_buy_sell.ts --network arc_testnet [--no-compile]
 
 // ============================================
 // Configuration - Modify these values
@@ -25,6 +26,7 @@ const TOKEN_ADDRESS_BY_NETWORK: Record<string, string> = {
   eth_sepolia: "0x02b6d8a16f9D79Cb9E8eD685492a1cD64fF627c3",
   bsc_testnet: "0x6B9048DFF2fA0ACd74fC9b195dC4768E1d541FBf",
   xlayer_testnet: "0x37cc29cfd8ca2238639791489a7668ccbc061be5", // agent token — X Layer testnet
+  arc_testnet: "0xd4f5Cc88A3A046e0CD9e4E5021F1d8bc838e088E", // agent token — Arc testnet (fill in after creating an agent)
 };
 
 function resolveTokenAddress(): string {
@@ -39,7 +41,7 @@ const CONFIG = {
   tokenAddress: resolveTokenAddress(),
 
   // Amount of VIRTUAL to spend on buy
-  buyAmount: "43000", // 1 VIRTUAL
+  buyAmount: "1000", // 1 VIRTUAL
 
   // Contract addresses (from environment or hardcode)
   bondingV5Address: process.env.BONDING_V5_ADDRESS || "",

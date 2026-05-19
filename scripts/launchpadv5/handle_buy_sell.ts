@@ -20,7 +20,7 @@ const { ethers } = hre;
 // ============================================
 const TOKEN_ADDRESS_BY_NETWORK: Record<string, string> = {
   // base_sepolia: "0xC4C27033ac81b7f6CE94bFcf5577956d5B690a08", // agentTokenV4 on base sepolia
-  base_sepolia: "0xbc36D98d309A8927e8a616C978BCF93111eC9196", // agentTokenV3 on base sepolia
+  base_sepolia: "0x2b06E5EC214341dea12430f83002278ce64252Bb", // agentTokenV3 on base sepolia
   // arbitrum_sepolia: "0x17742fa86139ed9dB81B2ec8037b2525061F97B9", // agentTokenV4 on arbitrum sepolia
   arbitrum_sepolia: "0x85A02c33aced66eD39a0fD07FB0cd8d75290939D", // agentTokenV3 on arbitrum sepolia
   eth_sepolia: "0x02b6d8a16f9D79Cb9E8eD685492a1cD64fF627c3",

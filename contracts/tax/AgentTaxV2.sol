@@ -65,6 +65,9 @@ contract AgentTaxV2 is Initializable, AccessControlUpgradeable {
 
     mapping(bytes32 partnerId => address recipient) public partnerRecipients;
     mapping(address tokenAddress => TokenPartnerConfig) public tokenPartnerConfigs;
+    /// @dev Upper bound of any configured per-token partner fee; used to guard `updateSwapParams`.
+    ///      Not decreased when individual tokens lower their rate (conservative).
+    uint16 public maxPartnerFeeRate;
 
     event TokenRegistered(address indexed tokenAddress, address indexed creator, address tba);
     event TaxDeposited(address indexed tokenAddress, uint256 amount);
@@ -335,7 +338,19 @@ contract AgentTaxV2 is Initializable, AccessControlUpgradeable {
 
             TokenPartnerConfig memory partnerConfig = tokenPartnerConfigs[tokenAddress];
             uint256 partnerFee = (assetReceived * partnerConfig.partnerFeeRate) / DENOM;
-            uint256 creatorFee = assetReceived - protocolFee - partnerFee;
+
+            // Cap fees if protocol + partner rates exceed 100% (e.g. after feeRate was raised
+            // without re-validating partner configs). Prevents underflow from bricking swaps.
+            uint256 remaining = assetReceived;
+            if (protocolFee > remaining) {
+                protocolFee = remaining;
+            }
+            remaining -= protocolFee;
+            if (partnerFee > remaining) {
+                partnerFee = remaining;
+            }
+            remaining -= partnerFee;
+            uint256 creatorFee = remaining;
 
             if (partnerFee > 0) {
                 address partnerRecipient = partnerRecipients[partnerConfig.partnerId];
@@ -445,6 +460,8 @@ contract AgentTaxV2 is Initializable, AccessControlUpgradeable {
      * @dev Partner fee is deducted from the total swapped asset amount alongside the
      *      protocol fee. Remaining amount goes to the token creator.
      *      `feeRate + partnerFeeRate` must not exceed DENOM (100%).
+     *      First configuration per token: EXECUTOR_ROLE or ADMIN_ROLE.
+     *      Subsequent updates: ADMIN_ROLE only.
      * @param tokenAddress The agent token address
      * @param partnerId Partner identifier (must have recipient configured if rate > 0)
      * @param partnerFeeRate Partner share in basis points (out of 10000)
@@ -453,7 +470,21 @@ contract AgentTaxV2 is Initializable, AccessControlUpgradeable {
         address tokenAddress,
         bytes32 partnerId,
         uint16 partnerFeeRate
-    ) external onlyRole(ADMIN_ROLE) {
+    ) external {
+        address sender = _msgSender();
+        TokenPartnerConfig memory existing = tokenPartnerConfigs[tokenAddress];
+        bool isUnset =
+            existing.partnerId == bytes32(0) && existing.partnerFeeRate == 0;
+
+        if (isUnset) {
+            require(
+                hasRole(EXECUTOR_ROLE, sender) || hasRole(ADMIN_ROLE, sender),
+                "Only executor or admin can set partner config"
+            );
+        } else {
+            require(hasRole(ADMIN_ROLE, sender), "Only admin can update partner config");
+        }
+
         require(tokenAddress != address(0), "Invalid token address");
         require(feeRate + partnerFeeRate <= DENOM, "Fee split exceeds 100%");
 
@@ -470,23 +501,11 @@ contract AgentTaxV2 is Initializable, AccessControlUpgradeable {
             partnerFeeRate: partnerFeeRate
         });
 
+        if (partnerFeeRate > maxPartnerFeeRate) {
+            maxPartnerFeeRate = partnerFeeRate;
+        }
+
         emit TokenPartnerConfigUpdated(tokenAddress, partnerId, partnerFeeRate);
-    }
-
-    /**
-     * @notice Update the global protocol (treasury) fee rate
-     * @dev Per-token partner fees are configured via setTokenPartnerConfig().
-     *      After updating, ensure `feeRate + partnerFeeRate <= DENOM` for all tokens
-     *      with an active partner split.
-     * @param protocolFeeRate_ Protocol share in basis points (out of 10000)
-     */
-    function updateFeeSplit(uint16 protocolFeeRate_) external onlyRole(ADMIN_ROLE) {
-        require(protocolFeeRate_ <= DENOM, "Fee rate too high");
-
-        uint16 oldFeeRate = feeRate;
-        feeRate = protocolFeeRate_;
-
-        emit FeeSplitUpdated(oldFeeRate, protocolFeeRate_);
     }
 
     /**
@@ -507,6 +526,10 @@ contract AgentTaxV2 is Initializable, AccessControlUpgradeable {
         uint16 feeRate_
     ) external onlyRole(ADMIN_ROLE) {
         require(feeRate_ <= DENOM, "Fee rate too high");
+        require(
+            feeRate_ + maxPartnerFeeRate <= DENOM,
+            "Fee split exceeds 100%"
+        );
 
         address oldRouter = address(router);
         address oldAsset = assetToken;

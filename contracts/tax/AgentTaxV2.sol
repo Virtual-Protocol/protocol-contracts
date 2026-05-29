@@ -354,6 +354,10 @@ contract AgentTaxV2 is Initializable, AccessControlUpgradeable {
 
             if (partnerFee > 0) {
                 address partnerRecipient = partnerRecipients[partnerConfig.partnerId];
+                require(
+                    partnerRecipient != address(0),
+                    "Partner recipient not set"
+                );
                 IERC20(assetToken).safeTransfer(partnerRecipient, partnerFee);
                 emit PartnerFeeDistributed(
                     tokenAddress,

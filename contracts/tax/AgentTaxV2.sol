@@ -38,6 +38,11 @@ contract AgentTaxV2 is Initializable, AccessControlUpgradeable {
         uint256 amountSwapped;
     }
 
+    struct TokenPartnerConfig {
+        bytes32 partnerId;
+        uint16 partnerFeeRate;
+    }
+
     bytes32 public constant ADMIN_ROLE = keccak256("ADMIN_ROLE");
     bytes32 public constant REGISTER_ROLE = keccak256("REGISTER_ROLE");
     bytes32 public constant SWAP_ROLE = keccak256("SWAP_ROLE");
@@ -57,6 +62,12 @@ contract AgentTaxV2 is Initializable, AccessControlUpgradeable {
     mapping(address tokenAddress => TaxAmounts) public tokenTaxAmounts;
 
     IBondingV5ForTaxV2 public bondingV5;
+
+    mapping(bytes32 partnerId => address recipient) public partnerRecipients;
+    mapping(address tokenAddress => TokenPartnerConfig) public tokenPartnerConfigs;
+    /// @dev Upper bound of any configured per-token partner fee; used to guard `updateSwapParams`.
+    ///      Not decreased when individual tokens lower their rate (conservative).
+    uint16 public maxPartnerFeeRate;
 
     event TokenRegistered(address indexed tokenAddress, address indexed creator, address tba);
     event TaxDeposited(address indexed tokenAddress, uint256 amount);
@@ -78,6 +89,23 @@ contract AgentTaxV2 is Initializable, AccessControlUpgradeable {
         uint256 newMaxThreshold
     );
     event TreasuryUpdated(address oldTreasury, address newTreasury);
+    event PartnerRecipientUpdated(
+        bytes32 indexed partnerId,
+        address oldRecipient,
+        address newRecipient
+    );
+    event TokenPartnerConfigUpdated(
+        address indexed tokenAddress,
+        bytes32 indexed partnerId,
+        uint16 partnerFeeRate
+    );
+    event PartnerFeeDistributed(
+        address indexed tokenAddress,
+        bytes32 indexed partnerId,
+        address indexed recipient,
+        uint256 amount
+    );
+    event FeeSplitUpdated(uint16 oldProtocolFeeRate, uint16 newProtocolFeeRate);
 
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() {
@@ -307,7 +335,37 @@ contract AgentTaxV2 is Initializable, AccessControlUpgradeable {
             emit SwapExecuted(tokenAddress, amountToSwap, assetReceived);
 
             uint256 protocolFee = (assetReceived * feeRate) / DENOM;
-            uint256 creatorFee = assetReceived - protocolFee;
+
+            TokenPartnerConfig memory partnerConfig = tokenPartnerConfigs[tokenAddress];
+            uint256 partnerFee = (assetReceived * partnerConfig.partnerFeeRate) / DENOM;
+
+            // Cap fees if protocol + partner rates exceed 100% (e.g. after feeRate was raised
+            // without re-validating partner configs). Prevents underflow from bricking swaps.
+            uint256 remaining = assetReceived;
+            if (protocolFee > remaining) {
+                protocolFee = remaining;
+            }
+            remaining -= protocolFee;
+            if (partnerFee > remaining) {
+                partnerFee = remaining;
+            }
+            remaining -= partnerFee;
+            uint256 creatorFee = remaining;
+
+            if (partnerFee > 0) {
+                address partnerRecipient = partnerRecipients[partnerConfig.partnerId];
+                require(
+                    partnerRecipient != address(0),
+                    "Partner recipient not set"
+                );
+                IERC20(assetToken).safeTransfer(partnerRecipient, partnerFee);
+                emit PartnerFeeDistributed(
+                    tokenAddress,
+                    partnerConfig.partnerId,
+                    partnerRecipient,
+                    partnerFee
+                );
+            }
 
             if (creatorFee > 0) {
                 IERC20(assetToken).safeTransfer(recipient.creator, creatorFee);
@@ -345,6 +403,16 @@ contract AgentTaxV2 is Initializable, AccessControlUpgradeable {
         return (amounts.amountCollected, amounts.amountSwapped);
     }
 
+    /**
+     * @notice Get partner fee configuration for an agent token
+     */
+    function getTokenPartnerConfig(
+        address tokenAddress
+    ) external view returns (bytes32 partnerId, uint16 partnerFeeRate) {
+        TokenPartnerConfig memory config = tokenPartnerConfigs[tokenAddress];
+        return (config.partnerId, config.partnerFeeRate);
+    }
+
     // ============ Creator Functions ============
 
     /**
@@ -374,6 +442,77 @@ contract AgentTaxV2 is Initializable, AccessControlUpgradeable {
     // ============ Admin Functions ============
 
     /**
+     * @notice Set the receiving address for a partner / referrer integration
+     * @param partnerId Unique partner identifier
+     * @param recipient Address that receives partner fee shares
+     */
+    function setPartnerRecipient(
+        bytes32 partnerId,
+        address recipient
+    ) external onlyRole(ADMIN_ROLE) {
+        require(partnerId != bytes32(0), "Invalid partner ID");
+        require(recipient != address(0), "Invalid recipient");
+
+        address oldRecipient = partnerRecipients[partnerId];
+        partnerRecipients[partnerId] = recipient;
+
+        emit PartnerRecipientUpdated(partnerId, oldRecipient, recipient);
+    }
+
+    /**
+     * @notice Configure partner fee split for an agent token
+     * @dev Partner fee is deducted from the total swapped asset amount alongside the
+     *      protocol fee. Remaining amount goes to the token creator.
+     *      `feeRate + partnerFeeRate` must not exceed DENOM (100%).
+     *      First configuration per token: EXECUTOR_ROLE or ADMIN_ROLE.
+     *      Subsequent updates: ADMIN_ROLE only.
+     * @param tokenAddress The agent token address
+     * @param partnerId Partner identifier (must have recipient configured if rate > 0)
+     * @param partnerFeeRate Partner share in basis points (out of 10000)
+     */
+    function setTokenPartnerConfig(
+        address tokenAddress,
+        bytes32 partnerId,
+        uint16 partnerFeeRate
+    ) external {
+        address sender = _msgSender();
+        TokenPartnerConfig memory existing = tokenPartnerConfigs[tokenAddress];
+        bool isUnset =
+            existing.partnerId == bytes32(0) && existing.partnerFeeRate == 0;
+
+        if (isUnset) {
+            require(
+                hasRole(EXECUTOR_ROLE, sender) || hasRole(ADMIN_ROLE, sender),
+                "Only executor or admin can set partner config"
+            );
+        } else {
+            require(hasRole(ADMIN_ROLE, sender), "Only admin can update partner config");
+        }
+
+        require(tokenAddress != address(0), "Invalid token address");
+        require(feeRate + partnerFeeRate <= DENOM, "Fee split exceeds 100%");
+
+        if (partnerFeeRate > 0) {
+            require(partnerId != bytes32(0), "Partner ID required");
+            require(
+                partnerRecipients[partnerId] != address(0),
+                "Partner recipient not set"
+            );
+        }
+
+        tokenPartnerConfigs[tokenAddress] = TokenPartnerConfig({
+            partnerId: partnerId,
+            partnerFeeRate: partnerFeeRate
+        });
+
+        if (partnerFeeRate > maxPartnerFeeRate) {
+            maxPartnerFeeRate = partnerFeeRate;
+        }
+
+        emit TokenPartnerConfigUpdated(tokenAddress, partnerId, partnerFeeRate);
+    }
+
+    /**
      * @notice Set BondingV5 contract address
      * @param bondingV5_ The address of the BondingV5 contract
      */
@@ -391,6 +530,10 @@ contract AgentTaxV2 is Initializable, AccessControlUpgradeable {
         uint16 feeRate_
     ) external onlyRole(ADMIN_ROLE) {
         require(feeRate_ <= DENOM, "Fee rate too high");
+        require(
+            feeRate_ + maxPartnerFeeRate <= DENOM,
+            "Fee split exceeds 100%"
+        );
 
         address oldRouter = address(router);
         address oldAsset = assetToken;

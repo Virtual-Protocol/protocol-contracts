@@ -227,6 +227,18 @@ module.exports = {
           browserURL: "https://sepolia.arbiscan.io/",
         },
       },
+      // Robinhood testnet (chainId 46630) is NOT in Etherscan V2's chainlist.
+      // verify:verify / verify:etherscan both fail with "Missing or unsupported chainid parameter".
+      // Kept for browserURL only; actual verification is handled in scripts/launchpadv5/utils.ts
+      // (same pattern as xlayer_* which uses okverify, and monad_* which uses Sourcify).
+      {
+        network: "robinhood_testnet",
+        chainId: 46630,
+        urls: {
+          apiURL: "https://explorer.testnet.chain.robinhood.com/api",
+          browserURL: "https://explorer.testnet.chain.robinhood.com",
+        },
+      },
       // X Layer (OKLink) — kept for reference only. Verification uses okxweb3explorer (okverify) below.
       // Standard Etherscan format (verify:verify / verify:etherscan) fails with "Missing or unsupported chainid parameter".
       {
@@ -375,6 +387,13 @@ module.exports = {
         "https://sepolia-rollup.arbitrum.io/rpc",
       accounts: [process.env.PRIVATE_KEY],
       chainId: 421614,
+    },
+    robinhood_testnet: {
+      url:
+        process.env.ROBINHOOD_TESTNET_RPC_URL ||
+        "https://testnet.rpc.robinhood.com",
+      accounts: [process.env.PRIVATE_KEY],
+      chainId: 46630,
     },
     // X Layer (OKX)
     // Do not fall back to RPC_URL to avoid accidental cross-chain deploys.

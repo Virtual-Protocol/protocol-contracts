@@ -334,11 +334,11 @@ export async function verifyContract(
 
   if (net === "robinhood_testnet") {
     // Robinhood testnet (chainId 46630) is not in Etherscan V2's chainlist.
-    // verify:verify / verify:etherscan both fail with "Missing or unsupported chainid parameter".
-    // The native explorer (https://explorer.testnet.chain.robinhood.com) may support
-    // Etherscan-compatible POST verification — attempt it and surface any failure clearly.
+    // hardhat.config.js uses apiKey as an object so hardhat-verify routes to the Blockscout
+    // explorer at https://explorer.testnet.chain.robinhood.com/api (from customChains).
+    // Blockscout is Etherscan-compatible and does not enforce API key validity.
     console.log(
-      "  Robinhood testnet: attempting native explorer verification (chainId 46630 not in Etherscan V2)."
+      "  Robinhood testnet: verifying via Blockscout explorer (https://explorer.testnet.chain.robinhood.com)."
     );
     try {
       await run("verify:verify", {

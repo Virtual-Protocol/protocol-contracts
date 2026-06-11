@@ -120,9 +120,13 @@ contract BondingConfig is Initializable, OwnableUpgradeable {
     /// @dev Appended in upgrade v2 — receives bonding-curve excess tokens at graduation to be burned.
     address public graduationExcessBurnWallet;
 
+    /// @dev Fake virtual liq for pre-upgrade tokens at graduation (BondingV5 mapping unset). Prod default: 6300.
+    uint256 public legacyInitialVirtualLiq;
+
     event DeployParamsUpdated(DeployParams params);
     event TeamTokenReservedWalletUpdated(address wallet);
     event GraduationExcessBurnWalletUpdated(address wallet);
+    event LegacyInitialVirtualLiqUpdated(uint256 legacyInitialVirtualLiq);
     event CommonParamsUpdated(uint256 initialSupply, address feeTo);
     event BondingCurveParamsUpdated(BondingCurveParams params);
     event AcfFakeInitialVirtualLiqUpdated(uint256 acfFakeInitialVirtualLiq);
@@ -216,6 +220,21 @@ contract BondingConfig is Initializable, OwnableUpgradeable {
     }
 
     /**
+     * @notice Fake virtual liq for pre-upgrade tokens at graduation migration.
+     * @dev Pre-upgrade tokens have no `tokenFakeInitialVirtualLiq` in BondingV5 (prod default: 6300).
+     */
+    function setLegacyInitialVirtualLiq(
+        uint256 legacyInitialVirtualLiq_
+    ) external onlyOwner {
+        require(
+            legacyInitialVirtualLiq_ > 0,
+            "legacyInitialVirtualLiq cannot be zero"
+        );
+        legacyInitialVirtualLiq = legacyInitialVirtualLiq_;
+        emit LegacyInitialVirtualLiqUpdated(legacyInitialVirtualLiq_);
+    }
+
+    /**
      * @notice Calculate bonding curve supply with validation
      * @dev Validates:
      *      1. airdropBips_ <= reserveSupplyParams.maxAirdropBips
@@ -259,6 +278,13 @@ contract BondingConfig is Initializable, OwnableUpgradeable {
         return needAcf_
             ? acfFakeInitialVirtualLiq
             : bondingCurveParams.fakeInitialVirtualLiq;
+    }
+
+    /**
+     * @notice Fake virtual liq for pre-upgrade tokens at graduation (BondingV5 mapping unset).
+     */
+    function getLegacyInitialVirtualLiq() external view returns (uint256) {
+        return legacyInitialVirtualLiq;
     }
 
     /**

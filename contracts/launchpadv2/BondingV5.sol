@@ -116,7 +116,7 @@ contract BondingV5 is
 
     /// @dev Appended in upgrade v2 — must remain last state variable (append-only layout).
     /// Fake initial virtual liquidity frozen at preLaunch for migration price continuity.
-    /// If unset (pre-upgrade token), graduation falls back to normal fake liq (6300).
+    /// If unset (pre-upgrade token), graduation uses BondingConfig legacyInitialVirtualLiq.
     mapping(address => uint256) public tokenFakeInitialVirtualLiq;
 
     event PreLaunched(
@@ -688,10 +688,10 @@ contract BondingV5 is
         // Bonding reserves include fakeInitialVirtualLiq that was never deposited.
         // Seed UniV2 with only the token share backed by real asset so FDV is continuous.
         uint256 fakeVirtualLiq = tokenFakeInitialVirtualLiq[tokenAddress_];
-        // Pre-upgrade tokens: mapping unset — all were launched with normal fake liq (6300).
         if (fakeVirtualLiq == 0) {
-            fakeVirtualLiq = bondingConfig.getFakeInitialVirtualLiq();
+            fakeVirtualLiq = bondingConfig.getLegacyInitialVirtualLiq();
         }
+        require(fakeVirtualLiq > 0, "Legacy initial virtual liq not set");
         uint256 lpTokenAmount = tokenBalance;
         if (fakeVirtualLiq > 0 && assetBalance > 0) {
             lpTokenAmount =

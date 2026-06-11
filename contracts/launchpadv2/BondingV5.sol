@@ -114,6 +114,11 @@ contract BondingV5 is
     /// @notice Raw `extParams_` from `preLaunch` (per agent token). Backend can read as canonical payload; not updated by `setFeeDelegation`.
     mapping(address => bytes) public tokenPreLaunchExtParams;
 
+    /// @dev Appended in upgrade v2 — must remain last state variable (append-only layout).
+    /// Fake initial virtual liquidity frozen at preLaunch for migration price continuity.
+    /// If unset (pre-upgrade token), graduation falls back to normal fake liq (6300).
+    mapping(address => uint256) public tokenFakeInitialVirtualLiq;
+
     event PreLaunched(
         address indexed token,
         address indexed pair,
@@ -332,8 +337,8 @@ contract BondingV5 is
 
         require(_approval(address(router), token, bondingCurveSupply));
 
-        // Get fixed fake initial virtual liquidity
-        uint256 liquidity = bondingConfig.getFakeInitialVirtualLiq();
+        uint256 liquidity = bondingConfig.getFakeInitialVirtualLiq(needAcf_);
+        tokenFakeInitialVirtualLiq[token] = liquidity;
         uint256 price = bondingCurveSupply / liquidity;
 
         router.addInitialLiquidity(token, bondingCurveSupply, liquidity);
@@ -348,7 +353,8 @@ contract BondingV5 is
 
         // Calculate and store per-token graduation threshold
         uint256 gradThreshold = bondingConfig.calculateGradThreshold(
-            bondingCurveSupply
+            bondingCurveSupply,
+            needAcf_
         );
         tokenGradThreshold[token] = gradThreshold;
 
@@ -679,6 +685,21 @@ contract BondingV5 is
         uint256 assetBalance = pairContract.assetBalance();
         uint256 tokenBalance = pairContract.balance();
 
+        // Bonding reserves include fakeInitialVirtualLiq that was never deposited.
+        // Seed UniV2 with only the token share backed by real asset so FDV is continuous.
+        uint256 fakeVirtualLiq = tokenFakeInitialVirtualLiq[tokenAddress_];
+        // Pre-upgrade tokens: mapping unset — all were launched with normal fake liq (6300).
+        if (fakeVirtualLiq == 0) {
+            fakeVirtualLiq = bondingConfig.getFakeInitialVirtualLiq();
+        }
+        uint256 lpTokenAmount = tokenBalance;
+        if (fakeVirtualLiq > 0 && assetBalance > 0) {
+            lpTokenAmount =
+                (tokenBalance * assetBalance) /
+                (assetBalance + fakeVirtualLiq);
+        }
+        uint256 excessTokens = tokenBalance - lpTokenAmount;
+
         router.graduate(tokenAddress_);
 
         // previously initFromBondingCurve has two parts:
@@ -703,13 +724,20 @@ contract BondingV5 is
         // previously executeBondingCurveApplicationSalt will create agentToken and do two parts:
         //      1. (lpSupply = all left $preToken in prePairAddress) $agentToken mint to agentTokenAddress
         //      2. (vaultSupply = 1B - lpSupply) $agentToken mint to prePairAddress
-        // now only need to transfer (all left agentTokens) $agentTokens from agentFactoryV6Address to agentTokenAddress
-        IERC20(tokenAddress_).safeTransfer(tokenAddress_, tokenBalance);
+        if (excessTokens > 0) {
+            IERC20(tokenAddress_).safeTransfer(
+                bondingConfig.teamTokenReservedWallet(),
+                excessTokens
+            );
+        }
+
+        // Transfer LP-bound tokens to agent token for UniV2 seeding
+        IERC20(tokenAddress_).safeTransfer(tokenAddress_, lpTokenAmount);
         require(tokenRef.applicationId != 0, "ApplicationId not found");
         address agentToken = agentFactory.executeBondingCurveApplicationSalt(
             tokenRef.applicationId,
             tokenRef.data.supply / 1 ether, // totalSupply
-            tokenBalance / 1 ether, // lpSupply
+            lpTokenAmount / 1 ether, // lpSupply
             pairAddress, // vault
             keccak256(
                 abi.encodePacked(msg.sender, block.timestamp, tokenAddress_)

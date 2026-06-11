@@ -725,10 +725,8 @@ contract BondingV5 is
         //      1. (lpSupply = all left $preToken in prePairAddress) $agentToken mint to agentTokenAddress
         //      2. (vaultSupply = 1B - lpSupply) $agentToken mint to prePairAddress
         if (excessTokens > 0) {
-            IERC20(tokenAddress_).safeTransfer(
-                bondingConfig.teamTokenReservedWallet(),
-                excessTokens
-            );
+            address burnWallet = bondingConfig.graduationExcessBurnWallet();
+            IERC20(tokenAddress_).safeTransfer(burnWallet, excessTokens);
         }
 
         // Transfer LP-bound tokens to agent token for UniV2 seeding

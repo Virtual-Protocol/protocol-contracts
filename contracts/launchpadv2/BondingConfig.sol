@@ -117,8 +117,12 @@ contract BondingConfig is Initializable, OwnableUpgradeable {
     /// `bondingCurveParams.fakeInitialVirtualLiq`.
     uint256 public acfFakeInitialVirtualLiq;
 
+    /// @dev Appended in upgrade v2 — receives bonding-curve excess tokens at graduation to be burned.
+    address public graduationExcessBurnWallet;
+
     event DeployParamsUpdated(DeployParams params);
     event TeamTokenReservedWalletUpdated(address wallet);
+    event GraduationExcessBurnWalletUpdated(address wallet);
     event CommonParamsUpdated(uint256 initialSupply, address feeTo);
     event BondingCurveParamsUpdated(BondingCurveParams params);
     event AcfFakeInitialVirtualLiqUpdated(uint256 acfFakeInitialVirtualLiq);
@@ -155,6 +159,16 @@ contract BondingConfig is Initializable, OwnableUpgradeable {
         bondingCurveParams = bondingCurveParams_;
         require(acfFakeInitialVirtualLiq_ > 0, "acfFakeInitialVirtualLiq cannot be zero");
         acfFakeInitialVirtualLiq = acfFakeInitialVirtualLiq_;
+    }
+
+    /**
+     * @notice Set wallet that receives excess bonding-curve tokens at graduation (to be burned off-chain).
+     */
+    function setGraduationExcessBurnWallet(
+        address wallet_
+    ) external onlyOwner {
+        graduationExcessBurnWallet = wallet_;
+        emit GraduationExcessBurnWalletUpdated(wallet_);
     }
 
     /**

@@ -691,7 +691,6 @@ contract BondingV5 is
         if (fakeVirtualLiq == 0) {
             fakeVirtualLiq = bondingConfig.getLegacyInitialVirtualLiq();
         }
-        require(fakeVirtualLiq > 0, "Legacy initial virtual liq not set");
         uint256 lpTokenAmount = tokenBalance;
         if (fakeVirtualLiq > 0 && assetBalance > 0) {
             lpTokenAmount =

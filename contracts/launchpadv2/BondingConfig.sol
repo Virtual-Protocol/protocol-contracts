@@ -48,7 +48,7 @@ contract BondingConfig is Initializable, OwnableUpgradeable {
 
     // Common bonding curve parameters (unified across all launch modes)
     struct BondingCurveParams {
-        uint256 fakeInitialVirtualLiq; // Fixed fake initial VIRTUAL liquidity (e.g., 6300 * 1e18)
+        uint256 fakeInitialVirtualLiq; // Normal launches (e.g., 6300 * 1e18)
         uint256 targetRealVirtual; // Target VIRTUAL from users at graduation (e.g., 42000 * 1e18)
     }
     BondingCurveParams public bondingCurveParams;
@@ -112,10 +112,24 @@ contract BondingConfig is Initializable, OwnableUpgradeable {
     uint256 public initialSupply;
     address public feeTo;
 
+    /// @dev Appended in upgrade v2 — do not insert before `feeTo` (would shift prior slots).
+    /// Fake initial VIRTUAL for needAcf launches (e.g., 14000 * 1e18). Normal launches use
+    /// `bondingCurveParams.fakeInitialVirtualLiq`.
+    uint256 public acfFakeInitialVirtualLiq;
+
+    /// @dev Appended in upgrade v2 — receives bonding-curve excess tokens at graduation to be burned.
+    address public graduationExcessBurnWallet;
+
+    /// @dev Fake virtual liq for pre-upgrade tokens at graduation (BondingV5 mapping unset). Prod default: 6300.
+    uint256 public legacyInitialVirtualLiq;
+
     event DeployParamsUpdated(DeployParams params);
     event TeamTokenReservedWalletUpdated(address wallet);
+    event GraduationExcessBurnWalletUpdated(address wallet);
+    event LegacyInitialVirtualLiqUpdated(uint256 legacyInitialVirtualLiq);
     event CommonParamsUpdated(uint256 initialSupply, address feeTo);
     event BondingCurveParamsUpdated(BondingCurveParams params);
+    event AcfFakeInitialVirtualLiqUpdated(uint256 acfFakeInitialVirtualLiq);
     event ReserveSupplyParamsUpdated(ReserveSupplyParams params);
     event PrivilegedLauncherUpdated(address indexed launcher, bool allowed);
 
@@ -135,7 +149,8 @@ contract BondingConfig is Initializable, OwnableUpgradeable {
         ReserveSupplyParams memory reserveSupplyParams_,
         ScheduledLaunchParams memory scheduledLaunchParams_,
         DeployParams memory deployParams_,
-        BondingCurveParams memory bondingCurveParams_
+        BondingCurveParams memory bondingCurveParams_,
+        uint256 acfFakeInitialVirtualLiq_
     ) external initializer {
         __Ownable_init(msg.sender);
 
@@ -146,6 +161,18 @@ contract BondingConfig is Initializable, OwnableUpgradeable {
         scheduledLaunchParams = scheduledLaunchParams_;
         deployParams = deployParams_;
         bondingCurveParams = bondingCurveParams_;
+        require(acfFakeInitialVirtualLiq_ > 0, "acfFakeInitialVirtualLiq cannot be zero");
+        acfFakeInitialVirtualLiq = acfFakeInitialVirtualLiq_;
+    }
+
+    /**
+     * @notice Set wallet that receives excess bonding-curve tokens at graduation (to be burned off-chain).
+     */
+    function setGraduationExcessBurnWallet(
+        address wallet_
+    ) external onlyOwner {
+        graduationExcessBurnWallet = wallet_;
+        emit GraduationExcessBurnWalletUpdated(wallet_);
     }
 
     /**
@@ -176,13 +203,35 @@ contract BondingConfig is Initializable, OwnableUpgradeable {
      * @param params_ The bonding curve parameters (K, assetRate, targetRealVirtual)
      */
     function setBondingCurveParams(
-        BondingCurveParams memory params_
+        BondingCurveParams memory params_,
+        uint256 acfFakeInitialVirtualLiq_
     ) external onlyOwner {
         require(params_.fakeInitialVirtualLiq > 0, "fakeInitialVirtualLiq cannot be zero");
         require(params_.targetRealVirtual > 0, "targetRealVirtual cannot be zero");
-        
+        require(
+            acfFakeInitialVirtualLiq_ > 0,
+            "acfFakeInitialVirtualLiq cannot be zero"
+        );
+
         bondingCurveParams = params_;
+        acfFakeInitialVirtualLiq = acfFakeInitialVirtualLiq_;
         emit BondingCurveParamsUpdated(params_);
+        emit AcfFakeInitialVirtualLiqUpdated(acfFakeInitialVirtualLiq_);
+    }
+
+    /**
+     * @notice Fake virtual liq for pre-upgrade tokens at graduation migration.
+     * @dev Pre-upgrade tokens have no `tokenFakeInitialVirtualLiq` in BondingV5 (prod default: 6300).
+     */
+    function setLegacyInitialVirtualLiq(
+        uint256 legacyInitialVirtualLiq_
+    ) external onlyOwner {
+        require(
+            legacyInitialVirtualLiq_ > 0,
+            "legacyInitialVirtualLiq cannot be zero"
+        );
+        legacyInitialVirtualLiq = legacyInitialVirtualLiq_;
+        emit LegacyInitialVirtualLiqUpdated(legacyInitialVirtualLiq_);
     }
 
     /**
@@ -211,7 +260,7 @@ contract BondingConfig is Initializable, OwnableUpgradeable {
     }
 
     /**
-     * @notice Get the fixed fake initial virtual liquidity
+     * @notice Get fake initial virtual liquidity for normal launches
      * @return fakeInitialVirtualLiq The fake initial VIRTUAL liquidity in wei
      */
     function getFakeInitialVirtualLiq() external view returns (uint256) {
@@ -219,18 +268,39 @@ contract BondingConfig is Initializable, OwnableUpgradeable {
     }
 
     /**
+     * @notice Get fake initial virtual liquidity by launch type
+     * @param needAcf_ Whether the token launch requires ACF reserve
+     * @return fakeInitialVirtualLiq The fake initial VIRTUAL liquidity in wei
+     */
+    function getFakeInitialVirtualLiq(
+        bool needAcf_
+    ) external view returns (uint256) {
+        return needAcf_
+            ? acfFakeInitialVirtualLiq
+            : bondingCurveParams.fakeInitialVirtualLiq;
+    }
+
+    /**
+     * @notice Fake virtual liq for pre-upgrade tokens at graduation (BondingV5 mapping unset).
+     */
+    function getLegacyInitialVirtualLiq() external view returns (uint256) {
+        return legacyInitialVirtualLiq;
+    }
+
+    /**
      * @notice Calculate graduation threshold for a token
-     * @dev Formula: gradThreshold = fakeInitialVirtualLiq * bondingCurveSupply / (targetRealVirtual + fakeInitialVirtualLiq)
+     * @dev Formula: gradThreshold = y0 * x0 / (targetRealVirtual + y0)
      * @param bondingCurveSupplyWei_ Bonding curve supply in wei
+     * @param needAcf_ Whether the token launch requires ACF reserve
      * @return gradThreshold The graduation threshold (agent token amount in wei)
      */
     function calculateGradThreshold(
-        uint256 bondingCurveSupplyWei_
+        uint256 bondingCurveSupplyWei_,
+        bool needAcf_
     ) external view returns (uint256) {
-        // gradThreshold = y0 * x0 / (targetRealVirtual + y0)
-        // where y0 = fakeInitialVirtualLiq (fixed), x0 = bondingCurveSupply
-        uint256 fakeInitialVirtualLiq = bondingCurveParams
-            .fakeInitialVirtualLiq;
+        uint256 fakeInitialVirtualLiq = needAcf_
+            ? acfFakeInitialVirtualLiq
+            : bondingCurveParams.fakeInitialVirtualLiq;
         return
             (fakeInitialVirtualLiq * bondingCurveSupplyWei_) /
             (bondingCurveParams.targetRealVirtual + fakeInitialVirtualLiq);

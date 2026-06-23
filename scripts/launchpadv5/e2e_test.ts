@@ -642,7 +642,7 @@ async function main() {
   console.log("Anti-Sniper Tax Vault Balance:", formatEther(antiSniperTaxVaultBalanceBeforeBuy2), "VIRTUAL");
 
   // Large buy may graduate; wallet must hold enough VIRTUAL + FRouter allowance (set in Step 2).
-  const buyAmount2 = parseEther("50000"); // 50_000 VIRTUAL
+  const buyAmount2 = parseEther("10000"); // 10_000 VIRTUAL
   const deadline2 = Math.floor(Date.now() / 1000) + 300;
 
   console.log("\n--- Executing buy (after anti-sniper period) ---");

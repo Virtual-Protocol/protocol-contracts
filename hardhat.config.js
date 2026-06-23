@@ -185,9 +185,10 @@ module.exports = {
       // X Layer — OKLink key used by okverify task; kept here for completeness
       xlayer_testnet:    process.env.OKLINK_API_KEY || process.env.ETHERSCAN_API_KEY || "",
       xlayer_mainnet:    process.env.OKLINK_API_KEY || process.env.ETHERSCAN_API_KEY || "",
-      // Robinhood testnet — Blockscout explorer (chainId 46630 not in Etherscan V2).
+      // Robinhood testnet/mainnet — Blockscout explorer (not in Etherscan V2).
       // Blockscout does not validate API keys; any non-empty string works.
       robinhood_testnet: process.env.ETHERSCAN_API_KEY || "blockscout",
+      robinhood_mainnet: process.env.ETHERSCAN_API_KEY || "blockscout",
     },
     customChains: [
       {
@@ -300,14 +301,12 @@ module.exports = {
           browserURL: "https://www.oklink.com/xlayer",
         },
       },
-      // Robinhood testnet (chainId 46630) — Etherscan v2 API (same key as other testnets).
-      // TODO: confirm browserURL once explorer is publicly available.
       {
-        network: "robinhood_testnet",
-        chainId: 46630,
+        network: "robinhood_mainnet",
+        chainId: 4663,
         urls: {
-          apiURL: "https://api.etherscan.io/v2/api",
-          browserURL: "https://explorer.robinhood-testnet.virtuals.io",
+          apiURL: "https://explorer.chain.robinhood.com/api",
+          browserURL: "https://explorer.chain.robinhood.com",
         },
       },
     ],
@@ -445,6 +444,11 @@ module.exports = {
         "https://testnet.rpc.robinhood.com",
       accounts: [process.env.PRIVATE_KEY],
       chainId: 46630,
+    },
+    robinhood_mainnet: {
+      url: process.env.ROBINHOOD_MAINNET_RPC_URL || "",
+      accounts: [process.env.PRIVATE_KEY],
+      chainId: 4663,
     },
     // X Layer (OKX)
     // Do not fall back to RPC_URL to avoid accidental cross-chain deploys.

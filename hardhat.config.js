@@ -490,6 +490,11 @@ module.exports = {
       accounts: [process.env.PRIVATE_KEY],
       chainId: 46630,
     },
+    robinhood_mainnet: {
+      url: process.env.ROBINHOOD_MAINNET_RPC_URL || "",
+      accounts: [process.env.PRIVATE_KEY],
+      chainId: 4663,
+    },
     base_sepolia_fire: {
       url: "https://sepolia.base.org",
       accounts: [process.env.PRIVATE_KEY],

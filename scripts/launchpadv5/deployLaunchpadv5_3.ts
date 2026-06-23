@@ -97,6 +97,9 @@ const { ethers, upgrades } = require("hardhat");
       teamTokenReservedWallet: string;
       fakeInitialVirtualLiq: string;
       targetRealVirtual: string;
+      acfFakeInitialVirtualLiq: string;
+      graduationExcessBurnWallet: string;
+      legacyInitialVirtualLiq: string;
       maxAirdropBips: string;
       maxTotalReservedBips: string;
       acfReservedBips: string;
@@ -187,6 +190,21 @@ const { ethers, upgrades } = require("hardhat");
       throw new Error("PRIVILEGED_LAUNCHER_ADDRESSES not set in environment");
     }
 
+    const acfFakeInitialVirtualLiq = process.env.ACF_FAKE_INITIAL_VIRTUAL_LIQ;
+    if (!acfFakeInitialVirtualLiq) {
+      throw new Error("ACF_FAKE_INITIAL_VIRTUAL_LIQ not set in environment");
+    }
+
+    const graduationExcessBurnWallet = process.env.GRADUATION_EXCESS_BURN_WALLET;
+    if (!graduationExcessBurnWallet) {
+      throw new Error("GRADUATION_EXCESS_BURN_WALLET not set in environment");
+    }
+
+    const legacyInitialVirtualLiq = process.env.LEGACY_INITIAL_VIRTUAL_LIQ;
+    if (!legacyInitialVirtualLiq) {
+      throw new Error("LEGACY_INITIAL_VIRTUAL_LIQ not set in environment");
+    }
+
     console.log("\nDeployment arguments loaded:", {
       contractController,
       fFactoryV3Address,
@@ -209,6 +227,9 @@ const { ethers, upgrades } = require("hardhat");
       maxTotalReservedBips,
       acfReservedBips,
       privilegedLauncherAddresses,
+      acfFakeInitialVirtualLiq,
+      graduationExcessBurnWallet,
+      legacyInitialVirtualLiq,
     });
 
       // ============================================
@@ -251,6 +272,7 @@ const { ethers, upgrades } = require("hardhat");
           scheduledLaunchParams,
           deployParams,
           bondingCurveParams,
+          parseEther(acfFakeInitialVirtualLiq).toString(),
         ],
         {
           initializer: "initialize",
@@ -271,6 +293,9 @@ const { ethers, upgrades } = require("hardhat");
         teamTokenReservedWallet,
         fakeInitialVirtualLiq,
         targetRealVirtual,
+        acfFakeInitialVirtualLiq,
+        graduationExcessBurnWallet,
+        legacyInitialVirtualLiq,
         maxAirdropBips,
         maxTotalReservedBips,
         acfReservedBips,
@@ -287,6 +312,14 @@ const { ethers, upgrades } = require("hardhat");
         await tx.wait();
         console.log("BondingConfig.setPrivilegedLauncher(true):", addr);
       }
+
+      const txBurnWallet = await bondingConfig.setGraduationExcessBurnWallet(graduationExcessBurnWallet);
+      await txBurnWallet.wait();
+      console.log("✅ BondingConfig.setGraduationExcessBurnWallet():", graduationExcessBurnWallet);
+
+      const txLegacyLiq = await bondingConfig.setLegacyInitialVirtualLiq(parseEther(legacyInitialVirtualLiq));
+      await txLegacyLiq.wait();
+      console.log("✅ BondingConfig.setLegacyInitialVirtualLiq():", legacyInitialVirtualLiq, "VIRTUAL");
 
       const txOwnCfg = await bondingConfig.transferOwnership(contractController);
       await txOwnCfg.wait();
@@ -422,6 +455,9 @@ const { ethers, upgrades } = require("hardhat");
       console.log("- Team Token Reserved Wallet:", s.teamTokenReservedWallet);
       console.log("- Fake Initial Virtual Liq:", s.fakeInitialVirtualLiq);
       console.log("- Target Real Virtual:", s.targetRealVirtual);
+      console.log("- ACF Fake Initial Virtual Liq:", s.acfFakeInitialVirtualLiq);
+      console.log("- Graduation Excess Burn Wallet:", s.graduationExcessBurnWallet);
+      console.log("- Legacy Initial Virtual Liq:", s.legacyInitialVirtualLiq);
     } else {
       console.log("(BondingConfig was reused — deploy-time params not printed.)");
     }

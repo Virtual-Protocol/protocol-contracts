@@ -247,6 +247,16 @@ module.exports = {
           browserURL: "https://www.oklink.com/xlayer",
         },
       },
+      // Robinhood testnet (chainId 46630) — Etherscan v2 API (same key as other testnets).
+      // TODO: confirm browserURL once explorer is publicly available.
+      {
+        network: "robinhood_testnet",
+        chainId: 46630,
+        urls: {
+          apiURL: "https://api.etherscan.io/v2/api",
+          browserURL: "https://explorer.robinhood-testnet.virtuals.io",
+        },
+      },
     ],
   },
   // @okxweb3/hardhat-explorer-verify: primary verification for X Layer (okverify task, Method 1).
@@ -393,6 +403,11 @@ module.exports = {
         "https://xlayerrpc.okx.com",
       accounts: [process.env.PRIVATE_KEY],
       chainId: 196,
+    },
+    robinhood_testnet: {
+      url: process.env.ROBINHOOD_TESTNET_RPC_URL || "",
+      accounts: [process.env.PRIVATE_KEY],
+      chainId: 46630,
     },
     base_sepolia_fire: {
       url: "https://sepolia.base.org",

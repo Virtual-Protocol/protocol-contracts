@@ -74,6 +74,10 @@ const { ethers, upgrades } = require("hardhat");
     if (!fRouterV3ExecutorWallets) {
       throw new Error("FRouterV3_EXECUTOR_WALLETS not set in environment");
     }
+    const beOpsWallet = process.env.BE_OPS_WALLET;
+    if (!beOpsWallet) {
+      throw new Error("BE_OPS_WALLET not set in environment");
+    }
 
     console.log("\nDeployment arguments loaded:", {
       contractController,
@@ -85,6 +89,7 @@ const { ethers, upgrades } = require("hardhat");
       prototypeSellTax,
       antiSniperBuyTaxStartValue,
       fRouterV3ExecutorWallets,
+      beOpsWallet,
     });
 
     // Track deployed/reused contracts
@@ -221,13 +226,19 @@ const { ethers, upgrades } = require("hardhat");
       await tx6.wait();
       console.log("DEFAULT_ADMIN_ROLE of FRouterV3 granted to admin:", admin);
 
-      // Grant EXECUTOR_ROLE to BE_OPS_WALLET (for resetTime)
+      // Grant EXECUTOR_ROLE to FRouterV3_EXECUTOR_WALLETS (for resetTime)
       const executorRole = await fRouterV3.EXECUTOR_ROLE();
       for (const wallet of fRouterV3ExecutorWallets.split(",").map((addr) => addr.trim()).filter((addr) => addr.length > 0)) {
         const tx7 = await fRouterV3.grantRole(executorRole, wallet);
         await tx7.wait();
-        console.log("EXECUTOR_ROLE of FRouterV3 granted to BE_OPS_WALLET:", wallet);
+        console.log("EXECUTOR_ROLE of FRouterV3 granted to:", wallet);
       }
+
+      // Grant BE_OPS_ROLE to BE_OPS_WALLET (for drainPool / buyForProject60days / sellForProject60days)
+      const beOpsRole = await fRouterV3.BE_OPS_ROLE();
+      const tx8 = await fRouterV3.grantRole(beOpsRole, beOpsWallet);
+      await tx8.wait();
+      console.log("BE_OPS_ROLE of FRouterV3 granted to BE_OPS_WALLET:", beOpsWallet);
     }
 
     // ============================================

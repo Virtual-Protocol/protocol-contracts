@@ -192,7 +192,7 @@ function formatRevertError(err: unknown): string {
       }
     }
 
-    const liquidityHuman = process.env.LIQUIDITY_AMOUNT?.trim() || "10";
+    const liquidityHuman = process.env.LIQUIDITY_AMOUNT?.trim() || "1";
 
     const virtualRO = new ethers.Contract(
       virtualToken,

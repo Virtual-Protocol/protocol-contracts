@@ -86,6 +86,20 @@ export async function promptYes(question: string): Promise<boolean> {
 export const HARDHAT_SIGNER_GAS_CEILING = 30_000_000;
 export const HARDHAT_SIGNER_GAS_CEILING_BIGINT = 30_000_000n;
 
+/**
+ * Robinhood testnet is an Arbitrum Orbit chain. L1 calldata cost is folded into intrinsic gas
+ * (gas_limit × price), so for large contracts the intrinsic gas can far exceed 15M.
+ * Use eth_estimateGas (gasLimit = undefined) instead of a hardcoded ceiling.
+ */
+export function isRobinhoodHardhatNetwork(): boolean {
+  try {
+    const n = hre.network?.name as string | undefined;
+    return n === "robinhood_testnet" || n === "robinhood_mainnet";
+  } catch {
+    return false;
+  }
+}
+
 /** https://docs.monad.xyz — fee = gas_limit × price (not gas_used). */
 export function isMonadHardhatNetwork(): boolean {
   try {
@@ -176,8 +190,14 @@ export function launchpadDefaultTxGasLimit(): bigint {
   return BigInt(clampGasInt(def));
 }
 
-/** Gas for heavy deploys / factory / V3 mint (capped at Hardhat signer max). */
-export function launchpadHeavyTxGasLimit(): number {
+/**
+ * Gas for heavy deploys / factory / V3 mint (capped at Hardhat signer max).
+ * Returns `undefined` for Robinhood networks — L1 calldata cost is folded into intrinsic gas
+ * on Arbitrum Orbit chains, so a hardcoded ceiling can be below the actual intrinsic requirement
+ * for large contracts. Returning undefined lets ethers.js call eth_estimateGas instead.
+ */
+export function launchpadHeavyTxGasLimit(): number | undefined {
+  if (isRobinhoodHardhatNetwork()) return undefined;
   const nonMonadDefault = isHardhatLocalNetwork()
     ? HARDHAT_SIGNER_GAS_CEILING
     : LAUNCHPAD_HEAVY_DEFAULT_REMOTE;
@@ -306,6 +326,39 @@ export async function verifyContract(
         console.log(
           "⚠️ MonadScan failed (Sourcify above may still be enough):",
           msg
+        );
+      }
+    }
+    return;
+  }
+
+  if (net === "robinhood_testnet") {
+    // Robinhood testnet (chainId 46630) is not in Etherscan V2's chainlist.
+    // hardhat.config.js uses apiKey as an object so hardhat-verify routes to the Blockscout
+    // explorer at https://explorer.testnet.chain.robinhood.com/api (from customChains).
+    // Blockscout is Etherscan-compatible and does not enforce API key validity.
+    console.log(
+      "  Robinhood testnet: verifying via Blockscout explorer (https://explorer.testnet.chain.robinhood.com)."
+    );
+    try {
+      await run("verify:verify", {
+        address,
+        constructorArguments,
+        ...(opts?.contract ? { contract: opts.contract } : {}),
+      });
+      console.log("✅ Contract verified (Robinhood explorer)");
+    } catch (error: any) {
+      const msg = error?.message ?? String(error);
+      if (
+        msg.includes("Already Verified") ||
+        msg.includes("already been verified") ||
+        msg.includes("Already verified")
+      ) {
+        console.log("✅ Contract already verified");
+      } else {
+        console.log("⚠️ Verification failed:", msg);
+        console.log(
+          `  Manual verification: ${address} on https://explorer.testnet.chain.robinhood.com`
         );
       }
     }

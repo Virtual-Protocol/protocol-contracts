@@ -372,7 +372,10 @@ contract FRouterV3 is
     }
 
     function hasAntiSniperTax(address pairAddress) public view returns (bool) {
-        return _calculateAntiSniperTax(pairAddress) > 0;
+        if (_calculateAntiSniperTax(pairAddress) > 0 || _calculateAntiSniperSellTax(pairAddress) > 0) {
+            return true;
+        }
+        return false;
     }
 
     function setTaxStartTime(

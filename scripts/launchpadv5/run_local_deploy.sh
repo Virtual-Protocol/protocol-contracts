@@ -51,8 +51,10 @@ DEFAULT_ENV_FILE=".env.launchpadv5_dev_bsc_local"  # .env.launchpadv5_local, .en
 #   bsc_testnet   - Deploy directly to BSC testnet (hardhat `bsc_testnet` url: BSC_TESTNET_RPC_URL,
 #                   then RPC_URL, then default; set these in the same env file you pass with --env).
 #   monad_testnet - Monad testnet (chainId 10143); MONAD_TESTNET_RPC_URL or RPC_URL in env file.
-#   xlayer_testnet - X Layer testnet (chainId 1952); XLAYER_TESTNET_RPC_URL in env file.
-#   xlayer_mainnet - X Layer mainnet (chainId 196); XLAYER_RPC_URL in env file.
+#   xlayer_testnet    - X Layer testnet (chainId 1952); XLAYER_TESTNET_RPC_URL in env file.
+#   xlayer_mainnet    - X Layer mainnet (chainId 196); XLAYER_RPC_URL in env file.
+#   robinhood_testnet - Robinhood testnet; ROBINHOOD_TESTNET_RPC_URL in env file.
+#   robinhood_mainnet - Robinhood mainnet (⚠️ caution!); ROBINHOOD_MAINNET_RPC_URL in env file.
 
 set -e
 

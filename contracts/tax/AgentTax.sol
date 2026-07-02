@@ -36,6 +36,8 @@ contract AgentTax is Initializable, AccessControlUpgradeable {
     bytes32 public constant ADMIN_ROLE = keccak256("ADMIN_ROLE");
     bytes32 public constant EXECUTOR_ROLE = keccak256("EXECUTOR_ROLE");
     bytes32 public constant EXECUTOR_V2_ROLE = keccak256("EXECUTOR_V2_ROLE");
+    bytes32 public constant FEE_RATE_ADJUSTER_ROLE =
+        keccak256("FEE_RATE_ADJUSTER_ROLE");
     uint256 internal constant MIN_PROTOTYPE_V2_ONCHAIN_VIRTUAL_ID = 10 ** 12;
 
     uint256 internal constant DENOM = 10000;
@@ -104,6 +106,15 @@ contract AgentTax is Initializable, AccessControlUpgradeable {
     ITBABonus public tbaBonus; // deprecated
     IBondingV2ForTax public bondingV2;
     IBondingV4ForTax public bondingV4;
+
+    mapping(uint256 agentId => uint16) public agentFeeRate;
+    mapping(uint256 agentId => bool) public hasAgentFeeRate;
+
+    event AgentFeeRateUpdated(
+        uint256 indexed agentId,
+        uint16 feeRate,
+        bool isOverride
+    );
 
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() {
@@ -212,6 +223,38 @@ contract AgentTax is Initializable, AccessControlUpgradeable {
     }
 
     /**
+     * @notice Sets a per-agent treasury fee rate (basis points). Creator receives the remainder.
+     * @dev Cleared via `clearAgentFeeRate`; until then swaps use this rate instead of `feeRate`.
+     */
+    function setAgentFeeRate(
+        uint256 agentId,
+        uint16 feeRate_
+    ) external onlyRole(FEE_RATE_ADJUSTER_ROLE) {
+        require(feeRate_ <= DENOM, "Invalid fee rate");
+        agentFeeRate[agentId] = feeRate_;
+        hasAgentFeeRate[agentId] = true;
+        emit AgentFeeRateUpdated(agentId, feeRate_, true);
+    }
+
+    /**
+     * @notice Removes a per-agent fee override so swaps fall back to global `feeRate`.
+     */
+    function clearAgentFeeRate(
+        uint256 agentId
+    ) external onlyRole(FEE_RATE_ADJUSTER_ROLE) {
+        delete agentFeeRate[agentId];
+        delete hasAgentFeeRate[agentId];
+        emit AgentFeeRateUpdated(agentId, feeRate, false);
+    }
+
+    function _feeRateForAgent(uint256 agentId) internal view returns (uint16) {
+        if (hasAgentFeeRate[agentId]) {
+            return agentFeeRate[agentId];
+        }
+        return feeRate;
+    }
+
+    /**
      * @notice Returns TBA and creator addresses used for tax attribution for `agentId`.
      */
     function getAgentRecipients(
@@ -304,7 +347,8 @@ contract AgentTax is Initializable, AccessControlUpgradeable {
             uint256 assetReceived = amounts[1];
             emit SwapExecuted(agentId, amountToSwap, assetReceived);
 
-            uint256 feeAmount = (assetReceived * feeRate) / DENOM;
+            uint256 feeAmount = (assetReceived * _feeRateForAgent(agentId)) /
+                DENOM;
             uint256 creatorFee = assetReceived - feeAmount;
 
             if (creatorFee > 0) {

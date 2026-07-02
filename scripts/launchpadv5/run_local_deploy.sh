@@ -51,8 +51,10 @@ DEFAULT_ENV_FILE=".env.launchpadv5_dev_bsc_local"  # .env.launchpadv5_local, .en
 #   bsc_testnet   - Deploy directly to BSC testnet (hardhat `bsc_testnet` url: BSC_TESTNET_RPC_URL,
 #                   then RPC_URL, then default; set these in the same env file you pass with --env).
 #   monad_testnet - Monad testnet (chainId 10143); MONAD_TESTNET_RPC_URL or RPC_URL in env file.
-#   xlayer_testnet - X Layer testnet (chainId 1952); XLAYER_TESTNET_RPC_URL in env file.
-#   xlayer_mainnet - X Layer mainnet (chainId 196); XLAYER_RPC_URL in env file.
+#   xlayer_testnet    - X Layer testnet (chainId 1952); XLAYER_TESTNET_RPC_URL in env file.
+#   xlayer_mainnet    - X Layer mainnet (chainId 196); XLAYER_RPC_URL in env file.
+#   robinhood_testnet - Robinhood testnet; ROBINHOOD_TESTNET_RPC_URL in env file.
+#   robinhood_mainnet - Robinhood mainnet (⚠️ caution!); ROBINHOOD_MAINNET_RPC_URL in env file.
 
 set -e
 
@@ -204,12 +206,27 @@ case "$NETWORK" in
         echo "Press Ctrl+C within 5 seconds to cancel..."
         sleep 5
         ;;
+    "arc_testnet")
+        HARDHAT_NETWORK="arc_testnet"
+        ;;
+    "arc_mainnet")
+        HARDHAT_NETWORK="arc_mainnet"
+        echo "⚠️  WARNING: Deploying to ARC MAINNET!"
+        echo "Press Ctrl+C within 5 seconds to cancel..."
+        sleep 5
+        ;;
     "robinhood_testnet")
         HARDHAT_NETWORK="robinhood_testnet"
         ;;
+    "robinhood_mainnet")
+        HARDHAT_NETWORK="robinhood_mainnet"
+        echo "⚠️  WARNING: Deploying to ROBINHOOD MAINNET!"
+        echo "Press Ctrl+C within 5 seconds to cancel..."
+        sleep 5
+        ;;
     *)
         echo "Error: Unknown network '$NETWORK'"
-        echo "Valid networks: local, base_sepolia, base, bsc_testnet, abstract_testnet, abstract_mainnet, monad_testnet, xlayer_testnet, xlayer_mainnet, robinhood_testnet"
+        echo "Valid networks: local, base_sepolia, base, bsc_testnet, abstract_testnet, abstract_mainnet, monad_testnet, xlayer_testnet, xlayer_mainnet, robinhood_testnet, robinhood_mainnet"
         exit 1
         ;;
 esac
@@ -316,7 +333,7 @@ save_univ2_env_from_log() {
 
 run_univ2_liquidity_deploy() {
     case "$HARDHAT_NETWORK" in
-        local|bsc_testnet|monad_testnet|xlayer_testnet|robinhood_testnet)
+        local|bsc_testnet|monad_testnet|xlayer_testnet|arc_testnet|robinhood_testnet|robinhood_mainnet)
             ;;
         *)
             echo "Skipping deployUniswapV2TestnetLiquidity.ts (not run on network $HARDHAT_NETWORK)"

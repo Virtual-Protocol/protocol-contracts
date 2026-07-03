@@ -353,6 +353,7 @@ async function setupBondingV5Test() {
         scheduledLaunchParams,
         deployParams,
         bondingCurveParams,
+        FAKE_INITIAL_VIRTUAL_LIQ, // acfFakeInitialVirtualLiq_ (8th arg added on current main)
       ],
       { initializer: "initialize" }
     );

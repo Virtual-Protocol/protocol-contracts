@@ -52,6 +52,19 @@ contract FRouterV3 is
     IBondingV5ForRouter public bondingV5;
     IBondingConfigForRouter public bondingConfig;
 
+    struct TradeEventData {
+        address token;
+        address trader;
+        address pair;
+        bool isBuy;
+        uint256 amountIn;
+        uint256 tokenAmount;
+        uint256 curveQuoteAmount;
+        uint256 traderQuoteAmount;
+        uint256 taxFee;
+        uint256 antiSniperFee;
+    }
+
     event PrivatePoolDrained(
         address indexed token,
         address indexed recipient,
@@ -64,6 +77,23 @@ contract FRouterV3 is
         address indexed veToken,
         address indexed recipient,
         uint256 veTokenAmount
+    );
+
+    event TradeExecuted(
+        address indexed token,
+        address indexed trader,
+        address indexed pair,
+        bool isBuy,
+        address quoteAsset,
+        uint256 amountIn,
+        uint256 tokenAmount,
+        uint256 curveQuoteAmount,
+        uint256 traderQuoteAmount,
+        uint256 taxFee,
+        uint256 antiSniperFee,
+        uint256 reserveTokenAfter,
+        uint256 reserveAssetAfter,
+        uint256 lastPrice
     );
 
     /// @custom:oz-upgrades-unsafe-allow constructor
@@ -169,6 +199,21 @@ contract FRouterV3 is
 
         pair.swap(amountIn, 0, 0, amountOut);
 
+        _emitTradeExecuted(
+            TradeEventData({
+                token: tokenAddress,
+                trader: to,
+                pair: pairAddress,
+                isBuy: false,
+                amountIn: amountIn,
+                tokenAmount: amountIn,
+                curveQuoteAmount: amountOut,
+                traderQuoteAmount: amount,
+                taxFee: txFee,
+                antiSniperFee: 0
+            })
+        );
+
         return (amountIn, amountOut);
     }
 
@@ -224,6 +269,21 @@ contract FRouterV3 is
         IFPairV2(pair).transferTo(to, amountOut);
 
         IFPairV2(pair).swap(0, amountOut, amount, 0);
+
+        _emitTradeExecuted(
+            TradeEventData({
+                token: tokenAddress,
+                trader: to,
+                pair: pair,
+                isBuy: true,
+                amountIn: amountIn,
+                tokenAmount: amountOut,
+                curveQuoteAmount: amount,
+                traderQuoteAmount: amountIn,
+                taxFee: normalTxFee,
+                antiSniperFee: antiSniperTxFee
+            })
+        );
 
         return (amount, amountOut);
     }
@@ -336,6 +396,31 @@ contract FRouterV3 is
             // Use startTime for backward compatibility
         }
         return finalTaxStartTime;
+    }
+
+    function _emitTradeExecuted(TradeEventData memory trade) private {
+        IFPairV2 pair = IFPairV2(trade.pair);
+        (uint256 remainingForSale, uint256 totalRaised) = pair.getReserves();
+        uint256 lastPrice = remainingForSale == 0
+            ? 0
+            : (totalRaised * 1 ether) / remainingForSale;
+
+        emit TradeExecuted(
+            trade.token,
+            trade.trader,
+            trade.pair,
+            trade.isBuy,
+            assetToken,
+            trade.amountIn,
+            trade.tokenAmount,
+            trade.curveQuoteAmount,
+            trade.traderQuoteAmount,
+            trade.taxFee,
+            trade.antiSniperFee,
+            remainingForSale,
+            totalRaised,
+            lastPrice
+        );
     }
 
     function hasAntiSniperTax(address pairAddress) public view returns (bool) {

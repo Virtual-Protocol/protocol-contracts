@@ -144,6 +144,43 @@ contract BondingV5 is
 
     event FeeDelegationUpdated(address indexed token, bool isFeeDelegation);
 
+    event TokenCreated(
+        uint256 virtualId,
+        address indexed creator,
+        address indexed token,
+        string name,
+        string symbol,
+        uint256 maxSupply,
+        uint256 saleAmount,
+        uint256 graduationThreshold,
+        uint256 targetRaiseAmount,
+        uint256 initialVirtualLiquidity,
+        uint256 initialPrice,
+        uint256 initialPurchase,
+        address quoteAsset,
+        address pair,
+        uint256 applicationId,
+        string description,
+        string image,
+        string twitter,
+        string telegram,
+        string youtube,
+        string website,
+        BondingConfig.LaunchParams launchParams,
+        uint256 startTime,
+        uint256 startTimeDelay
+    );
+
+    event MigrateExecuted(
+        address indexed caller,
+        address indexed token,
+        address pair,
+        address agentToken,
+        uint256 applicationId,
+        uint256 assetAmount,
+        uint256 tokenAmount
+    );
+
     error InvalidTokenStatus();
     error InvalidInput();
     error SlippageTooHigh();
@@ -421,6 +458,38 @@ contract BondingV5 is
             tokenInfo[token].virtualId,
             initialPurchase,
             tokenLaunchParams[token]
+        );
+
+        // Net quote target at the graduation threshold (excludes buy tax / anti-sniper fees).
+        uint256 targetRaiseAmount = (liquidity * bondingCurveSupply) /
+            gradThreshold -
+            liquidity;
+
+        emit TokenCreated(
+            tokenInfo[token].virtualId,
+            msg.sender,
+            token,
+            name_,
+            ticker_,
+            configInitialSupply * (10 ** IAgentTokenV4(token).decimals()),
+            bondingCurveSupply,
+            gradThreshold,
+            targetRaiseAmount,
+            liquidity * 2,
+            price,
+            initialPurchase,
+            assetToken,
+            pair,
+            applicationId,
+            desc_,
+            img_,
+            urls_[0],
+            urls_[1],
+            urls_[2],
+            urls_[3],
+            tokenLaunchParams[token],
+            actualStartTime,
+            actualStartTimeDelay
         );
 
         return (token, pair, tokenInfo[token].virtualId, initialPurchase);
@@ -753,6 +822,15 @@ contract BondingV5 is
         // );
 
         emit Graduated(tokenAddress_, agentToken);
+        emit MigrateExecuted(
+            msg.sender,
+            tokenAddress_,
+            pairAddress,
+            agentToken,
+            tokenRef.applicationId,
+            assetBalance,
+            tokenBalance
+        );
         tokenRef.trading = false;
         tokenRef.tradingOnUniswap = true;
     }

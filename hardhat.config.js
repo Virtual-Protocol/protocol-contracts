@@ -277,8 +277,8 @@ module.exports = {
         network: "robinhood_testnet",
         chainId: 46630,
         urls: {
-          apiURL: "https://explorer.testnet.chain.robinhood.com/api",
-          browserURL: "https://explorer.testnet.chain.robinhood.com",
+          apiURL: "https://robinhoodchain-testnet.blockscout.com/api",
+          browserURL: "https://robinhoodchain-testnet.blockscout.com",
         },
       },
       // X Layer (OKLink) — kept for reference only. Verification uses okxweb3explorer (okverify) below.
@@ -305,8 +305,8 @@ module.exports = {
         network: "robinhood_mainnet",
         chainId: 4663,
         urls: {
-          apiURL: "https://explorer.chain.robinhood.com/api",
-          browserURL: "https://explorer.chain.robinhood.com",
+          apiURL: "https://robinhoodchain.blockscout.com/api",
+          browserURL: "https://robinhoodchain.blockscout.com",
         },
       },
     ],

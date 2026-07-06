@@ -90,8 +90,6 @@ describe("Indexing events (BondingV5 / FRouterV3)", function () {
     // targetRaiseAmount computed without underflow/revert and is positive
     expect(tc.args.targetRaiseAmount).to.be.greaterThan(0n);
     expect(tc.args.initialPrice).to.be.greaterThan(0n);
-    expect(tc.args.twitter).to.equal("tw");
-    expect(tc.args.website).to.equal("web");
   });
 
   it("launch succeeds and enables trading", async function () {

@@ -162,10 +162,6 @@ contract BondingV5 is
         uint256 applicationId,
         string description,
         string image,
-        string twitter,
-        string telegram,
-        string youtube,
-        string website,
         BondingConfig.LaunchParams launchParams,
         uint256 startTime,
         uint256 startTimeDelay
@@ -473,10 +469,6 @@ contract BondingV5 is
             applicationId,
             desc_,
             img_,
-            urls_[0],
-            urls_[1],
-            urls_[2],
-            urls_[3],
             tokenLaunchParams[token],
             actualStartTime,
             actualStartTimeDelay

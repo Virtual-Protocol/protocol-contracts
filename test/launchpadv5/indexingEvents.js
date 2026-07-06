@@ -128,17 +128,17 @@ describe("Indexing events (BondingV5 / FRouterV3)", function () {
     expect(te.args.token).to.equal(tokenAddress);
     expect(te.args.pair).to.equal(pairAddress);
     expect(te.args.quoteAsset).to.equal(addresses.virtualToken);
-    // buy semantics: trader pays amountIn total; curve gets amountIn - taxes
+    // buy semantics: trader pays amountIn total; curve gets `amount` = amountIn - taxes;
+    // amountOut is the token received by the trader.
     expect(te.args.amountIn).to.equal(buyAmount);
-    expect(te.args.traderQuoteAmount).to.equal(buyAmount);
-    expect(te.args.taxFee + te.args.antiSniperFee + te.args.curveQuoteAmount).to.equal(buyAmount);
+    expect(te.args.taxFee + te.args.antiSniperFee + te.args.amount).to.equal(buyAmount);
     // anti-sniper window still open -> nonzero anti-sniper fee
     expect(te.args.antiSniperFee).to.be.greaterThan(0n);
-    expect(te.args.tokenAmount).to.be.greaterThan(0n);
+    expect(te.args.amountOut).to.be.greaterThan(0n);
 
     // Ground-truth cross-checks: emitted amounts == actual tokens/VIRTUAL moved.
     expect(vBefore - (await virtualToken.balanceOf(user2.address))).to.equal(te.args.amountIn);
-    expect((await token.balanceOf(user2.address)) - tBefore).to.equal(te.args.tokenAmount);
+    expect((await token.balanceOf(user2.address)) - tBefore).to.equal(te.args.amountOut);
     expect((await virtualToken.balanceOf(addresses.taxVault)) - taxVaultBefore).to.equal(te.args.taxFee);
     expect((await virtualToken.balanceOf(addresses.antiSniperTaxVault)) - antiVaultBefore).to.equal(te.args.antiSniperFee);
 
@@ -185,16 +185,16 @@ describe("Indexing events (BondingV5 / FRouterV3)", function () {
     const te = parseOne(fRouterV3, receipt, "TradeExecuted");
     expect(te, "TradeExecuted emitted").to.not.be.undefined;
     expect(te.args.isBuy).to.equal(false);
-    // sell semantics: amountIn and tokenAmount are the token sold
+    // sell semantics: amountIn is the token sold; amountOut is the gross quote out of
+    // the curve; amount is the net quote received by the trader after tax.
     expect(te.args.amountIn).to.equal(sellAmount);
-    expect(te.args.tokenAmount).to.equal(sellAmount);
     expect(te.args.antiSniperFee).to.equal(0n);
-    // net received = gross curve quote - tax
-    expect(te.args.traderQuoteAmount).to.equal(te.args.curveQuoteAmount - te.args.taxFee);
+    // net received (amount) = gross curve quote (amountOut) - tax
+    expect(te.args.amount).to.equal(te.args.amountOut - te.args.taxFee);
 
     // Ground-truth cross-checks: emitted amounts == actual tokens/VIRTUAL moved.
-    expect(tBefore - (await token.balanceOf(user2.address))).to.equal(te.args.tokenAmount);
-    expect((await virtualToken.balanceOf(user2.address)) - vBefore).to.equal(te.args.traderQuoteAmount);
+    expect(tBefore - (await token.balanceOf(user2.address))).to.equal(te.args.amountIn);
+    expect((await virtualToken.balanceOf(user2.address)) - vBefore).to.equal(te.args.amount);
     expect((await virtualToken.balanceOf(addresses.taxVault)) - taxVaultBefore).to.equal(te.args.taxFee);
 
     const [rTok, rAsset] = await pair.getReserves();
@@ -202,7 +202,7 @@ describe("Indexing events (BondingV5 / FRouterV3)", function () {
     expect(te.args.reserveAssetAfter).to.equal(rAsset);
   });
 
-  it("graduation emits Graduated + MigrateExecuted + a final TradeExecuted", async function () {
+  it("graduation emits Graduated + a final TradeExecuted", async function () {
     const { user1 } = accounts;
     const { bondingV5, fRouterV3, virtualToken } = contracts;
 
@@ -222,14 +222,6 @@ describe("Indexing events (BondingV5 / FRouterV3)", function () {
     expect(grad.args.token).to.equal(tokenAddress);
     const agentToken = grad.args.agentToken;
     expect(agentToken).to.not.equal(ethers.ZeroAddress);
-
-    const me = parseOne(bondingV5, receipt, "MigrateExecuted");
-    expect(me, "MigrateExecuted emitted").to.not.be.undefined;
-    expect(me.args.token).to.equal(tokenAddress);
-    expect(me.args.pair).to.equal(pairAddress);
-    expect(me.args.agentToken).to.equal(agentToken);
-    expect(me.args.assetAmount).to.be.greaterThan(0n);
-    expect(me.args.tokenAmount).to.be.greaterThan(0n);
 
     const info = await bondingV5.tokenInfo(tokenAddress);
     expect(info.tradingOnUniswap).to.equal(true);

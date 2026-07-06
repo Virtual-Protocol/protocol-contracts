@@ -169,16 +169,6 @@ contract BondingV5 is
         uint256 startTimeDelay
     );
 
-    event MigrateExecuted(
-        address indexed caller,
-        address indexed token,
-        address pair,
-        address agentToken,
-        uint256 applicationId,
-        uint256 assetAmount,
-        uint256 tokenAmount
-    );
-
     error InvalidTokenStatus();
     error InvalidInput();
     error SlippageTooHigh();
@@ -818,15 +808,6 @@ contract BondingV5 is
         // );
 
         emit Graduated(tokenAddress_, agentToken);
-        emit MigrateExecuted(
-            msg.sender,
-            tokenAddress_,
-            pairAddress,
-            agentToken,
-            tokenRef.applicationId,
-            assetBalance,
-            tokenBalance
-        );
         tokenRef.trading = false;
         tokenRef.tradingOnUniswap = true;
     }

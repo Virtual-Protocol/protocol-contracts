@@ -58,9 +58,8 @@ contract FRouterV3 is
         address pair;
         bool isBuy;
         uint256 amountIn;
-        uint256 tokenAmount;
-        uint256 curveQuoteAmount;
-        uint256 traderQuoteAmount;
+        uint256 amountOut;
+        uint256 amount;
         uint256 taxFee;
         uint256 antiSniperFee;
     }
@@ -86,9 +85,8 @@ contract FRouterV3 is
         bool isBuy,
         address quoteAsset,
         uint256 amountIn,
-        uint256 tokenAmount,
-        uint256 curveQuoteAmount,
-        uint256 traderQuoteAmount,
+        uint256 amountOut,
+        uint256 amount,
         uint256 taxFee,
         uint256 antiSniperFee,
         uint256 reserveTokenAfter,
@@ -206,9 +204,8 @@ contract FRouterV3 is
                 pair: pairAddress,
                 isBuy: false,
                 amountIn: amountIn,
-                tokenAmount: amountIn,
-                curveQuoteAmount: amountOut,
-                traderQuoteAmount: amount,
+                amountOut: amountOut,
+                amount: amount,
                 taxFee: txFee,
                 antiSniperFee: 0
             })
@@ -277,9 +274,8 @@ contract FRouterV3 is
                 pair: pair,
                 isBuy: true,
                 amountIn: amountIn,
-                tokenAmount: amountOut,
-                curveQuoteAmount: amount,
-                traderQuoteAmount: amountIn,
+                amountOut: amountOut,
+                amount: amount,
                 taxFee: normalTxFee,
                 antiSniperFee: antiSniperTxFee
             })
@@ -412,9 +408,8 @@ contract FRouterV3 is
             trade.isBuy,
             assetToken,
             trade.amountIn,
-            trade.tokenAmount,
-            trade.curveQuoteAmount,
-            trade.traderQuoteAmount,
+            trade.amountOut,
+            trade.amount,
             trade.taxFee,
             trade.antiSniperFee,
             remainingForSale,

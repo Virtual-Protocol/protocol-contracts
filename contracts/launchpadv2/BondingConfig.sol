@@ -25,13 +25,13 @@ contract BondingConfig is Initializable, OwnableUpgradeable {
     }
     ReserveSupplyParams public reserveSupplyParams;
 
-  // Anti-sniper tax type constants
-  // Buy-side types: duration over which buy anti-sniper tax decreases from 99% to 0%
-  uint8 public constant ANTI_SNIPER_NONE = 0; // No anti-sniper tax (0 seconds)
-  uint8 public constant ANTI_SNIPER_60S = 1; // 60 seconds duration (default)
-  uint8 public constant ANTI_SNIPER_98M = 2; // 98 minutes duration
-  // Sell-only: same linear decay on sells only (no buy anti-sniper tax)
-  uint8 public constant ANTI_SNIPER_24H_SELL = 3; // 24 hours sell-only duration
+    // Anti-sniper tax type constants
+    // Buy-side: duration over which buy anti-sniper tax decreases from 99% to 0%
+    uint8 public constant ANTI_SNIPER_NONE = 0; // No anti-sniper tax (0 seconds)
+    uint8 public constant ANTI_SNIPER_60S = 1; // 60 seconds buy-only (default)
+    uint8 public constant ANTI_SNIPER_98M = 2; // 98 minutes buy-only
+    uint8 public constant ANTI_SNIPER_98M_SELL = 3; // 98 minutes sell-only
+    uint8 public constant ANTI_SNIPER_98M_BOTH = 4; // 98 minutes buy and sell
 
     // Scheduled launch parameters
     struct ScheduledLaunchParams {
@@ -364,7 +364,7 @@ contract BondingConfig is Initializable, OwnableUpgradeable {
 
     /**
      * @notice Check if anti-sniper tax type is valid
-     * @param antiSniperType_ The anti-sniper type (0=none, 1=60s, 2=98min, 3=24h sell-only)
+     * @param antiSniperType_ 0=none, 1=60s buy, 2=98m buy, 3=98m sell, 4=98m both
      * @return Whether the type is valid
      */
     function isValidAntiSniperType(
@@ -374,22 +374,37 @@ contract BondingConfig is Initializable, OwnableUpgradeable {
             antiSniperType_ == ANTI_SNIPER_NONE ||
             antiSniperType_ == ANTI_SNIPER_60S ||
             antiSniperType_ == ANTI_SNIPER_98M ||
-            antiSniperType_ == ANTI_SNIPER_24H_SELL;
+            antiSniperType_ == ANTI_SNIPER_98M_SELL ||
+            antiSniperType_ == ANTI_SNIPER_98M_BOTH;
     }
 
     /**
-     * @notice Whether anti-sniper tax applies to sells only (not buys)
+     * @notice Whether anti-sniper tax applies on buys for this type
      */
-    function isSellOnlyAntiSniperType(
+    function appliesAntiSniperOnBuy(
         uint8 antiSniperType_
     ) external pure returns (bool) {
-        return antiSniperType_ == ANTI_SNIPER_24H_SELL;
+        return
+            antiSniperType_ == ANTI_SNIPER_60S ||
+            antiSniperType_ == ANTI_SNIPER_98M ||
+            antiSniperType_ == ANTI_SNIPER_98M_BOTH;
+    }
+
+    /**
+     * @notice Whether anti-sniper tax applies on sells for this type
+     */
+    function appliesAntiSniperOnSell(
+        uint8 antiSniperType_
+    ) external pure returns (bool) {
+        return
+            antiSniperType_ == ANTI_SNIPER_98M_SELL ||
+            antiSniperType_ == ANTI_SNIPER_98M_BOTH;
     }
 
     /**
      * @notice Get anti-sniper tax duration in seconds for a given type
      * @param antiSniperType_ The anti-sniper type
-     * @return Duration in seconds (0 for NONE, 60 for 60S, 5880 for 98M, 86400 for 24H_SELL)
+     * @return Duration in seconds (0 for NONE, 60 for 60S, 5880 for 98M variants)
      */
     function getAntiSniperDuration(
         uint8 antiSniperType_
@@ -398,10 +413,12 @@ contract BondingConfig is Initializable, OwnableUpgradeable {
             return 0;
         } else if (antiSniperType_ == ANTI_SNIPER_60S) {
             return 60; // 60 seconds
-        } else if (antiSniperType_ == ANTI_SNIPER_98M) {
+        } else if (
+            antiSniperType_ == ANTI_SNIPER_98M ||
+            antiSniperType_ == ANTI_SNIPER_98M_SELL ||
+            antiSniperType_ == ANTI_SNIPER_98M_BOTH
+        ) {
             return 5880; // 98 minutes = 98 * 60 = 5880 seconds
-        } else if (antiSniperType_ == ANTI_SNIPER_24H_SELL) {
-            return 86400; // 24 hours
         }
         revert InvalidAntiSniperType();
     }

@@ -46,6 +46,8 @@ const ACF_RESERVED_BIPS = 5000; // ACF operations reserve 50%
 const ANTI_SNIPER_NONE = 0;
 const ANTI_SNIPER_60S = 1;
 const ANTI_SNIPER_98M = 2;
+const ANTI_SNIPER_98M_SELL = 3;
+const ANTI_SNIPER_98M_BOTH = 4;
 
 // Fee structure
 const NORMAL_LAUNCH_FEE = ethers.parseEther("100"); // Fee for scheduled/marketing launches
@@ -904,7 +906,11 @@ describe("BondingV5", function () {
         .true;
       expect(await bondingConfig.isValidAntiSniperType(ANTI_SNIPER_98M)).to.be
         .true;
-      expect(await bondingConfig.isValidAntiSniperType(3)).to.be.false;
+      expect(await bondingConfig.isValidAntiSniperType(ANTI_SNIPER_98M_SELL)).to.be
+        .true;
+      expect(await bondingConfig.isValidAntiSniperType(ANTI_SNIPER_98M_BOTH)).to.be
+        .true;
+      expect(await bondingConfig.isValidAntiSniperType(6)).to.be.false;
     });
 
     it("Should return correct durations for anti-sniper types", async function () {
@@ -919,6 +925,24 @@ describe("BondingV5", function () {
       expect(
         await bondingConfig.getAntiSniperDuration(ANTI_SNIPER_98M)
       ).to.equal(98 * 60);
+      expect(
+        await bondingConfig.getAntiSniperDuration(ANTI_SNIPER_98M_SELL)
+      ).to.equal(98 * 60);
+      expect(
+        await bondingConfig.getAntiSniperDuration(ANTI_SNIPER_98M_BOTH)
+      ).to.equal(98 * 60);
+      expect(
+        await bondingConfig.appliesAntiSniperOnBuy(ANTI_SNIPER_98M_SELL)
+      ).to.be.false;
+      expect(
+        await bondingConfig.appliesAntiSniperOnSell(ANTI_SNIPER_98M_SELL)
+      ).to.be.true;
+      expect(
+        await bondingConfig.appliesAntiSniperOnBuy(ANTI_SNIPER_98M_BOTH)
+      ).to.be.true;
+      expect(
+        await bondingConfig.appliesAntiSniperOnSell(ANTI_SNIPER_98M_BOTH)
+      ).to.be.true;
     });
 
     it("Should revert preLaunch with invalid anti-sniper type", async function () {
@@ -945,10 +969,184 @@ describe("BondingV5", function () {
           LAUNCH_MODE_NORMAL,
           0,
           false,
-          5, // Invalid anti-sniper type
+          6, // Invalid anti-sniper type
           false
         ,"0x")
       ).to.be.revertedWithCustomError(bondingV5, "InvalidAntiSniperType");
+    });
+
+    it("Should collect sell-only anti-sniper tax for ANTI_SNIPER_98M_SELL and no buy anti-sniper tax", async function () {
+      const { user1, user2 } = accounts;
+      const { bondingV5, virtualToken, fRouterV3, fFactoryV3 } = contracts;
+
+      const purchaseAmount = ethers.parseEther("1000");
+      await virtualToken
+        .connect(user1)
+        .approve(addresses.bondingV5, purchaseAmount);
+      await virtualToken
+        .connect(user2)
+        .approve(addresses.bondingV5, ethers.MaxUint256);
+      await virtualToken
+        .connect(user2)
+        .approve(addresses.fRouterV3, ethers.MaxUint256);
+
+      const startTime = (await time.latest()) + START_TIME_DELAY + 1;
+      const tx = await bondingV5.connect(user1).preLaunch(
+        "98m Sell Sniper Tax",
+        "S98M",
+        [0, 1, 2],
+        "Description",
+        "https://example.com/image.png",
+        ["", "", "", ""],
+        purchaseAmount,
+        startTime,
+        LAUNCH_MODE_NORMAL,
+        0,
+        false,
+        ANTI_SNIPER_98M_SELL,
+        false,
+        "0x"
+      );
+
+      const receipt = await tx.wait();
+      const event = receipt.logs.find((log) => {
+        try {
+          return bondingV5.interface.parseLog(log)?.name === "PreLaunched";
+        } catch (e) {
+          return false;
+        }
+      });
+      const tokenAddress = bondingV5.interface.parseLog(event).args.token;
+      const pairAddress = bondingV5.interface.parseLog(event).args.pair;
+
+      await time.increase(START_TIME_DELAY + 1);
+      await bondingV5.launch(tokenAddress);
+
+      const antiSniperTaxVault = await fFactoryV3.antiSniperTaxVault();
+      const antiSniperVaultBeforeBuy = await virtualToken.balanceOf(
+        antiSniperTaxVault
+      );
+
+      expect(await fRouterV3.hasAntiSniperTax(pairAddress)).to.be.true;
+
+      await bondingV5
+        .connect(user2)
+        .buy(ethers.parseEther("500"), tokenAddress, 0, (await time.latest()) + 300);
+
+      const antiSniperVaultAfterBuy = await virtualToken.balanceOf(
+        antiSniperTaxVault
+      );
+      expect(antiSniperVaultAfterBuy).to.equal(antiSniperVaultBeforeBuy);
+
+      const agentToken = await ethers.getContractAt("AgentTokenV4", tokenAddress);
+      const tokenBalance = await agentToken.balanceOf(user2.address);
+      await agentToken
+        .connect(user2)
+        .approve(addresses.bondingV5, tokenBalance);
+      await agentToken
+        .connect(user2)
+        .approve(addresses.fRouterV3, tokenBalance);
+
+      const antiSniperVaultBeforeSell = await virtualToken.balanceOf(
+        antiSniperTaxVault
+      );
+      const sellAmount = tokenBalance / 4n;
+
+      await bondingV5
+        .connect(user2)
+        .sell(sellAmount, tokenAddress, 0, (await time.latest()) + 300);
+
+      const antiSniperVaultAfterSell = await virtualToken.balanceOf(
+        antiSniperTaxVault
+      );
+      expect(antiSniperVaultAfterSell).to.be.gt(antiSniperVaultBeforeSell);
+    });
+
+    it("Should collect anti-sniper tax on both buy and sell for ANTI_SNIPER_98M_BOTH", async function () {
+      const { user1, user2 } = accounts;
+      const { bondingV5, virtualToken, fRouterV3, fFactoryV3 } = contracts;
+
+      const purchaseAmount = ethers.parseEther("1000");
+      await virtualToken
+        .connect(user1)
+        .approve(addresses.bondingV5, purchaseAmount);
+      await virtualToken
+        .connect(user2)
+        .approve(addresses.bondingV5, ethers.MaxUint256);
+      await virtualToken
+        .connect(user2)
+        .approve(addresses.fRouterV3, ethers.MaxUint256);
+
+      const startTime = (await time.latest()) + START_TIME_DELAY + 1;
+      const tx = await bondingV5.connect(user1).preLaunch(
+        "98m Both Sniper Tax",
+        "B98M",
+        [0, 1, 2],
+        "Description",
+        "https://example.com/image.png",
+        ["", "", "", ""],
+        purchaseAmount,
+        startTime,
+        LAUNCH_MODE_NORMAL,
+        0,
+        false,
+        ANTI_SNIPER_98M_BOTH,
+        false,
+        "0x"
+      );
+
+      const receipt = await tx.wait();
+      const event = receipt.logs.find((log) => {
+        try {
+          return bondingV5.interface.parseLog(log)?.name === "PreLaunched";
+        } catch (e) {
+          return false;
+        }
+      });
+      const tokenAddress = bondingV5.interface.parseLog(event).args.token;
+      const pairAddress = bondingV5.interface.parseLog(event).args.pair;
+
+      await time.increase(START_TIME_DELAY + 1);
+      await bondingV5.launch(tokenAddress);
+
+      const antiSniperTaxVault = await fFactoryV3.antiSniperTaxVault();
+      const antiSniperVaultBeforeBuy = await virtualToken.balanceOf(
+        antiSniperTaxVault
+      );
+
+      expect(await fRouterV3.hasAntiSniperTax(pairAddress)).to.be.true;
+
+      await bondingV5
+        .connect(user2)
+        .buy(ethers.parseEther("500"), tokenAddress, 0, (await time.latest()) + 300);
+
+      const antiSniperVaultAfterBuy = await virtualToken.balanceOf(
+        antiSniperTaxVault
+      );
+      expect(antiSniperVaultAfterBuy).to.be.gt(antiSniperVaultBeforeBuy);
+
+      const agentToken = await ethers.getContractAt("AgentTokenV4", tokenAddress);
+      const tokenBalance = await agentToken.balanceOf(user2.address);
+      await agentToken
+        .connect(user2)
+        .approve(addresses.bondingV5, tokenBalance);
+      await agentToken
+        .connect(user2)
+        .approve(addresses.fRouterV3, tokenBalance);
+
+      const antiSniperVaultBeforeSell = await virtualToken.balanceOf(
+        antiSniperTaxVault
+      );
+      const sellAmount = tokenBalance / 4n;
+
+      await bondingV5
+        .connect(user2)
+        .sell(sellAmount, tokenAddress, 0, (await time.latest()) + 300);
+
+      const antiSniperVaultAfterSell = await virtualToken.balanceOf(
+        antiSniperTaxVault
+      );
+      expect(antiSniperVaultAfterSell).to.be.gt(antiSniperVaultBeforeSell);
     });
   });
 
@@ -1405,6 +1603,92 @@ describe("BondingV5", function () {
 
         expect(await bondingV5.tokenAntiSniperType(tokenAddress)).to.equal(
           ANTI_SNIPER_98M
+        );
+      });
+
+      it("Should create token with ANTI_SNIPER_98M_SELL (98m sell-only duration)", async function () {
+        const { user1 } = accounts;
+        const { bondingV5, virtualToken } = contracts;
+
+        const purchaseAmount = ethers.parseEther("1000");
+        await virtualToken
+          .connect(user1)
+          .approve(addresses.bondingV5, purchaseAmount);
+
+        const startTime = (await time.latest()) + START_TIME_DELAY + 1;
+        const tx = await bondingV5
+          .connect(user1)
+          .preLaunch(
+            "98m Sell Anti-Sniper",
+            "AS98S",
+            [0, 1],
+            "Description",
+            "https://example.com/image.png",
+            ["", "", "", ""],
+            purchaseAmount,
+            startTime,
+            LAUNCH_MODE_NORMAL,
+            0,
+            false,
+            ANTI_SNIPER_98M_SELL,
+            false
+          ,"0x");
+
+        const receipt = await tx.wait();
+        const event = receipt.logs.find((log) => {
+          try {
+            return bondingV5.interface.parseLog(log)?.name === "PreLaunched";
+          } catch (e) {
+            return false;
+          }
+        });
+        const tokenAddress = bondingV5.interface.parseLog(event).args.token;
+
+        expect(await bondingV5.tokenAntiSniperType(tokenAddress)).to.equal(
+          ANTI_SNIPER_98M_SELL
+        );
+      });
+
+      it("Should create token with ANTI_SNIPER_98M_BOTH (98m buy and sell duration)", async function () {
+        const { user1 } = accounts;
+        const { bondingV5, virtualToken } = contracts;
+
+        const purchaseAmount = ethers.parseEther("1000");
+        await virtualToken
+          .connect(user1)
+          .approve(addresses.bondingV5, purchaseAmount);
+
+        const startTime = (await time.latest()) + START_TIME_DELAY + 1;
+        const tx = await bondingV5
+          .connect(user1)
+          .preLaunch(
+            "98m Both Anti-Sniper",
+            "AS98B",
+            [0, 1],
+            "Description",
+            "https://example.com/image.png",
+            ["", "", "", ""],
+            purchaseAmount,
+            startTime,
+            LAUNCH_MODE_NORMAL,
+            0,
+            false,
+            ANTI_SNIPER_98M_BOTH,
+            false
+          ,"0x");
+
+        const receipt = await tx.wait();
+        const event = receipt.logs.find((log) => {
+          try {
+            return bondingV5.interface.parseLog(log)?.name === "PreLaunched";
+          } catch (e) {
+            return false;
+          }
+        });
+        const tokenAddress = bondingV5.interface.parseLog(event).args.token;
+
+        expect(await bondingV5.tokenAntiSniperType(tokenAddress)).to.equal(
+          ANTI_SNIPER_98M_BOTH
         );
       });
     });

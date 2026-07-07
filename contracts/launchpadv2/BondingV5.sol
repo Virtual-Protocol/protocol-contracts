@@ -153,13 +153,11 @@ contract BondingV5 is
         uint256 maxSupply,
         uint256 saleAmount,
         uint256 graduationThreshold,
-        uint256 targetRaiseAmount,
         uint256 initialVirtualLiquidity,
         uint256 initialPrice,
         uint256 initialPurchase,
         address quoteAsset,
         address pair,
-        uint256 applicationId,
         string description,
         string image,
         BondingConfig.LaunchParams launchParams,
@@ -447,10 +445,6 @@ contract BondingV5 is
         );
 
         // Net quote target at the graduation threshold (excludes buy tax / anti-sniper fees).
-        uint256 targetRaiseAmount = (liquidity * bondingCurveSupply) /
-            gradThreshold -
-            liquidity;
-
         emit TokenCreated(
             tokenInfo[token].virtualId,
             msg.sender,
@@ -460,13 +454,11 @@ contract BondingV5 is
             configInitialSupply * (10 ** IAgentTokenV4(token).decimals()),
             bondingCurveSupply,
             gradThreshold,
-            targetRaiseAmount,
             liquidity * 2,
             price,
             initialPurchase,
             assetToken,
             pair,
-            applicationId,
             desc_,
             img_,
             tokenLaunchParams[token],

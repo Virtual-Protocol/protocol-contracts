@@ -221,8 +221,8 @@ contract FRouterV3 is
                 amountIn: amountIn,
                 amountOut: amountOut,
                 amount: amount,
-                taxFee: txFee,
-                antiSniperFee: 0
+                taxFee: normalTxFee,
+                antiSniperFee: antiSniperTxFee
             })
         );
 
@@ -433,7 +433,7 @@ contract FRouterV3 is
         (uint256 remainingForSale, uint256 totalRaised) = pair.getReserves();
         uint256 lastPrice = remainingForSale == 0
             ? 0
-            : (totalRaised * 1 ether) / remainingForSale;
+            : ((totalRaised * 1 ether) / remainingForSale); // last price multiplied by 10 * 10^18 
 
         emit TradeExecuted(
             trade.token,

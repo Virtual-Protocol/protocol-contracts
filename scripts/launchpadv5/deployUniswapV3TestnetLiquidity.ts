@@ -117,8 +117,8 @@ async function tryVerify(address: string, ctorArgs: any[]) {
     const chainId = (await ethers.provider.getNetwork()).chainId;
     const timeoutMs = Number(process.env.TX_CONFIRM_TIMEOUT_MS || "240000");
     const fee = Number(envStr("UNISWAP_V3_FEE") || "3000");
-    const liquidityHuman = process.env.LIQUIDITY_AMOUNT?.trim() || "10";
-    const swapVirtualHuman = process.env.SWAP_TEST_VIRTUAL_AMOUNT?.trim() || "1";
+    const liquidityHuman = process.env.LIQUIDITY_AMOUNT?.trim() || "1";
+    const swapVirtualHuman = process.env.SWAP_TEST_VIRTUAL_AMOUNT?.trim() || "0.1";
 
     const MAX_SIGNER_GAS_LIMIT = launchpadHeavyTxGasLimit();
 

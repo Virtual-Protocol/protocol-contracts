@@ -26,7 +26,8 @@ interface IBondingV5ForRouter {
 // Minimal interface for BondingConfig to get anti-sniper duration
 interface IBondingConfigForRouter {
     function getAntiSniperDuration(uint8 antiSniperType_) external pure returns (uint256);
-    function ANTI_SNIPER_NONE() external pure returns (uint8);
+    function appliesAntiSniperOnBuy(uint8 antiSniperType_) external pure returns (bool);
+    function appliesAntiSniperOnSell(uint8 antiSniperType_) external pure returns (bool);
 }
 
 // Minimal interface for AgentTax to deposit tax with on-chain attribution
@@ -183,17 +184,31 @@ contract FRouterV3 is
 
         token.safeTransferFrom(to, pairAddress, amountIn);
 
-        uint fee = factory.sellTax();
-        uint256 txFee = (fee * amountOut) / 100;
+        uint256 normalTax = factory.sellTax();
+        uint256 antiSniperTax = _calculateAntiSniperSellTax(pairAddress);
+        if (normalTax + antiSniperTax > 99) {
+            antiSniperTax = 99 - normalTax;
+        }
 
-        uint256 amount = amountOut - txFee;
+        uint256 normalTxFee = (normalTax * amountOut) / 100;
+        uint256 antiSniperTxFee = (antiSniperTax * amountOut) / 100;
+
+        uint256 amount = amountOut - normalTxFee - antiSniperTxFee;
         address feeTo = factory.taxVault();
 
         pair.transferAsset(to, amount);
-        // Transfer tax from pair to router, then deposit with on-chain attribution
-        pair.transferAsset(address(this), txFee);
-        IERC20(assetToken).forceApprove(feeTo, txFee);
-        IAgentTaxForRouter(feeTo).depositTax(tokenAddress, txFee);
+        // Transfer normal sell tax from pair to router, then deposit with on-chain attribution
+        pair.transferAsset(address(this), normalTxFee);
+        IERC20(assetToken).forceApprove(feeTo, normalTxFee);
+        IAgentTaxForRouter(feeTo).depositTax(tokenAddress, normalTxFee);
+
+        // Anti-sniper sell tax goes to separate vault (no attribution needed)
+        if (antiSniperTxFee > 0) {
+            pair.transferAsset(
+                factory.antiSniperTaxVault(),
+                antiSniperTxFee
+            );
+        }
 
         pair.swap(amountIn, 0, 0, amountOut);
 
@@ -232,7 +247,7 @@ contract FRouterV3 is
         if (isInitialPurchase) {
             // No anti-sniper tax for creator's initial purchase
         } else {
-            antiSniperTax = _calculateAntiSniperTax(pair); // Anti-sniper tax for regular purchases
+            antiSniperTax = _calculateAntiSniperBuyTax(pair);
         }
         // Ensure total tax does not exceed 99% (user must receive at least 1%)
         if (normalTax + antiSniperTax > 99) {
@@ -330,15 +345,26 @@ contract FRouterV3 is
     }
 
     /**
-     * @dev Calculate anti-sniper tax based on time elapsed since pair start
-     * BondingV5 tokens: Use configurable anti-sniper types (NONE=0s, 60S=60s, 98M=98min)
-     * BondingV4 X_LAUNCH tokens: Tax decreases from 99% to 0% over 99 seconds
-     * Legacy tokens: Tax decreases from 99% to 0% over 99 minutes
-     * @param pairAddress The address of the pair
-     * @return taxPercentage Tax in percentage (1 = 1%)
+     * @dev Calculate buy-side anti-sniper tax (60S, 98M, 98M_BOTH on BondingV5)
      */
-    function _calculateAntiSniperTax(
+    function _calculateAntiSniperBuyTax(
         address pairAddress
+    ) private view returns (uint256) {
+        return _calculateAntiSniperTaxForSide(pairAddress, true);
+    }
+
+    /**
+     * @dev Calculate sell-side anti-sniper tax (98M_SELL, 98M_BOTH on BondingV5)
+     */
+    function _calculateAntiSniperSellTax(
+        address pairAddress
+    ) private view returns (uint256) {
+        return _calculateAntiSniperTaxForSide(pairAddress, false);
+    }
+
+    function _calculateAntiSniperTaxForSide(
+        address pairAddress,
+        bool isBuy
     ) private view returns (uint256) {
         IFPairV2 pair = IFPairV2(pairAddress);
 
@@ -348,29 +374,37 @@ contract FRouterV3 is
         uint256 startTax = factory.antiSniperBuyTaxStartValue(); // 99%
 
         uint8 antiSniperType = bondingV5.tokenAntiSniperType(tokenAddress);
+        if (isBuy) {
+            if (!bondingConfig.appliesAntiSniperOnBuy(antiSniperType)) {
+                return 0;
+            }
+        } else if (!bondingConfig.appliesAntiSniperOnSell(antiSniperType)) {
+            return 0;
+        }
+
         // Get the duration for this anti-sniper type
         uint256 duration = bondingConfig.getAntiSniperDuration(antiSniperType);
-        
+
         // ANTI_SNIPER_NONE: no tax at all
         if (duration == 0) {
             return 0;
         }
-        
+
         // Get tax start time
         uint256 taxStartTime = _getTaxStartTime(pair);
-        
+
         // If trading hasn't started yet, use maximum tax
         if (block.timestamp < taxStartTime) {
             return startTax;
         }
-        
+
         uint256 timeElapsed = block.timestamp - taxStartTime;
-        
+
         // If time elapsed exceeds duration, no tax
         if (timeElapsed >= duration) {
             return 0;
         }
-        
+
         // Linear decrease: tax = startTax * (duration - timeElapsed) / duration
         return startTax * (duration - timeElapsed) / duration;
     }
@@ -419,7 +453,9 @@ contract FRouterV3 is
     }
 
     function hasAntiSniperTax(address pairAddress) public view returns (bool) {
-        return _calculateAntiSniperTax(pairAddress) > 0;
+        return
+            _calculateAntiSniperBuyTax(pairAddress) > 0 ||
+            _calculateAntiSniperSellTax(pairAddress) > 0;
     }
 
     function setTaxStartTime(

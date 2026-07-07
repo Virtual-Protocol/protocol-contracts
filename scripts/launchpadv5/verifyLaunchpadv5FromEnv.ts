@@ -10,6 +10,7 @@
  *   ENV_FILE=.env.launchpadv5_dev_xlayer_testnet npx hardhat run scripts/launchpadv5/verifyLaunchpadv5FromEnv.ts --network xlayer_testnet
  *   ENV_FILE=.env.launchpadv5_prod_xlayer npx hardhat run scripts/launchpadv5/verifyLaunchpadv5FromEnv.ts --network xlayer_mainnet
  *   ENV_FILE=.env.launchpadv5_dev_robinhood_testnet npx hardhat run scripts/launchpadv5/verifyLaunchpadv5FromEnv.ts --network robinhood_testnet
+ *   ENV_FILE=.env.launchpadv5_prod_robinhood npx hardhat run scripts/launchpadv5/verifyLaunchpadv5FromEnv.ts --network robinhood_mainnet
  *
  * X Layer (OKLink): Method 1 — uses `okverify` task from @okxweb3/hardhat-explorer-verify plugin.
  * Method 2 (etherscan.customChains + verify:verify/verify:etherscan) does NOT work — OKLink's endpoint

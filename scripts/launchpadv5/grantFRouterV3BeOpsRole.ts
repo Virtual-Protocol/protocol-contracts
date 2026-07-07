@@ -7,7 +7,7 @@
  *
  * Usage:
  *   ENV_FILE=.env.launchpadv5_dev_robinhood_testnet npx hardhat run scripts/launchpadv5/grantFRouterV3BeOpsRole.ts --network robinhood_testnet
- *   ENV_FILE=.env.launchpadv5_dev_abstract_testnet   npx hardhat run scripts/launchpadv5/grantFRouterV3BeOpsRole.ts --network abstract_testnet
+ *   ENV_FILE=.env.launchpadv5_dev_arc_testnet   npx hardhat run scripts/launchpadv5/grantFRouterV3BeOpsRole.ts --network arc_testnet
  */
 
 const { ethers } = require("hardhat");

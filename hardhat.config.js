@@ -185,9 +185,10 @@ module.exports = {
       // X Layer — OKLink key used by okverify task; kept here for completeness
       xlayer_testnet:    process.env.OKLINK_API_KEY || process.env.ETHERSCAN_API_KEY || "",
       xlayer_mainnet:    process.env.OKLINK_API_KEY || process.env.ETHERSCAN_API_KEY || "",
-      // Robinhood testnet — Blockscout explorer (chainId 46630 not in Etherscan V2).
+      // Robinhood testnet/mainnet — Blockscout explorer (not in Etherscan V2).
       // Blockscout does not validate API keys; any non-empty string works.
       robinhood_testnet: process.env.ETHERSCAN_API_KEY || "blockscout",
+      robinhood_mainnet: process.env.ETHERSCAN_API_KEY || "blockscout",
     },
     customChains: [
       {
@@ -250,16 +251,34 @@ module.exports = {
           browserURL: "https://sepolia.arbiscan.io/",
         },
       },
+      // Arc Network — uses Blockscout (Etherscan-compatible API).
+      // Explorer: https://testnet.arcscan.app
+      {
+        network: "arc_testnet",
+        chainId: 5042002,
+        urls: {
+          apiURL: "https://testnet.arcscan.app/api",
+          browserURL: "https://testnet.arcscan.app",
+        },
+      },
+      {
+        network: "arc_mainnet",
+        chainId: 5042,
+        urls: {
+          apiURL: "https://arcscan.app/api",
+          browserURL: "https://arcscan.app",
       // Robinhood testnet (chainId 46630) is NOT in Etherscan V2's chainlist.
       // apiKey is an object (see above), so hardhat-verify uses this Blockscout apiURL directly
       // instead of routing to Etherscan V2. Blockscout is Etherscan-compatible and does not
       // validate API key values. The robinhood_testnet entry in apiKey holds any non-empty string.
+        },
+      },
       {
         network: "robinhood_testnet",
         chainId: 46630,
         urls: {
-          apiURL: "https://explorer.testnet.chain.robinhood.com/api",
-          browserURL: "https://explorer.testnet.chain.robinhood.com",
+          apiURL: "https://robinhoodchain-testnet.blockscout.com/api",
+          browserURL: "https://robinhoodchain-testnet.blockscout.com",
         },
       },
       // X Layer (OKLink) — kept for reference only. Verification uses okxweb3explorer (okverify) below.
@@ -282,14 +301,12 @@ module.exports = {
           browserURL: "https://www.oklink.com/xlayer",
         },
       },
-      // Robinhood testnet (chainId 46630) — Etherscan v2 API (same key as other testnets).
-      // TODO: confirm browserURL once explorer is publicly available.
       {
-        network: "robinhood_testnet",
-        chainId: 46630,
+        network: "robinhood_mainnet",
+        chainId: 4663,
         urls: {
-          apiURL: "https://api.etherscan.io/v2/api",
-          browserURL: "https://explorer.robinhood-testnet.virtuals.io",
+          apiURL: "https://robinhoodchain.blockscout.com/api",
+          browserURL: "https://robinhoodchain.blockscout.com",
         },
       },
     ],
@@ -428,6 +445,11 @@ module.exports = {
       accounts: [process.env.PRIVATE_KEY],
       chainId: 46630,
     },
+    robinhood_mainnet: {
+      url: process.env.ROBINHOOD_MAINNET_RPC_URL || "",
+      accounts: [process.env.PRIVATE_KEY],
+      chainId: 4663,
+    },
     // X Layer (OKX)
     // Do not fall back to RPC_URL to avoid accidental cross-chain deploys.
     xlayer_testnet: {
@@ -446,10 +468,32 @@ module.exports = {
       accounts: [process.env.PRIVATE_KEY],
       chainId: 196,
     },
+    // Arc Network — https://www.arc.network/
+    // Do not fall back to RPC_URL to avoid accidental cross-chain deploys.
+    arc_testnet: {
+      url:
+        process.env.ARC_TESTNET_RPC_URL ||
+        "https://rpc.arc-testnet.network",
+      accounts: [process.env.PRIVATE_KEY],
+      chainId: 5042002,
+      timeout: 120_000,
+    },
+    arc_mainnet: {
+      url:
+        process.env.ARC_MAINNET_RPC_URL ||
+        "https://rpc.arc.network",
+      accounts: [process.env.PRIVATE_KEY],
+      chainId: 5042,
+    },
     robinhood_testnet: {
       url: process.env.ROBINHOOD_TESTNET_RPC_URL || "",
       accounts: [process.env.PRIVATE_KEY],
       chainId: 46630,
+    },
+    robinhood_mainnet: {
+      url: process.env.ROBINHOOD_MAINNET_RPC_URL || "",
+      accounts: [process.env.PRIVATE_KEY],
+      chainId: 4663,
     },
     base_sepolia_fire: {
       url: "https://sepolia.base.org",

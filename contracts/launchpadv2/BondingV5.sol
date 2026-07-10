@@ -157,23 +157,39 @@ contract BondingV5 is
         _disableInitializers();
     }
 
-    /// @notice Decode `isFeeDelegation` from optional extension calldata.
-    /// @dev V1 layout: first 32 bytes = `abi.encode(bool isFeeDelegation)` (standard ABI word).
-    ///      Empty `extParams` or length less than 32 ⇒ false. Extra trailing bytes are ignored here so
-    ///      callers can forward-compat append more values after the bool (same encoding rules).
-    ///      Non-canonical bool words (not 0 or 1) ⇒ false.
-    function _decodeIsFeeDelegation(bytes calldata extParams) internal pure returns (bool) {
-        if (extParams.length < 32) {
-            return false;
-        }
-        bytes32 word;
+    /// @notice Validate the `extParams` payload before storing it.
+    /// @dev Supported layouts (length → version):
+    ///        0  bytes → V0: empty, all fields take default values
+    ///        32 bytes → V1: abi.encode(bool isFeeDelegation)
+    ///      Rules for every non-empty version:
+    ///        • Length must be a multiple of 32 (ABI word-aligned).
+    ///        • First word must be a canonical bool (0 or 1).
+    ///      To introduce V2 (e.g. 64 bytes): add the second-word check here and
+    ///      raise the `len > 32` guard to `len > 64`.
+    function _validateExtParams(bytes calldata extParams) internal pure {
+        uint256 len = extParams.length;
+        if (len == 0) return;
+        if (len % 32 != 0) revert InvalidInput();
+
+        uint256 v;
         assembly ("memory-safe") {
-            word := calldataload(extParams.offset)
+            v := calldataload(extParams.offset)
         }
-        uint256 v = uint256(word);
-        if (v == 1) return true;
-        if (v == 0) return false;
-        return false;
+        if (v > 1) revert InvalidInput();
+
+        // Only V1 (32 bytes) is currently defined. Reject any longer payload until V2 is added.
+        if (len > 32) revert InvalidInput();
+    }
+
+    /// @notice Read `isFeeDelegation` from already-validated `extParams`.
+    /// @dev Called only after `_validateExtParams` has passed, so no re-validation needed.
+    function _decodeIsFeeDelegation(bytes calldata extParams) internal pure returns (bool) {
+        if (extParams.length < 32) return false;
+        uint256 v;
+        assembly ("memory-safe") {
+            v := calldataload(extParams.offset)
+        }
+        return v == 1;
     }
 
     function initialize(
@@ -210,6 +226,7 @@ contract BondingV5 is
         bool isProject60days_,
         bytes calldata extParams_
     ) public nonReentrant returns (address, address, uint, uint256) {
+        _validateExtParams(extParams_);
         bool isFeeDelegation_ = _decodeIsFeeDelegation(extParams_);
 
         // Fail-fast: validate reserve bips and calculate bonding curve supply upfront

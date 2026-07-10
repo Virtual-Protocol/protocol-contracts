@@ -450,6 +450,18 @@ module.exports = {
       accounts: [process.env.PRIVATE_KEY],
       chainId: 4663,
     },
+    robinhood_fire: {
+      url: process.env.ROBINHOOD_MAINNET_RPC_URL || "",
+      accounts: [process.env.PRIVATE_KEY],
+      chainId: 4663,
+      fireblocks: {
+        privateKey: process.env.FIREBLOCKS_API_PRIVATE_KEY_PATH,
+        apiKey: process.env.FIREBLOCKS_API_KEY,
+        vaultAccountIds: process.env.FIREBLOCKS_VAULT_ACCOUNT_IDS,
+        chainId: 4663,
+        assetId:"ROBINHOOD",
+      },
+    },
     // X Layer (OKX)
     // Do not fall back to RPC_URL to avoid accidental cross-chain deploys.
     xlayer_testnet: {

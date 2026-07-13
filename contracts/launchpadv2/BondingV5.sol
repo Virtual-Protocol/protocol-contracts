@@ -293,9 +293,11 @@ contract BondingV5 is
         BondingConfig.DeployParams memory configDeployParams = bondingConfig
             .getDeployParams();
 
+        string memory tokenName = string.concat(name_, " by Virtuals");
+
         (address token, uint256 applicationId) = agentFactory
             .createNewAgentTokenAndApplication(
-                name_, // without "fun " prefix
+                tokenName, // without "fun " prefix
                 ticker_,
                 abi.encode(
                     // tokenSupplyParams
@@ -393,7 +395,7 @@ contract BondingV5 is
 
         // Set Data struct fields
         newToken.data.token = token;
-        newToken.data.name = name_;
+        newToken.data.name = tokenName;
         newToken.data._name = name_;
         newToken.data.ticker = ticker_;
         newToken.data.supply = bondingCurveSupply;

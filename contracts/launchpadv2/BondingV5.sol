@@ -157,23 +157,34 @@ contract BondingV5 is
         _disableInitializers();
     }
 
-    /// @notice Decode `isFeeDelegation` from optional extension calldata.
-    /// @dev V1 layout: first 32 bytes = `abi.encode(bool isFeeDelegation)` (standard ABI word).
-    ///      Empty `extParams` or length less than 32 ⇒ false. Extra trailing bytes are ignored here so
-    ///      callers can forward-compat append more values after the bool (same encoding rules).
-    ///      Non-canonical bool words (not 0 or 1) ⇒ false.
-    function _decodeIsFeeDelegation(bytes calldata extParams) internal pure returns (bool) {
+    /// @dev `extParams` first 32-byte word — flags in the LSB (same byte as `abi.encode(bool)`):
+    ///      bit 0: `isFeeDelegation`
+    ///      bit 1: skip `" by Virtuals"` suffix (unset ⇒ append; V1-compatible)
+    ///      Empty `extParams` or length < 32 ⇒ both flags false ⇒ fee delegation off, suffix on.
+    uint256 private constant EXT_PARAMS_FLAG_FEE_DELEGATION = 1;
+    uint256 private constant EXT_PARAMS_FLAG_SKIP_SUFFIX = 2;
+
+    function _loadExtParamsWord(
+        bytes calldata extParams
+    ) internal pure returns (uint256 v) {
         if (extParams.length < 32) {
-            return false;
+            return 0;
         }
-        bytes32 word;
         assembly ("memory-safe") {
-            word := calldataload(extParams.offset)
+            v := calldataload(extParams.offset)
         }
-        uint256 v = uint256(word);
-        if (v == 1) return true;
-        if (v == 0) return false;
-        return false;
+    }
+
+    function _decodeIsFeeDelegation(
+        bytes calldata extParams
+    ) internal pure returns (bool) {
+        return (_loadExtParamsWord(extParams) & EXT_PARAMS_FLAG_FEE_DELEGATION) != 0;
+    }
+
+    function _decodeAppendByVirtualsSuffix(
+        bytes calldata extParams
+    ) internal pure returns (bool) {
+        return (_loadExtParamsWord(extParams) & EXT_PARAMS_FLAG_SKIP_SUFFIX) == 0;
     }
 
     function initialize(
@@ -191,9 +202,8 @@ contract BondingV5 is
         bondingConfig = BondingConfig(bondingConfig_);
     }
 
-    /// @param extParams_ Optional extension payload. V1: `abi.encode(bool isFeeDelegation)`; use
-    ///         `""` (empty) to default `isFeeDelegation` to false. Future versions may use
-    ///         `abi.encode(bool, ...)`; this function only reads the first bool word.
+    /// @param extParams_ Optional extension payload (first 32 bytes). V1: `abi.encode(bool isFeeDelegation)`.
+    ///         V2: set bit 1 of the word to skip `" by Virtuals"` (bit 1 unset ⇒ append). Use `""` for defaults.
     function preLaunch(
         string memory name_,
         string memory ticker_,
@@ -293,7 +303,7 @@ contract BondingV5 is
         BondingConfig.DeployParams memory configDeployParams = bondingConfig
             .getDeployParams();
 
-        string memory tokenName = string.concat(name_, " by Virtuals");
+        string memory tokenName = _decodeAppendByVirtualsSuffix(extParams_) ? string.concat(name_, " by Virtuals") : name_;
 
         (address token, uint256 applicationId) = agentFactory
             .createNewAgentTokenAndApplication(

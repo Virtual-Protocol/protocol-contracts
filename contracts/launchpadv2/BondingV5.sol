@@ -144,6 +144,27 @@ contract BondingV5 is
 
     event FeeDelegationUpdated(address indexed token, bool isFeeDelegation);
 
+    event TokenCreated(
+        uint256 virtualId,
+        address indexed creator,
+        address indexed token,
+        string name,
+        string symbol,
+        uint256 maxSupply,
+        uint256 saleAmount,
+        uint256 graduationThreshold,
+        uint256 initialVirtualLiquidity,
+        uint256 initialPrice,
+        uint256 initialPurchase,
+        address quoteAsset,
+        address pair,
+        string description,
+        string image,
+        BondingConfig.LaunchParams launchParams,
+        uint256 startTime,
+        uint256 startTimeDelay
+    );
+
     error InvalidTokenStatus();
     error InvalidInput();
     error SlippageTooHigh();
@@ -433,6 +454,28 @@ contract BondingV5 is
             tokenInfo[token].virtualId,
             initialPurchase,
             tokenLaunchParams[token]
+        );
+
+        // Net quote target at the graduation threshold (excludes buy tax / anti-sniper fees).
+        emit TokenCreated(
+            tokenInfo[token].virtualId,
+            msg.sender,
+            token,
+            name_,
+            ticker_,
+            configInitialSupply * (10 ** IAgentTokenV4(token).decimals()),
+            bondingCurveSupply,
+            gradThreshold,
+            liquidity * 2,
+            price,
+            initialPurchase,
+            assetToken,
+            pair,
+            desc_,
+            img_,
+            tokenLaunchParams[token],
+            actualStartTime,
+            actualStartTimeDelay
         );
 
         return (token, pair, tokenInfo[token].virtualId, initialPurchase);

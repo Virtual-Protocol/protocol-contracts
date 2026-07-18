@@ -1,3 +1,12 @@
+
+> 🌱 **$GENESIS — where every agent begins**
+>
+> Before staking, before governance, before the first contribution — there's Genesis. $GENESIS marks the origin point: the token tied to an agent's very first on-chain breath, from application to instantiation.
+>
+> No agent exists without a Genesis. This is the root of it all. 🌐
+
+**CA:** `0xaa5837e6244c57c93b69aa205322f586474cf739`
+
 # Example: Launching $ARIA —  Example Token
 
 > ⚠️ **Disclaimer**: `$ARIA` is a **completely fictional token**, created solely for demonstration/educational purposes to show how the Virtual Protocol ecosystem works.

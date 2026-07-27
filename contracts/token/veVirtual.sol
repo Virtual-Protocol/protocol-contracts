@@ -7,6 +7,7 @@ import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/utils/structs/Checkpoints.sol";
 import "@openzeppelin/contracts-upgradeable/governance/utils/VotesUpgradeable.sol";
+import "./IRVirtualConverter.sol";
 
 contract veVirtual is
     Initializable,
@@ -46,6 +47,14 @@ contract veVirtual is
 
     event AdminUnlocked(bool adminUnlocked);
     bool public adminUnlocked;
+
+    address public rVirtualConverter;
+    event RVirtualConverterUpdated(address rVirtualConverter);
+    event ConvertedVeVirtualToRVirtual(
+        address indexed user,
+        uint256 id,
+        uint256 amount
+    );
 
     function initialize(
         address baseToken_,
@@ -297,5 +306,49 @@ contract veVirtual is
             amount += locks[account][i].amount;
         }
         return amount;
+    }
+
+    /**
+     * @notice Set the RVirtualConverter contract that convertVeVirtualToRVirtual() forwards to.
+     */
+    function setRVirtualConverter(
+        address rVirtualConverter_
+    ) external onlyRole(ADMIN_ROLE) {
+        require(rVirtualConverter_ != address(0), "Invalid converter");
+        rVirtualConverter = rVirtualConverter_;
+        emit RVirtualConverterUpdated(rVirtualConverter_);
+    }
+
+    /**
+     * @notice Voluntarily give up a lock's underlying VIRTUAL (and its voting power) in
+     *         exchange for an equal amount of rVirtual. Unlike withdraw(), this does not
+     *         require the lock to be matured - the user is explicitly forfeiting the
+     *         remaining lock time. The lock is deleted regardless of its autoRenew state.
+     * @dev Approves RVirtualConverter for exactly this lock's amount and calls its
+     *      convertVirtualToRVirtual() - the same open entrypoint any wallet can call directly.
+     *      There is no veVirtual-specific path on the converter side.
+     */
+    function convertVeVirtualToRVirtual(uint256 id) external nonReentrant {
+        require(rVirtualConverter != address(0), "Converter not set");
+        address account = _msgSender();
+        uint256 index = _indexOf(account, id);
+        Lock memory lock = locks[account][index];
+
+        uint256 amount = lock.amount;
+
+        uint256 lastIndex = locks[account].length - 1;
+        if (index != lastIndex) {
+            locks[account][index] = locks[account][lastIndex];
+        }
+        locks[account].pop();
+
+        IERC20(baseToken).approve(rVirtualConverter, amount);
+        IRVirtualConverter(rVirtualConverter).convertVirtualToRVirtual(
+            amount,
+            account
+        );
+
+        emit ConvertedVeVirtualToRVirtual(account, id, amount);
+        _transferVotingUnits(account, address(0), amount);
     }
 }

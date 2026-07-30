@@ -113,6 +113,51 @@ describe("RVirtualConverter", function () {
     });
   });
 
+  describe("delivery verification (M-01 fix)", function () {
+    let taxedRVirtual, taxedConverter;
+
+    beforeEach(async function () {
+      // 10% fee-on-transfer token standing in for a taxed rVirtual configuration.
+      taxedRVirtual = await ethers.deployContract("FeeOnTransferMock", [
+        "rVirtual",
+        "rVIRTUAL",
+        deployer.address,
+        parseEther("1000000000"),
+        1000, // 10% fee
+        other.address, // fee sink
+      ]);
+
+      const Converter = await ethers.getContractFactory("RVirtualConverter");
+      taxedConverter = await upgrades.deployProxy(Converter, [
+        virtual.target,
+        taxedRVirtual.target,
+      ]);
+      await taxedRVirtual.transfer(taxedConverter.target, parseEther("10000"));
+
+      await virtual.connect(user).approve(taxedConverter.target, parseEther("1000"));
+    });
+
+    it("should revert the whole conversion instead of silently under-delivering", async function () {
+      await expect(
+        taxedConverter.connect(user).convertVirtualToRVirtual(parseEther("100"), user.address)
+      ).to.be.revertedWith("rVirtual delivery mismatch");
+
+      // Both legs must have unwound - caller keeps their VIRTUAL, receives no rVirtual.
+      expect(await virtual.balanceOf(user.address)).to.be.equal(parseEther("1000"));
+      expect(await taxedRVirtual.balanceOf(user.address)).to.be.equal(0);
+    });
+
+    it("should still succeed and emit the exact delivered amount for a non-taxed token", async function () {
+      await expect(
+        converter.connect(user).convertVirtualToRVirtual(parseEther("100"), user.address)
+      )
+        .to.emit(converter, "ConvertedVirtualToRVirtual")
+        .withArgs(user.address, user.address, parseEther("100"));
+
+      expect(await rVirtual.balanceOf(user.address)).to.be.equal(parseEther("100"));
+    });
+  });
+
   describe("withdrawVirtual", function () {
     beforeEach(async function () {
       await converter.setAdminWallet(adminWallet.address);

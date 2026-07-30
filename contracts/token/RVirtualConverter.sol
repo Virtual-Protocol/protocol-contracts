@@ -67,9 +67,13 @@ contract RVirtualConverter is
             address(this),
             amount
         );
-        IERC20(rVirtualToken).safeTransfer(rVirtualReceiver, amount);
 
-        emit ConvertedVirtualToRVirtual(_msgSender(), rVirtualReceiver, amount);
+        uint256 balanceBefore = IERC20(rVirtualToken).balanceOf(rVirtualReceiver);
+        IERC20(rVirtualToken).safeTransfer(rVirtualReceiver, amount);
+        uint256 delivered = IERC20(rVirtualToken).balanceOf(rVirtualReceiver) - balanceBefore;
+        require(delivered == amount, "rVirtual delivery mismatch");
+
+        emit ConvertedVirtualToRVirtual(_msgSender(), rVirtualReceiver, delivered);
     }
 
     function setAdminWallet(address adminWallet_) external onlyRole(ADMIN_ROLE) {

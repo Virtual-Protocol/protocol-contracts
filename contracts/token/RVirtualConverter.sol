@@ -26,11 +26,12 @@ contract RVirtualConverter is
 
     address public virtualToken;
     address public rVirtualToken;
-    address public adminWallet;
     /// @notice Treasury multisig that every conversion's incoming VIRTUAL is sent to
     ///         directly. Set once at initialize() and never changed at runtime - VIRTUAL
     ///         is never custodied by this contract, so there is no accumulated balance
-    ///         for a compromised or malicious admin key to sweep (see audit L-02).
+    ///         for a compromised or malicious admin key to sweep (see audit L-02). This
+    ///         is also why there is no adminWallet/withdrawVirtual() sweep mechanism here
+    ///         anymore (see audit I-06) - there is nothing left for it to sweep.
     address public treasury;
 
     event ConvertedVirtualToRVirtual(
@@ -38,11 +39,6 @@ contract RVirtualConverter is
         address indexed rVirtualReceiver,
         uint256 amount
     );
-    event AdminWalletUpdated(
-        address indexed previousAdminWallet,
-        address indexed newAdminWallet
-    );
-    event VirtualWithdrawn(address adminWallet, uint256 amount);
 
     function initialize(
         address virtualToken_,
@@ -92,22 +88,6 @@ contract RVirtualConverter is
         require(delivered == amount, "rVirtual delivery mismatch");
 
         emit ConvertedVirtualToRVirtual(_msgSender(), rVirtualReceiver, delivered);
-    }
-
-    function setAdminWallet(address adminWallet_) external onlyRole(ADMIN_ROLE) {
-        require(adminWallet_ != address(0), "Invalid admin wallet");
-        address previousAdminWallet = adminWallet;
-        adminWallet = adminWallet_;
-        emit AdminWalletUpdated(previousAdminWallet, adminWallet_);
-    }
-
-    /// @notice Withdraw accumulated VIRTUAL out of this contract. Only VIRTUAL - there is
-    ///         intentionally no withdrawal path for rVirtual or any other token here, so
-    ///         adminWallet is never exposed to rVirtual's transfer tax.
-    function withdrawVirtual(uint256 amount) external nonReentrant {
-        require(_msgSender() == adminWallet, "Only admin wallet");
-        IERC20(virtualToken).safeTransfer(adminWallet, amount);
-        emit VirtualWithdrawn(adminWallet, amount);
     }
 
     function _authorizeUpgrade(

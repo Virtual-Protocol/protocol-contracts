@@ -9,10 +9,10 @@ const { parseEther } = ethers;
 
 describe("RVirtualConverter", function () {
   let virtual, rVirtual, converter;
-  let deployer, user, other, adminWallet, treasury;
+  let deployer, user, other, treasury;
 
   before(async function () {
-    [deployer, user, other, adminWallet, treasury] = await ethers.getSigners();
+    [deployer, user, other, treasury] = await ethers.getSigners();
   });
 
   beforeEach(async function () {
@@ -195,63 +195,13 @@ describe("RVirtualConverter", function () {
     });
   });
 
-  describe("setAdminWallet events (L-10 fix)", function () {
-    it("should emit both the previous and new admin wallet, indexed", async function () {
-      await expect(converter.setAdminWallet(adminWallet.address))
-        .to.emit(converter, "AdminWalletUpdated")
-        .withArgs(ethers.ZeroAddress, adminWallet.address);
-
-      await expect(converter.setAdminWallet(other.address))
-        .to.emit(converter, "AdminWalletUpdated")
-        .withArgs(adminWallet.address, other.address);
-    });
-  });
-
-  describe("withdrawVirtual", function () {
-    beforeEach(async function () {
-      await converter.setAdminWallet(adminWallet.address);
-      // VIRTUAL no longer accumulates in the converter via conversions (see L-02 fix
-      // above) - donate directly so withdrawVirtual's own mechanics can still be
-      // exercised in isolation.
-      await virtual.transfer(converter.target, parseEther("100"));
-    });
-
-    it("should allow only adminWallet to withdraw the accumulated VIRTUAL", async function () {
-      await expect(
-        converter.connect(adminWallet).withdrawVirtual(parseEther("100"))
-      )
-        .to.emit(converter, "VirtualWithdrawn")
-        .withArgs(adminWallet.address, parseEther("100"));
-
-      expect(await virtual.balanceOf(adminWallet.address)).to.be.equal(parseEther("100"));
-      expect(await virtual.balanceOf(converter.target)).to.be.equal(0);
-    });
-
-    it("should allow withdrawing up to the full current balance, no reserve floor", async function () {
-      const full = await virtual.balanceOf(converter.target);
-      await expect(converter.connect(adminWallet).withdrawVirtual(full)).to.not.be.reverted;
-      expect(await virtual.balanceOf(converter.target)).to.be.equal(0);
-    });
-
-    it("should reject withdrawal from anyone other than adminWallet", async function () {
-      await expect(
-        converter.connect(user).withdrawVirtual(parseEther("100"))
-      ).to.be.revertedWith("Only admin wallet");
-      await expect(
-        converter.connect(deployer).withdrawVirtual(parseEther("100"))
-      ).to.be.revertedWith("Only admin wallet");
-    });
-
-    it("should reject non-admin-role setting of adminWallet", async function () {
-      await expect(
-        converter.connect(user).setAdminWallet(other.address)
-      ).to.be.reverted;
-    });
-  });
-
-  it("should provide no path to withdraw rVirtual or any other token", async function () {
-    // The contract intentionally only exposes withdrawVirtual() - there is no generic
-    // rescue/withdraw function for rVirtual or arbitrary tokens.
+  it("should provide no VIRTUAL/rVirtual sweep mechanism at all (I-06 fix)", async function () {
+    // withdrawVirtual()/adminWallet/setAdminWallet were removed entirely once L-02's
+    // treasury routing made them unnecessary - VIRTUAL is never custodied by this
+    // contract, so there is nothing left for an admin-controlled sweep to reach.
+    expect(converter.withdrawVirtual).to.be.undefined;
+    expect(converter.setAdminWallet).to.be.undefined;
+    expect(converter.adminWallet).to.be.undefined;
     expect(converter.withdrawRVirtual).to.be.undefined;
     expect(converter.rescueToken).to.be.undefined;
     expect(converter.recoverToken).to.be.undefined;

@@ -207,6 +207,17 @@ describe("RVirtualConverter", function () {
     expect(converter.recoverToken).to.be.undefined;
   });
 
+  describe("_disableInitializers on implementation (L-12 fix)", function () {
+    it("should reject calling initialize() directly on the raw implementation contract", async function () {
+      const implAddress = await upgrades.erc1967.getImplementationAddress(converter.target);
+      const implementation = await ethers.getContractAt("RVirtualConverter", implAddress);
+
+      await expect(
+        implementation.initialize(virtual.target, rVirtual.target, treasury.address)
+      ).to.be.reverted;
+    });
+  });
+
   describe("UUPS upgradeability", function () {
     it("should upgrade to V2, run new code, upgrade back to V1, and end up with identical bytecode", async function () {
       const implBefore = await upgrades.erc1967.getImplementationAddress(converter.target);

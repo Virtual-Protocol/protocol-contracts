@@ -34,6 +34,11 @@ contract RVirtualConverter is
     ///         anymore (see audit I-06) - there is nothing left for it to sweep.
     address public treasury;
 
+    /// @custom:oz-upgrades-unsafe-allow constructor
+    constructor() {
+        _disableInitializers();
+    }
+
     event ConvertedVirtualToRVirtual(
         address indexed caller,
         address indexed rVirtualReceiver,

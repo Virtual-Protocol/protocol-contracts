@@ -25,6 +25,13 @@ describe("veVIRTUAL", function () {
     veVirtual = await upgrades.deployProxy(Contract, [virtual.target, 104]);
   });
 
+  it("should reject calling initialize() directly on the raw implementation contract (L-12 fix)", async function () {
+    const implAddress = await upgrades.erc1967.getImplementationAddress(veVirtual.target);
+    const implementation = await ethers.getContractAt("veVirtual", implAddress);
+
+    await expect(implementation.initialize(virtual.target, 104)).to.be.reverted;
+  });
+
   it("should allow staking", async function () {
     await virtual.transfer(staker.address, parseEther("1000"));
 

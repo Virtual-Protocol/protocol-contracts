@@ -35,6 +35,11 @@ contract veVirtual is
 
     uint8 public maxWeeks;
 
+    /// @custom:oz-upgrades-unsafe-allow constructor
+    constructor() {
+        _disableInitializers();
+    }
+
     event Stake(
         address indexed user,
         uint256 id,

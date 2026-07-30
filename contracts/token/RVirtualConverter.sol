@@ -38,7 +38,10 @@ contract RVirtualConverter is
         address indexed rVirtualReceiver,
         uint256 amount
     );
-    event AdminWalletUpdated(address adminWallet);
+    event AdminWalletUpdated(
+        address indexed previousAdminWallet,
+        address indexed newAdminWallet
+    );
     event VirtualWithdrawn(address adminWallet, uint256 amount);
 
     function initialize(
@@ -93,8 +96,9 @@ contract RVirtualConverter is
 
     function setAdminWallet(address adminWallet_) external onlyRole(ADMIN_ROLE) {
         require(adminWallet_ != address(0), "Invalid admin wallet");
+        address previousAdminWallet = adminWallet;
         adminWallet = adminWallet_;
-        emit AdminWalletUpdated(adminWallet_);
+        emit AdminWalletUpdated(previousAdminWallet, adminWallet_);
     }
 
     /// @notice Withdraw accumulated VIRTUAL out of this contract. Only VIRTUAL - there is

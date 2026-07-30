@@ -195,6 +195,18 @@ describe("RVirtualConverter", function () {
     });
   });
 
+  describe("setAdminWallet events (L-10 fix)", function () {
+    it("should emit both the previous and new admin wallet, indexed", async function () {
+      await expect(converter.setAdminWallet(adminWallet.address))
+        .to.emit(converter, "AdminWalletUpdated")
+        .withArgs(ethers.ZeroAddress, adminWallet.address);
+
+      await expect(converter.setAdminWallet(other.address))
+        .to.emit(converter, "AdminWalletUpdated")
+        .withArgs(adminWallet.address, other.address);
+    });
+  });
+
   describe("withdrawVirtual", function () {
     beforeEach(async function () {
       await converter.setAdminWallet(adminWallet.address);

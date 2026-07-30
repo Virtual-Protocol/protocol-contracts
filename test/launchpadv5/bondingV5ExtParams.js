@@ -44,12 +44,20 @@ function encodeFlags(opts) {
   return ethers.AbiCoder.defaultAbiCoder().encode(["uint256"], [buildFlags(opts)]);
 }
 
-/** Flags + trailing recipient: abi.encode(uint256 flags, bytes recipient). */
-function encodeFlagsWithRecipient(opts, recipientBytes) {
+/** Flags + trailing recipient: abi.encode(uint256 flags, bytes32 recipient). */
+function encodeFlagsWithRecipient(opts, recipient32) {
   return ethers.AbiCoder.defaultAbiCoder().encode(
-    ["uint256", "bytes"],
-    [buildFlags(opts), recipientBytes]
+    ["uint256", "bytes32"],
+    [buildFlags(opts), recipient32]
   );
+}
+
+/** Recipient as a right-aligned integer in bytes32, matching the contract wire. */
+function addressToRecipient32(addr) {
+  return ethers.zeroPadValue(addr, 32); // uint160, right-aligned
+}
+function twitterIdToRecipient32(id) {
+  return ethers.toBeHex(BigInt(id), 32); // uint64, right-aligned
 }
 
 /** Legacy V1 encoding: abi.encode(bool isFeeDelegation). */
@@ -118,7 +126,9 @@ describe("BondingV5 extParams — v3 launch settings (robotics + fee delegation)
     expect(await bondingV5.isFeeDelegation(tokenAddress)).to.equal(false);
     expect(await bondingV5.isRobotics(tokenAddress)).to.equal(false);
     expect(await bondingV5.feeDelegationType(tokenAddress)).to.equal(0);
-    expect(await bondingV5.feeDelegationRecipient(tokenAddress)).to.equal("0x");
+    expect(await bondingV5.feeDelegationRecipient(tokenAddress)).to.equal(
+      ethers.ZeroHash
+    );
   });
 
   it("keeps legacy abi.encode(bool) working with new fields defaulted", async function () {
@@ -128,7 +138,9 @@ describe("BondingV5 extParams — v3 launch settings (robotics + fee delegation)
     expect(await bondingV5.isFeeDelegation(tokenAddress)).to.equal(true);
     expect(await bondingV5.isRobotics(tokenAddress)).to.equal(false);
     expect(await bondingV5.feeDelegationType(tokenAddress)).to.equal(0);
-    expect(await bondingV5.feeDelegationRecipient(tokenAddress)).to.equal("0x");
+    expect(await bondingV5.feeDelegationRecipient(tokenAddress)).to.equal(
+      ethers.ZeroHash
+    );
   });
 
   it("decodes isRobotics from bit 2", async function () {
@@ -146,11 +158,12 @@ describe("BondingV5 extParams — v3 launch settings (robotics + fee delegation)
     const recipient = ethers.getAddress(
       "0x00000000000000000000000000000000000000aa"
     );
-    const recipientBytes = ethers.hexlify(ethers.getBytes(recipient));
+    // Address stored as a right-aligned uint160 in bytes32.
+    const recipient32 = addressToRecipient32(recipient);
 
     const extParams = encodeFlagsWithRecipient(
       { isFeeDelegation: true, feeDelegationType: FEE_DELEGATION_TYPE_ADDRESS },
-      recipientBytes
+      recipient32
     );
     const { tokenAddress } = await preLaunchWithExtParams(extParams);
 
@@ -158,43 +171,42 @@ describe("BondingV5 extParams — v3 launch settings (robotics + fee delegation)
     expect(await bondingV5.feeDelegationType(tokenAddress)).to.equal(
       FEE_DELEGATION_TYPE_ADDRESS
     );
-    expect(await bondingV5.feeDelegationRecipient(tokenAddress)).to.equal(
-      recipientBytes
-    );
+    const stored = await bondingV5.feeDelegationRecipient(tokenAddress);
+    expect(stored).to.equal(recipient32);
+    // The address is recoverable from the low 20 bytes.
+    expect(ethers.getAddress(ethers.dataSlice(stored, 12, 32))).to.equal(recipient);
   });
 
-  it("stores raw twitter id bytes as fee delegation recipient", async function () {
+  it("stores twitter id as a right-aligned uint64 recipient", async function () {
     const { bondingV5 } = contracts;
     const twitterId = "1234567890";
-    const recipientBytes = ethers.hexlify(ethers.toUtf8Bytes(twitterId));
+    const recipient32 = twitterIdToRecipient32(twitterId);
 
     const extParams = encodeFlagsWithRecipient(
       { isFeeDelegation: true, feeDelegationType: FEE_DELEGATION_TYPE_TWITTER },
-      recipientBytes
+      recipient32
     );
     const { tokenAddress } = await preLaunchWithExtParams(extParams);
 
     expect(await bondingV5.feeDelegationType(tokenAddress)).to.equal(
       FEE_DELEGATION_TYPE_TWITTER
     );
-    expect(await bondingV5.feeDelegationRecipient(tokenAddress)).to.equal(
-      recipientBytes
-    );
-    expect(ethers.toUtf8String(await bondingV5.feeDelegationRecipient(tokenAddress))).to.equal(
-      twitterId
-    );
+    const stored = await bondingV5.feeDelegationRecipient(tokenAddress);
+    expect(stored).to.equal(recipient32);
+    // The numeric id is recovered by reading the word as an integer.
+    expect(BigInt(stored).toString()).to.equal(twitterId);
   });
 
   it("emits PreLaunchExtParams with the decoded settings", async function () {
     const { bondingV5, virtualToken } = contracts;
-    const recipientBytes = ethers.hexlify(ethers.toUtf8Bytes("42"));
+    const recipient32 = twitterIdToRecipient32("42");
     const extParams = encodeFlagsWithRecipient(
       {
         isFeeDelegation: true,
         isRobotics: true,
         feeDelegationType: FEE_DELEGATION_TYPE_TWITTER,
       },
-      recipientBytes
+      recipient32
     );
 
     await virtualToken
@@ -229,7 +241,7 @@ describe("BondingV5 extParams — v3 launch settings (robotics + fee delegation)
         true,
         true,
         FEE_DELEGATION_TYPE_TWITTER,
-        recipientBytes
+        recipient32
       );
   });
 });

@@ -127,11 +127,12 @@ contract BondingV5 is
     ///         (decoded from bits 3-4 of the `extParams_` flags word).
     mapping(address => uint8) public feeDelegationType;
 
-    /// @notice Raw fee delegation recipient bytes from the `extParams_` trailing segment:
-    ///         a 20-byte address for type 1; the raw twitter account id bytes for type 2
-    ///         (the recipient vault is only created just before `launch`). Empty when no delegation.
+    /// @notice Fee delegation recipient from the `extParams_` trailing word, stored as a fixed
+    ///         `bytes32` right-aligned integer: the recipient address as `uint160` for type 1, or
+    ///         the twitter account id as `uint64` for type 2 (the vault is only created just before
+    ///         `launch`). `bytes32(0)` when no delegation. Fixed-size to save gas vs dynamic bytes.
     /// @dev MUST remain the last state variable (append-only layout).
-    mapping(address => bytes) public feeDelegationRecipient;
+    mapping(address => bytes32) public feeDelegationRecipient;
 
     event PreLaunched(
         address indexed token,
@@ -164,7 +165,7 @@ contract BondingV5 is
         bool isFeeDelegation,
         bool isRobotics,
         uint8 feeDelegationType,
-        bytes feeDelegationRecipient
+        bytes32 feeDelegationRecipient
     );
 
     error InvalidTokenStatus();
@@ -190,11 +191,13 @@ contract BondingV5 is
     ///        bits 3-4: `feeDelegationType` (0 = none, 1 = address, 2 = twitter)
     ///        remaining bits: reserved = 0, available for future flags/enums.
     ///
-    ///      Trailing segment (`extParams[32:]`, present only when needed) carries the variable-length
-    ///      `feeDelegationRecipient`, ABI-encoded as `abi.encode(uint256 flags, bytes recipient)`:
-    ///        - type 1 (address): the 20-byte recipient address
-    ///        - type 2 (twitter): the raw twitter account id bytes
-    ///      Future variable-length fields are appended after this and decoded defensively by length.
+    ///      Trailing word (`extParams[32:64]`, present only when needed) carries the
+    ///      `feeDelegationRecipient` as a fixed `bytes32`, ABI-encoded as
+    ///      `abi.encode(uint256 flags, bytes32 recipient)` with the recipient a right-aligned integer:
+    ///        - type 1 (address): the recipient address as `uint160`
+    ///        - type 2 (twitter): the twitter account id as `uint64`
+    ///      The recipient is opaque to this contract (stored/emitted as-is); off-chain decodes by type.
+    ///      Future fields are appended after this word and decoded defensively by length.
     ///
     ///      Rules that MUST hold for every future change:
     ///        - Never repurpose or move an existing bit/offset (bit 0 / bit 1 semantics are frozen).
@@ -249,18 +252,19 @@ contract BondingV5 is
             );
     }
 
-    /// @dev Reads the trailing `feeDelegationRecipient` bytes when present. Length-gated so legacy
-    ///      flags-only payloads (length ⇐ 32) and future longer payloads both decode safely; extra
-    ///      trailing tuple elements added later do not affect this decode.
+    /// @dev Reads the trailing `feeDelegationRecipient` word (2nd word of
+    ///      `abi.encode(uint256 flags, bytes32 recipient)`) when present. Length-gated so legacy
+    ///      flags-only payloads (length < 64) return `bytes32(0)`, and future longer payloads
+    ///      (extra words appended after the recipient) still decode this word safely.
     function _decodeFeeDelegationRecipient(
         bytes calldata extParams
-    ) internal pure returns (bytes memory) {
-        // abi.encode(uint256, bytes) is at least 3 words (flags + offset + length).
-        if (extParams.length < 96) {
-            return "";
+    ) internal pure returns (bytes32 recipient) {
+        if (extParams.length < 64) {
+            return bytes32(0);
         }
-        (, bytes memory recipient) = abi.decode(extParams, (uint256, bytes));
-        return recipient;
+        assembly ("memory-safe") {
+            recipient := calldataload(add(extParams.offset, 32))
+        }
     }
 
     function initialize(
@@ -485,7 +489,7 @@ contract BondingV5 is
         // Decode and store the extended launch settings so on-chain is the source of truth.
         bool isRobotics_ = _decodeIsRobotics(extParams_);
         uint8 feeDelegationType_ = _decodeFeeDelegationType(extParams_);
-        bytes memory feeDelegationRecipient_ = _decodeFeeDelegationRecipient(extParams_);
+        bytes32 feeDelegationRecipient_ = _decodeFeeDelegationRecipient(extParams_);
         isRobotics[token] = isRobotics_;
         feeDelegationType[token] = feeDelegationType_;
         feeDelegationRecipient[token] = feeDelegationRecipient_;

@@ -9,10 +9,10 @@ const { parseEther } = ethers;
 
 describe("RVirtualConverter", function () {
   let virtual, rVirtual, converter;
-  let deployer, user, other, adminWallet;
+  let deployer, user, other, adminWallet, treasury;
 
   before(async function () {
-    [deployer, user, other, adminWallet] = await ethers.getSigners();
+    [deployer, user, other, adminWallet, treasury] = await ethers.getSigners();
   });
 
   beforeEach(async function () {
@@ -31,6 +31,7 @@ describe("RVirtualConverter", function () {
     converter = await upgrades.deployProxy(Converter, [
       virtual.target,
       rVirtual.target,
+      treasury.address,
     ]);
 
     // Pre-fund the converter with rVirtual liquidity for these tests (production pre-funds
@@ -51,7 +52,10 @@ describe("RVirtualConverter", function () {
         .withArgs(user.address, user.address, parseEther("100"));
 
       expect(await virtual.balanceOf(user.address)).to.be.equal(parseEther("900"));
-      expect(await virtual.balanceOf(converter.target)).to.be.equal(parseEther("100"));
+      // Incoming VIRTUAL is routed straight to the treasury (L-02 fix) - the converter
+      // itself never custodies any VIRTUAL.
+      expect(await virtual.balanceOf(converter.target)).to.be.equal(0);
+      expect(await virtual.balanceOf(treasury.address)).to.be.equal(parseEther("100"));
       expect(await rVirtual.balanceOf(user.address)).to.be.equal(parseEther("100"));
     });
 
@@ -131,6 +135,7 @@ describe("RVirtualConverter", function () {
       taxedConverter = await upgrades.deployProxy(Converter, [
         virtual.target,
         taxedRVirtual.target,
+        treasury.address,
       ]);
       await taxedRVirtual.transfer(taxedConverter.target, parseEther("10000"));
 
@@ -158,10 +163,34 @@ describe("RVirtualConverter", function () {
     });
   });
 
+  describe("treasury routing (L-02 fix)", function () {
+    it("should reject a zero-address treasury at initialize", async function () {
+      const Converter = await ethers.getContractFactory("RVirtualConverter");
+      await expect(
+        upgrades.deployProxy(Converter, [
+          virtual.target,
+          rVirtual.target,
+          ethers.ZeroAddress,
+        ])
+      ).to.be.revertedWith("Invalid treasury");
+    });
+
+    it("should route every conversion's incoming VIRTUAL straight to treasury, never the converter", async function () {
+      await converter.connect(user).convertVirtualToRVirtual(parseEther("30"), user.address);
+      await converter.connect(user).convertVirtualToRVirtual(parseEther("20"), other.address);
+
+      expect(await virtual.balanceOf(treasury.address)).to.be.equal(parseEther("50"));
+      expect(await virtual.balanceOf(converter.target)).to.be.equal(0);
+    });
+  });
+
   describe("withdrawVirtual", function () {
     beforeEach(async function () {
       await converter.setAdminWallet(adminWallet.address);
-      await converter.connect(user).convertVirtualToRVirtual(parseEther("100"), user.address);
+      // VIRTUAL no longer accumulates in the converter via conversions (see L-02 fix
+      // above) - donate directly so withdrawVirtual's own mechanics can still be
+      // exercised in isolation.
+      await virtual.transfer(converter.target, parseEther("100"));
     });
 
     it("should allow only adminWallet to withdraw the accumulated VIRTUAL", async function () {

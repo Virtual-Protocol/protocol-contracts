@@ -27,6 +27,11 @@ contract RVirtualConverter is
     address public virtualToken;
     address public rVirtualToken;
     address public adminWallet;
+    /// @notice Treasury multisig that every conversion's incoming VIRTUAL is sent to
+    ///         directly. Set once at initialize() and never changed at runtime - VIRTUAL
+    ///         is never custodied by this contract, so there is no accumulated balance
+    ///         for a compromised or malicious admin key to sweep (see audit L-02).
+    address public treasury;
 
     event ConvertedVirtualToRVirtual(
         address indexed caller,
@@ -38,7 +43,8 @@ contract RVirtualConverter is
 
     function initialize(
         address virtualToken_,
-        address rVirtualToken_
+        address rVirtualToken_,
+        address treasury_
     ) external initializer {
         __ReentrancyGuard_init();
         __AccessControl_init();
@@ -46,6 +52,7 @@ contract RVirtualConverter is
 
         require(virtualToken_ != address(0), "Invalid virtual token");
         require(rVirtualToken_ != address(0), "Invalid rVirtual token");
+        require(treasury_ != address(0), "Invalid treasury");
         // NOTE (audit M-02): the 1:1 conversion below is a raw-integer transfer with no
         // decimals rescaling. This is safe only because VIRTUAL and rVirtual are both
         // guaranteed by protocol design to use 18 decimals - if either token is ever
@@ -54,6 +61,7 @@ contract RVirtualConverter is
         // it in here.
         virtualToken = virtualToken_;
         rVirtualToken = rVirtualToken_;
+        treasury = treasury_;
 
         _grantRole(DEFAULT_ADMIN_ROLE, _msgSender());
         _grantRole(ADMIN_ROLE, _msgSender());
@@ -70,7 +78,7 @@ contract RVirtualConverter is
 
         IERC20(virtualToken).safeTransferFrom(
             _msgSender(),
-            address(this),
+            treasury,
             amount
         );
 

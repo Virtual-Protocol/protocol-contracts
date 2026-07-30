@@ -10,10 +10,10 @@ const { time } = require("@nomicfoundation/hardhat-network-helpers");
 
 describe("veVIRTUAL - convertVeVirtualToRVirtual", function () {
   let virtual, rVirtual, veVirtual, converter;
-  let deployer, staker, staker2, other;
+  let deployer, staker, staker2, other, treasury;
 
   before(async function () {
-    [deployer, staker, staker2, other] = await ethers.getSigners();
+    [deployer, staker, staker2, other, treasury] = await ethers.getSigners();
   });
 
   beforeEach(async function () {
@@ -35,6 +35,7 @@ describe("veVIRTUAL - convertVeVirtualToRVirtual", function () {
     converter = await upgrades.deployProxy(ConverterContract, [
       virtual.target,
       rVirtual.target,
+      treasury.address,
     ]);
     await rVirtual.transfer(converter.target, parseEther("1000000000"));
 
@@ -78,7 +79,9 @@ describe("veVIRTUAL - convertVeVirtualToRVirtual", function () {
       expect(await veVirtual.numPositions(staker.address)).to.be.equal(0);
       expect(await veVirtual.balanceOf(staker.address)).to.be.equal(0);
       expect(await rVirtual.balanceOf(staker.address)).to.be.equal(parseEther("100"));
-      expect(await virtual.balanceOf(converter.target)).to.be.equal(parseEther("100"));
+      // Incoming VIRTUAL is routed straight to treasury (L-02 fix), never held by the converter.
+      expect(await virtual.balanceOf(converter.target)).to.be.equal(0);
+      expect(await virtual.balanceOf(treasury.address)).to.be.equal(parseEther("100"));
     });
 
     it("should also convert an already-matured lock", async function () {

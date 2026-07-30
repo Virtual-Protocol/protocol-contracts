@@ -342,7 +342,7 @@ contract veVirtual is
         }
         locks[account].pop();
 
-        IERC20(baseToken).approve(rVirtualConverter, amount);
+        IERC20(baseToken).forceApprove(rVirtualConverter, amount);
         IRVirtualConverter(rVirtualConverter).convertVirtualToRVirtual(
             amount,
             account

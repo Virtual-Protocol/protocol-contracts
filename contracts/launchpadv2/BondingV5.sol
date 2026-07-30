@@ -209,7 +209,9 @@ contract BondingV5 is
     uint256 private constant EXT_PARAMS_FLAG_FEE_DELEGATION = 1;
     uint256 private constant EXT_PARAMS_FLAG_SKIP_SUFFIX = 2;
     uint256 private constant EXT_PARAMS_FLAG_ROBOTICS = 4; // bit 2
-    uint256 private constant EXT_PARAMS_FEE_DELEGATION_TYPE_SHIFT = 3; // bits 3-4
+    // `feeDelegationType` occupies bits 3-4 of the flags word: shift right by 3 to bring
+    // those bits down, then mask with 0x3 (2 bits) to isolate them (0 = none, 1 = address, 2 = twitter).
+    uint256 private constant EXT_PARAMS_FEE_DELEGATION_TYPE_SHIFT = 3;
     uint256 private constant EXT_PARAMS_FEE_DELEGATION_TYPE_MASK = 0x3;
 
     function _loadExtParamsWord(

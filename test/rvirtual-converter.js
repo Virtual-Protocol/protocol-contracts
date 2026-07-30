@@ -175,6 +175,17 @@ describe("RVirtualConverter", function () {
       ).to.be.revertedWith("Invalid treasury");
     });
 
+    it("should reject virtualToken and rVirtualToken being the same address (L-09 fix)", async function () {
+      const Converter = await ethers.getContractFactory("RVirtualConverter");
+      await expect(
+        upgrades.deployProxy(Converter, [
+          virtual.target,
+          virtual.target,
+          treasury.address,
+        ])
+      ).to.be.revertedWith("Tokens must differ");
+    });
+
     it("should route every conversion's incoming VIRTUAL straight to treasury, never the converter", async function () {
       await converter.connect(user).convertVirtualToRVirtual(parseEther("30"), user.address);
       await converter.connect(user).convertVirtualToRVirtual(parseEther("20"), other.address);

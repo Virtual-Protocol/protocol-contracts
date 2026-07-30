@@ -315,6 +315,10 @@ contract veVirtual is
         address rVirtualConverter_
     ) external onlyRole(ADMIN_ROLE) {
         require(rVirtualConverter_ != address(0), "Invalid converter");
+        require(
+            IRVirtualConverter(rVirtualConverter_).virtualToken() == baseToken,
+            "Converter token mismatch"
+        );
         rVirtualConverter = rVirtualConverter_;
         emit RVirtualConverterUpdated(rVirtualConverter_);
     }

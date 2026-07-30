@@ -58,6 +58,21 @@ describe("veVIRTUAL - convertVeVirtualToRVirtual", function () {
     ).to.be.reverted;
   });
 
+  it("should reject a converter whose virtualToken doesn't match veVirtual's baseToken (L-09 fix)", async function () {
+    // A converter wired up with a DIFFERENT token as its virtualToken (e.g. rVirtual
+    // itself, standing in for any mismatched deployment).
+    const ConverterContract = await ethers.getContractFactory("RVirtualConverter");
+    const mismatchedConverter = await upgrades.deployProxy(ConverterContract, [
+      rVirtual.target,
+      virtual.target,
+      other.address,
+    ]);
+
+    await expect(
+      veVirtual.setRVirtualConverter(mismatchedConverter.target)
+    ).to.be.revertedWith("Converter token mismatch");
+  });
+
   describe("with rVirtualConverter configured", function () {
     beforeEach(async function () {
       await veVirtual.setRVirtualConverter(converter.target);
@@ -178,7 +193,9 @@ describe("veVIRTUAL - convertVeVirtualToRVirtual", function () {
     it("should overwrite (not error on) a stale nonzero allowance toward a no-op converter", async function () {
       // A no-op converter never pulls the approved VIRTUAL, so the allowance from the
       // FIRST conversion call is left standing at the full lock amount.
-      const noOpConverter = await ethers.deployContract("NoOpConverterMock");
+      const noOpConverter = await ethers.deployContract("NoOpConverterMock", [
+        virtual.target,
+      ]);
       await veVirtual.setRVirtualConverter(noOpConverter.target);
 
       await veVirtual.connect(staker).stake(parseEther("100"), 52, false);

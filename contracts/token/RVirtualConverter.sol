@@ -46,6 +46,12 @@ contract RVirtualConverter is
 
         require(virtualToken_ != address(0), "Invalid virtual token");
         require(rVirtualToken_ != address(0), "Invalid rVirtual token");
+        // NOTE (audit M-02): the 1:1 conversion below is a raw-integer transfer with no
+        // decimals rescaling. This is safe only because VIRTUAL and rVirtual are both
+        // guaranteed by protocol design to use 18 decimals - if either token is ever
+        // redeployed/migrated to a different decimals value, this invariant must be
+        // re-verified (or an explicit decimals() equivalence check added) before wiring
+        // it in here.
         virtualToken = virtualToken_;
         rVirtualToken = rVirtualToken_;
 

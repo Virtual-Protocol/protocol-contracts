@@ -114,10 +114,24 @@ contract BondingV5 is
     /// @notice Raw `extParams_` from `preLaunch` (per agent token). Backend can read as canonical payload; not updated by `setFeeDelegation`.
     mapping(address => bytes) public tokenPreLaunchExtParams;
 
-    /// @dev Appended in upgrade v2 — must remain last state variable (append-only layout).
+    /// @dev Appended in upgrade v2 (append-only layout).
     /// Fake initial virtual liquidity frozen at preLaunch for migration price continuity.
     /// If unset (pre-upgrade token), graduation uses BondingConfig legacyInitialVirtualLiq.
     mapping(address => uint256) public tokenFakeInitialVirtualLiq;
+
+    /// @dev Appended in upgrade v3 — decoded from `extParams_` at preLaunch (append-only layout).
+    /// Robotics flag (bit 2 of the flags word). See extParams encoding notes above `preLaunch`.
+    mapping(address => bool) public isRobotics;
+
+    /// @notice Fee delegation type per token: 0 = none, 1 = address, 2 = twitter
+    ///         (decoded from bits 3-4 of the `extParams_` flags word).
+    mapping(address => uint8) public feeDelegationType;
+
+    /// @notice Raw fee delegation recipient bytes from the `extParams_` trailing segment:
+    ///         a 20-byte address for type 1; the raw twitter account id bytes for type 2
+    ///         (the recipient vault is only created just before `launch`). Empty when no delegation.
+    /// @dev MUST remain the last state variable (append-only layout).
+    mapping(address => bytes) public feeDelegationRecipient;
 
     event PreLaunched(
         address indexed token,
@@ -144,6 +158,15 @@ contract BondingV5 is
 
     event FeeDelegationUpdated(address indexed token, bool isFeeDelegation);
 
+    /// @notice Emitted at preLaunch with the extended launch settings decoded from `extParams_`.
+    event PreLaunchExtParams(
+        address indexed token,
+        bool isFeeDelegation,
+        bool isRobotics,
+        uint8 feeDelegationType,
+        bytes feeDelegationRecipient
+    );
+
     error InvalidTokenStatus();
     error InvalidInput();
     error SlippageTooHigh();
@@ -157,12 +180,34 @@ contract BondingV5 is
         _disableInitializers();
     }
 
-    /// @dev `extParams` first 32-byte word — flags in the LSB (same byte as `abi.encode(bool)`):
-    ///      bit 0: `isFeeDelegation`
-    ///      bit 1: skip `" by Virtuals"` suffix (unset ⇒ append; V1-compatible)
-    ///      Empty `extParams` or length < 32 ⇒ both flags false ⇒ fee delegation off, suffix on.
+    /// @dev `extParams` encoding — append-only and length-tolerant so it stays backward
+    ///      compatible and can be freely extended:
+    ///
+    ///      Word 0 (`extParams[0:32]`) is a flags bitfield (same LSB byte as `abi.encode(bool)`):
+    ///        bit 0:    `isFeeDelegation`
+    ///        bit 1:    skip `" by Virtuals"` suffix (unset ⇒ append; V1-compatible)
+    ///        bit 2:    `isRobotics`
+    ///        bits 3-4: `feeDelegationType` (0 = none, 1 = address, 2 = twitter)
+    ///        remaining bits: reserved = 0, available for future flags/enums.
+    ///
+    ///      Trailing segment (`extParams[32:]`, present only when needed) carries the variable-length
+    ///      `feeDelegationRecipient`, ABI-encoded as `abi.encode(uint256 flags, bytes recipient)`:
+    ///        - type 1 (address): the 20-byte recipient address
+    ///        - type 2 (twitter): the raw twitter account id bytes
+    ///      Future variable-length fields are appended after this and decoded defensively by length.
+    ///
+    ///      Rules that MUST hold for every future change:
+    ///        - Never repurpose or move an existing bit/offset (bit 0 / bit 1 semantics are frozen).
+    ///        - Decoders tolerate shorter and longer payloads: read a field only when the length
+    ///          covers it, otherwise use the default; ignore trailing bytes / higher bits.
+    ///
+    ///      Empty `extParams` or length < 32 ⇒ all flags false ⇒ fee delegation off, suffix on,
+    ///      robotics off, no delegation type/recipient (identical to the pre-v3 behaviour).
     uint256 private constant EXT_PARAMS_FLAG_FEE_DELEGATION = 1;
     uint256 private constant EXT_PARAMS_FLAG_SKIP_SUFFIX = 2;
+    uint256 private constant EXT_PARAMS_FLAG_ROBOTICS = 4; // bit 2
+    uint256 private constant EXT_PARAMS_FEE_DELEGATION_TYPE_SHIFT = 3; // bits 3-4
+    uint256 private constant EXT_PARAMS_FEE_DELEGATION_TYPE_MASK = 0x3;
 
     function _loadExtParamsWord(
         bytes calldata extParams
@@ -187,6 +232,37 @@ contract BondingV5 is
         return (_loadExtParamsWord(extParams) & EXT_PARAMS_FLAG_SKIP_SUFFIX) == 0;
     }
 
+    function _decodeIsRobotics(
+        bytes calldata extParams
+    ) internal pure returns (bool) {
+        return (_loadExtParamsWord(extParams) & EXT_PARAMS_FLAG_ROBOTICS) != 0;
+    }
+
+    function _decodeFeeDelegationType(
+        bytes calldata extParams
+    ) internal pure returns (uint8) {
+        return
+            uint8(
+                (_loadExtParamsWord(extParams) >>
+                    EXT_PARAMS_FEE_DELEGATION_TYPE_SHIFT) &
+                    EXT_PARAMS_FEE_DELEGATION_TYPE_MASK
+            );
+    }
+
+    /// @dev Reads the trailing `feeDelegationRecipient` bytes when present. Length-gated so legacy
+    ///      flags-only payloads (length ⇐ 32) and future longer payloads both decode safely; extra
+    ///      trailing tuple elements added later do not affect this decode.
+    function _decodeFeeDelegationRecipient(
+        bytes calldata extParams
+    ) internal pure returns (bytes memory) {
+        // abi.encode(uint256, bytes) is at least 3 words (flags + offset + length).
+        if (extParams.length < 96) {
+            return "";
+        }
+        (, bytes memory recipient) = abi.decode(extParams, (uint256, bytes));
+        return recipient;
+    }
+
     function initialize(
         address factory_,
         address router_,
@@ -202,8 +278,11 @@ contract BondingV5 is
         bondingConfig = BondingConfig(bondingConfig_);
     }
 
-    /// @param extParams_ Optional extension payload (first 32 bytes). V1: `abi.encode(bool isFeeDelegation)`.
-    ///         V2: set bit 1 of the word to skip `" by Virtuals"` (bit 1 unset ⇒ append). Use `""` for defaults.
+    /// @param extParams_ Optional extension payload. See the extParams encoding notes above for the
+    ///         full (append-only, backward-compatible) layout. V1: `abi.encode(bool isFeeDelegation)`.
+    ///         V2: set bit 1 of the flags word to skip `" by Virtuals"`. V3: bit 2 = `isRobotics`,
+    ///         bits 3-4 = `feeDelegationType`, with the optional `feeDelegationRecipient` appended as
+    ///         `abi.encode(uint256 flags, bytes recipient)`. Use `""` for defaults.
     function preLaunch(
         string memory name_,
         string memory ticker_,
@@ -403,6 +482,14 @@ contract BondingV5 is
         isFeeDelegation[token] = isFeeDelegation_;
         tokenPreLaunchExtParams[token] = extParams_;
 
+        // Decode and store the extended launch settings so on-chain is the source of truth.
+        bool isRobotics_ = _decodeIsRobotics(extParams_);
+        uint8 feeDelegationType_ = _decodeFeeDelegationType(extParams_);
+        bytes memory feeDelegationRecipient_ = _decodeFeeDelegationRecipient(extParams_);
+        isRobotics[token] = isRobotics_;
+        feeDelegationType[token] = feeDelegationType_;
+        feeDelegationRecipient[token] = feeDelegationRecipient_;
+
         // Set Data struct fields
         newToken.data.token = token;
         newToken.data.name = tokenName;
@@ -433,6 +520,14 @@ contract BondingV5 is
             tokenInfo[token].virtualId,
             initialPurchase,
             tokenLaunchParams[token]
+        );
+
+        emit PreLaunchExtParams(
+            token,
+            isFeeDelegation_,
+            isRobotics_,
+            feeDelegationType_,
+            feeDelegationRecipient_
         );
 
         return (token, pair, tokenInfo[token].virtualId, initialPurchase);

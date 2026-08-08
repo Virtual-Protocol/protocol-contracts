@@ -356,6 +356,10 @@ contract veVirtual is
             amount,
             account
         );
+        // Clear the allowance regardless of whether the converter consumed it (audit I-04) -
+        // a converter that doesn't pull the funds would otherwise leave the permission
+        // standing indefinitely, including after a later repoint to a different converter.
+        IERC20(baseToken).forceApprove(rVirtualConverter, 0);
 
         emit ConvertedVeVirtualToRVirtual(account, id, amount);
         _transferVotingUnits(account, address(0), amount);

@@ -191,8 +191,11 @@ describe("veVIRTUAL - convertVeVirtualToRVirtual", function () {
 
   describe("forceApprove instead of raw approve (L-04 fix)", function () {
     it("should overwrite (not error on) a stale nonzero allowance toward a no-op converter", async function () {
-      // A no-op converter never pulls the approved VIRTUAL, so the allowance from the
-      // FIRST conversion call is left standing at the full lock amount.
+      // A SECOND lock/conversion must not revert despite the converter never having pulled
+      // the funds from the first call - forceApprove() overwrites cleanly regardless.
+      // (A raw, non-force approve() would also succeed on a standard ERC20 like VIRTUAL,
+      // but forceApprove is the hardened SafeERC20 path that also works on tokens which
+      // reject a direct nonzero-to-nonzero approve, e.g. USDT-style tokens.)
       const noOpConverter = await ethers.deployContract("NoOpConverterMock", [
         virtual.target,
       ]);
@@ -202,15 +205,6 @@ describe("veVIRTUAL - convertVeVirtualToRVirtual", function () {
       const firstId = (await veVirtual.locks(staker.address, 0)).id;
       await veVirtual.connect(staker).convertVeVirtualToRVirtual(firstId);
 
-      expect(
-        await virtual.allowance(veVirtual.target, noOpConverter.target)
-      ).to.be.equal(parseEther("100"));
-
-      // A SECOND lock/conversion must not revert despite the standing non-zero
-      // allowance - forceApprove() overwrites it cleanly. (A raw, non-force approve()
-      // would also succeed on a standard ERC20 like VIRTUAL, but forceApprove is the
-      // hardened SafeERC20 path that also works on tokens which reject a direct
-      // nonzero-to-nonzero approve, e.g. USDT-style tokens.)
       await virtual.transfer(staker.address, parseEther("50"));
       await veVirtual.connect(staker).stake(parseEther("50"), 52, false);
       const secondId = (await veVirtual.locks(staker.address, 0)).id;
@@ -218,11 +212,25 @@ describe("veVIRTUAL - convertVeVirtualToRVirtual", function () {
       await expect(
         veVirtual.connect(staker).convertVeVirtualToRVirtual(secondId)
       ).to.not.be.reverted;
+    });
 
-      // Allowance now reflects only the second call's amount - overwritten, not summed.
+    it("should clear the allowance after the call even when the converter never pulled the funds (audit I-04 fix)", async function () {
+      // A no-op converter never pulls the approved VIRTUAL. Previously the allowance was
+      // left standing at the full lock amount indefinitely (including after a later
+      // repoint to a different converter); veVirtual now clears it itself regardless of
+      // what the converter did.
+      const noOpConverter = await ethers.deployContract("NoOpConverterMock", [
+        virtual.target,
+      ]);
+      await veVirtual.setRVirtualConverter(noOpConverter.target);
+
+      await veVirtual.connect(staker).stake(parseEther("100"), 52, false);
+      const id = (await veVirtual.locks(staker.address, 0)).id;
+      await veVirtual.connect(staker).convertVeVirtualToRVirtual(id);
+
       expect(
         await virtual.allowance(veVirtual.target, noOpConverter.target)
-      ).to.be.equal(parseEther("50"));
+      ).to.be.equal(0);
     });
   });
 });

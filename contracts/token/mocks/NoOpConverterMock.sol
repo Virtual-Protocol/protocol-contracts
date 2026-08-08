@@ -11,9 +11,11 @@ import "../IRVirtualConverter.sol";
 ///         and therefore leaves zero residual allowance.
 contract NoOpConverterMock is IRVirtualConverter {
     address public virtualToken;
+    address public rVirtualToken;
 
-    constructor(address virtualToken_) {
+    constructor(address virtualToken_, address rVirtualToken_) {
         virtualToken = virtualToken_;
+        rVirtualToken = rVirtualToken_;
     }
 
     function convertVirtualToRVirtual(

@@ -55,6 +55,13 @@ contract veVirtual is
 
     address public rVirtualConverter;
     event RVirtualConverterUpdated(address rVirtualConverter);
+    /// @notice Snapshotted from rVirtualConverter.rVirtualToken() at the moment
+    ///         setRVirtualConverter() last wired a converter in - NOT re-read from the
+    ///         converter at conversion time. This is the ground truth convertVeVirtualToRVirtual()
+    ///         checks actual delivery against (audit M-02 fix), so it stays correct even if the
+    ///         wired converter is later upgraded to claim a different payout token without a
+    ///         matching re-wiring call.
+    address public rVirtualToken;
     event ConvertedVeVirtualToRVirtual(
         address indexed user,
         uint256 id,
@@ -325,6 +332,12 @@ contract veVirtual is
             "Converter token mismatch"
         );
         rVirtualConverter = rVirtualConverter_;
+        // Snapshot the payout token NOW, while this converter is trusted/being wired in.
+        // convertVeVirtualToRVirtual() checks delivery against this stored copy, not against
+        // rVirtualConverter.rVirtualToken() read fresh at conversion time - otherwise a later
+        // in-place upgrade of this same converter could simply lie about what it pays out and
+        // the check would trust it (audit M-02 fix).
+        rVirtualToken = IRVirtualConverter(rVirtualConverter_).rVirtualToken();
         emit RVirtualConverterUpdated(rVirtualConverter_);
     }
 
@@ -351,6 +364,14 @@ contract veVirtual is
         }
         locks[account].pop();
 
+        // Confirm delivery here, in the contract that bears the loss, rather than trusting
+        // the converter's own internal accounting (audit M-02 fix) - checked against
+        // rVirtualToken, which was snapshotted at the last trusted wiring call and cannot be
+        // changed by a later upgrade of the same converter. A shortfall reverts the WHOLE
+        // transaction, including the lock deletion above, so the account keeps its position
+        // instead of losing it silently.
+        uint256 balanceBefore = IERC20(rVirtualToken).balanceOf(account);
+
         IERC20(baseToken).forceApprove(rVirtualConverter, amount);
         IRVirtualConverter(rVirtualConverter).convertVirtualToRVirtual(
             amount,
@@ -360,6 +381,11 @@ contract veVirtual is
         // a converter that doesn't pull the funds would otherwise leave the permission
         // standing indefinitely, including after a later repoint to a different converter.
         IERC20(baseToken).forceApprove(rVirtualConverter, 0);
+
+        require(
+            IERC20(rVirtualToken).balanceOf(account) - balanceBefore == amount,
+            "Conversion shortfall"
+        );
 
         emit ConvertedVeVirtualToRVirtual(account, id, amount);
         _transferVotingUnits(account, address(0), amount);

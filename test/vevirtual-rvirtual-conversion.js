@@ -190,16 +190,24 @@ describe("veVIRTUAL - convertVeVirtualToRVirtual", function () {
   });
 
   describe("forceApprove instead of raw approve (L-04 fix)", function () {
-    it("should overwrite (not error on) a stale nonzero allowance toward a no-op converter", async function () {
-      // A SECOND lock/conversion must not revert despite the converter never having pulled
-      // the funds from the first call - forceApprove() overwrites cleanly regardless.
-      // (A raw, non-force approve() would also succeed on a standard ERC20 like VIRTUAL,
-      // but forceApprove is the hardened SafeERC20 path that also works on tokens which
-      // reject a direct nonzero-to-nonzero approve, e.g. USDT-style tokens.)
-      const noOpConverter = await ethers.deployContract("NoOpConverterMock", [
+    it("should overwrite (not error on) a stale nonzero allowance toward a non-consuming converter", async function () {
+      // A SECOND lock/conversion must not revert despite the first call's converter never
+      // having pulled the funds - forceApprove() overwrites cleanly regardless. (A raw,
+      // non-force approve() would also succeed on a standard ERC20 like VIRTUAL, but
+      // forceApprove is the hardened SafeERC20 path that also works on tokens which reject a
+      // direct nonzero-to-nonzero approve, e.g. USDT-style tokens.)
+      //
+      // Uses NonConsumingConverterMock, not NoOpConverterMock: once the M-02 delivery check
+      // is in place, a converter that delivers nothing (NoOpConverterMock) makes the whole
+      // conversion revert, so it can no longer reach a *successful* call that leaves the
+      // allowance standing - only a converter that delivers correctly via a path that
+      // doesn't touch the allowance can.
+      const nonConsumingConverter = await ethers.deployContract("NonConsumingConverterMock", [
         virtual.target,
+        rVirtual.target,
       ]);
-      await veVirtual.setRVirtualConverter(noOpConverter.target);
+      await rVirtual.mint(nonConsumingConverter.target, parseEther("1000"));
+      await veVirtual.setRVirtualConverter(nonConsumingConverter.target);
 
       await veVirtual.connect(staker).stake(parseEther("100"), 52, false);
       const firstId = (await veVirtual.locks(staker.address, 0)).id;
@@ -214,23 +222,84 @@ describe("veVIRTUAL - convertVeVirtualToRVirtual", function () {
       ).to.not.be.reverted;
     });
 
-    it("should clear the allowance after the call even when the converter never pulled the funds (audit I-04 fix)", async function () {
-      // A no-op converter never pulls the approved VIRTUAL. Previously the allowance was
-      // left standing at the full lock amount indefinitely (including after a later
-      // repoint to a different converter); veVirtual now clears it itself regardless of
-      // what the converter did.
-      const noOpConverter = await ethers.deployContract("NoOpConverterMock", [
+    it("should clear the allowance after a successful call even when the converter never pulled the funds (audit I-04 fix)", async function () {
+      // NonConsumingConverterMock delivers correctly (so the M-02 check passes and the call
+      // succeeds) but never calls transferFrom on the approved VIRTUAL. Previously the
+      // allowance was left standing at the full lock amount indefinitely in this scenario
+      // (including after a later repoint to a different converter); veVirtual now clears it
+      // itself regardless of what the converter did.
+      const nonConsumingConverter = await ethers.deployContract("NonConsumingConverterMock", [
         virtual.target,
+        rVirtual.target,
       ]);
-      await veVirtual.setRVirtualConverter(noOpConverter.target);
+      await rVirtual.mint(nonConsumingConverter.target, parseEther("1000"));
+      await veVirtual.setRVirtualConverter(nonConsumingConverter.target);
 
       await veVirtual.connect(staker).stake(parseEther("100"), 52, false);
       const id = (await veVirtual.locks(staker.address, 0)).id;
       await veVirtual.connect(staker).convertVeVirtualToRVirtual(id);
 
       expect(
-        await virtual.allowance(veVirtual.target, noOpConverter.target)
+        await virtual.allowance(veVirtual.target, nonConsumingConverter.target)
       ).to.be.equal(0);
+    });
+  });
+
+  describe("delivery verification (audit M-02 fix)", function () {
+    it("should revert the whole conversion, preserving the lock, when the converter delivers nothing and doesn't pull funds", async function () {
+      const noOpConverter = await ethers.deployContract("NoOpConverterMock", [
+        virtual.target,
+        rVirtual.target,
+      ]);
+      await veVirtual.setRVirtualConverter(noOpConverter.target);
+
+      await veVirtual.connect(staker).stake(parseEther("100"), 52, false);
+      const id = (await veVirtual.locks(staker.address, 0)).id;
+
+      await expect(
+        veVirtual.connect(staker).convertVeVirtualToRVirtual(id)
+      ).to.be.revertedWith("Conversion shortfall");
+
+      // The lock survives - the revert rolled back the deletion too.
+      expect((await veVirtual.locks(staker.address, 0)).id).to.equal(id);
+      expect(await veVirtual.stakedAmountOf(staker.address)).to.equal(parseEther("100"));
+    });
+
+    it("should revert the whole conversion, preserving the lock, when a malicious converter steals the VIRTUAL and delivers nothing", async function () {
+      // Simulates exactly the audit's repointed-converter scenario: the converter pulls the
+      // approved VIRTUAL via transferFrom and routes it to an attacker address, delivering
+      // zero rVirtual, without reverting itself. Before the M-02 fix, veVirtual had no way to
+      // notice - the lock was already deleted and the call "succeeded". Now the balance-delta
+      // check catches the shortfall and reverts the whole transaction.
+      const maliciousConverter = await ethers.deployContract("MaliciousConverterMock", [
+        virtual.target,
+        rVirtual.target,
+        other.address,
+      ]);
+      await veVirtual.setRVirtualConverter(maliciousConverter.target);
+
+      await veVirtual.connect(staker).stake(parseEther("100"), 52, false);
+      const id = (await veVirtual.locks(staker.address, 0)).id;
+
+      await expect(
+        veVirtual.connect(staker).convertVeVirtualToRVirtual(id)
+      ).to.be.revertedWith("Conversion shortfall");
+
+      expect((await veVirtual.locks(staker.address, 0)).id).to.equal(id);
+      expect(await virtual.balanceOf(other.address)).to.equal(0);
+    });
+
+    it("should still succeed normally against the real converter, unaffected by the new check", async function () {
+      await veVirtual.setRVirtualConverter(converter.target);
+
+      await veVirtual.connect(staker).stake(parseEther("100"), 52, false);
+      const id = (await veVirtual.locks(staker.address, 0)).id;
+
+      await expect(
+        veVirtual.connect(staker).convertVeVirtualToRVirtual(id)
+      ).to.not.be.reverted;
+
+      expect(await rVirtual.balanceOf(staker.address)).to.equal(parseEther("100"));
     });
   });
 });

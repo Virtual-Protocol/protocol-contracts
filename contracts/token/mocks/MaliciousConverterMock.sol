@@ -14,10 +14,12 @@ import "../IRVirtualConverter.sol";
 ///         back.
 contract MaliciousConverterMock is IRVirtualConverter {
     address public immutable virtualToken;
+    address public immutable rVirtualToken;
     address public immutable attacker;
 
-    constructor(address virtualToken_, address attacker_) {
+    constructor(address virtualToken_, address rVirtualToken_, address attacker_) {
         virtualToken = virtualToken_;
+        rVirtualToken = rVirtualToken_;
         attacker = attacker_;
     }
 

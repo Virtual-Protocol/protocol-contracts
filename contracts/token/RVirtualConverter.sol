@@ -7,6 +7,7 @@ import "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol"
 import "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 
 /// @notice Open, permissionless 1:1 converter from VIRTUAL to rVirtual.
 ///
@@ -58,12 +59,15 @@ contract RVirtualConverter is
         require(rVirtualToken_ != address(0), "Invalid rVirtual token");
         require(treasury_ != address(0), "Invalid treasury");
         require(virtualToken_ != rVirtualToken_, "Tokens must differ");
-        // NOTE (audit M-02): the 1:1 conversion below is a raw-integer transfer with no
-        // decimals rescaling. This is safe only because VIRTUAL and rVirtual are both
-        // guaranteed by protocol design to use 18 decimals - if either token is ever
-        // redeployed/migrated to a different decimals value, this invariant must be
-        // re-verified (or an explicit decimals() equivalence check added) before wiring
-        // it in here.
+        // The 1:1 conversion below is a raw-integer transfer with no decimals rescaling -
+        // only correct when both tokens use the same decimals (18, by protocol design).
+        // Asserted here (audit I-03) rather than left as a comment, since a future
+        // deployment of this converter against a different pair would otherwise mis-scale
+        // every conversion silently.
+        require(
+            IERC20Metadata(virtualToken_).decimals() == IERC20Metadata(rVirtualToken_).decimals(),
+            "Decimals mismatch"
+        );
         virtualToken = virtualToken_;
         rVirtualToken = rVirtualToken_;
         treasury = treasury_;

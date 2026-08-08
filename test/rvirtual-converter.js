@@ -195,6 +195,31 @@ describe("RVirtualConverter", function () {
     });
   });
 
+  describe("decimals equivalence check (audit I-03 fix)", function () {
+    it("should reject initialize() when virtualToken and rVirtualToken have different decimals", async function () {
+      const sixDecimalToken = await ethers.deployContract("MockERC20SixDecimals", [
+        "USDC-like", "SIX", deployer.address, parseEther("1000000"),
+      ]);
+
+      const Converter = await ethers.getContractFactory("RVirtualConverter");
+      await expect(
+        upgrades.deployProxy(Converter, [
+          virtual.target,
+          sixDecimalToken.target,
+          treasury.address,
+        ])
+      ).to.be.revertedWith("Decimals mismatch");
+    });
+
+    it("should still deploy normally when both tokens use 18 decimals", async function () {
+      // converter (from beforeEach) already deployed successfully with virtual/rVirtual,
+      // both 18 decimals - this just documents that the new check doesn't false-positive
+      // on the intended pair.
+      expect(await converter.virtualToken()).to.equal(virtual.target);
+      expect(await converter.rVirtualToken()).to.equal(rVirtual.target);
+    });
+  });
+
   it("should provide no VIRTUAL/rVirtual sweep mechanism at all (I-06 fix)", async function () {
     // withdrawVirtual()/adminWallet/setAdminWallet were removed entirely once L-02's
     // treasury routing made them unnecessary - VIRTUAL is never custodied by this

@@ -205,7 +205,7 @@ describe("BondingV5 / FRouterV3 — drain liquidity (V5 suite)", function () {
         { initializer: "initialize" }
       );
       await freshRouter.waitForDeployment();
-      await freshRouter.grantRole(await freshRouter.EXECUTOR_ROLE(), admin.address);
+      await freshRouter.grantRole(await freshRouter.BE_OPS_ROLE(), admin.address);
 
       await expect(
         freshRouter

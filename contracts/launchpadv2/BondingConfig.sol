@@ -32,6 +32,7 @@ contract BondingConfig is Initializable, OwnableUpgradeable {
     uint8 public constant ANTI_SNIPER_98M = 2; // 98 minutes buy-only
     uint8 public constant ANTI_SNIPER_98M_SELL = 3; // 98 minutes sell-only
     uint8 public constant ANTI_SNIPER_98M_BOTH = 4; // 98 minutes buy and sell
+    uint8 public constant ANTI_SNIPER_10M = 5; // 10 minutes buy-only
 
     // Scheduled launch parameters
     struct ScheduledLaunchParams {
@@ -364,7 +365,7 @@ contract BondingConfig is Initializable, OwnableUpgradeable {
 
     /**
      * @notice Check if anti-sniper tax type is valid
-     * @param antiSniperType_ 0=none, 1=60s buy, 2=98m buy, 3=98m sell, 4=98m both
+     * @param antiSniperType_ 0=none, 1=60s buy, 2=98m buy, 3=98m sell, 4=98m both, 5=10m buy
      * @return Whether the type is valid
      */
     function isValidAntiSniperType(
@@ -375,7 +376,8 @@ contract BondingConfig is Initializable, OwnableUpgradeable {
             antiSniperType_ == ANTI_SNIPER_60S ||
             antiSniperType_ == ANTI_SNIPER_98M ||
             antiSniperType_ == ANTI_SNIPER_98M_SELL ||
-            antiSniperType_ == ANTI_SNIPER_98M_BOTH;
+            antiSniperType_ == ANTI_SNIPER_98M_BOTH ||
+            antiSniperType_ == ANTI_SNIPER_10M;
     }
 
     /**
@@ -387,7 +389,8 @@ contract BondingConfig is Initializable, OwnableUpgradeable {
         return
             antiSniperType_ == ANTI_SNIPER_60S ||
             antiSniperType_ == ANTI_SNIPER_98M ||
-            antiSniperType_ == ANTI_SNIPER_98M_BOTH;
+            antiSniperType_ == ANTI_SNIPER_98M_BOTH ||
+            antiSniperType_ == ANTI_SNIPER_10M;
     }
 
     /**
@@ -404,7 +407,7 @@ contract BondingConfig is Initializable, OwnableUpgradeable {
     /**
      * @notice Get anti-sniper tax duration in seconds for a given type
      * @param antiSniperType_ The anti-sniper type
-     * @return Duration in seconds (0 for NONE, 60 for 60S, 5880 for 98M variants)
+     * @return Duration in seconds (0 for NONE, 60 for 60S, 600 for 10M, 5880 for 98M variants)
      */
     function getAntiSniperDuration(
         uint8 antiSniperType_
@@ -413,6 +416,8 @@ contract BondingConfig is Initializable, OwnableUpgradeable {
             return 0;
         } else if (antiSniperType_ == ANTI_SNIPER_60S) {
             return 60; // 60 seconds
+        } else if (antiSniperType_ == ANTI_SNIPER_10M) {
+            return 600; // 10 minutes = 10 * 60 = 600 seconds
         } else if (
             antiSniperType_ == ANTI_SNIPER_98M ||
             antiSniperType_ == ANTI_SNIPER_98M_SELL ||

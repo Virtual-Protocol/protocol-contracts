@@ -26,6 +26,7 @@ const ACF_FEE = ethers.parseEther("10");
 
 const FAKE_INITIAL_VIRTUAL_LIQ = ethers.parseEther("6300");
 const TARGET_REAL_VIRTUAL = ethers.parseEther("42000");
+const ACF_FAKE_INITIAL_VIRTUAL_LIQ = ethers.parseEther("14000");
 
 const BONDING_V4_FEE = 10;
 
@@ -296,10 +297,14 @@ async function setupV2V3TaxComparisonTest(options = {}) {
         fakeInitialVirtualLiq: FAKE_INITIAL_VIRTUAL_LIQ,
         targetRealVirtual: TARGET_REAL_VIRTUAL,
       },
+      ACF_FAKE_INITIAL_VIRTUAL_LIQ,
     ],
     { initializer: "initialize" }
   );
   await bondingConfig.waitForDeployment();
+
+  // Graduation transfers bonding-curve excess tokens here to be burned off-chain
+  await bondingConfig.setGraduationExcessBurnWallet(beOpsWallet.address);
 
   let bondingV4;
   if (includeBondingV4) {

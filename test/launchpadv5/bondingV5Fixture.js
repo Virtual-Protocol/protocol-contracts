@@ -23,6 +23,7 @@ const NORMAL_LAUNCH_FEE = ethers.parseEther("100");
 const ACF_FEE = ethers.parseEther("10");
 const FAKE_INITIAL_VIRTUAL_LIQ = ethers.parseEther("6300");
 const TARGET_REAL_VIRTUAL = ethers.parseEther("42000");
+const ACF_FAKE_INITIAL_VIRTUAL_LIQ = ethers.parseEther("14000");
 
 async function setupBondingV5Test() {
   const setup = {};
@@ -353,7 +354,7 @@ async function setupBondingV5Test() {
         scheduledLaunchParams,
         deployParams,
         bondingCurveParams,
-        FAKE_INITIAL_VIRTUAL_LIQ, // acfFakeInitialVirtualLiq_ (8th arg added on current main)
+        ACF_FAKE_INITIAL_VIRTUAL_LIQ,
       ],
       { initializer: "initialize" }
     );
@@ -363,6 +364,10 @@ async function setupBondingV5Test() {
     // Backend allowlist: Project60days launch() + X/ACP preLaunch (tests use owner as default launcher)
     await bondingConfig.setPrivilegedLauncher(owner.address, true);
     console.log("setPrivilegedLauncher(true) for owner (test default backend)");
+
+    // Graduation transfers bonding-curve excess tokens here to be burned off-chain
+    await bondingConfig.setGraduationExcessBurnWallet(beOpsWallet.address);
+    console.log("graduationExcessBurnWallet set to beOpsWallet");
 
     // 4.2 Deploy BondingV5
     console.log("\n--- Deploying BondingV5 ---");
@@ -440,6 +445,10 @@ async function setupBondingV5Test() {
     // Additional role for admin to call FRouterV3 directly in tests
     await fRouterV3.grantRole(await fRouterV3.EXECUTOR_ROLE(), admin.address);
     console.log("EXECUTOR_ROLE granted to admin in FRouterV3");
+
+    // drainPrivatePool / drainUniV2Pool are gated by BE_OPS_ROLE
+    await fRouterV3.grantRole(await fRouterV3.BE_OPS_ROLE(), admin.address);
+    console.log("BE_OPS_ROLE granted to admin in FRouterV3");
 
     await agentFactoryV7.grantRole(
       await agentFactoryV7.REMOVE_LIQUIDITY_ROLE(),

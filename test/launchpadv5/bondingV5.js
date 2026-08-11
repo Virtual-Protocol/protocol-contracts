@@ -56,6 +56,7 @@ const ACF_FEE = ethers.parseEther("10"); // Extra fee when needAcf = true (10 on
 // Bonding curve params
 const FAKE_INITIAL_VIRTUAL_LIQ = ethers.parseEther("6300");
 const TARGET_REAL_VIRTUAL = ethers.parseEther("42000");
+const ACF_FAKE_INITIAL_VIRTUAL_LIQ = ethers.parseEther("14000");
 const { setupBondingV5Test } = require("./bondingV5Fixture.js");
 
 describe("BondingV5", function () {
@@ -823,7 +824,9 @@ describe("BondingV5", function () {
         targetRealVirtual: ethers.parseEther("50000"),
       };
 
-      await bondingConfig.connect(owner).setBondingCurveParams(newParams);
+      await bondingConfig
+        .connect(owner)
+        .setBondingCurveParams(newParams, ACF_FAKE_INITIAL_VIRTUAL_LIQ);
 
       const params = await bondingConfig.bondingCurveParams();
       expect(params.fakeInitialVirtualLiq).to.equal(
@@ -832,10 +835,13 @@ describe("BondingV5", function () {
       expect(params.targetRealVirtual).to.equal(newParams.targetRealVirtual);
 
       // Reset to original
-      await bondingConfig.connect(owner).setBondingCurveParams({
-        fakeInitialVirtualLiq: FAKE_INITIAL_VIRTUAL_LIQ,
-        targetRealVirtual: TARGET_REAL_VIRTUAL,
-      });
+      await bondingConfig.connect(owner).setBondingCurveParams(
+        {
+          fakeInitialVirtualLiq: FAKE_INITIAL_VIRTUAL_LIQ,
+          targetRealVirtual: TARGET_REAL_VIRTUAL,
+        },
+        ACF_FAKE_INITIAL_VIRTUAL_LIQ
+      );
     });
 
     it("Should revert if non-owner tries to update params", async function () {
@@ -3324,6 +3330,7 @@ describe("BondingV5", function () {
             fakeInitialVirtualLiq: FAKE_INITIAL_VIRTUAL_LIQ,
             targetRealVirtual: TARGET_REAL_VIRTUAL,
           },
+          ACF_FAKE_INITIAL_VIRTUAL_LIQ,
         ],
         { initializer: "initialize" }
       );

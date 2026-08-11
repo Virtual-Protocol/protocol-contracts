@@ -331,13 +331,23 @@ contract veVirtual is
             IRVirtualConverter(rVirtualConverter_).virtualToken() == baseToken,
             "Converter token mismatch"
         );
+        // Pin the payout token on first wiring, then require every subsequent repoint to
+        // declare the SAME token (audit H-1 follow-up). Without this, a repoint to a brand
+        // new malicious converter could nominate its own rVirtualToken() - passing the
+        // virtualToken check above while the M-02 delivery check in
+        // convertVeVirtualToRVirtual() then validates against that nomination instead of
+        // against real value, so a staker's position could be destroyed for a worthless
+        // token that "arrives" in the exact expected amount. Pinning means a repoint to a
+        // converter paying a different token now reverts here instead of silently changing
+        // what stakers receive - trading an availability risk (conversions revert until
+        // fixed) for the fund-loss risk this closes.
+        address newRVirtualToken = IRVirtualConverter(rVirtualConverter_).rVirtualToken();
+        require(
+            rVirtualToken == address(0) || newRVirtualToken == rVirtualToken,
+            "Payout token mismatch"
+        );
         rVirtualConverter = rVirtualConverter_;
-        // Snapshot the payout token NOW, while this converter is trusted/being wired in.
-        // convertVeVirtualToRVirtual() checks delivery against this stored copy, not against
-        // rVirtualConverter.rVirtualToken() read fresh at conversion time - otherwise a later
-        // in-place upgrade of this same converter could simply lie about what it pays out and
-        // the check would trust it (audit M-02 fix).
-        rVirtualToken = IRVirtualConverter(rVirtualConverter_).rVirtualToken();
+        rVirtualToken = newRVirtualToken;
         emit RVirtualConverterUpdated(rVirtualConverter_);
     }
 

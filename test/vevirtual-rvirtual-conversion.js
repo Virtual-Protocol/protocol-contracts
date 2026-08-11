@@ -302,4 +302,63 @@ describe("veVIRTUAL - convertVeVirtualToRVirtual", function () {
       expect(await rVirtual.balanceOf(staker.address)).to.equal(parseEther("100"));
     });
   });
+
+  describe("payout token pinning on repoint (audit H-1 follow-up fix)", function () {
+    it("should reject repointing to a converter that nominates a DIFFERENT payout token than the one already pinned", async function () {
+      // The gap the M-02 fix alone didn't close: setRVirtualConverter re-read
+      // rVirtualToken() from whichever converter was being wired in, with no check against
+      // the previously stored value. A repoint to a brand new converter could nominate a
+      // worthless token as its own rVirtualToken() - passing the virtualToken() check (which
+      // only verifies the INPUT side) while the M-02 delivery check then validates against
+      // that nomination instead of against real value.
+      await veVirtual.setRVirtualConverter(converter.target); // pins rVirtualToken = rVirtual.target
+
+      const worthlessToken = await ethers.deployContract("MockERC20", [
+        "Worthless", "WORTHLESS", deployer.address, parseEther("1000000"),
+      ]);
+      const maliciousConverter = await ethers.deployContract("NonConsumingConverterMock", [
+        virtual.target,      // virtualToken() - matches baseToken, passes that check
+        worthlessToken.target, // rVirtualToken() - a token the attacker fully controls
+      ]);
+      await worthlessToken.transfer(maliciousConverter.target, parseEther("1000"));
+
+      await expect(
+        veVirtual.setRVirtualConverter(maliciousConverter.target)
+      ).to.be.revertedWith("Payout token mismatch");
+
+      // rVirtualConverter and rVirtualToken are both untouched - the malicious converter was
+      // never wired in.
+      expect(await veVirtual.rVirtualConverter()).to.equal(converter.target);
+      expect(await veVirtual.rVirtualToken()).to.equal(rVirtual.target);
+    });
+
+    it("should allow the FIRST wiring to pin any payout token (no prior value to conflict with)", async function () {
+      const freshVeVirtual = await upgrades.deployProxy(
+        await ethers.getContractFactory("veVirtual"),
+        [virtual.target, 104],
+      );
+      expect(await freshVeVirtual.rVirtualToken()).to.equal(ethers.ZeroAddress);
+
+      await expect(
+        freshVeVirtual.setRVirtualConverter(converter.target)
+      ).to.not.be.reverted;
+      expect(await freshVeVirtual.rVirtualToken()).to.equal(rVirtual.target);
+    });
+
+    it("should allow repointing to a DIFFERENT converter that pays out the SAME already-pinned token", async function () {
+      await veVirtual.setRVirtualConverter(converter.target); // pins rVirtualToken = rVirtual.target
+
+      const secondConverter = await ethers.deployContract("NonConsumingConverterMock", [
+        virtual.target,
+        rVirtual.target, // same payout token as the first converter
+      ]);
+      await rVirtual.mint(secondConverter.target, parseEther("1000"));
+
+      await expect(
+        veVirtual.setRVirtualConverter(secondConverter.target)
+      ).to.not.be.reverted;
+      expect(await veVirtual.rVirtualConverter()).to.equal(secondConverter.target);
+      expect(await veVirtual.rVirtualToken()).to.equal(rVirtual.target);
+    });
+  });
 });

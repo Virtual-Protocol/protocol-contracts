@@ -277,8 +277,8 @@ module.exports = {
         network: "robinhood_testnet",
         chainId: 46630,
         urls: {
-          apiURL: "https://robinhoodchain-testnet.blockscout.com/api",
-          browserURL: "https://robinhoodchain-testnet.blockscout.com",
+          apiURL: "https://explorer.testnet.chain.robinhood.com/api",
+          browserURL: "https://explorer.testnet.chain.robinhood.com",
         },
       },
       // X Layer (OKLink) — kept for reference only. Verification uses okxweb3explorer (okverify) below.
@@ -441,7 +441,7 @@ module.exports = {
     robinhood_testnet: {
       url:
         process.env.ROBINHOOD_TESTNET_RPC_URL ||
-        "https://testnet.rpc.robinhood.com",
+        "https://rpc.testnet.chain.robinhood.com",
       accounts: [process.env.PRIVATE_KEY],
       chainId: 46630,
     },

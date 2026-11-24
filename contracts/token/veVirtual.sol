@@ -28,6 +28,9 @@ contract veVirtual is
     uint16 public constant DENOM = 10000;
     bytes32 public constant ADMIN_ROLE = keccak256("ADMIN_ROLE");
     uint256 public constant MAX_POSITIONS = 200;
+    /// @notice Minimum time a lock must have existed (measured from lock.start) before it
+    ///         can be converted via convertVeVirtualToRVirtual().
+    uint256 public constant MIN_CONVERT_AGE = 30 days;
 
     address public baseToken;
     mapping(address => Lock[]) public locks;
@@ -356,6 +359,8 @@ contract veVirtual is
      *         exchange for an equal amount of rVirtual. Unlike withdraw(), this does not
      *         require the lock to be matured - the user is explicitly forfeiting the
      *         remaining lock time. The lock is deleted regardless of its autoRenew state.
+     *         The lock must be at least MIN_CONVERT_AGE old, measured from lock.start
+     *         (note: toggleAutoRenew() resets lock.start, which restarts this window).
      * @dev Approves RVirtualConverter for exactly this lock's amount and calls its
      *      convertVirtualToRVirtual() - the same open entrypoint any wallet can call directly.
      *      There is no veVirtual-specific path on the converter side.
@@ -365,6 +370,10 @@ contract veVirtual is
         address account = _msgSender();
         uint256 index = _indexOf(account, id);
         Lock memory lock = locks[account][index];
+        require(
+            block.timestamp >= lock.start + MIN_CONVERT_AGE,
+            "Lock too recent to convert"
+        );
 
         uint256 amount = lock.amount;
 

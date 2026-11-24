@@ -7,7 +7,7 @@ import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/utils/structs/Checkpoints.sol";
 import "@openzeppelin/contracts-upgradeable/governance/utils/VotesUpgradeable.sol";
-import "./IRVirtualConverter.sol";
+import "./IAgVirtConverter.sol";
 
 contract veVirtual is
     Initializable,
@@ -29,7 +29,7 @@ contract veVirtual is
     bytes32 public constant ADMIN_ROLE = keccak256("ADMIN_ROLE");
     uint256 public constant MAX_POSITIONS = 200;
     /// @notice Minimum time a lock must have existed (measured from lock.start) before it
-    ///         can be converted via convertVeVirtualToRVirtual().
+    ///         can be converted via convertVeVirtualToAgVirt().
     uint256 public constant MIN_CONVERT_AGE = 30 days;
 
     address public baseToken;
@@ -56,16 +56,16 @@ contract veVirtual is
     event AdminUnlocked(bool adminUnlocked);
     bool public adminUnlocked;
 
-    address public rVirtualConverter;
-    event RVirtualConverterUpdated(address rVirtualConverter);
-    /// @notice Snapshotted from rVirtualConverter.rVirtualToken() at the moment
-    ///         setRVirtualConverter() last wired a converter in - NOT re-read from the
-    ///         converter at conversion time. This is the ground truth convertVeVirtualToRVirtual()
+    address public agVirtConverter;
+    event AgVirtConverterUpdated(address agVirtConverter);
+    /// @notice Snapshotted from agVirtConverter.agVirtToken() at the moment
+    ///         setAgVirtConverter() last wired a converter in - NOT re-read from the
+    ///         converter at conversion time. This is the ground truth convertVeVirtualToAgVirt()
     ///         checks actual delivery against (audit M-02 fix), so it stays correct even if the
     ///         wired converter is later upgraded to claim a different payout token without a
     ///         matching re-wiring call.
-    address public rVirtualToken;
-    event ConvertedVeVirtualToRVirtual(
+    address public agVirtToken;
+    event ConvertedVeVirtualToAgVirt(
         address indexed user,
         uint256 id,
         uint256 amount
@@ -324,49 +324,49 @@ contract veVirtual is
     }
 
     /**
-     * @notice Set the RVirtualConverter contract that convertVeVirtualToRVirtual() forwards to.
+     * @notice Set the AgVirtConverter contract that convertVeVirtualToAgVirt() forwards to.
      */
-    function setRVirtualConverter(
-        address rVirtualConverter_
+    function setAgVirtConverter(
+        address agVirtConverter_
     ) external onlyRole(ADMIN_ROLE) {
-        require(rVirtualConverter_ != address(0), "Invalid converter");
+        require(agVirtConverter_ != address(0), "Invalid converter");
         require(
-            IRVirtualConverter(rVirtualConverter_).virtualToken() == baseToken,
+            IAgVirtConverter(agVirtConverter_).virtualToken() == baseToken,
             "Converter token mismatch"
         );
         // Pin the payout token on first wiring, then require every subsequent repoint to
         // declare the SAME token (audit H-1 follow-up). Without this, a repoint to a brand
-        // new malicious converter could nominate its own rVirtualToken() - passing the
+        // new malicious converter could nominate its own agVirtToken() - passing the
         // virtualToken check above while the M-02 delivery check in
-        // convertVeVirtualToRVirtual() then validates against that nomination instead of
+        // convertVeVirtualToAgVirt() then validates against that nomination instead of
         // against real value, so a staker's position could be destroyed for a worthless
         // token that "arrives" in the exact expected amount. Pinning means a repoint to a
         // converter paying a different token now reverts here instead of silently changing
         // what stakers receive - trading an availability risk (conversions revert until
         // fixed) for the fund-loss risk this closes.
-        address newRVirtualToken = IRVirtualConverter(rVirtualConverter_).rVirtualToken();
+        address newAgVirtToken = IAgVirtConverter(agVirtConverter_).agVirtToken();
         require(
-            rVirtualToken == address(0) || newRVirtualToken == rVirtualToken,
+            agVirtToken == address(0) || newAgVirtToken == agVirtToken,
             "Payout token mismatch"
         );
-        rVirtualConverter = rVirtualConverter_;
-        rVirtualToken = newRVirtualToken;
-        emit RVirtualConverterUpdated(rVirtualConverter_);
+        agVirtConverter = agVirtConverter_;
+        agVirtToken = newAgVirtToken;
+        emit AgVirtConverterUpdated(agVirtConverter_);
     }
 
     /**
      * @notice Voluntarily give up a lock's underlying VIRTUAL (and its voting power) in
-     *         exchange for an equal amount of rVirtual. Unlike withdraw(), this does not
+     *         exchange for an equal amount of agVirt. Unlike withdraw(), this does not
      *         require the lock to be matured - the user is explicitly forfeiting the
      *         remaining lock time. The lock is deleted regardless of its autoRenew state.
      *         The lock must be at least MIN_CONVERT_AGE old, measured from lock.start
      *         (note: toggleAutoRenew() resets lock.start, which restarts this window).
-     * @dev Approves RVirtualConverter for exactly this lock's amount and calls its
-     *      convertVirtualToRVirtual() - the same open entrypoint any wallet can call directly.
+     * @dev Approves AgVirtConverter for exactly this lock's amount and calls its
+     *      convertVirtualToAgVirt() - the same open entrypoint any wallet can call directly.
      *      There is no veVirtual-specific path on the converter side.
      */
-    function convertVeVirtualToRVirtual(uint256 id) external nonReentrant {
-        require(rVirtualConverter != address(0), "Converter not set");
+    function convertVeVirtualToAgVirt(uint256 id) external nonReentrant {
+        require(agVirtConverter != address(0), "Converter not set");
         address account = _msgSender();
         uint256 index = _indexOf(account, id);
         Lock memory lock = locks[account][index];
@@ -385,28 +385,28 @@ contract veVirtual is
 
         // Confirm delivery here, in the contract that bears the loss, rather than trusting
         // the converter's own internal accounting (audit M-02 fix) - checked against
-        // rVirtualToken, which was snapshotted at the last trusted wiring call and cannot be
+        // agVirtToken, which was snapshotted at the last trusted wiring call and cannot be
         // changed by a later upgrade of the same converter. A shortfall reverts the WHOLE
         // transaction, including the lock deletion above, so the account keeps its position
         // instead of losing it silently.
-        uint256 balanceBefore = IERC20(rVirtualToken).balanceOf(account);
+        uint256 balanceBefore = IERC20(agVirtToken).balanceOf(account);
 
-        IERC20(baseToken).forceApprove(rVirtualConverter, amount);
-        IRVirtualConverter(rVirtualConverter).convertVirtualToRVirtual(
+        IERC20(baseToken).forceApprove(agVirtConverter, amount);
+        IAgVirtConverter(agVirtConverter).convertVirtualToAgVirt(
             amount,
             account
         );
         // Clear the allowance regardless of whether the converter consumed it (audit I-04) -
         // a converter that doesn't pull the funds would otherwise leave the permission
         // standing indefinitely, including after a later repoint to a different converter.
-        IERC20(baseToken).forceApprove(rVirtualConverter, 0);
+        IERC20(baseToken).forceApprove(agVirtConverter, 0);
 
         require(
-            IERC20(rVirtualToken).balanceOf(account) - balanceBefore == amount,
+            IERC20(agVirtToken).balanceOf(account) - balanceBefore == amount,
             "Conversion shortfall"
         );
 
-        emit ConvertedVeVirtualToRVirtual(account, id, amount);
+        emit ConvertedVeVirtualToAgVirt(account, id, amount);
         _transferVotingUnits(account, address(0), amount);
     }
 }

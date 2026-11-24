@@ -4,7 +4,7 @@ pragma solidity ^0.8.20;
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 
 /// @notice TEST-ONLY mock modeling a fee-on-transfer / tax token, used to simulate the
-///         real rVirtual (GodToken)'s configurable transfer tax for security PoC purposes
+///         real agVirt (GodToken)'s configurable transfer tax for security PoC purposes
 ///         (see verify_H-2.js). NOT used in production - lives under contracts/token/mocks
 ///         solely to be reachable by Hardhat's compiler for the test.
 ///

@@ -4,7 +4,7 @@ pragma solidity ^0.8.20;
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 
 /// @notice Minimal mock ERC20 with 6 decimals (like USDC), used ONLY to verify H-3
-/// (RVirtualConverter never asserts rVirtualToken.decimals() == 18).
+/// (AgVirtConverter never asserts agVirtToken.decimals() == 18).
 contract MockERC20SixDecimals is ERC20 {
     constructor(
         string memory name,
